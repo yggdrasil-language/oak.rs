@@ -195,6 +195,7 @@ fn keyword_or_ident(text: &str) -> MetisTokenType {
         "island" => MetisTokenType::KwIsland,
         "namespace" => MetisTokenType::KwNamespace,
         "use" => MetisTokenType::KwUse,
+        "using" => MetisTokenType::KwUsing,
         "node" => MetisTokenType::KwNode,
         "relation" => MetisTokenType::KwRelation,
         "axiom" => MetisTokenType::KwAxiom,

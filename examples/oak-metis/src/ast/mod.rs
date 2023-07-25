@@ -18,19 +18,23 @@ impl MetisRoot {
 /// Compilation unit: islands and top-level actions.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Module {
+    /// Top-level `using Path` entries (name resolution only; no math).
+    pub usings: Vec<String>,
     /// `island` declarations.
     pub islands: Vec<Island>,
     /// Top-level `action` blocks.
     pub actions: Vec<Action>,
 }
 
-/// `island Name { ... }`.
+/// `island Name { ... }` or `island Name : Base { ... }`.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Island {
     /// Optional `namespace path::…` prefix applied to this island.
     pub namespace: Option<String>,
     /// Island name.
     pub name: String,
+    /// Optional single-base extension (`island C : B`).
+    pub extends: Option<String>,
     /// Body items.
     pub items: Vec<Item>,
 }
@@ -38,7 +42,7 @@ pub struct Island {
 /// Island body item.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Item {
-    /// `use OtherIsland`
+    /// Island-body `use OtherIsland` (legacy; prefer `island C : B` / top-level `using`).
     Use(String),
     /// `node Name`
     Node(String),

@@ -53,6 +53,7 @@ impl Parser {
     }
 
     fn parse_module(&mut self) -> Result<Module, String> {
+        let mut usings = Vec::new();
         let mut islands = Vec::new();
         let mut actions = Vec::new();
         let mut current_ns: Option<String> = None;
@@ -60,6 +61,9 @@ impl Parser {
             match k {
                 MetisTokenType::KwNamespace => {
                     current_ns = Some(self.parse_namespace()?);
+                }
+                MetisTokenType::KwUsing => {
+                    usings.push(self.parse_using()?);
                 }
                 MetisTokenType::KwIsland => {
                     let mut island = self.parse_island()?;
@@ -73,7 +77,12 @@ impl Parser {
                         island.items.push(Item::Rewrites(rw));
                     }
                     else {
-                        islands.push(Island { namespace: current_ns.clone(), name: "_".into(), items: vec![Item::Rewrites(rw)] });
+                        islands.push(Island {
+                            namespace: current_ns.clone(),
+                            name: "_".into(),
+                            extends: None,
+                            items: vec![Item::Rewrites(rw)],
+                        });
                     }
                 }
                 MetisTokenType::KwConnection => {
@@ -82,18 +91,32 @@ impl Parser {
                         island.items.push(Item::Connection(c));
                     }
                     else {
-                        islands.push(Island { namespace: current_ns.clone(), name: "_".into(), items: vec![Item::Connection(c)] });
+                        islands.push(Island {
+                            namespace: current_ns.clone(),
+                            name: "_".into(),
+                            extends: None,
+                            items: vec![Item::Connection(c)],
+                        });
                     }
                 }
-                other => return Err(format!("expected namespace/island/action/rewrites/connection, got {other:?}")),
+                other => return Err(format!("expected namespace/using/island/action/rewrites/connection, got {other:?}")),
             }
         }
-        Ok(Module { islands, actions })
+        Ok(Module { usings, islands, actions })
     }
 
     fn parse_namespace(&mut self) -> Result<String, String> {
         self.expect(MetisTokenType::KwNamespace)?;
-        self.parse_path_string()
+        let path = self.parse_path_string()?;
+        self.maybe_semi();
+        Ok(path)
+    }
+
+    fn parse_using(&mut self) -> Result<String, String> {
+        self.expect(MetisTokenType::KwUsing)?;
+        let path = self.parse_path_string()?;
+        self.maybe_semi();
+        Ok(path)
     }
 
     fn skip_attrs(&mut self) -> Result<(), String> {
@@ -124,6 +147,13 @@ impl Parser {
     fn parse_island(&mut self) -> Result<Island, String> {
         self.expect(MetisTokenType::KwIsland)?;
         let name = self.expect_ident()?;
+        let extends = if self.peek_kind() == Some(MetisTokenType::Colon) {
+            self.bump()?;
+            Some(self.expect_ident()?)
+        }
+        else {
+            None
+        };
         self.expect(MetisTokenType::LBrace)?;
         let mut items = Vec::new();
         while self.peek_kind() != Some(MetisTokenType::RBrace) {
@@ -131,7 +161,7 @@ impl Parser {
             items.push(self.parse_item()?);
         }
         self.expect(MetisTokenType::RBrace)?;
-        Ok(Island { namespace: None, name, items })
+        Ok(Island { namespace: None, name, extends, items })
     }
 
     fn parse_item(&mut self) -> Result<Item, String> {

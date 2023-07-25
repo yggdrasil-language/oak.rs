@@ -119,4 +119,38 @@ island X {
 "#;
         assert!(parse_module(src).is_err());
     }
+
+    #[test]
+    fn lexes_using_keyword() {
+        let toks = lex_stub("using std::algebra::GroupTheory").expect("lex");
+        assert_eq!(toks[0], MetisTokenType::KwUsing);
+    }
+
+    #[test]
+    fn parses_top_level_using_and_single_base_extension() {
+        let src = r#"
+namespace std::algebra
+using std::algebra::GroupTheory
+
+island GroupTheory {
+    node Element
+}
+
+island AbelianGroup : GroupTheory {
+    axiom MultiplicationCommutative {
+        forall (a: Element, b: Element)
+        (
+            a == b
+        )
+    }
+}
+"#;
+        let m = parse_module(src).expect("parse");
+        assert_eq!(m.usings, vec!["std::algebra::GroupTheory".to_string()]);
+        assert_eq!(m.islands[0].name, "GroupTheory");
+        assert_eq!(m.islands[0].extends, None);
+        assert_eq!(m.islands[1].name, "AbelianGroup");
+        assert_eq!(m.islands[1].extends.as_deref(), Some("GroupTheory"));
+        assert!(m.islands[1].items.iter().any(|i| matches!(i, Item::Axiom(_))));
+    }
 }
