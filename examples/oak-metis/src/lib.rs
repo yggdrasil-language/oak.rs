@@ -153,4 +153,15 @@ island AbelianGroup : GroupTheory {
         assert_eq!(m.islands[1].extends.as_deref(), Some("GroupTheory"));
         assert!(m.islands[1].items.iter().any(|i| matches!(i, Item::Axiom(_))));
     }
+
+    #[test]
+    fn parses_qualified_base_extension_path() {
+        let src = r#"
+using std::algebra::GroupTheory
+island GroupTheory { node Element }
+island AbelianGroup : std::algebra::GroupTheory { node Element }
+"#;
+        let m = parse_module(src).expect("parse");
+        assert_eq!(m.islands[1].extends.as_deref(), Some("std::algebra::GroupTheory"));
+    }
 }

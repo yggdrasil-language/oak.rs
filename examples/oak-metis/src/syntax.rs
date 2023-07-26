@@ -149,7 +149,7 @@ impl Parser {
         let name = self.expect_ident()?;
         let extends = if self.peek_kind() == Some(MetisTokenType::Colon) {
             self.bump()?;
-            Some(self.expect_ident()?)
+            Some(self.parse_path_string()?)
         }
         else {
             None
