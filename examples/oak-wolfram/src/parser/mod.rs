@@ -230,8 +230,11 @@ impl<'config> Pratt<WolframLanguage> for WolframParser<'config> {
         };
 
         let info = match kind {
-            WolframTokenType::Minus => Some(OperatorInfo::right(150)),     // Unary minus
-            WolframTokenType::Factorial => Some(OperatorInfo::right(150)), // ! (Not)
+            // Unary Minus sits between Times (90) and Power (120), matching Wolfram:
+            // `-x^2` → Times[-1, Power[x, 2]], not Power[Times[-1, x], 2].
+            WolframTokenType::Minus => Some(OperatorInfo::right(100)),
+            // Logical Not (`!x`) stays below relational ops.
+            WolframTokenType::Factorial => Some(OperatorInfo::right(65)),
             _ => None,
         };
 
@@ -288,12 +291,52 @@ impl<'config> Pratt<WolframLanguage> for WolframParser<'config> {
             WolframTokenType::MapAllOperator => Some(OperatorInfo::right(110)),     // f //@ list
             WolframTokenType::Power => Some(OperatorInfo::right(120)),
             _ => None,
-        }?;
+        };
 
-        if info.precedence < min_precedence {
-            return None;
+        if let Some(info) = info {
+            if info.precedence < min_precedence {
+                return None;
+            }
+            return Some(binary(state, left, kind, info.precedence, info.associativity, WolframElementType::BinaryExpr, |s, p| {
+                self.parse_pratt(s, p)
+            }));
         }
 
-        Some(binary(state, left, kind, info.precedence, info.associativity, WolframElementType::BinaryExpr, |s, p| self.parse_pratt(s, p)))
+        // Implicit Times: `x y`, `2 x`, `Sin[x] Cos[x]` (Wolfram juxtaposition).
+        const TIMES_PREC: u8 = 90;
+        if TIMES_PREC >= min_precedence && Self::can_start_juxtaposition(state.peek_kind()) {
+            let cp = state.checkpoint_before(left);
+            let _right = self.parse_pratt(state, TIMES_PREC + 1);
+            return Some(state.finish_at(cp, WolframElementType::BinaryExpr));
+        }
+
+        None
+    }
+}
+
+impl<'config> WolframParser<'config> {
+    /// Tokens that may begin a primary after juxtaposition (no leading infix op).
+    fn can_start_juxtaposition(kind: Option<WolframTokenType>) -> bool {
+        let Some(kind) = kind else {
+            return false;
+        };
+        if Self::is_symbol_token(kind) {
+            return true;
+        }
+        matches!(
+            kind,
+            WolframTokenType::Integer
+                | WolframTokenType::Real
+                | WolframTokenType::String
+                | WolframTokenType::LeftBrace
+                | WolframTokenType::LeftParen
+                | WolframTokenType::Slot
+                | WolframTokenType::SlotSequence
+                | WolframTokenType::Underscore
+                | WolframTokenType::DoubleUnderscore
+                | WolframTokenType::TripleUnderscore
+                | WolframTokenType::Minus // `-y` after `x` → Times[x, Times[-1, y]]
+                | WolframTokenType::Factorial // `!p` after `x`
+        )
     }
 }

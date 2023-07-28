@@ -155,7 +155,8 @@ impl<'config> WolframBuilder<'config> {
         }
         let lhs = lhs.ok_or_else(|| source.syntax_error("Binary missing lhs".into(), span.start))?;
         let rhs = rhs.ok_or_else(|| source.syntax_error("Binary missing rhs".into(), span.start))?;
-        let operator = operator.ok_or_else(|| source.syntax_error("Binary missing operator".into(), span.start))?;
+        // Juxtaposition builds BinaryExpr without a Times leaf token.
+        let operator = operator.unwrap_or(WolframTokenType::Times);
         Ok(Expression::Binary(Box::new(BinaryExpr { operator, lhs, rhs, span })))
     }
 

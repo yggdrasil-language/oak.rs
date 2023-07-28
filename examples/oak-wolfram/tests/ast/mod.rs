@@ -116,6 +116,76 @@ fn ast_full_form_binary_and_part() {
 }
 
 #[test]
+fn ast_unary_minus_power_precedence() {
+    // `-x^2` must be Times[-1, Power[x, 2]], not Power[Times[-1, x], 2].
+    let ff = build("-x^2").full_form();
+    match &ff.expressions[0] {
+        Expression::Call { head, arguments, .. } => {
+            assert!(matches!(head.as_ref(), Expression::Symbol(id) if id.name == "Times"));
+            assert_eq!(arguments.len(), 2);
+            match &arguments[1] {
+                Expression::Call { head, arguments: pow_args, .. } => {
+                    assert!(matches!(head.as_ref(), Expression::Symbol(id) if id.name == "Power"));
+                    assert_eq!(pow_args.len(), 2);
+                }
+                other => panic!("expected Power rhs, got {other:?}"),
+            }
+        }
+        other => panic!("expected Times Call, got {other:?}"),
+    }
+
+    let paren = build("(-x)^2").full_form();
+    match &paren.expressions[0] {
+        Expression::Call { head, .. } => {
+            assert!(matches!(head.as_ref(), Expression::Symbol(id) if id.name == "Power"));
+        }
+        other => panic!("expected Power, got {other:?}"),
+    }
+
+    let exp = build("Exp[-x^2]").full_form();
+    match &exp.expressions[0] {
+        Expression::Call { head, arguments, .. } => {
+            assert!(matches!(head.as_ref(), Expression::Symbol(id) if id.name == "Exp"));
+            match &arguments[0] {
+                Expression::Call { head, arguments: targs, .. } => {
+                    assert!(matches!(head.as_ref(), Expression::Symbol(id) if id.name == "Times"));
+                    assert!(
+                        matches!(&targs[1], Expression::Call { head, .. } if matches!(head.as_ref(), Expression::Symbol(id) if id.name == "Power"))
+                    );
+                }
+                other => panic!("expected Times inside Exp, got {other:?}"),
+            }
+        }
+        other => panic!("expected Exp Call, got {other:?}"),
+    }
+}
+
+#[test]
+fn ast_implicit_times_and_d_arity() {
+    let times = build("x y").full_form();
+    match &times.expressions[0] {
+        Expression::Call { head, arguments, .. } => {
+            assert!(matches!(head.as_ref(), Expression::Symbol(id) if id.name == "Times"));
+            assert_eq!(arguments.len(), 2);
+        }
+        other => panic!("expected Times, got {other:?}"),
+    }
+
+    let d = build("D[x y, x]");
+    match &d.expressions[0] {
+        Expression::Call { head, arguments, .. } => {
+            assert!(matches!(head.as_ref(), Expression::Symbol(id) if id.name == "D"));
+            assert_eq!(arguments.len(), 2, "D[x y, x] must keep two args, got {arguments:?}");
+            match &arguments[0] {
+                Expression::Binary(bin) => assert_eq!(bin.operator, WolframTokenType::Times),
+                other => panic!("expected Times binary first arg, got {other:?}"),
+            }
+        }
+        other => panic!("expected D Call, got {other:?}"),
+    }
+}
+
+#[test]
 fn ast_full_form_pattern_and_if_call() {
     let root = build("x_").full_form();
     match &root.expressions[0] {
