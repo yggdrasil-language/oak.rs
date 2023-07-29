@@ -42,6 +42,18 @@ pub enum Statement {
         #[cfg_attr(feature = "serde", serde(with = "oak_core::serde_range"))]
         span: Span,
     },
+    /// `switch … case … otherwise … end`.
+    Switch {
+        /// Discriminant expression.
+        discriminant: Expression,
+        /// `case` arms `(value, body)`.
+        cases: Vec<(Expression, Vec<Statement>)>,
+        /// Optional `otherwise` body.
+        otherwise: Vec<Statement>,
+        /// Source span.
+        #[cfg_attr(feature = "serde", serde(with = "oak_core::serde_range"))]
+        span: Span,
+    },
     /// `try … catch … end`.
     Try {
         /// Protected body.
@@ -67,7 +79,12 @@ impl Statement {
     pub fn span(&self) -> Span {
         match self {
             Self::Expr(e) => e.span(),
-            Self::If { span, .. } | Self::While { span, .. } | Self::For { span, .. } | Self::Try { span, .. } | Self::Error { span } => span.clone(),
+            Self::If { span, .. }
+            | Self::While { span, .. }
+            | Self::For { span, .. }
+            | Self::Switch { span, .. }
+            | Self::Try { span, .. }
+            | Self::Error { span } => span.clone(),
         }
     }
 
@@ -103,6 +120,18 @@ impl Statement {
         }
     }
 
+    /// `switch` statement parts.
+    pub fn as_switch(&self) -> Option<SwitchView<'_>> {
+        match self {
+            Self::Switch { discriminant, cases, otherwise, .. } => Some(SwitchView {
+                discriminant,
+                cases: cases.as_slice(),
+                otherwise: otherwise.as_slice(),
+            }),
+            _ => None,
+        }
+    }
+
     /// `try` / `catch` statement parts.
     pub fn as_try(&self) -> Option<TryView<'_>> {
         match self {
@@ -128,6 +157,17 @@ pub struct IfView<'a> {
     pub elseifs: &'a [(Expression, Vec<Statement>)],
     /// Else body.
     pub else_body: &'a [Statement],
+}
+
+/// Typed view over a `switch` statement.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct SwitchView<'a> {
+    /// Discriminant expression.
+    pub discriminant: &'a Expression,
+    /// `case` arms.
+    pub cases: &'a [(Expression, Vec<Statement>)],
+    /// `otherwise` body.
+    pub otherwise: &'a [Statement],
 }
 
 /// Typed view over a `try` statement.

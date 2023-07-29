@@ -50,6 +50,7 @@ impl<'config> MatlabParser<'config> {
             Some(MatlabTokenType::If) => self.parse_if(state),
             Some(MatlabTokenType::While) => self.parse_while(state),
             Some(MatlabTokenType::For) => self.parse_for(state),
+            Some(MatlabTokenType::Switch) => self.parse_switch(state),
             Some(MatlabTokenType::Try) => self.parse_try(state),
             _ => self.parse_expression(state),
         }
@@ -124,6 +125,42 @@ impl<'config> MatlabParser<'config> {
             state.bump();
         }
         state.finish_at(checkpoint, MatlabElementType::ForStmt)
+    }
+
+    fn parse_switch<'a, S: Source + ?Sized>(&self, state: &mut State<'a, S>) -> &'a GreenNode<'a, MatlabLanguage> {
+        let checkpoint = state.checkpoint();
+        state.bump(); // switch
+        self.parse_expression(state); // discriminant
+        self.skip_statement_separators(state);
+        while state.at(MatlabTokenType::Case) {
+            state.bump();
+            self.parse_expression(state); // case value
+            self.parse_switch_arm_body(state);
+        }
+        if state.at(MatlabTokenType::Otherwise) {
+            state.bump();
+            self.parse_switch_arm_body(state);
+        }
+        if state.at(MatlabTokenType::End) {
+            state.bump();
+        }
+        state.finish_at(checkpoint, MatlabElementType::SwitchStmt)
+    }
+
+    fn parse_switch_arm_body<'a, S: Source + ?Sized>(&self, state: &mut State<'a, S>) {
+        self.skip_statement_separators(state);
+        while !Self::at_switch_arm_terminator(state) {
+            self.parse_statement(state);
+            self.skip_statement_separators(state);
+        }
+    }
+
+    fn at_switch_arm_terminator(state: &State<'_, impl Source + ?Sized>) -> bool {
+        state.at(MatlabTokenType::Case)
+            || state.at(MatlabTokenType::Otherwise)
+            || state.at(MatlabTokenType::End)
+            || state.at(MatlabTokenType::Eof)
+            || !state.not_at_end()
     }
 
     fn parse_try<'a, S: Source + ?Sized>(&self, state: &mut State<'a, S>) -> &'a GreenNode<'a, MatlabLanguage> {

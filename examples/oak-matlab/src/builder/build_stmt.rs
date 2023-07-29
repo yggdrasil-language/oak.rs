@@ -16,6 +16,15 @@ enum IfPhase {
     Else,
 }
 
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum SwitchPhase {
+    Disc,
+    AfterDisc,
+    CaseValue,
+    CaseBody,
+    Otherwise,
+}
+
 impl<'config> MatlabBuilder<'config> {
     pub(crate) fn build_stmt<S: Source + ?Sized>(&self, node: RedNode<'_, MatlabLanguage>, source: &S) -> Result<Statement, OakError> {
         let span = node.span();
@@ -23,6 +32,7 @@ impl<'config> MatlabBuilder<'config> {
             MatlabElementType::IfStmt => self.build_if(node, source),
             MatlabElementType::WhileStmt => self.build_while(node, source),
             MatlabElementType::ForStmt => self.build_for(node, source),
+            MatlabElementType::SwitchStmt => self.build_switch(node, source),
             MatlabElementType::TryStmt => self.build_try(node, source),
             MatlabElementType::Error => Ok(Statement::Error { span }),
             kind if crate::builder::utils::is_expr_kind(kind) => Ok(Statement::Expr(self.build_expr(node, source)?)),
@@ -114,6 +124,57 @@ impl<'config> MatlabBuilder<'config> {
         }
         let header = header.ok_or_else(|| source.syntax_error("For missing header".into(), span.start))?;
         Ok(Statement::For { header, body, span })
+    }
+
+    fn build_switch<S: Source + ?Sized>(&self, node: RedNode<'_, MatlabLanguage>, source: &S) -> Result<Statement, OakError> {
+        let span = node.span();
+        let mut discriminant = None;
+        let mut cases = Vec::new();
+        let mut otherwise = Vec::new();
+        let mut pending_case: Option<Expression> = None;
+        let mut case_body = Vec::new();
+        let mut phase = SwitchPhase::Disc;
+
+        for child in node.children() {
+            match child {
+                RedTree::Leaf(t) => match t.kind() {
+                    MatlabTokenType::Case => {
+                        if let Some(val) = pending_case.take() {
+                            cases.push((val, std::mem::take(&mut case_body)));
+                        }
+                        phase = SwitchPhase::CaseValue;
+                    }
+                    MatlabTokenType::Otherwise => {
+                        if let Some(val) = pending_case.take() {
+                            cases.push((val, std::mem::take(&mut case_body)));
+                        }
+                        phase = SwitchPhase::Otherwise;
+                    }
+                    _ => {}
+                },
+                RedTree::Node(n) => match phase {
+                    SwitchPhase::Disc => {
+                        discriminant = Some(self.build_expr(n, source)?);
+                        phase = SwitchPhase::AfterDisc;
+                    }
+                    SwitchPhase::AfterDisc => {
+                        // Unexpected node before first case — treat as error recovery skip.
+                    }
+                    SwitchPhase::CaseValue => {
+                        pending_case = Some(self.build_expr(n, source)?);
+                        phase = SwitchPhase::CaseBody;
+                    }
+                    SwitchPhase::CaseBody => case_body.push(self.build_stmt(n, source)?),
+                    SwitchPhase::Otherwise => otherwise.push(self.build_stmt(n, source)?),
+                },
+            }
+        }
+        if let Some(val) = pending_case.take() {
+            cases.push((val, case_body));
+        }
+
+        let discriminant = discriminant.ok_or_else(|| source.syntax_error("Switch missing discriminant".into(), span.start))?;
+        Ok(Statement::Switch { discriminant, cases, otherwise, span })
     }
 
     fn build_try<S: Source + ?Sized>(&self, node: RedNode<'_, MatlabLanguage>, source: &S) -> Result<Statement, OakError> {

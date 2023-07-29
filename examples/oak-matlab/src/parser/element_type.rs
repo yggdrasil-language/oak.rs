@@ -33,6 +33,8 @@ pub enum MatlabElementType {
     WhileStmt,
     /// `for … end` statement.
     ForStmt,
+    /// `switch … end` statement.
+    SwitchStmt,
     /// `try … catch … end` statement.
     TryStmt,
     /// Error node.
