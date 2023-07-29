@@ -31,8 +31,19 @@ Armor=heavy
 }
 
 #[test]
+fn westwood_digit_leading_section_names() {
+    let src = "[VehicleTypes]\n0=MTNK\n[MTNK]\nPrimary=90mm\n[90mm]\nDamage=75\n";
+    let root = parse_with(src, &IniLanguage::westwood()).expect("90mm section");
+    assert!(root.sections.iter().any(|s| s.name == "90mm"));
+    let weapon = root.sections.iter().find(|s| s.name == "90mm").unwrap();
+    assert_eq!(weapon.properties[0].key, "Damage");
+    assert_eq!(weapon.properties[0].value, "75");
+}
+
+#[test]
 fn westwood_preserves_duplicate_keys() {
     let root = parse_with("[D]\nK=first\nK=second\n", &IniLanguage::westwood()).unwrap();
     let values: Vec<_> = root.sections[0].properties.iter().map(|p| p.value.as_str()).collect();
     assert_eq!(values, ["first", "second"]);
 }
+

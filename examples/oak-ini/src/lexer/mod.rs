@@ -221,6 +221,21 @@ impl<'config> IniLexer<'config> {
             return false;
         }
 
+        // Westwood type ids like `90mm` must be one name token, not Integer+Identifier.
+        if self.config.numeric_keys && first.is_ascii_digit() {
+            let mut i = 1usize;
+            while let Some(ch) = state.peek_next_n(i) {
+                if ch.is_ascii_digit() || ch == '.' || ch == 'e' || ch == 'E' || ch == '+' || ch == '-' {
+                    i += 1;
+                    continue;
+                }
+                if ch.is_ascii_alphabetic() || ch == '_' {
+                    return false;
+                }
+                break;
+            }
+        }
+
         // If it's a sign, check if followed by a digit
         if first == '-' || first == '+' {
             if let Some(next) = state.peek_next_n(1) {
@@ -286,8 +301,10 @@ impl<'config> IniLexer<'config> {
             None => return false,
         };
 
-        // Identifiers must start with a letter or underscore
-        if !(ch.is_ascii_alphabetic() || ch == '_') {
+        // Identifiers must start with a letter or underscore.
+        // With `numeric_keys`, also allow digit-leading names such as `90mm`.
+        let digit_ok = self.config.numeric_keys && ch.is_ascii_digit();
+        if !(ch.is_ascii_alphabetic() || ch == '_' || digit_ok) {
             return false;
         }
 
@@ -303,6 +320,12 @@ impl<'config> IniLexer<'config> {
 
         let end = state.get_position();
         let text = state.get_text_in((start..end).into());
+
+        // Pure digits still prefer Integer (lex_number runs first). Digit+letter → Identifier.
+        if text.chars().all(|c| c.is_ascii_digit()) {
+            state.set_position(start);
+            return false;
+        }
 
         // Check if it's a boolean or date-time
         let kind = match text.to_lowercase().as_str() {
