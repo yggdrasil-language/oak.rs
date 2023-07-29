@@ -24,13 +24,17 @@ pub mod mcp;
 /// Parser module.
 pub mod parser;
 
-pub use crate::{ast::IniRoot, builder::IniBuilder, language::IniLanguage, lexer::IniLexer, parser::IniParser};
+pub use crate::{ast::IniRoot, builder::IniBuilder, language::{IniLanguage, IniValueStyle}, lexer::IniLexer, parser::IniParser};
 
-/// Parses an INI string.
+/// Parses an INI string with the default dialect.
 pub fn parse(ini: &str) -> Result<crate::ast::IniRoot, String> {
+    parse_with(ini, &IniLanguage::default())
+}
+
+/// Parses an INI string with an explicit dialect configuration.
+pub fn parse_with(ini: &str, language: &IniLanguage) -> Result<crate::ast::IniRoot, String> {
     use oak_core::{Builder, parser::session::ParseSession, source::SourceText};
-    let language = IniLanguage::default();
-    let builder = IniBuilder::new(&language);
+    let builder = IniBuilder::new(language);
     let source = SourceText::new(ini.to_string());
     let mut cache = ParseSession::default();
     let result = builder.build(&source, &[], &mut cache);

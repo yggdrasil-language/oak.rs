@@ -65,7 +65,18 @@ impl<'config> IniBuilder<'config> {
 
         for child in node.children() {
             match child {
-                RedTree::Leaf(t) if t.kind == IniTokenType::Identifier => name = source.get_text_in(t.span.clone().into()).to_string(),
+                RedTree::Node(n) if n.green.kind == IniElementType::Key && name.is_empty() => {
+                    name = source.get_text_in(n.span().into()).trim().to_string();
+                }
+                RedTree::Leaf(t)
+                    if name.is_empty()
+                        && matches!(
+                            t.kind,
+                            IniTokenType::Identifier | IniTokenType::String | IniTokenType::Integer | IniTokenType::Float
+                        ) =>
+                {
+                    name = source.get_text_in(t.span.clone().into()).trim().to_string();
+                }
                 RedTree::Node(n) if n.green.kind == IniElementType::KeyValue => properties.push(self.build_property(n, source)?),
                 _ => {}
             }
@@ -82,10 +93,11 @@ impl<'config> IniBuilder<'config> {
         for child in node.children() {
             if let RedTree::Node(n) = child {
                 if n.green.kind == IniElementType::Key {
-                    key = source.get_text_in(n.span().into()).to_string();
+                    key = source.get_text_in(n.span().into()).trim().to_string();
                 }
                 else if n.green.kind == IniElementType::Value {
-                    value = source.get_text_in(n.span().into()).to_string();
+                    // Trivia after the value token may widen the span; trim line endings for classic INI.
+                    value = source.get_text_in(n.span().into()).trim_end_matches(['\r', '\n']).trim().to_string();
                 }
             }
         }

@@ -23,7 +23,8 @@ pub struct IniLexer<'config> {
 impl<'config> Lexer<IniLanguage> for IniLexer<'config> {
     fn lex<'a, S: Source + ?Sized>(&self, source: &S, _edits: &[oak_core::TextEdit], cache: &'a mut impl LexerCache<IniLanguage>) -> LexOutput<IniLanguage> {
         let mut state: State<'_, S> = State::new(source);
-        let result = self.run(&mut state);
+        let mut pending_line_value = false;
+        let result = self.run(&mut state, &mut pending_line_value);
         if result.is_ok() {
             state.add_eof();
         }
@@ -38,9 +39,15 @@ impl<'config> IniLexer<'config> {
     }
 
     /// The main lexical analysis loop.
-    fn run<'a, S: Source + ?Sized>(&self, state: &mut State<'a, S>) -> Result<(), OakError> {
+    fn run<'a, S: Source + ?Sized>(&self, state: &mut State<'a, S>, pending_line_value: &mut bool) -> Result<(), OakError> {
         while state.not_at_end() {
             let safe_point = state.get_position();
+
+            if *pending_line_value {
+                self.lex_line_remainder_value(state);
+                *pending_line_value = false;
+                continue;
+            }
 
             if self.skip_whitespace(state) {
                 continue;
@@ -66,7 +73,7 @@ impl<'config> IniLexer<'config> {
                 continue;
             }
 
-            if self.lex_punctuation(state) {
+            if self.lex_punctuation(state, pending_line_value) {
                 continue;
             }
 
@@ -74,6 +81,37 @@ impl<'config> IniLexer<'config> {
         }
 
         Ok(())
+    }
+
+    /// After `=` in line-remainder dialect: spaces, then one value token until end of line.
+    fn lex_line_remainder_value<'a, S: Source + ?Sized>(&self, state: &mut State<'a, S>) {
+        // Leading spaces/tabs on the value (not newlines).
+        let ws_start = state.get_position();
+        while let Some(ch) = state.peek() {
+            if ch == ' ' || ch == '\t' || ch == '\r' {
+                state.advance(ch.len_utf8());
+            }
+            else {
+                break;
+            }
+        }
+        if state.get_position() > ws_start {
+            state.add_token(IniTokenType::Whitespace, ws_start, state.get_position());
+        }
+
+        let start = state.get_position();
+        while let Some(ch) = state.peek() {
+            if ch == '\n' {
+                break;
+            }
+            // Inline `;` comment ends the value (Westwood line comment).
+            if ch == ';' {
+                break;
+            }
+            state.advance(ch.len_utf8());
+        }
+        // Always emit a value token (may be empty for `Key=`).
+        state.add_token(IniTokenType::String, start, state.get_position());
     }
 
     /// Skips whitespace characters (excluding newlines).
@@ -113,7 +151,8 @@ impl<'config> IniLexer<'config> {
         let start = state.get_position();
 
         if let Some(ch) = state.current() {
-            if ch == ';' || ch == '#' {
+            let is_comment = ch == ';' || (ch == '#' && self.config.hash_comments);
+            if is_comment {
                 // Skip comment character
                 state.advance(1);
 
@@ -283,7 +322,9 @@ impl<'config> IniLexer<'config> {
     }
 
     /// Handles punctuation
-    fn lex_punctuation<'a, S: Source + ?Sized>(&self, state: &mut State<'a, S>) -> bool {
+    fn lex_punctuation<'a, S: Source + ?Sized>(&self, state: &mut State<'a, S>, pending_line_value: &mut bool) -> bool {
+        use crate::language::IniValueStyle;
+
         let start = state.get_position();
 
         // Match longer symbols first
@@ -313,6 +354,9 @@ impl<'config> IniLexer<'config> {
 
             state.advance(ch.len_utf8());
             state.add_token(kind, start, state.get_position());
+            if kind == IniTokenType::Equal && self.config.value_style == IniValueStyle::LineRemainder {
+                *pending_line_value = true;
+            }
             return true;
         }
 

@@ -2,7 +2,7 @@
 pub mod element_type;
 
 use crate::{
-    language::IniLanguage,
+    language::{IniLanguage, IniValueStyle},
     lexer::{IniLexer, token_type::IniTokenType},
 };
 use oak_core::{
@@ -26,6 +26,10 @@ impl<'config> IniParser<'config> {
         Self { config }
     }
 
+    fn at_stop(&self, state: &State<'_, impl Source + ?Sized>) -> bool {
+        !state.not_at_end() || state.at(IniTokenType::Eof)
+    }
+
     /// Parses an INI table or array of tables.
     pub(crate) fn parse_table<'a, S: Source + ?Sized>(&self, state: &mut State<'a, S>) -> Result<(), oak_core::errors::OakError> {
         let checkpoint = state.checkpoint();
@@ -43,9 +47,9 @@ impl<'config> IniParser<'config> {
         };
 
         // Sections can have key-values following them
-        while state.not_at_end() && !state.at(IniTokenType::LeftBracket) && !state.at(IniTokenType::DoubleLeftBracket) {
+        while !self.at_stop(state) && !state.at(IniTokenType::LeftBracket) && !state.at(IniTokenType::DoubleLeftBracket) {
             self.skip_trivia(state);
-            if !state.not_at_end() || state.at(IniTokenType::LeftBracket) || state.at(IniTokenType::DoubleLeftBracket) {
+            if self.at_stop(state) || state.at(IniTokenType::LeftBracket) || state.at(IniTokenType::DoubleLeftBracket) {
                 break;
             }
             self.parse_key_value(state)?;
@@ -62,7 +66,15 @@ impl<'config> IniParser<'config> {
 
         self.skip_trivia(state);
         state.expect(IniTokenType::Equal)?;
-        self.skip_trivia(state);
+        // Line-remainder values keep the end-of-line boundary; only skip spaces already emitted as trivia before the value token.
+        if self.config.value_style != IniValueStyle::LineRemainder {
+            self.skip_trivia(state);
+        }
+        else {
+            while state.at(IniTokenType::Whitespace) {
+                state.bump();
+            }
+        }
 
         self.parse_value(state)?;
 
@@ -75,14 +87,14 @@ impl<'config> IniParser<'config> {
         let checkpoint = state.checkpoint();
         // Support dotted keys: a.b.c
         loop {
-            if state.at(IniTokenType::Identifier) {
+            if state.at(IniTokenType::Identifier) || state.at(IniTokenType::String) {
                 state.bump();
             }
-            else if state.at(IniTokenType::String) {
+            else if self.config.numeric_keys && (state.at(IniTokenType::Integer) || state.at(IniTokenType::Float)) {
                 state.bump();
             }
             else {
-                let err = oak_core::errors::OakError::expected_token("identifier or string", state.tokens.index(), state.source_id());
+                let err = oak_core::errors::OakError::expected_token("identifier or string", state.current_offset(), state.source_id());
                 state.errors.push(err);
                 return Err(state.errors.last().unwrap().clone());
             }
@@ -103,6 +115,23 @@ impl<'config> IniParser<'config> {
     /// Parses an INI value.
     fn parse_value<'a, S: Source + ?Sized>(&self, state: &mut State<'a, S>) -> Result<(), oak_core::errors::OakError> {
         let checkpoint = state.checkpoint();
+        if self.config.value_style == IniValueStyle::LineRemainder {
+            // Lexer emits a single String token (possibly empty) for the line remainder.
+            if state.at(IniTokenType::String) {
+                state.bump();
+            }
+            else if self.at_stop(state) || state.at(IniTokenType::Newline) {
+                // `Key=` with nothing before EOF/newline — empty value node.
+            }
+            else {
+                let err = oak_core::errors::OakError::expected_token("line value", state.current_offset(), state.source_id());
+                state.errors.push(err);
+                return Err(state.errors.last().unwrap().clone());
+            }
+            state.finish_at(checkpoint, element_type::IniElementType::Value);
+            return Ok(());
+        }
+
         let kind = state.peek_kind().ok_or_else(|| {
             let err = oak_core::errors::OakError::unexpected_eof(state.tokens.index(), state.source_id());
             state.errors.push(err);
@@ -120,7 +149,7 @@ impl<'config> IniParser<'config> {
                 self.parse_inline_table(state)?;
             }
             _ => {
-                let err = oak_core::errors::OakError::expected_token("value", state.tokens.index(), state.source_id());
+                let err = oak_core::errors::OakError::expected_token("value", state.current_offset(), state.source_id());
                 state.errors.push(err);
                 return Err(state.errors.last().unwrap().clone());
             }
@@ -136,7 +165,7 @@ impl<'config> IniParser<'config> {
         state.expect(IniTokenType::LeftBracket)?;
         self.skip_trivia(state);
 
-        while state.not_at_end() && !state.at(IniTokenType::RightBracket) {
+        while !self.at_stop(state) && !state.at(IniTokenType::RightBracket) {
             self.parse_value(state)?;
             self.skip_trivia(state);
             if state.at(IniTokenType::Comma) {
@@ -156,7 +185,7 @@ impl<'config> IniParser<'config> {
         state.expect(IniTokenType::LeftBrace)?;
         self.skip_trivia(state);
 
-        while state.not_at_end() && !state.at(IniTokenType::RightBrace) {
+        while !self.at_stop(state) && !state.at(IniTokenType::RightBrace) {
             self.parse_key_value(state)?;
             self.skip_trivia(state);
             if state.at(IniTokenType::Comma) {
@@ -172,7 +201,7 @@ impl<'config> IniParser<'config> {
 
     /// Skips trivia (whitespace, newlines, comments).
     fn skip_trivia<'a, S: Source + ?Sized>(&self, state: &mut State<'a, S>) {
-        while state.not_at_end() {
+        while !self.at_stop(state) {
             let kind = match state.peek_kind() {
                 Some(k) => k,
                 None => break,
@@ -193,13 +222,18 @@ impl<'config> Parser<IniLanguage> for IniParser<'config> {
         let lexer = IniLexer::new(self.config);
         parse_with_lexer(&lexer, text, edits, cache, |state| {
             let checkpoint = state.checkpoint();
-            while state.not_at_end() {
+            while !self.at_stop(state) {
                 self.skip_trivia(state);
-                if !state.not_at_end() {
+                if self.at_stop(state) {
                     break;
                 }
 
-                if state.at(IniTokenType::LeftBracket) || state.at(IniTokenType::DoubleLeftBracket) { self.parse_table(state)? } else { self.parse_key_value(state)? }
+                if state.at(IniTokenType::LeftBracket) || state.at(IniTokenType::DoubleLeftBracket) {
+                    self.parse_table(state)?
+                }
+                else {
+                    self.parse_key_value(state)?
+                }
             }
 
             Ok(state.finish_at(checkpoint, element_type::IniElementType::Root))
