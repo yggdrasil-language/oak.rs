@@ -10,5 +10,17 @@ pub(crate) fn is_trivia(node: &RedTree<'_, MatlabLanguage>) -> bool {
 }
 
 pub(crate) fn is_expr_kind(kind: MatlabElementType) -> bool {
-    matches!(kind, MatlabElementType::Expression | MatlabElementType::Symbol | MatlabElementType::Literal | MatlabElementType::Array | MatlabElementType::Call | MatlabElementType::BinaryExpr | MatlabElementType::PrefixExpr | MatlabElementType::PostfixExpr)
+    matches!(
+        kind,
+        MatlabElementType::Expression
+            | MatlabElementType::Symbol
+            | MatlabElementType::Literal
+            | MatlabElementType::Array
+            | MatlabElementType::Call
+            | MatlabElementType::BinaryExpr
+            | MatlabElementType::PrefixExpr
+            | MatlabElementType::PostfixExpr
+            | MatlabElementType::AnonymousFunction
+            | MatlabElementType::FunctionHandle
+    )
 }

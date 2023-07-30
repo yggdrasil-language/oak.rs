@@ -18,6 +18,8 @@ impl<'config> MatlabBuilder<'config> {
             MatlabElementType::BinaryExpr => self.build_binary(node, source),
             MatlabElementType::PrefixExpr => self.build_prefix(node, source),
             MatlabElementType::PostfixExpr => self.build_postfix(node, source),
+            MatlabElementType::AnonymousFunction => self.build_anonymous_function(node, source),
+            MatlabElementType::FunctionHandle => self.build_function_handle(node, source),
             MatlabElementType::Expression => {
                 let mut inner = None;
                 for child in node.children() {
@@ -187,5 +189,51 @@ impl<'config> MatlabBuilder<'config> {
         let operator = operator.ok_or_else(|| source.syntax_error("Postfix missing operator".into(), span.start))?;
         let operand = operand.ok_or_else(|| source.syntax_error("Postfix missing operand".into(), span.start))?;
         Ok(Expression::Postfix(Box::new(UnaryExpr { operator, operand, span })))
+    }
+
+    fn build_anonymous_function<S: Source + ?Sized>(&self, node: RedNode<'_, MatlabLanguage>, source: &S) -> Result<Expression, OakError> {
+        let span = node.span();
+        let mut parameters = Vec::new();
+        let mut body = None;
+        for child in node.children() {
+            if utils::is_trivia(&child) {
+                continue;
+            }
+            match child {
+                RedTree::Node(n) if n.element_type() == MatlabElementType::Arguments => {
+                    parameters = self.build_arguments(n, source)?;
+                }
+                RedTree::Node(n) => {
+                    // First non-Arguments node after params is the body.
+                    if body.is_none() {
+                        body = Some(self.build_expr(n, source)?);
+                    }
+                }
+                _ => {}
+            }
+        }
+        let body = body.ok_or_else(|| source.syntax_error("Anonymous function missing body".into(), span.start))?;
+        Ok(Expression::AnonymousFunction { parameters, body: Box::new(body), span })
+    }
+
+    fn build_function_handle<S: Source + ?Sized>(&self, node: RedNode<'_, MatlabLanguage>, source: &S) -> Result<Expression, OakError> {
+        let span = node.span();
+        let mut target = None;
+        for child in node.children() {
+            if utils::is_trivia(&child) {
+                continue;
+            }
+            match child {
+                RedTree::Leaf(t) if t.kind() == MatlabTokenType::Identifier && target.is_none() => {
+                    target = Some(Expression::Symbol(Identifier { name: text(source, t.span()), span: t.span() }));
+                }
+                RedTree::Node(n) if target.is_none() => {
+                    target = Some(self.build_expr(n, source)?);
+                }
+                _ => {}
+            }
+        }
+        let target = target.ok_or_else(|| source.syntax_error("Function handle missing target".into(), span.start))?;
+        Ok(Expression::FunctionHandle { target: Box::new(target), span })
     }
 }

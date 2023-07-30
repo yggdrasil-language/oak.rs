@@ -37,6 +37,10 @@ pub enum MatlabElementType {
     SwitchStmt,
     /// `try … catch … end` statement.
     TryStmt,
+    /// `@(x,y) expr` anonymous function.
+    AnonymousFunction,
+    /// `@name` function handle reference.
+    FunctionHandle,
     /// Error node.
     Error,
 }

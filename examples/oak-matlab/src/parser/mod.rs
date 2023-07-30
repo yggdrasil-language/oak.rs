@@ -217,6 +217,27 @@ impl<'config> MatlabParser<'config> {
         }
         state.finish_at(checkpoint, MatlabElementType::Array)
     }
+
+    /// `@sin` or `@(x,y) body`.
+    fn parse_at_expr<'a, S: Source + ?Sized>(&self, state: &mut State<'a, S>) -> &'a GreenNode<'a, MatlabLanguage> {
+        let checkpoint = state.checkpoint();
+        state.bump(); // @
+        if state.at(MatlabTokenType::LeftParen) {
+            self.parse_call_args(state); // parameters
+            self.parse_pratt(state, 0); // body
+            state.finish_at(checkpoint, MatlabElementType::AnonymousFunction)
+        }
+        else {
+            // `@name` — primary name / call target without consuming trailing `(args)` as the handle itself.
+            if state.at(MatlabTokenType::Identifier) {
+                state.bump();
+            }
+            else {
+                self.primary(state);
+            }
+            state.finish_at(checkpoint, MatlabElementType::FunctionHandle)
+        }
+    }
 }
 
 impl<'config> Pratt<MatlabLanguage> for MatlabParser<'config> {
@@ -248,6 +269,9 @@ impl<'config> Pratt<MatlabLanguage> for MatlabParser<'config> {
             // Lone `:` in subsref means "all" (e.g. `A(1,:)`).
             state.bump();
             state.finish_at(checkpoint, MatlabElementType::Symbol)
+        }
+        else if state.at(MatlabTokenType::At) {
+            self.parse_at_expr(state)
         }
         else if state.at(MatlabTokenType::Number) || state.at(MatlabTokenType::String) || state.at(MatlabTokenType::Character) {
             state.bump();

@@ -51,6 +51,24 @@ pub enum Expression {
         #[cfg_attr(feature = "serde", serde(with = "oak_core::serde_range"))]
         span: Span,
     },
+    /// `@(x, y) body` anonymous function.
+    AnonymousFunction {
+        /// Parameter expressions (typically symbols).
+        parameters: Vec<Expression>,
+        /// Function body.
+        body: Box<Expression>,
+        /// Source span.
+        #[cfg_attr(feature = "serde", serde(with = "oak_core::serde_range"))]
+        span: Span,
+    },
+    /// `@sin` / `@name` function handle.
+    FunctionHandle {
+        /// Target name / expression.
+        target: Box<Expression>,
+        /// Source span.
+        #[cfg_attr(feature = "serde", serde(with = "oak_core::serde_range"))]
+        span: Span,
+    },
 }
 
 /// Binary operator application.
@@ -86,7 +104,12 @@ impl Expression {
     pub fn span(&self) -> Span {
         match self {
             Self::Symbol(id) => id.span.clone(),
-            Self::Literal { span, .. } | Self::Array { span, .. } | Self::Call { span, .. } | Self::Grouped { span, .. } => span.clone(),
+            Self::Literal { span, .. }
+            | Self::Array { span, .. }
+            | Self::Call { span, .. }
+            | Self::Grouped { span, .. }
+            | Self::AnonymousFunction { span, .. }
+            | Self::FunctionHandle { span, .. } => span.clone(),
             Self::Binary(b) => b.span.clone(),
             Self::Prefix(u) | Self::Postfix(u) => u.span.clone(),
         }
