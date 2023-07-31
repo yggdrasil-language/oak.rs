@@ -1,0 +1,26 @@
+[package]
+name = "oak-athena"
+version.workspace = true
+authors.workspace = true
+description = "Athena expression-language parser for Oak (renamed from oak-simple-math). Lowercase calls, lists, dicts."
+edition.workspace = true
+license.workspace = true
+homepage.workspace = true
+repository = "https://github.com/ygg-lang/oaks/tree/master/examples/oak-athena"
+documentation = "https://docs.rs/oak-athena"
+categories = ["parsing"]
+keywords = ["parser", "athena", "simple-math", "dsl", "symbolic", "oak"]
+
+[dependencies]
+oak-core = { workspace = true }
+serde = { workspace = true, optional = true }
+
+[dev-dependencies]
+oak-testing = { workspace = true }
+
+[features]
+default = ["serde"]
+serde = ["dep:serde", "oak-core/serde"]
+
+[package.metadata.docs.rs]
+all-features = true
