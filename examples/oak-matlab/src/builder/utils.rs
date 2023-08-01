@@ -16,6 +16,7 @@ pub(crate) fn is_expr_kind(kind: MatlabElementType) -> bool {
             | MatlabElementType::Symbol
             | MatlabElementType::Literal
             | MatlabElementType::Array
+            | MatlabElementType::CellArray
             | MatlabElementType::Call
             | MatlabElementType::BinaryExpr
             | MatlabElementType::PrefixExpr

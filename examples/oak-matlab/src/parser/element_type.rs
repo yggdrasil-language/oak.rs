@@ -21,6 +21,8 @@ pub enum MatlabElementType {
     Arguments,
     /// `[a, b]` array / row.
     Array,
+    /// `{a, b}` cell array / row.
+    CellArray,
     /// Binary operator application.
     BinaryExpr,
     /// Prefix operator application.

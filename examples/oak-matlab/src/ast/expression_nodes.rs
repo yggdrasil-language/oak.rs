@@ -27,6 +27,14 @@ pub enum Expression {
         #[cfg_attr(feature = "serde", serde(with = "oak_core::serde_range"))]
         span: Span,
     },
+    /// Cell array `{…}` with row groups (distinct from numeric/matrix `Array`).
+    CellArray {
+        /// Rows of cell elements.
+        rows: Vec<Vec<Expression>>,
+        /// Source span.
+        #[cfg_attr(feature = "serde", serde(with = "oak_core::serde_range"))]
+        span: Span,
+    },
     /// Call / indexing `f(…)` / `A(…)`.
     Call {
         /// Head expression.
@@ -106,6 +114,7 @@ impl Expression {
             Self::Symbol(id) => id.span.clone(),
             Self::Literal { span, .. }
             | Self::Array { span, .. }
+            | Self::CellArray { span, .. }
             | Self::Call { span, .. }
             | Self::Grouped { span, .. }
             | Self::AnonymousFunction { span, .. }
@@ -135,6 +144,14 @@ impl Expression {
     pub fn as_array(&self) -> Option<&[Vec<Expression>]> {
         match self {
             Self::Array { rows, .. } => Some(rows.as_slice()),
+            _ => None,
+        }
+    }
+
+    /// Cell-array rows (`{…}`).
+    pub fn as_cell_array(&self) -> Option<&[Vec<Expression>]> {
+        match self {
+            Self::CellArray { rows, .. } => Some(rows.as_slice()),
             _ => None,
         }
     }

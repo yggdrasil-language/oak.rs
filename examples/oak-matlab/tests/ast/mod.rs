@@ -82,6 +82,41 @@ fn ast_array_owned() {
 }
 
 #[test]
+fn ast_cell_array_owned() {
+    let root = build("{1, 2}");
+    match &root.items[0] {
+        Statement::Expr(Expression::CellArray { rows, .. }) => {
+            assert_eq!(rows.len(), 1);
+            assert_eq!(rows[0].len(), 2);
+        }
+        other => panic!("expected CellArray, got {other:?}"),
+    }
+}
+
+#[test]
+fn ast_cell_array_in_call_args() {
+    let root = build("cellfun(@numel, {1, 2})");
+    match &root.items[0] {
+        Statement::Expr(Expression::Call { head, arguments, .. }) => {
+            match head.as_ref() {
+                Expression::Symbol(id) => assert_eq!(id.name, "cellfun"),
+                other => panic!("expected cellfun head, got {other:?}"),
+            }
+            assert_eq!(arguments.len(), 2, "cell brace must stay one argument, got {arguments:?}");
+            assert!(matches!(arguments[0], Expression::FunctionHandle { .. }));
+            match &arguments[1] {
+                Expression::CellArray { rows, .. } => {
+                    assert_eq!(rows.len(), 1);
+                    assert_eq!(rows[0].len(), 2);
+                }
+                other => panic!("expected CellArray arg, got {other:?}"),
+            }
+        }
+        other => panic!("expected Call, got {other:?}"),
+    }
+}
+
+#[test]
 fn ast_for_owned() {
     let root = build("for i=1:3, i, end");
     match &root.items[0] {

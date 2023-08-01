@@ -18,6 +18,7 @@ impl HoverProvider<MatlabLanguage> for MatlabHoverProvider {
             MatlabElementType::Root => "### MATLAB Root\nTop-level expression container.",
             MatlabElementType::Call => "### MATLAB Call\nFunction or indexing call `f(…)`.",
             MatlabElementType::Array => "### MATLAB Array\nMatrix / row literal `[…]`.",
+            MatlabElementType::CellArray => "### MATLAB CellArray\nCell array literal `{…}`.",
             MatlabElementType::BinaryExpr => "### MATLAB BinaryExpr\nBinary operator application.",
             MatlabElementType::Symbol => "### MATLAB Symbol\nIdentifier / name.",
             MatlabElementType::Literal => "### MATLAB Literal\nNumber or string literal.",

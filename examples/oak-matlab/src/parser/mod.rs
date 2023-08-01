@@ -218,6 +218,22 @@ impl<'config> MatlabParser<'config> {
         state.finish_at(checkpoint, MatlabElementType::Array)
     }
 
+    /// `{a, b; c}` cell array literal (not matrix `Array`).
+    fn parse_cell_array<'a, S: Source + ?Sized>(&self, state: &mut State<'a, S>) -> &'a GreenNode<'a, MatlabLanguage> {
+        let checkpoint = state.checkpoint();
+        state.bump(); // {
+        while state.not_at(MatlabTokenType::RightBrace) && state.not_at_end() {
+            self.parse_expression(state);
+            if state.at(MatlabTokenType::Comma) || state.at(MatlabTokenType::Semicolon) {
+                state.bump();
+            }
+        }
+        if state.at(MatlabTokenType::RightBrace) {
+            state.bump();
+        }
+        state.finish_at(checkpoint, MatlabElementType::CellArray)
+    }
+
     /// `@sin` or `@(x,y) body`.
     fn parse_at_expr<'a, S: Source + ?Sized>(&self, state: &mut State<'a, S>) -> &'a GreenNode<'a, MatlabLanguage> {
         let checkpoint = state.checkpoint();
@@ -279,6 +295,13 @@ impl<'config> Pratt<MatlabLanguage> for MatlabParser<'config> {
         }
         else if state.at(MatlabTokenType::LeftBracket) {
             let mut node = self.parse_array(state);
+            while state.at(MatlabTokenType::LeftParen) {
+                node = self.parse_paren_postfix(state, node);
+            }
+            node
+        }
+        else if state.at(MatlabTokenType::LeftBrace) {
+            let mut node = self.parse_cell_array(state);
             while state.at(MatlabTokenType::LeftParen) {
                 node = self.parse_paren_postfix(state, node);
             }

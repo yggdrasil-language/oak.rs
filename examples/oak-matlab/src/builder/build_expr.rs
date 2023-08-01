@@ -14,6 +14,7 @@ impl<'config> MatlabBuilder<'config> {
             MatlabElementType::Symbol => self.build_symbol(node, source),
             MatlabElementType::Literal => Ok(Expression::Literal { value: text(source, span.clone()), span }),
             MatlabElementType::Array => self.build_array(node, source),
+            MatlabElementType::CellArray => self.build_cell_array(node, source),
             MatlabElementType::Call => self.build_call(node, source),
             MatlabElementType::BinaryExpr => self.build_binary(node, source),
             MatlabElementType::PrefixExpr => self.build_prefix(node, source),
@@ -71,6 +72,29 @@ impl<'config> MatlabBuilder<'config> {
             rows.pop();
         }
         Ok(Expression::Array { rows, span })
+    }
+
+    fn build_cell_array<S: Source + ?Sized>(&self, node: RedNode<'_, MatlabLanguage>, source: &S) -> Result<Expression, OakError> {
+        let span = node.span();
+        let mut rows: Vec<Vec<Expression>> = vec![Vec::new()];
+        for child in node.children() {
+            if utils::is_trivia(&child) {
+                continue;
+            }
+            match child {
+                RedTree::Leaf(t) if t.kind() == MatlabTokenType::Semicolon => {
+                    rows.push(Vec::new());
+                }
+                RedTree::Leaf(_) => {}
+                RedTree::Node(n) => {
+                    rows.last_mut().unwrap().push(self.build_expr(n, source)?);
+                }
+            }
+        }
+        if rows.last().is_some_and(|r| r.is_empty()) && rows.len() > 1 {
+            rows.pop();
+        }
+        Ok(Expression::CellArray { rows, span })
     }
 
     fn build_call<S: Source + ?Sized>(&self, node: RedNode<'_, MatlabLanguage>, source: &S) -> Result<Expression, OakError> {
