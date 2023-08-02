@@ -39,6 +39,8 @@ pub enum MatlabElementType {
     SwitchStmt,
     /// `try … catch … end` statement.
     TryStmt,
+    /// Command syntax `name arg1 arg2` (no parentheses).
+    CommandStmt,
     /// `@(x,y) expr` anonymous function.
     AnonymousFunction,
     /// `@name` function handle reference.

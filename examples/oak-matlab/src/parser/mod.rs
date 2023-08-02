@@ -52,8 +52,73 @@ impl<'config> MatlabParser<'config> {
             Some(MatlabTokenType::For) => self.parse_for(state),
             Some(MatlabTokenType::Switch) => self.parse_switch(state),
             Some(MatlabTokenType::Try) => self.parse_try(state),
+            Some(MatlabTokenType::Identifier) if Self::looks_like_command(state) => self.parse_command(state),
             _ => self.parse_expression(state),
         }
+    }
+
+    /// Same-line look-ahead that skips only whitespace / comments (not newlines).
+    fn peek_same_line_kind_at(state: &State<'_, impl Source + ?Sized>, mut n: usize) -> Option<MatlabTokenType> {
+        let mut offset = 0;
+        while let Some(token) = state.peek_at(offset) {
+            match token.kind {
+                MatlabTokenType::Whitespace | MatlabTokenType::Comment | MatlabTokenType::BlockComment => {
+                    offset += 1;
+                }
+                MatlabTokenType::Newline => return None,
+                _ => {
+                    if n == 0 {
+                        return Some(token.kind);
+                    }
+                    n -= 1;
+                    offset += 1;
+                }
+            }
+        }
+        None
+    }
+
+    /// Command syntax: `hold on` / `disp 1` — Identifier followed by space-separated arg tokens, not `(…)`.
+    /// Rejects `name id=` so `parfor i=1:n` stays non-command (until `parfor` is a keyword).
+    fn looks_like_command(state: &State<'_, impl Source + ?Sized>) -> bool {
+        if !state.at(MatlabTokenType::Identifier) {
+            return false;
+        }
+        match Self::peek_same_line_kind_at(state, 1) {
+            Some(MatlabTokenType::Identifier) => !matches!(Self::peek_same_line_kind_at(state, 2), Some(MatlabTokenType::Assign)),
+            Some(MatlabTokenType::Number | MatlabTokenType::String | MatlabTokenType::Character) => true,
+            _ => false,
+        }
+    }
+
+    fn at_command_arg(state: &State<'_, impl Source + ?Sized>) -> bool {
+        matches!(
+            Self::peek_same_line_kind_at(state, 0),
+            Some(MatlabTokenType::Identifier | MatlabTokenType::Number | MatlabTokenType::String | MatlabTokenType::Character)
+        )
+    }
+
+    /// `hold on`, `grid minor`, `close all`.
+    fn parse_command<'a, S: Source + ?Sized>(&self, state: &mut State<'a, S>) -> &'a GreenNode<'a, MatlabLanguage> {
+        let checkpoint = state.checkpoint();
+        let name_cp = state.checkpoint();
+        state.bump(); // command name Identifier
+        state.finish_at(name_cp, MatlabElementType::Symbol);
+        while Self::at_command_arg(state) {
+            let arg_cp = state.checkpoint();
+            match state.peek_kind() {
+                Some(MatlabTokenType::Identifier) => {
+                    state.bump();
+                    state.finish_at(arg_cp, MatlabElementType::Symbol);
+                }
+                Some(MatlabTokenType::Number | MatlabTokenType::String | MatlabTokenType::Character) => {
+                    state.bump();
+                    state.finish_at(arg_cp, MatlabElementType::Literal);
+                }
+                _ => break,
+            }
+        }
+        state.finish_at(checkpoint, MatlabElementType::CommandStmt)
     }
 
     fn parse_expression<'a, S: Source + ?Sized>(&self, state: &mut State<'a, S>) -> &'a GreenNode<'a, MatlabLanguage> {

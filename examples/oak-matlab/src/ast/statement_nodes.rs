@@ -66,6 +66,16 @@ pub enum Statement {
         #[cfg_attr(feature = "serde", serde(with = "oak_core::serde_range"))]
         span: Span,
     },
+    /// MATLAB command syntax: `hold on`, `grid minor`, `close all` (space-separated, no `(…)`).
+    Command {
+        /// Command name (`hold`, `grid`, …).
+        name: crate::ast::root_nodes::Identifier,
+        /// Space-separated arguments (identifiers / literals).
+        args: Vec<Expression>,
+        /// Source span.
+        #[cfg_attr(feature = "serde", serde(with = "oak_core::serde_range"))]
+        span: Span,
+    },
     /// Recovery / error node.
     Error {
         /// Source span.
@@ -84,6 +94,7 @@ impl Statement {
             | Self::For { span, .. }
             | Self::Switch { span, .. }
             | Self::Try { span, .. }
+            | Self::Command { span, .. }
             | Self::Error { span } => span.clone(),
         }
     }
@@ -92,6 +103,14 @@ impl Statement {
     pub fn as_expr(&self) -> Option<&Expression> {
         match self {
             Self::Expr(e) => Some(e),
+            _ => None,
+        }
+    }
+
+    /// Command-syntax statement (`hold on`).
+    pub fn as_command(&self) -> Option<(&crate::ast::root_nodes::Identifier, &[Expression])> {
+        match self {
+            Self::Command { name, args, .. } => Some((name, args.as_slice())),
             _ => None,
         }
     }

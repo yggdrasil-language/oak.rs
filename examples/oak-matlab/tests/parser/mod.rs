@@ -92,6 +92,19 @@ fn test_parser_try_catch_end() {
 }
 
 #[test]
+fn test_parser_command_stmt() {
+    assert_has_kind("hold on", MatlabElementType::CommandStmt);
+    assert_has_kind("grid minor", MatlabElementType::CommandStmt);
+    assert_has_kind("disp 1", MatlabElementType::CommandStmt);
+    assert_has_kind("close all;", MatlabElementType::CommandStmt);
+}
+
+#[test]
+fn test_parser_call_not_command() {
+    assert_has_kind("sin(x)", MatlabElementType::Call);
+}
+
+#[test]
 fn test_parser_end_index() {
     assert_has_kind("[1, 2, 3](end)", MatlabElementType::Call);
 }

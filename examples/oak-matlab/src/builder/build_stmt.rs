@@ -34,10 +34,38 @@ impl<'config> MatlabBuilder<'config> {
             MatlabElementType::ForStmt => self.build_for(node, source),
             MatlabElementType::SwitchStmt => self.build_switch(node, source),
             MatlabElementType::TryStmt => self.build_try(node, source),
+            MatlabElementType::CommandStmt => self.build_command(node, source),
             MatlabElementType::Error => Ok(Statement::Error { span }),
             kind if crate::builder::utils::is_expr_kind(kind) => Ok(Statement::Expr(self.build_expr(node, source)?)),
             other => Err(source.syntax_error(format!("Unexpected MATLAB statement kind: {other:?}"), span.start)),
         }
+    }
+
+    fn build_command<S: Source + ?Sized>(&self, node: RedNode<'_, MatlabLanguage>, source: &S) -> Result<Statement, OakError> {
+        let span = node.span();
+        let mut name = None;
+        let mut args = Vec::new();
+        for child in node.children() {
+            if crate::builder::utils::is_trivia(&child) {
+                continue;
+            }
+            let RedTree::Node(n) = child else {
+                continue;
+            };
+            let expr = self.build_expr(n, source)?;
+            if name.is_none() {
+                match expr {
+                    Expression::Symbol(id) => name = Some(id),
+                    other => {
+                        return Err(source.syntax_error(format!("Command name must be a symbol, got {other:?}"), span.start));
+                    }
+                }
+            } else {
+                args.push(expr);
+            }
+        }
+        let name = name.ok_or_else(|| source.syntax_error("Empty command statement".into(), span.start))?;
+        Ok(Statement::Command { name, args, span })
     }
 
     fn build_if<S: Source + ?Sized>(&self, node: RedNode<'_, MatlabLanguage>, source: &S) -> Result<Statement, OakError> {

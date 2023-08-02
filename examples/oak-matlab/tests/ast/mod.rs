@@ -142,6 +142,44 @@ fn ast_try_owned() {
 }
 
 #[test]
+fn ast_command_owned() {
+    let root = build("hold on");
+    assert_eq!(root.items.len(), 1, "command must be one statement, got {root:?}");
+    match &root.items[0] {
+        Statement::Command { name, args, .. } => {
+            assert_eq!(name.name, "hold");
+            assert_eq!(args.len(), 1);
+            match &args[0] {
+                Expression::Symbol(id) => assert_eq!(id.name, "on"),
+                other => panic!("expected symbol arg, got {other:?}"),
+            }
+        }
+        other => panic!("expected Command, got {other:?}"),
+    }
+}
+
+#[test]
+fn ast_command_disp_literal() {
+    let root = build("disp 1");
+    let (name, args) = root.primary().expect("primary").as_command().expect("as_command");
+    assert_eq!(name.name, "disp");
+    assert_eq!(args.len(), 1);
+    assert!(matches!(args[0], Expression::Literal { .. }));
+}
+
+#[test]
+fn ast_call_not_command() {
+    let root = build("sin(x)");
+    assert!(root.primary().and_then(|s| s.as_expr()).and_then(|e| e.as_call()).is_some());
+}
+
+#[test]
+fn ast_assign_not_command() {
+    let root = build("x = 1");
+    assert!(root.primary().and_then(|s| s.as_expr()).and_then(|e| e.as_assignment()).is_some());
+}
+
+#[test]
 fn ast_typed_accessors_call_array_assign_colon() {
     let call_root = build("sin(x, y)");
     let call = call_root.primary().expect("primary").as_expr().expect("expr");

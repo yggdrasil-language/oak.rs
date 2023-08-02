@@ -22,6 +22,7 @@ impl HoverProvider<MatlabLanguage> for MatlabHoverProvider {
             MatlabElementType::BinaryExpr => "### MATLAB BinaryExpr\nBinary operator application.",
             MatlabElementType::Symbol => "### MATLAB Symbol\nIdentifier / name.",
             MatlabElementType::Literal => "### MATLAB Literal\nNumber or string literal.",
+            MatlabElementType::CommandStmt => "### MATLAB Command\nCommand syntax `name arg1 arg2` (no parentheses).",
             _ => return None,
         };
         Some(oak_hover::Hover { contents: contents.to_string(), range: Some(node.span()) })
