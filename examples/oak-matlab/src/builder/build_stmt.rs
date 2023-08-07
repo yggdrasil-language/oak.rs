@@ -35,9 +35,43 @@ impl<'config> MatlabBuilder<'config> {
             MatlabElementType::SwitchStmt => self.build_switch(node, source),
             MatlabElementType::TryStmt => self.build_try(node, source),
             MatlabElementType::CommandStmt => self.build_command(node, source),
+            MatlabElementType::GlobalStmt => self.build_name_declaration(node, source, true),
+            MatlabElementType::PersistentStmt => self.build_name_declaration(node, source, false),
             MatlabElementType::Error => Ok(Statement::Error { span }),
             kind if crate::builder::utils::is_expr_kind(kind) => Ok(Statement::Expr(self.build_expr(node, source)?)),
             other => Err(source.syntax_error(format!("Unexpected MATLAB statement kind: {other:?}"), span.start)),
+        }
+    }
+
+    fn build_name_declaration<S: Source + ?Sized>(
+        &self,
+        node: RedNode<'_, MatlabLanguage>,
+        source: &S,
+        is_global: bool,
+    ) -> Result<Statement, OakError> {
+        let span = node.span();
+        let mut names = Vec::new();
+        for child in node.children() {
+            if crate::builder::utils::is_trivia(&child) {
+                continue;
+            }
+            let RedTree::Node(n) = child else {
+                continue;
+            };
+            match self.build_expr(n, source)? {
+                Expression::Symbol(id) => names.push(id),
+                other => {
+                    return Err(source.syntax_error(
+                        format!("Declaration name must be a symbol, got {other:?}"),
+                        span.start,
+                    ));
+                }
+            }
+        }
+        if is_global {
+            Ok(Statement::Global { names, span })
+        } else {
+            Ok(Statement::Persistent { names, span })
         }
     }
 

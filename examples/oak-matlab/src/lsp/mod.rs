@@ -23,6 +23,8 @@ impl HoverProvider<MatlabLanguage> for MatlabHoverProvider {
             MatlabElementType::Symbol => "### MATLAB Symbol\nIdentifier / name.",
             MatlabElementType::Literal => "### MATLAB Literal\nNumber or string literal.",
             MatlabElementType::CommandStmt => "### MATLAB Command\nCommand syntax `name arg1 arg2` (no parentheses).",
+            MatlabElementType::GlobalStmt => "### MATLAB Global\n`global` name declaration.",
+            MatlabElementType::PersistentStmt => "### MATLAB Persistent\n`persistent` name declaration.",
             _ => return None,
         };
         Some(oak_hover::Hover { contents: contents.to_string(), range: Some(node.span()) })

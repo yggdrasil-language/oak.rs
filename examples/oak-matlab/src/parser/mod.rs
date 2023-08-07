@@ -52,6 +52,8 @@ impl<'config> MatlabParser<'config> {
             Some(MatlabTokenType::For) => self.parse_for(state),
             Some(MatlabTokenType::Switch) => self.parse_switch(state),
             Some(MatlabTokenType::Try) => self.parse_try(state),
+            Some(MatlabTokenType::Global) => self.parse_declaration(state, MatlabElementType::GlobalStmt),
+            Some(MatlabTokenType::Persistent) => self.parse_declaration(state, MatlabElementType::PersistentStmt),
             Some(MatlabTokenType::Identifier) if Self::looks_like_command(state) => self.parse_command(state),
             _ => self.parse_expression(state),
         }
@@ -119,6 +121,22 @@ impl<'config> MatlabParser<'config> {
             }
         }
         state.finish_at(checkpoint, MatlabElementType::CommandStmt)
+    }
+
+    /// `global x y` / `persistent a b` — keyword then same-line identifiers.
+    fn parse_declaration<'a, S: Source + ?Sized>(
+        &self,
+        state: &mut State<'a, S>,
+        kind: MatlabElementType,
+    ) -> &'a GreenNode<'a, MatlabLanguage> {
+        let checkpoint = state.checkpoint();
+        state.bump(); // global / persistent
+        while Self::peek_same_line_kind_at(state, 0) == Some(MatlabTokenType::Identifier) {
+            let name_cp = state.checkpoint();
+            state.bump();
+            state.finish_at(name_cp, MatlabElementType::Symbol);
+        }
+        state.finish_at(checkpoint, kind)
     }
 
     fn parse_expression<'a, S: Source + ?Sized>(&self, state: &mut State<'a, S>) -> &'a GreenNode<'a, MatlabLanguage> {

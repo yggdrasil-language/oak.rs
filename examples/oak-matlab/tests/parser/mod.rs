@@ -105,6 +105,13 @@ fn test_parser_call_not_command() {
 }
 
 #[test]
+fn test_parser_global_persistent_stmt() {
+    assert_has_kind("global x", MatlabElementType::GlobalStmt);
+    assert_has_kind("global x y", MatlabElementType::GlobalStmt);
+    assert_has_kind("persistent z", MatlabElementType::PersistentStmt);
+}
+
+#[test]
 fn test_parser_end_index() {
     assert_has_kind("[1, 2, 3](end)", MatlabElementType::Call);
 }

@@ -41,6 +41,10 @@ pub enum MatlabElementType {
     TryStmt,
     /// Command syntax `name arg1 arg2` (no parentheses).
     CommandStmt,
+    /// `global x y` declaration.
+    GlobalStmt,
+    /// `persistent x y` declaration.
+    PersistentStmt,
     /// `@(x,y) expr` anonymous function.
     AnonymousFunction,
     /// `@name` function handle reference.

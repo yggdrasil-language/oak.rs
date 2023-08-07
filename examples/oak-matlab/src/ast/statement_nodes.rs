@@ -76,6 +76,22 @@ pub enum Statement {
         #[cfg_attr(feature = "serde", serde(with = "oak_core::serde_range"))]
         span: Span,
     },
+    /// `global x y` declaration.
+    Global {
+        /// Declared names.
+        names: Vec<crate::ast::root_nodes::Identifier>,
+        /// Source span.
+        #[cfg_attr(feature = "serde", serde(with = "oak_core::serde_range"))]
+        span: Span,
+    },
+    /// `persistent x y` declaration.
+    Persistent {
+        /// Declared names.
+        names: Vec<crate::ast::root_nodes::Identifier>,
+        /// Source span.
+        #[cfg_attr(feature = "serde", serde(with = "oak_core::serde_range"))]
+        span: Span,
+    },
     /// Recovery / error node.
     Error {
         /// Source span.
@@ -95,6 +111,8 @@ impl Statement {
             | Self::Switch { span, .. }
             | Self::Try { span, .. }
             | Self::Command { span, .. }
+            | Self::Global { span, .. }
+            | Self::Persistent { span, .. }
             | Self::Error { span } => span.clone(),
         }
     }
@@ -111,6 +129,22 @@ impl Statement {
     pub fn as_command(&self) -> Option<(&crate::ast::root_nodes::Identifier, &[Expression])> {
         match self {
             Self::Command { name, args, .. } => Some((name, args.as_slice())),
+            _ => None,
+        }
+    }
+
+    /// `global` declaration names.
+    pub fn as_global(&self) -> Option<&[crate::ast::root_nodes::Identifier]> {
+        match self {
+            Self::Global { names, .. } => Some(names.as_slice()),
+            _ => None,
+        }
+    }
+
+    /// `persistent` declaration names.
+    pub fn as_persistent(&self) -> Option<&[crate::ast::root_nodes::Identifier]> {
+        match self {
+            Self::Persistent { names, .. } => Some(names.as_slice()),
             _ => None,
         }
     }

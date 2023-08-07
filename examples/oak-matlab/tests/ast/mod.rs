@@ -180,6 +180,24 @@ fn ast_assign_not_command() {
 }
 
 #[test]
+fn ast_global_owned() {
+    let root = build("global x y");
+    assert_eq!(root.items.len(), 1, "got {root:?}");
+    let names = root.primary().expect("primary").as_global().expect("as_global");
+    assert_eq!(names.len(), 2);
+    assert_eq!(names[0].name, "x");
+    assert_eq!(names[1].name, "y");
+}
+
+#[test]
+fn ast_persistent_owned() {
+    let root = build("persistent z");
+    let names = root.primary().expect("primary").as_persistent().expect("as_persistent");
+    assert_eq!(names.len(), 1);
+    assert_eq!(names[0].name, "z");
+}
+
+#[test]
 fn ast_typed_accessors_call_array_assign_colon() {
     let call_root = build("sin(x, y)");
     let call = call_root.primary().expect("primary").as_expr().expect("expr");
