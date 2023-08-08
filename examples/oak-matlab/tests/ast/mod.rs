@@ -198,6 +198,36 @@ fn ast_persistent_owned() {
 }
 
 #[test]
+fn ast_member_owned() {
+    let root = build("containers.Map");
+    assert_eq!(root.items.len(), 1, "got {root:?}");
+    let (object, field) = root.primary().expect("primary").as_expr().expect("expr").as_member().expect("as_member");
+    assert_eq!(object.as_symbol().map(|s| s.name.as_str()), Some("containers"));
+    assert_eq!(field.name, "Map");
+}
+
+#[test]
+fn ast_member_then_call() {
+    let root = build("containers.Map('a', 1)");
+    match &root.items[0] {
+        Statement::Expr(Expression::Call { head, arguments, .. }) => {
+            let (object, field) = head.as_member().expect("member head");
+            assert_eq!(object.as_symbol().map(|s| s.name.as_str()), Some("containers"));
+            assert_eq!(field.name, "Map");
+            assert_eq!(arguments.len(), 2);
+        }
+        other => panic!("expected Call(Member, …), got {other:?}"),
+    }
+}
+
+#[test]
+fn ast_dot_times_not_member() {
+    let root = build("a .* b");
+    let bin = root.primary().expect("primary").as_expr().expect("expr").as_elementwise().expect("elementwise");
+    assert_eq!(bin.operator, MatlabTokenType::DotTimes);
+}
+
+#[test]
 fn ast_typed_accessors_call_array_assign_colon() {
     let call_root = build("sin(x, y)");
     let call = call_root.primary().expect("primary").as_expr().expect("expr");

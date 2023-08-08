@@ -16,6 +16,7 @@ impl<'config> MatlabBuilder<'config> {
             MatlabElementType::Array => self.build_array(node, source),
             MatlabElementType::CellArray => self.build_cell_array(node, source),
             MatlabElementType::Call => self.build_call(node, source),
+            MatlabElementType::MemberAccess => self.build_member(node, source),
             MatlabElementType::BinaryExpr => self.build_binary(node, source),
             MatlabElementType::PrefixExpr => self.build_prefix(node, source),
             MatlabElementType::PostfixExpr => self.build_postfix(node, source),
@@ -126,6 +127,41 @@ impl<'config> MatlabBuilder<'config> {
             expr = Expression::Call { head: Box::new(expr), arguments: args, span: span.clone() };
         }
         Ok(expr)
+    }
+
+    fn build_member<S: Source + ?Sized>(&self, node: RedNode<'_, MatlabLanguage>, source: &S) -> Result<Expression, OakError> {
+        let span = node.span();
+        let mut object = None;
+        let mut field = None;
+        for child in node.children() {
+            if utils::is_trivia(&child) {
+                continue;
+            }
+            match child {
+                RedTree::Leaf(t) if t.kind() == MatlabTokenType::Dot => {}
+                RedTree::Leaf(t) if t.kind() == MatlabTokenType::Identifier && object.is_none() => {
+                    object = Some(Expression::Symbol(Identifier { name: text(source, t.span()), span: t.span() }));
+                }
+                RedTree::Node(n) if object.is_none() => {
+                    object = Some(self.build_expr(n, source)?);
+                }
+                RedTree::Node(n) if n.element_type() == MatlabElementType::Symbol && field.is_none() => {
+                    match self.build_expr(n, source)? {
+                        Expression::Symbol(id) => field = Some(id),
+                        other => {
+                            return Err(source.syntax_error(format!("Member field must be a symbol, got {other:?}"), span.start));
+                        }
+                    }
+                }
+                RedTree::Leaf(t) if t.kind() == MatlabTokenType::Identifier && field.is_none() => {
+                    field = Some(Identifier { name: text(source, t.span()), span: t.span() });
+                }
+                _ => {}
+            }
+        }
+        let object = object.ok_or_else(|| source.syntax_error("Member missing object".into(), span.start))?;
+        let field = field.ok_or_else(|| source.syntax_error("Member missing field".into(), span.start))?;
+        Ok(Expression::Member { object: Box::new(object), field, span })
     }
 
     fn build_arguments<S: Source + ?Sized>(&self, node: RedNode<'_, MatlabLanguage>, source: &S) -> Result<Vec<Expression>, OakError> {

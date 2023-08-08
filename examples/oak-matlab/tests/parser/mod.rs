@@ -112,6 +112,13 @@ fn test_parser_global_persistent_stmt() {
 }
 
 #[test]
+fn test_parser_member_access() {
+    assert_has_kind("containers.Map", MatlabElementType::MemberAccess);
+    assert_has_kind("a.b.c", MatlabElementType::MemberAccess);
+    assert_has_kind("containers.Map('a', 1)", MatlabElementType::Call);
+}
+
+#[test]
 fn test_parser_end_index() {
     assert_has_kind("[1, 2, 3](end)", MatlabElementType::Call);
 }

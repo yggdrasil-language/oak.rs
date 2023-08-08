@@ -23,6 +23,8 @@ pub enum MatlabElementType {
     Array,
     /// `{a, b}` cell array / row.
     CellArray,
+    /// Member / package access `a.b`.
+    MemberAccess,
     /// Binary operator application.
     BinaryExpr,
     /// Prefix operator application.

@@ -286,6 +286,26 @@ impl<'config> MatlabParser<'config> {
         state.finish_at(checkpoint, MatlabElementType::Call)
     }
 
+    /// `expr.name` member / package access.
+    fn parse_member_access<'a, S: Source + ?Sized>(&self, state: &mut State<'a, S>, left: &'a GreenNode<'a, MatlabLanguage>) -> &'a GreenNode<'a, MatlabLanguage> {
+        let checkpoint = state.checkpoint_before(left);
+        state.bump(); // .
+        if state.at(MatlabTokenType::Identifier) {
+            let field_cp = state.checkpoint();
+            state.bump();
+            state.finish_at(field_cp, MatlabElementType::Symbol);
+        }
+        else {
+            // Recovery: non-identifier after `.` becomes an error leaf under MemberAccess.
+            let err_cp = state.checkpoint();
+            if state.not_at_end() && !state.at(MatlabTokenType::Eof) {
+                state.bump();
+            }
+            state.finish_at(err_cp, MatlabElementType::Error);
+        }
+        state.finish_at(checkpoint, MatlabElementType::MemberAccess)
+    }
+
     fn parse_array<'a, S: Source + ?Sized>(&self, state: &mut State<'a, S>) -> &'a GreenNode<'a, MatlabLanguage> {
         let checkpoint = state.checkpoint();
         state.bump(); // [
@@ -426,6 +446,15 @@ impl<'config> Pratt<MatlabLanguage> for MatlabParser<'config> {
                 return None;
             }
             return Some(self.parse_paren_postfix(state, left));
+        }
+
+        // Member / package access `a.b` (not `.*` / `./` / `.^`).
+        if kind == MatlabTokenType::Dot {
+            const MEMBER_PREC: u8 = 165;
+            if MEMBER_PREC < min_precedence {
+                return None;
+            }
+            return Some(self.parse_member_access(state, left));
         }
 
         let postfix_info = match kind {

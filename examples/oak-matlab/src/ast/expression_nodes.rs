@@ -45,6 +45,16 @@ pub enum Expression {
         #[cfg_attr(feature = "serde", serde(with = "oak_core::serde_range"))]
         span: Span,
     },
+    /// Member / package access `a.b` (not elementwise `.*`).
+    Member {
+        /// Left object / package expression.
+        object: Box<Expression>,
+        /// Field / member name.
+        field: Identifier,
+        /// Source span.
+        #[cfg_attr(feature = "serde", serde(with = "oak_core::serde_range"))]
+        span: Span,
+    },
     /// Binary / infix operator.
     Binary(Box<BinaryExpr>),
     /// Prefix operator.
@@ -116,6 +126,7 @@ impl Expression {
             | Self::Array { span, .. }
             | Self::CellArray { span, .. }
             | Self::Call { span, .. }
+            | Self::Member { span, .. }
             | Self::Grouped { span, .. }
             | Self::AnonymousFunction { span, .. }
             | Self::FunctionHandle { span, .. } => span.clone(),
@@ -160,6 +171,14 @@ impl Expression {
     pub fn as_call(&self) -> Option<(&Expression, &[Expression])> {
         match self {
             Self::Call { head, arguments, .. } => Some((head.as_ref(), arguments.as_slice())),
+            _ => None,
+        }
+    }
+
+    /// Member / package access `object.field`.
+    pub fn as_member(&self) -> Option<(&Expression, &Identifier)> {
+        match self {
+            Self::Member { object, field, .. } => Some((object.as_ref(), field)),
             _ => None,
         }
     }
