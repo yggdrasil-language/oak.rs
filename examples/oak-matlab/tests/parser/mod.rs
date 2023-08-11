@@ -61,6 +61,14 @@ fn test_parser_prefix_postfix() {
 }
 
 #[test]
+fn test_parser_unary_minus_below_power() {
+    // MATLAB: `-x^2` is `-(x^2)`, not `(-x)^2`.
+    parse_ok("-x^2");
+    assert_has_kind("-x^2", MatlabElementType::PrefixExpr);
+    assert_has_kind("-x^2", MatlabElementType::BinaryExpr);
+}
+
+#[test]
 fn test_parser_grouped() {
     parse_ok("(a+b)*c");
 }

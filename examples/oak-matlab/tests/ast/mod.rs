@@ -290,6 +290,16 @@ fn ast_typed_accessors_matrix_ops() {
     let power = power_root.primary().expect("primary").as_expr().expect("expr");
     assert_eq!(power.as_elementwise().map(|b| b.operator), Some(MatlabTokenType::DotPower));
 
+    let neg_pow_root = build("-x^2");
+    let neg_pow = neg_pow_root.primary().expect("primary").as_expr().expect("expr");
+    let prefix = neg_pow.as_prefix().expect("unary minus wraps power");
+    assert_eq!(prefix.operator, MatlabTokenType::Minus);
+    assert!(prefix.operand.as_binary().is_some(), "operand should be x^2 BinaryExpr");
+    assert_eq!(
+        prefix.operand.as_binary().map(|b| b.operator),
+        Some(MatlabTokenType::Power)
+    );
+
     let tr_root = build("A'");
     let tr = tr_root.primary().expect("primary").as_expr().expect("expr");
     let u = tr.as_transpose().expect("as_transpose");

@@ -430,7 +430,8 @@ impl<'config> Pratt<MatlabLanguage> for MatlabParser<'config> {
             None => return self.primary(state),
         };
         let info = match kind {
-            MatlabTokenType::Minus | MatlabTokenType::Plus | MatlabTokenType::Not => Some(OperatorInfo::right(150)),
+            // MATLAB: `^` / `.^` bind tighter than unary `+` / `-` / `~` (`-x^2` → `-(x^2)`).
+            MatlabTokenType::Minus | MatlabTokenType::Plus | MatlabTokenType::Not => Some(OperatorInfo::right(110)),
             _ => None,
         };
         if let Some(info) = info { unary(state, kind, info.precedence, MatlabElementType::PrefixExpr, |s, p| self.parse_pratt(s, p)) } else { self.primary(state) }
