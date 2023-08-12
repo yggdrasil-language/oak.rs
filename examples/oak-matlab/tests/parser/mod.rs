@@ -94,6 +94,16 @@ fn test_parser_for_end() {
 }
 
 #[test]
+fn test_parser_parfor_end() {
+    assert_has_kind("parfor i=1:3, i, end", MatlabElementType::ParforStmt);
+}
+
+#[test]
+fn test_parser_spmd_end() {
+    assert_has_kind("spmd, 1, end", MatlabElementType::SpmdStmt);
+}
+
+#[test]
 fn test_parser_try_catch_end() {
     assert_has_kind("try, 2, catch, 3, end", MatlabElementType::TryStmt);
     assert_has_kind("try, error('e'), catch, 1, end", MatlabElementType::TryStmt);

@@ -42,6 +42,24 @@ pub enum Statement {
         #[cfg_attr(feature = "serde", serde(with = "oak_core::serde_range"))]
         span: Span,
     },
+    /// `parfor … end` (parallel for; same surface shape as `for`).
+    Parfor {
+        /// Header expression (typically `i = 1:n`).
+        header: Expression,
+        /// Loop body.
+        body: Vec<Statement>,
+        /// Source span.
+        #[cfg_attr(feature = "serde", serde(with = "oak_core::serde_range"))]
+        span: Span,
+    },
+    /// `spmd … end` parallel block.
+    Spmd {
+        /// Block body.
+        body: Vec<Statement>,
+        /// Source span.
+        #[cfg_attr(feature = "serde", serde(with = "oak_core::serde_range"))]
+        span: Span,
+    },
     /// `switch … case … otherwise … end`.
     Switch {
         /// Discriminant expression.
@@ -108,6 +126,8 @@ impl Statement {
             Self::If { span, .. }
             | Self::While { span, .. }
             | Self::For { span, .. }
+            | Self::Parfor { span, .. }
+            | Self::Spmd { span, .. }
             | Self::Switch { span, .. }
             | Self::Try { span, .. }
             | Self::Command { span, .. }
@@ -169,6 +189,22 @@ impl Statement {
     pub fn as_for(&self) -> Option<(&Expression, &[Statement])> {
         match self {
             Self::For { header, body, .. } => Some((header, body.as_slice())),
+            _ => None,
+        }
+    }
+
+    /// `parfor` statement parts.
+    pub fn as_parfor(&self) -> Option<(&Expression, &[Statement])> {
+        match self {
+            Self::Parfor { header, body, .. } => Some((header, body.as_slice())),
+            _ => None,
+        }
+    }
+
+    /// `spmd` body statements.
+    pub fn as_spmd(&self) -> Option<&[Statement]> {
+        match self {
+            Self::Spmd { body, .. } => Some(body.as_slice()),
             _ => None,
         }
     }

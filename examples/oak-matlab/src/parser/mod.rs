@@ -50,6 +50,8 @@ impl<'config> MatlabParser<'config> {
             Some(MatlabTokenType::If) => self.parse_if(state),
             Some(MatlabTokenType::While) => self.parse_while(state),
             Some(MatlabTokenType::For) => self.parse_for(state),
+            Some(MatlabTokenType::Parfor) => self.parse_parfor(state),
+            Some(MatlabTokenType::Spmd) => self.parse_spmd(state),
             Some(MatlabTokenType::Switch) => self.parse_switch(state),
             Some(MatlabTokenType::Try) => self.parse_try(state),
             Some(MatlabTokenType::Global) => self.parse_declaration(state, MatlabElementType::GlobalStmt),
@@ -208,6 +210,27 @@ impl<'config> MatlabParser<'config> {
             state.bump();
         }
         state.finish_at(checkpoint, MatlabElementType::ForStmt)
+    }
+
+    fn parse_parfor<'a, S: Source + ?Sized>(&self, state: &mut State<'a, S>) -> &'a GreenNode<'a, MatlabLanguage> {
+        let checkpoint = state.checkpoint();
+        state.bump(); // parfor
+        self.parse_expression(state); // usually `i = 1:n`
+        self.parse_block_body(state);
+        if state.at(MatlabTokenType::End) {
+            state.bump();
+        }
+        state.finish_at(checkpoint, MatlabElementType::ParforStmt)
+    }
+
+    fn parse_spmd<'a, S: Source + ?Sized>(&self, state: &mut State<'a, S>) -> &'a GreenNode<'a, MatlabLanguage> {
+        let checkpoint = state.checkpoint();
+        state.bump(); // spmd
+        self.parse_block_body(state);
+        if state.at(MatlabTokenType::End) {
+            state.bump();
+        }
+        state.finish_at(checkpoint, MatlabElementType::SpmdStmt)
     }
 
     fn parse_switch<'a, S: Source + ?Sized>(&self, state: &mut State<'a, S>) -> &'a GreenNode<'a, MatlabLanguage> {

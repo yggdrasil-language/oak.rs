@@ -76,6 +76,10 @@ pub enum MatlabTokenType {
     While,
     /// `for` keyword.
     For,
+    /// `parfor` keyword.
+    Parfor,
+    /// `spmd` keyword.
+    Spmd,
     /// `break` keyword.
     Break,
     /// `continue` keyword.

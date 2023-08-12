@@ -128,6 +128,8 @@ impl<'config> MatlabLexer<'config> {
                     "elseif" => MatlabTokenType::Elseif,
                     "while" => MatlabTokenType::While,
                     "for" => MatlabTokenType::For,
+                    "parfor" => MatlabTokenType::Parfor,
+                    "spmd" => MatlabTokenType::Spmd,
                     "break" => MatlabTokenType::Break,
                     "continue" => MatlabTokenType::Continue,
                     "return" => MatlabTokenType::Return,

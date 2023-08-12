@@ -129,6 +129,29 @@ fn ast_for_owned() {
 }
 
 #[test]
+fn ast_parfor_owned() {
+    let root = build("parfor i=1:3, i, end");
+    match &root.items[0] {
+        Statement::Parfor { header, body, .. } => {
+            assert!(matches!(header, Expression::Binary(_)));
+            assert_eq!(body.len(), 1);
+        }
+        other => panic!("expected Parfor, got {other:?}"),
+    }
+}
+
+#[test]
+fn ast_spmd_owned() {
+    let root = build("spmd, 1, end");
+    match &root.items[0] {
+        Statement::Spmd { body, .. } => {
+            assert_eq!(body.len(), 1);
+        }
+        other => panic!("expected Spmd, got {other:?}"),
+    }
+}
+
+#[test]
 fn ast_try_owned() {
     let root = build("try, 2, catch, 3, end");
     match &root.items[0] {
@@ -264,6 +287,15 @@ fn ast_typed_accessors_statements() {
     let for_root = build("for i=1:3, i, end");
     let (header, body) = for_root.primary().expect("primary").as_for().expect("as_for");
     assert!(header.as_assignment().is_some() || header.as_binary().is_some());
+    assert_eq!(body.len(), 1);
+
+    let parfor_root = build("parfor i=1:3, i, end");
+    let (header, body) = parfor_root.primary().expect("primary").as_parfor().expect("as_parfor");
+    assert!(header.as_assignment().is_some() || header.as_binary().is_some());
+    assert_eq!(body.len(), 1);
+
+    let spmd_root = build("spmd, 1, end");
+    let body = spmd_root.primary().expect("primary").as_spmd().expect("as_spmd");
     assert_eq!(body.len(), 1);
 
     let try_root = build("try, 2, catch, 3, end");

@@ -37,6 +37,10 @@ pub enum MatlabElementType {
     WhileStmt,
     /// `for … end` statement.
     ForStmt,
+    /// `parfor … end` statement.
+    ParforStmt,
+    /// `spmd … end` statement.
+    SpmdStmt,
     /// `switch … end` statement.
     SwitchStmt,
     /// `try … catch … end` statement.

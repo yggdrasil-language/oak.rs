@@ -32,6 +32,8 @@ impl<'config> MatlabBuilder<'config> {
             MatlabElementType::IfStmt => self.build_if(node, source),
             MatlabElementType::WhileStmt => self.build_while(node, source),
             MatlabElementType::ForStmt => self.build_for(node, source),
+            MatlabElementType::ParforStmt => self.build_parfor(node, source),
+            MatlabElementType::SpmdStmt => self.build_spmd(node, source),
             MatlabElementType::SwitchStmt => self.build_switch(node, source),
             MatlabElementType::TryStmt => self.build_try(node, source),
             MatlabElementType::CommandStmt => self.build_command(node, source),
@@ -186,6 +188,34 @@ impl<'config> MatlabBuilder<'config> {
         }
         let header = header.ok_or_else(|| source.syntax_error("For missing header".into(), span.start))?;
         Ok(Statement::For { header, body, span })
+    }
+
+    fn build_parfor<S: Source + ?Sized>(&self, node: RedNode<'_, MatlabLanguage>, source: &S) -> Result<Statement, OakError> {
+        let span = node.span();
+        let mut header = None;
+        let mut body = Vec::new();
+        for child in node.children() {
+            if let RedTree::Node(n) = child {
+                if header.is_none() {
+                    header = Some(self.build_expr(n, source)?);
+                } else {
+                    body.push(self.build_stmt(n, source)?);
+                }
+            }
+        }
+        let header = header.ok_or_else(|| source.syntax_error("Parfor missing header".into(), span.start))?;
+        Ok(Statement::Parfor { header, body, span })
+    }
+
+    fn build_spmd<S: Source + ?Sized>(&self, node: RedNode<'_, MatlabLanguage>, source: &S) -> Result<Statement, OakError> {
+        let span = node.span();
+        let mut body = Vec::new();
+        for child in node.children() {
+            if let RedTree::Node(n) = child {
+                body.push(self.build_stmt(n, source)?);
+            }
+        }
+        Ok(Statement::Spmd { body, span })
     }
 
     fn build_switch<S: Source + ?Sized>(&self, node: RedNode<'_, MatlabLanguage>, source: &S) -> Result<Statement, OakError> {
