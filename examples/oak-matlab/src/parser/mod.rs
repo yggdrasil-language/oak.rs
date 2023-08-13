@@ -439,6 +439,26 @@ impl<'config> Pratt<MatlabLanguage> for MatlabParser<'config> {
                 state.finish_at(checkpoint, MatlabElementType::Symbol)
             }
         }
+        // Class introspection builtins share spellings with classdef section keywords.
+        else if matches!(
+            state.peek_kind(),
+            Some(MatlabTokenType::Methods | MatlabTokenType::Properties | MatlabTokenType::Events)
+        ) {
+            state.bump();
+            if state.at(MatlabTokenType::LeftParen) {
+                while state.at(MatlabTokenType::LeftParen) {
+                    self.parse_call_args(state);
+                }
+                let mut node = state.finish_at(checkpoint, MatlabElementType::Call);
+                while state.at(MatlabTokenType::LeftParen) {
+                    node = self.parse_paren_postfix(state, node);
+                }
+                node
+            }
+            else {
+                state.finish_at(checkpoint, MatlabElementType::Symbol)
+            }
+        }
         else if state.at(MatlabTokenType::End) {
             // Indexing `end` (and bare keyword use) as a symbol primary.
             state.bump();

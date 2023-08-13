@@ -121,6 +121,8 @@ fn test_parser_command_stmt() {
 #[test]
 fn test_parser_call_not_command() {
     assert_has_kind("sin(x)", MatlabElementType::Call);
+    assert_has_kind("methods('double')", MatlabElementType::Call);
+    assert_has_kind("properties(obj)", MatlabElementType::Call);
 }
 
 #[test]
