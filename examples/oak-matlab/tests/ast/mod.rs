@@ -182,6 +182,23 @@ fn ast_command_owned() {
 }
 
 #[test]
+fn ast_command_keyword_bareword_args() {
+    let root = build("dbstop if error");
+    assert_eq!(root.items.len(), 1, "command with keyword bareword must be one statement, got {root:?}");
+    let (name, args) = root.primary().expect("primary").as_command().expect("as_command");
+    assert_eq!(name.name, "dbstop");
+    assert_eq!(args.len(), 2, "got {args:?}");
+    match &args[0] {
+        Expression::Symbol(id) => assert_eq!(id.name, "if"),
+        other => panic!("expected keyword bareword as symbol, got {other:?}"),
+    }
+    match &args[1] {
+        Expression::Symbol(id) => assert_eq!(id.name, "error"),
+        other => panic!("expected symbol, got {other:?}"),
+    }
+}
+
+#[test]
 fn ast_command_disp_literal() {
     let root = build("disp 1");
     let (name, args) = root.primary().expect("primary").as_command().expect("as_command");

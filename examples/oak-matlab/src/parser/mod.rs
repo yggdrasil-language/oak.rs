@@ -82,8 +82,39 @@ impl<'config> MatlabParser<'config> {
         None
     }
 
-    /// Command syntax: `hold on` / `disp 1` — Identifier followed by space-separated arg tokens, not `(…)`.
-    /// Rejects `name id=` so `parfor i=1:n` stays non-command (until `parfor` is a keyword).
+    /// Keywords that MATLAB command syntax may treat as bareword args (`dbstop if error`).
+    /// Statement-leading keywords (`if`, `for`, …) still start their own statements when first on a line.
+    fn is_command_bareword_keyword(kind: MatlabTokenType) -> bool {
+        matches!(
+            kind,
+            MatlabTokenType::Function
+                | MatlabTokenType::End
+                | MatlabTokenType::If
+                | MatlabTokenType::Else
+                | MatlabTokenType::Elseif
+                | MatlabTokenType::While
+                | MatlabTokenType::For
+                | MatlabTokenType::Parfor
+                | MatlabTokenType::Spmd
+                | MatlabTokenType::Break
+                | MatlabTokenType::Continue
+                | MatlabTokenType::Return
+                | MatlabTokenType::Switch
+                | MatlabTokenType::Case
+                | MatlabTokenType::Otherwise
+                | MatlabTokenType::Try
+                | MatlabTokenType::Catch
+                | MatlabTokenType::Global
+                | MatlabTokenType::Persistent
+                | MatlabTokenType::Classdef
+                | MatlabTokenType::Properties
+                | MatlabTokenType::Methods
+                | MatlabTokenType::Events
+        )
+    }
+
+    /// Command syntax: `hold on` / `disp 1` / `dbstop if error` — Identifier then same-line barewords, not `(…)`.
+    /// Rejects `name id=` so `parfor i=1:n` stays non-command (keyword `parfor` already owns that path).
     fn looks_like_command(state: &State<'_, impl Source + ?Sized>) -> bool {
         if !state.at(MatlabTokenType::Identifier) {
             return false;
@@ -91,18 +122,20 @@ impl<'config> MatlabParser<'config> {
         match Self::peek_same_line_kind_at(state, 1) {
             Some(MatlabTokenType::Identifier) => !matches!(Self::peek_same_line_kind_at(state, 2), Some(MatlabTokenType::Assign)),
             Some(MatlabTokenType::Number | MatlabTokenType::String | MatlabTokenType::Character) => true,
+            Some(k) if Self::is_command_bareword_keyword(k) => true,
             _ => false,
         }
     }
 
     fn at_command_arg(state: &State<'_, impl Source + ?Sized>) -> bool {
-        matches!(
-            Self::peek_same_line_kind_at(state, 0),
-            Some(MatlabTokenType::Identifier | MatlabTokenType::Number | MatlabTokenType::String | MatlabTokenType::Character)
-        )
+        match Self::peek_same_line_kind_at(state, 0) {
+            Some(MatlabTokenType::Identifier | MatlabTokenType::Number | MatlabTokenType::String | MatlabTokenType::Character) => true,
+            Some(k) if Self::is_command_bareword_keyword(k) => true,
+            _ => false,
+        }
     }
 
-    /// `hold on`, `grid minor`, `close all`.
+    /// `hold on`, `grid minor`, `close all`, `dbstop if error`.
     fn parse_command<'a, S: Source + ?Sized>(&self, state: &mut State<'a, S>) -> &'a GreenNode<'a, MatlabLanguage> {
         let checkpoint = state.checkpoint();
         let name_cp = state.checkpoint();
@@ -112,6 +145,10 @@ impl<'config> MatlabParser<'config> {
             let arg_cp = state.checkpoint();
             match state.peek_kind() {
                 Some(MatlabTokenType::Identifier) => {
+                    state.bump();
+                    state.finish_at(arg_cp, MatlabElementType::Symbol);
+                }
+                Some(k) if Self::is_command_bareword_keyword(k) => {
                     state.bump();
                     state.finish_at(arg_cp, MatlabElementType::Symbol);
                 }

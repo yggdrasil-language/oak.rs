@@ -115,6 +115,7 @@ fn test_parser_command_stmt() {
     assert_has_kind("grid minor", MatlabElementType::CommandStmt);
     assert_has_kind("disp 1", MatlabElementType::CommandStmt);
     assert_has_kind("close all;", MatlabElementType::CommandStmt);
+    assert_has_kind("dbstop if error", MatlabElementType::CommandStmt);
 }
 
 #[test]
