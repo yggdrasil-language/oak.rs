@@ -214,6 +214,23 @@ fn ast_call_not_command() {
 }
 
 #[test]
+fn ast_methods_call_keyword_head() {
+    let root = build("methods('double')");
+    assert_eq!(root.items.len(), 1, "got {root:?}");
+    let (head, args) = root
+        .primary()
+        .and_then(|s| s.as_expr())
+        .and_then(|e| e.as_call())
+        .expect("methods(...) call");
+    match head {
+        Expression::Symbol(id) => assert_eq!(id.name, "methods"),
+        other => panic!("expected methods symbol head, got {other:?}"),
+    }
+    assert_eq!(args.len(), 1);
+    assert!(matches!(args[0], Expression::Literal { .. }));
+}
+
+#[test]
 fn ast_assign_not_command() {
     let root = build("x = 1");
     assert!(root.primary().and_then(|s| s.as_expr()).and_then(|e| e.as_assignment()).is_some());

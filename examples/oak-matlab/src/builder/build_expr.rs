@@ -107,7 +107,16 @@ impl<'config> MatlabBuilder<'config> {
                 continue;
             }
             match child {
-                RedTree::Leaf(t) if t.kind() == MatlabTokenType::Identifier && head.is_none() => {
+                RedTree::Leaf(t)
+                    if head.is_none()
+                        && matches!(
+                            t.kind(),
+                            MatlabTokenType::Identifier
+                                | MatlabTokenType::Methods
+                                | MatlabTokenType::Properties
+                                | MatlabTokenType::Events
+                        ) =>
+                {
                     head = Some(Expression::Symbol(Identifier { name: text(source, t.span()), span: t.span() }));
                 }
                 RedTree::Node(n) if n.element_type() == MatlabElementType::Arguments => {
