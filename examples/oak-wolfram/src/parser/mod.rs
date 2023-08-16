@@ -285,6 +285,8 @@ impl<'config> Pratt<WolframLanguage> for WolframParser<'config> {
             WolframTokenType::Plus | WolframTokenType::Minus => Some(OperatorInfo::left(80)),
             WolframTokenType::Times | WolframTokenType::Divide => Some(OperatorInfo::left(90)),
             WolframTokenType::At => Some(OperatorInfo::right(100)),                 // f @ x
+            WolframTokenType::AtStar => Some(OperatorInfo::left(105)),              // f @* g  Composition
+            WolframTokenType::StarSlash => Some(OperatorInfo::left(105)),           // f /* g  RightComposition
             WolframTokenType::MapOperator => Some(OperatorInfo::right(110)),        // f /@ list
             WolframTokenType::ApplyOperator => Some(OperatorInfo::right(110)),      // f @@ terms
             WolframTokenType::ApplyLevelOperator => Some(OperatorInfo::right(110)), // f @@@ terms

@@ -29,6 +29,18 @@ fn test_parser_binary_expr() {
 }
 
 #[test]
+fn test_parser_composition_ops() {
+    for input in ["f@*g", "f/*g", "a@*b@*c", "a/*b/*c"] {
+        let source = SourceText::new(input.to_string());
+        let language = WolframLanguage::default();
+        let mut cache = oak_core::ParseSession::<WolframLanguage>::default();
+        let parser = WolframParser::new(&language);
+        let output = parser.parse(&source, &[], &mut cache);
+        assert!(output.result.is_ok(), "parse failed for {input}");
+    }
+}
+
+#[test]
 fn test_parser_complex() {
     let input = "f[x] + g[y, {1, 2}] * (a + b)!";
     let source = SourceText::new(input.to_string());
