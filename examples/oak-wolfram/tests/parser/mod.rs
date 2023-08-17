@@ -41,6 +41,18 @@ fn test_parser_composition_ops() {
 }
 
 #[test]
+fn test_parser_message_name_and_slot_n() {
+    for input in ["f::x", "Message[f::x]", "#2", "#2 &", "MapIndexed[#2 &, {a, b}]", "??Plus"] {
+        let source = SourceText::new(input.to_string());
+        let language = WolframLanguage::default();
+        let mut cache = oak_core::ParseSession::<WolframLanguage>::default();
+        let parser = WolframParser::new(&language);
+        let output = parser.parse(&source, &[], &mut cache);
+        assert!(output.result.is_ok(), "parse failed for {input}");
+    }
+}
+
+#[test]
 fn test_parser_complex() {
     let input = "f[x] + g[y, {1, 2}] * (a + b)!";
     let source = SourceText::new(input.to_string());

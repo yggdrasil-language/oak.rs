@@ -233,6 +233,8 @@ impl<'config> Pratt<WolframLanguage> for WolframParser<'config> {
             // Unary Minus sits between Times (90) and Power (120), matching Wolfram:
             // `-x^2` → Times[-1, Power[x, 2]], not Power[Times[-1, x], 2].
             WolframTokenType::Minus => Some(OperatorInfo::right(100)),
+            // `??expr` Information (prefix). Single `?` PatternTest remains unimplemented as binary.
+            WolframTokenType::DoubleQuestion => Some(OperatorInfo::right(155)),
             // Logical Not (`!x`) stays below relational ops.
             WolframTokenType::Factorial => Some(OperatorInfo::right(65)),
             _ => None,
@@ -292,6 +294,8 @@ impl<'config> Pratt<WolframLanguage> for WolframParser<'config> {
             WolframTokenType::ApplyLevelOperator => Some(OperatorInfo::right(110)), // f @@@ terms
             WolframTokenType::MapAllOperator => Some(OperatorInfo::right(110)),     // f //@ list
             WolframTokenType::Power => Some(OperatorInfo::right(120)),
+            // MessageName `f::tag` binds tighter than most infix (Wolfram ~675–750 band).
+            WolframTokenType::MessageName => Some(OperatorInfo::none(150)),
             _ => None,
         };
 

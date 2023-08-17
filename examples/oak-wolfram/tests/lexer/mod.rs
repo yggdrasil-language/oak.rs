@@ -52,6 +52,42 @@ fn generate_baseline() {
 }
 
 #[test]
+fn test_slot_n_and_message_name_tokens() {
+    use oak_core::{Lexer, ParseSession, SourceText, TokenType};
+    use oak_wolfram::WolframTokenType;
+
+    let language = WolframLanguage::default();
+    let lexer = WolframLexer::new(&language);
+    let mut cache = ParseSession::default();
+
+    let source = SourceText::new("#2 f::x ##3 ??Plus".to_string());
+    let result = lexer.lex(&source, &[], &mut cache);
+    let tokens = result.result.expect("lex");
+    let kinds: Vec<_> = tokens
+        .iter()
+        .filter(|t| !t.kind.is_ignored())
+        .map(|t| (format!("{:?}", t.kind), source.get_text_in(t.span.clone()).to_string()))
+        .collect();
+
+    assert!(
+        kinds.iter().any(|(k, t)| k == "Slot" && t == "#2"),
+        "expected Slot #2 token, got {kinds:?}"
+    );
+    assert!(
+        kinds.iter().any(|(k, t)| k == "SlotSequence" && t == "##3"),
+        "expected SlotSequence ##3 token, got {kinds:?}"
+    );
+    assert!(
+        kinds.iter().any(|(k, _)| k == "MessageName"),
+        "expected MessageName :: token, got {kinds:?}"
+    );
+    assert!(
+        kinds.iter().any(|(k, _)| k == "DoubleQuestion"),
+        "expected DoubleQuestion ?? token, got {kinds:?}"
+    );
+}
+
+#[test]
 #[cfg(feature = "serde")]
 fn test_wolfram_lexer() {
     let here = Path::new(env!("CARGO_MANIFEST_DIR"));

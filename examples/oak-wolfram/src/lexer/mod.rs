@@ -270,7 +270,8 @@ impl<'config> WolframLexer<'config> {
             ("!!", WolframTokenType::Factorial), // Double Factorial
             ("___", WolframTokenType::TripleUnderscore),
             ("__", WolframTokenType::DoubleUnderscore),
-            ("##", WolframTokenType::SlotSequence),
+            ("::", WolframTokenType::MessageName),
+            ("??", WolframTokenType::DoubleQuestion),
         ];
 
         for (pat, kind) in patterns {
@@ -279,6 +280,24 @@ impl<'config> WolframLexer<'config> {
                 state.add_token(*kind, start, state.get_position());
                 return true;
             }
+        }
+
+        // `#` / `#n` Slot and `##` / `##n` SlotSequence (digits stay in the same token).
+        if state.starts_with("##") {
+            state.advance(2);
+            while state.peek().is_some_and(|c| c.is_ascii_digit()) {
+                state.advance(1);
+            }
+            state.add_token(WolframTokenType::SlotSequence, start, state.get_position());
+            return true;
+        }
+        if state.starts_with("#") {
+            state.advance(1);
+            while state.peek().is_some_and(|c| c.is_ascii_digit()) {
+                state.advance(1);
+            }
+            state.add_token(WolframTokenType::Slot, start, state.get_position());
+            return true;
         }
 
         // Single-character operators
@@ -294,7 +313,6 @@ impl<'config> WolframLexer<'config> {
                 '>' => Some(WolframTokenType::Greater),
                 '?' => Some(WolframTokenType::Question),
                 '_' => Some(WolframTokenType::Underscore),
-                '#' => Some(WolframTokenType::Slot),
                 '.' => Some(WolframTokenType::Dot),
                 ':' => Some(WolframTokenType::Colon),
                 '@' => Some(WolframTokenType::At),

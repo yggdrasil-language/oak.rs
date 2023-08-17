@@ -194,6 +194,8 @@ pub enum WolframTokenType {
     Semicolon,
     /// `:`.
     Colon,
+    /// `::` MessageName.
+    MessageName,
     /// `.`.
     Dot,
 
@@ -204,6 +206,8 @@ pub enum WolframTokenType {
     DoubleArrow,
     /// `?`.
     Question,
+    /// `??` Information.
+    DoubleQuestion,
     /// `_`.
     Underscore,
     /// `__`.
@@ -276,6 +280,8 @@ impl WolframTokenType {
             | Self::Arrow
             | Self::DoubleArrow
             | Self::Question
+            | Self::DoubleQuestion
+            | Self::MessageName
             | Self::Underscore
             | Self::DoubleUnderscore
             | Self::TripleUnderscore
