@@ -55,8 +55,8 @@ pub struct TextSegment {
 pub struct InterpolationSegment {
     /// The interpolation expression.
     pub expr: TermExpression,
-    /// Whether this is a Fluent variable (with the ߷ marker).
-    pub is_fluent: bool,
+    /// Whether this is a locale argument (with the ߷ locale marker).
+    pub is_locale: bool,
     /// The source code span.
     #[cfg_attr(feature = "serde", serde(with = "oak_core::serde_range"))]
     pub span: Span,

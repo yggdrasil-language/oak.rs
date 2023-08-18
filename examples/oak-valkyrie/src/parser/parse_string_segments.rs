@@ -1,14 +1,14 @@
 use crate::ast::{Identifier, InterpolationSegment, NamePath, Span, StringSegment, TermExpression, TextSegment};
 
-/// Fluent 变量标记字符 (Gwot, U+07DF)
-const FLUENT_MARKER: char = '\u{07DF}';
+/// Locale 参数标记字符 (Gwot, U+07DF)
+const LOCALE_MARKER: char = '\u{07DF}';
 
 /// 解析字符串内容为片段列表。
 ///
 /// 该函数处理以下功能：
 /// - 插值解析：解析 `{terms}` 格式的插值表达式
 /// - 转义处理：处理 `\{` 和 `\}` 转义序列
-/// - Fluent 标记：识别 `߷` (Gwot, U+07DF) 符号标记的 Fluent 变量
+/// - Locale 标记：识别 `߷` (Gwot, U+07DF) 符号标记的本地化参数
 /// - Raw String 处理：前缀为 `r` 时不解析插值
 ///
 /// # 参数
@@ -67,9 +67,9 @@ pub fn parse_string_segments(content: &str, span_start: usize, is_raw: bool) -> 
                     current_text.clear();
                 }
 
-                let is_fluent = if let Some((_, next_ch)) = chars.peek() { *next_ch == FLUENT_MARKER } else { false };
+                let is_locale = if let Some((_, next_ch)) = chars.peek() { *next_ch == LOCALE_MARKER } else { false };
 
-                if is_fluent {
+                if is_locale {
                     chars.next();
                 }
 
@@ -101,7 +101,7 @@ pub fn parse_string_segments(content: &str, span_start: usize, is_raw: bool) -> 
                 let trimmed_expr = expr_content.trim();
                 segments.push(StringSegment::Interpolation(Box::new(InterpolationSegment {
                     expr: TermExpression::NamePath(Box::new(NamePath { parts: vec![Identifier { name: trimmed_expr.to_string(), span: Span { start: expr_start, end: expr_end } }], span: Span { start: expr_start, end: expr_end } })),
-                    is_fluent,
+                    is_locale,
                     span: Span { start: expr_start, end: expr_end + 1 },
                 })));
 
