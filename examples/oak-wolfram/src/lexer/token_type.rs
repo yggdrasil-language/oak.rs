@@ -220,6 +220,8 @@ pub enum WolframTokenType {
     SlotSequence,
     /// `!`.
     Factorial,
+    /// `'` derivative prime.
+    Prime,
 
     // Comments
     /// A comment.
@@ -287,7 +289,8 @@ impl WolframTokenType {
             | Self::TripleUnderscore
             | Self::Slot
             | Self::SlotSequence
-            | Self::Factorial => UniversalTokenRole::Operator,
+            | Self::Factorial
+            | Self::Prime => UniversalTokenRole::Operator,
             Self::If
             | Self::Then
             | Self::Else

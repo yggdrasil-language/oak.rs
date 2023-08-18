@@ -318,6 +318,7 @@ impl<'config> WolframLexer<'config> {
                 '@' => Some(WolframTokenType::At),
                 '&' => Some(WolframTokenType::Ampersand),
                 '!' => Some(WolframTokenType::Factorial),
+                '\'' => Some(WolframTokenType::Prime),
                 _ => None,
             };
             if let Some(k) = kind {

@@ -259,6 +259,8 @@ impl<'config> Pratt<WolframLanguage> for WolframParser<'config> {
         let postfix_info = match kind {
             WolframTokenType::Ampersand => Some(OperatorInfo::left(10)),  // body &
             WolframTokenType::Factorial => Some(OperatorInfo::left(160)), // x!
+            // `y'` Derivative[1][y] — high precedence, below Part/Call so `y'[x]` = (y')[x].
+            WolframTokenType::Prime => Some(OperatorInfo::left(168)),
             // `x_` Pattern[x, Blank[]] — high precedence, below Part/Call.
             WolframTokenType::Underscore | WolframTokenType::DoubleUnderscore | WolframTokenType::TripleUnderscore => Some(OperatorInfo::left(165)),
             _ => None,

@@ -53,6 +53,18 @@ fn test_parser_message_name_and_slot_n() {
 }
 
 #[test]
+fn test_parser_derivative_prime() {
+    for input in ["y'", "y'[x]", "DSolveValue[y'[x] == y[x], y[x], x]"] {
+        let source = SourceText::new(input.to_string());
+        let language = WolframLanguage::default();
+        let mut cache = oak_core::ParseSession::<WolframLanguage>::default();
+        let parser = WolframParser::new(&language);
+        let output = parser.parse(&source, &[], &mut cache);
+        assert!(output.result.is_ok(), "parse failed for {input}");
+    }
+}
+
+#[test]
 fn test_parser_complex() {
     let input = "f[x] + g[y, {1, 2}] * (a + b)!";
     let source = SourceText::new(input.to_string());
