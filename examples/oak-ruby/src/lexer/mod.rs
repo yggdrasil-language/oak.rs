@@ -54,6 +54,10 @@ impl<'config> RubyLexer<'config> {
                 continue;
             }
 
+            if self.lex_sigil_variable(state) {
+                continue;
+            }
+
             if self.lex_number_literal(state) {
                 continue;
             }
@@ -131,10 +135,66 @@ impl<'config> RubyLexer<'config> {
 
             state.add_token(RubyTokenType::Comment, start_pos, state.get_position());
             true
-        }
-        else {
+        } else if self.skip_begin_end_comment(state) {
+            true
+        } else {
             false
         }
+    }
+
+    /// `=begin` … `=end` 块注释。
+    fn skip_begin_end_comment<'a, S: Source + ?Sized>(&self, state: &mut State<'a, S>) -> bool {
+        let start_pos = state.get_position();
+        if state.peek() != Some('=') {
+            return false;
+        }
+        // 仅在行首或空白后识别；LexerState 无列信息时，要求前面已是换行/文件头。
+        let rest = {
+            let mut buf = String::new();
+            let mut i = 0;
+            while let Some(ch) = state.peek_next_n(i) {
+                if ch == '\n' || ch == '\r' || buf.len() > 8 {
+                    break;
+                }
+                buf.push(ch);
+                i += 1;
+            }
+            buf
+        };
+        if !rest.starts_with("=begin") {
+            return false;
+        }
+        // 吃掉到 =end 行结束
+        while state.not_at_end() {
+            // 找行首 =end
+            let line_start = state.get_position();
+            let mut line = String::new();
+            while let Some(ch) = state.peek() {
+                if ch == '\n' || ch == '\r' {
+                    break;
+                }
+                line.push(ch);
+                state.advance(ch.len_utf8());
+            }
+            // 吃换行
+            if let Some('\r') = state.peek() {
+                state.advance(1);
+            }
+            if let Some('\n') = state.peek() {
+                state.advance(1);
+            }
+            if line.trim_start().starts_with("=end") {
+                state.add_token(RubyTokenType::Comment, start_pos, state.get_position());
+                let _ = line_start;
+                return true;
+            }
+            if state.get_position() == line_start {
+                // 死锁保护
+                state.advance(1);
+            }
+        }
+        state.add_token(RubyTokenType::Comment, start_pos, state.get_position());
+        true
     }
 
     /// Handles string literals
@@ -184,6 +244,10 @@ impl<'config> RubyLexer<'config> {
     /// Handles symbols
     fn lex_symbol<'a, S: Source + ?Sized>(&self, state: &mut State<'a, S>) -> bool {
         if let Some(':') = state.peek() {
+            // `::` 是作用域运算符，必须留给 `lex_single_char_tokens`。
+            if state.peek_next_n(1) == Some(':') {
+                return false;
+            }
             let start_pos = state.get_position();
             state.advance(1); // Skip ':'
 
@@ -227,6 +291,8 @@ impl<'config> RubyLexer<'config> {
                     state.add_token(RubyTokenType::Symbol, start_pos, state.get_position());
                     return true;
                 }
+                // 单独 `:` 不是 Symbol：回退，交给单字符 tokenize。
+                state.set_position(start_pos);
             }
         }
         false
@@ -366,6 +432,46 @@ impl<'config> RubyLexer<'config> {
         }
     }
 
+    /// `@ivar` / `@@cvar` / `$global` 整词。
+    fn lex_sigil_variable<'a, S: Source + ?Sized>(&self, state: &mut State<'a, S>) -> bool {
+        let Some(sigil) = state.peek() else {
+            return false;
+        };
+        if sigil != '@' && sigil != '$' {
+            return false;
+        }
+        let start_pos = state.get_position();
+        state.advance(1);
+        let mut kind = if sigil == '$' {
+            RubyTokenType::GlobalVariable
+        } else {
+            RubyTokenType::InstanceVariable
+        };
+        if sigil == '@' && state.peek() == Some('@') {
+            state.advance(1);
+            kind = RubyTokenType::ClassVariable;
+        }
+        // `$1` 等 digit 全局；其余需标识符首字符。
+        let Some(first) = state.peek() else {
+            state.set_position(start_pos);
+            return false;
+        };
+        if !(first.is_ascii_alphabetic() || first == '_' || (sigil == '$' && first.is_ascii_digit())) {
+            state.set_position(start_pos);
+            return false;
+        }
+        state.advance(1);
+        while let Some(ch) = state.peek() {
+            if ch.is_ascii_alphanumeric() || ch == '_' || ch == '?' || ch == '!' {
+                state.advance(1);
+            } else {
+                break;
+            }
+        }
+        state.add_token(kind, start_pos, state.get_position());
+        true
+    }
+
     /// Handles identifiers or keywords
     fn lex_identifier_or_keyword<'a, S: Source + ?Sized>(&self, state: &mut State<'a, S>) -> bool {
         let start_pos = state.get_position();
@@ -435,6 +541,7 @@ impl<'config> RubyLexer<'config> {
             "undef" => RubyTokenType::Undef,
             "defined?" => RubyTokenType::Defined,
             "do" => RubyTokenType::Do,
+            _ if buf.starts_with(|c: char| c.is_ascii_uppercase()) => RubyTokenType::Constant,
             _ => RubyTokenType::Identifier,
         };
 
@@ -542,8 +649,8 @@ impl<'config> RubyLexer<'config> {
             return true;
         }
 
-        // Single-character delimiters
-        let delimiters = ['(', ')', '[', ']', '{', '}', ',', ';', '.', ':', '@', '$'];
+        // Single-character delimiters（`@`/`$` 由 `lex_sigil_variable` 处理）
+        let delimiters = ['(', ')', '[', ']', '{', '}', ',', ';', '.', ':'];
 
         if let Some(ch) = state.peek() {
             if delimiters.contains(&ch) {
@@ -559,8 +666,6 @@ impl<'config> RubyLexer<'config> {
                     ';' => RubyTokenType::Semicolon,
                     '.' => RubyTokenType::Dot,
                     ':' => RubyTokenType::Colon,
-                    '@' => RubyTokenType::At,
-                    '$' => RubyTokenType::Dollar,
                     _ => RubyTokenType::Invalid,
                 };
                 state.add_token(kind, start_pos, state.get_position());

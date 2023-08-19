@@ -495,7 +495,7 @@ impl TokenType for RubyTokenType {
     const END_OF_STREAM: Self = Self::Error;
 
     fn is_ignored(&self) -> bool {
-        false
+        matches!(self, Self::Whitespace | Self::Newline | Self::Comment)
     }
 
     fn role(&self) -> Self::Role {
