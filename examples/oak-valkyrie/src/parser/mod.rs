@@ -17,6 +17,10 @@ impl<'config> Parser<ValkyrieLanguage> for ValkyrieParser<'config> {
         oak_core::parser::parse_with_lexer(&ValkyrieLexer::new(self.config), text, edits, cache, |state| {
             let cp = state.sink.checkpoint();
             while state.not_at_end() {
+                // Eof 是真实 token，不能再 parse_item，否则会生成空 ExprStatement。
+                if state.at(crate::ValkyrieTokenType::Eof) {
+                    break;
+                }
                 parse_item(state)?;
                 state.skip_trivia();
             }

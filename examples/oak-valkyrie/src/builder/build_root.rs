@@ -14,12 +14,18 @@ impl<'config> ValkyrieBuilder<'config> {
         let mut items = Vec::new();
         for child in red_root.children() {
             match child {
-                RedTree::Node(n) => match self.build_item(n, source) {
-                    Ok(item) => items.push(item),
-                    Err(err) => {
-                        return Err(err);
+                RedTree::Node(n) => {
+                    // 仅含 Eof 的空 ExprStatement 不进 AST。
+                    if n.green.kind == ValkyrieElementType::ExprStatement && is_eof_only_expr_stmt(&n) {
+                        continue;
                     }
-                },
+                    match self.build_item(n, source) {
+                        Ok(item) => items.push(item),
+                        Err(err) => {
+                            return Err(err);
+                        }
+                    }
+                }
                 RedTree::Leaf(t) => match t.kind {
                     ValkyrieTokenType::Whitespace | ValkyrieTokenType::Newline | ValkyrieTokenType::LineComment | ValkyrieTokenType::BlockComment => continue,
                     ValkyrieTokenType::Eof => continue,
@@ -171,4 +177,22 @@ impl<'config> ValkyrieBuilder<'config> {
             _ => Err(source.syntax_error(format!("Unexpected item: {:?}", n.green.kind), n.span().start)),
         }
     }
+}
+
+fn is_eof_only_expr_stmt(node: &RedNode<ValkyrieLanguage>) -> bool {
+    let mut saw_eof = false;
+    for child in node.children() {
+        match child {
+            RedTree::Leaf(t) => match t.kind {
+                ValkyrieTokenType::Whitespace
+                | ValkyrieTokenType::Newline
+                | ValkyrieTokenType::LineComment
+                | ValkyrieTokenType::BlockComment => {}
+                ValkyrieTokenType::Eof => saw_eof = true,
+                _ => return false,
+            },
+            RedTree::Node(_) => return false,
+        }
+    }
+    saw_eof
 }
