@@ -87,6 +87,18 @@ pub enum StatementNode {
         #[serde(with = "oak_core::serde_range")]
         span: Range<usize>,
     },
+    /// `for x in expr`（builder 可再降成 while）
+    For {
+        /// 循环变量
+        var: String,
+        /// 可枚举表达式
+        iterable: ExpressionNode,
+        /// 循环体
+        body: Vec<StatementNode>,
+        /// Source code span
+        #[serde(with = "oak_core::serde_range")]
+        span: Range<usize>,
+    },
     /// Case statement
     Case {
         /// Value expression
@@ -119,6 +131,11 @@ pub enum StatementNode {
         #[serde(with = "oak_core::serde_range")]
         span: Range<usize>,
     },
+    /// `break`
+    Break {
+        #[serde(with = "oak_core::serde_range")]
+        span: Range<usize>,
+    },
 }
 
 /// Ruby expression node
@@ -143,6 +160,10 @@ pub enum ExpressionNode {
         method: String,
         /// Argument list
         args: Vec<ExpressionNode>,
+        /// 块参数（`{|x|` / `do |x|`）
+        block_params: Vec<String>,
+        /// 块体；无块时为 `None`
+        block_body: Option<Vec<StatementNode>>,
         /// Source code span
         #[serde(with = "oak_core::serde_range")]
         span: Range<usize>,

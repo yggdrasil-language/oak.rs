@@ -294,6 +294,14 @@ pub enum RubyElementType {
     Error,
     /// Equal operator `=`.
     Equal,
+    /// 赋值语句 `name = expr`。
+    AssignmentStatement,
+    /// 数组字面量 `[a, b]`。
+    ArrayExpression,
+    /// 块表达式 `{...}` / `do...end`
+    BlockExpression,
+    /// `break`
+    BreakStatement,
 }
 
 impl RubyElementType {
@@ -503,6 +511,10 @@ impl fmt::Display for RubyElementType {
             Self::ArgumentList => "ArgumentList",
             Self::Error => "Error",
             Self::Equal => "Equal",
+            Self::AssignmentStatement => "AssignmentStatement",
+            Self::ArrayExpression => "ArrayExpression",
+            Self::BlockExpression => "BlockExpression",
+            Self::BreakStatement => "BreakStatement",
         };
         write!(f, "{}", name)
     }
