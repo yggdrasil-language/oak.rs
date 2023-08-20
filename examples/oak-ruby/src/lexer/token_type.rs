@@ -288,7 +288,9 @@ pub enum RubyTokenType {
 impl RubyTokenType {
     /// Returns true if the token is ignored (whitespace, newline, or comment).
     pub fn is_ignored(&self) -> bool {
-        matches!(self, Self::Whitespace | Self::Newline | Self::Comment)
+        // 换行在 Ruby 里是语句边界，不能当 trivia 自动跳过，
+        // 否则 `@x = foo\nif cond` 会被当成修饰符 if。
+        matches!(self, Self::Whitespace | Self::Comment)
     }
 
     /// Returns true if the token type is a keyword.
@@ -495,7 +497,7 @@ impl TokenType for RubyTokenType {
     const END_OF_STREAM: Self = Self::Error;
 
     fn is_ignored(&self) -> bool {
-        matches!(self, Self::Whitespace | Self::Newline | Self::Comment)
+        matches!(self, Self::Whitespace | Self::Comment)
     }
 
     fn role(&self) -> Self::Role {
