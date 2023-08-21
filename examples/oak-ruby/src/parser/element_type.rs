@@ -298,6 +298,8 @@ pub enum RubyElementType {
     AssignmentStatement,
     /// 数组字面量 `[a, b]`。
     ArrayExpression,
+    /// 哈希字面量 `{a => 1}` / `{}`。
+    HashExpression,
     /// 块表达式 `{...}` / `do...end`
     BlockExpression,
     /// `break`
@@ -513,6 +515,7 @@ impl fmt::Display for RubyElementType {
             Self::Equal => "Equal",
             Self::AssignmentStatement => "AssignmentStatement",
             Self::ArrayExpression => "ArrayExpression",
+            Self::HashExpression => "HashExpression",
             Self::BlockExpression => "BlockExpression",
             Self::BreakStatement => "BreakStatement",
         };

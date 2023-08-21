@@ -10,7 +10,7 @@ use oak_core::{
     GreenNode, OakError, TextEdit,
     parser::{
         ParseCache, ParseOutput, Parser, ParserState, parse_with_lexer,
-        pratt::{Associativity, Pratt, PrattParser, binary, unary},
+        pratt::{Associativity, Pratt, PrattParser},
     },
     source::Source,
 };
@@ -28,10 +28,44 @@ impl<'config> RubyParser<'config> {
         Self { config }
     }
 
+    /// 语句间隙：空格 / 注释 / 换行。
+    fn skip_stmt_gap<'a, S: Source + ?Sized>(&self, state: &mut State<'a, S>) {
+        use crate::lexer::token_type::RubyTokenType::*;
+        while matches!(state.peek_kind(), Some(Whitespace | Comment | Newline)) {
+            state.bump();
+        }
+    }
+
+    /// 表达式内间隙：运算符后允许换行续行。
+    fn skip_expr_gap<'a, S: Source + ?Sized>(&self, state: &mut State<'a, S>) {
+        use crate::lexer::token_type::RubyTokenType::*;
+        while matches!(state.peek_kind(), Some(Whitespace | Comment | Newline)) {
+            state.bump();
+        }
+    }
+
+    /// 仅同行修饰符：跳过空格/注释后若是 `if`/`unless`。
+    fn peek_same_line_modifier<'a, S: Source + ?Sized>(&self, state: &mut State<'a, S>) -> Option<bool> {
+        use crate::lexer::token_type::RubyTokenType::*;
+        while matches!(state.peek_kind(), Some(Whitespace | Comment)) {
+            state.bump();
+        }
+        match state.peek_kind() {
+            Some(If) => Some(false),
+            Some(Unless) => Some(true),
+            _ => None,
+        }
+    }
+
     fn parse_statement<'a, S: Source + ?Sized>(&self, state: &mut State<'a, S>) -> Result<(), OakError> {
         use crate::lexer::token_type::RubyTokenType::*;
-        while state.peek_kind().is_some_and(|kind| kind.is_ignored()) {
-            state.bump();
+        self.skip_stmt_gap(state);
+        // 体循环边界：不要把 `end`/`else` 当表达式吞掉。
+        if matches!(
+            state.peek_kind(),
+            Some(End | Else | Elsif | When | Rescue | Ensure) | None
+        ) {
+            return Ok(());
         }
         if matches!(
             state.peek_kind(),
@@ -46,10 +80,28 @@ impl<'config> RubyParser<'config> {
             let checkpoint = state.checkpoint();
             state.bump();
             state.bump();
+            self.skip_expr_gap(state);
             PrattParser::parse(state, 0, self);
-            state.eat(Semicolon);
-            state.eat(Newline);
-            state.finish_at(checkpoint, crate::parser::element_type::RubyElementType::AssignmentStatement);
+            // 行尾修饰符：同一行的 `if`/`unless`（换行后的 if 是新语句）。
+            if let Some(is_unless) = self.peek_same_line_modifier(state) {
+                state.bump();
+                self.skip_expr_gap(state);
+                PrattParser::parse(state, 0, self);
+                state.eat(Semicolon);
+                state.eat(Newline);
+                state.finish_at(
+                    checkpoint,
+                    if is_unless {
+                        crate::parser::element_type::RubyElementType::UnlessStatement
+                    } else {
+                        crate::parser::element_type::RubyElementType::IfStatement
+                    },
+                );
+            } else {
+                state.eat(Semicolon);
+                state.eat(Newline);
+                state.finish_at(checkpoint, crate::parser::element_type::RubyElementType::AssignmentStatement);
+            }
             return Ok(());
         }
         match state.peek_kind() {
@@ -67,24 +119,58 @@ impl<'config> RubyParser<'config> {
             Some(Break) => {
                 let cp = state.checkpoint();
                 state.bump();
-                state.eat(Semicolon);
-                state.eat(Newline);
-                state.finish_at(cp, crate::parser::element_type::RubyElementType::BreakStatement);
+                // `break if cond` / `break unless cond`
+                if let Some(is_unless) = self.peek_same_line_modifier(state) {
+                    state.bump();
+                    self.skip_expr_gap(state);
+                    PrattParser::parse(state, 0, self);
+                    state.eat(Semicolon);
+                    state.eat(Newline);
+                    state.finish_at(
+                        cp,
+                        if is_unless {
+                            crate::parser::element_type::RubyElementType::UnlessStatement
+                        } else {
+                            crate::parser::element_type::RubyElementType::IfStatement
+                        },
+                    );
+                } else {
+                    state.eat(Semicolon);
+                    state.eat(Newline);
+                    state.finish_at(cp, crate::parser::element_type::RubyElementType::BreakStatement);
+                }
             }
             Some(Next) => {
                 let cp = state.checkpoint();
                 state.bump();
-                state.eat(Semicolon);
-                state.eat(Newline);
-                state.finish_at(cp, crate::parser::element_type::RubyElementType::ReturnStatement);
+                // `next if cond`：先记成 if，体里是空 next（宿主过渡当 continue 近似）。
+                if let Some(is_unless) = self.peek_same_line_modifier(state) {
+                    state.bump();
+                    self.skip_expr_gap(state);
+                    PrattParser::parse(state, 0, self);
+                    state.eat(Semicolon);
+                    state.eat(Newline);
+                    state.finish_at(
+                        cp,
+                        if is_unless {
+                            crate::parser::element_type::RubyElementType::UnlessStatement
+                        } else {
+                            crate::parser::element_type::RubyElementType::IfStatement
+                        },
+                    );
+                } else {
+                    state.eat(Semicolon);
+                    state.eat(Newline);
+                    state.finish_at(cp, crate::parser::element_type::RubyElementType::BreakStatement);
+                }
             }
             _ => {
                 let cp = state.checkpoint();
                 PrattParser::parse(state, 0, self);
                 // 语句修饰符：`stmt if cond` / `stmt unless cond`
-                if matches!(state.peek_kind(), Some(If | Unless)) {
-                    let is_unless = matches!(state.peek_kind(), Some(Unless));
+                if let Some(is_unless) = self.peek_same_line_modifier(state) {
                     state.bump();
+                    self.skip_expr_gap(state);
                     PrattParser::parse(state, 0, self);
                     state.eat(Semicolon);
                     state.eat(Newline);
@@ -181,7 +267,7 @@ impl<'config> RubyParser<'config> {
     /// `{|a,b| ...}` 或 `do |a| ... end`；无块则不动。
     fn parse_optional_block<'a, S: Source + ?Sized>(&self, state: &mut State<'a, S>) {
         use crate::lexer::token_type::RubyTokenType::*;
-        while state.peek_kind().is_some_and(|k| k.is_ignored()) {
+        while matches!(state.peek_kind(), Some(Whitespace | Comment)) {
             state.bump();
         }
         let brace = state.at(LeftBrace);
@@ -193,7 +279,7 @@ impl<'config> RubyParser<'config> {
         state.bump(); // { or do
         if state.eat(BitOr) {
             while state.not_at_end() && !state.at(BitOr) {
-                if state.peek_kind().is_some_and(|k| k.is_ignored()) {
+                if matches!(state.peek_kind(), Some(Whitespace | Comment | Newline)) {
                     state.bump();
                     continue;
                 }
@@ -268,8 +354,14 @@ impl<'config> RubyParser<'config> {
         use crate::lexer::token_type::RubyTokenType::*;
         let cp = state.checkpoint();
         state.bump(); // def
-        if matches!(state.peek_kind(), Some(Identifier | Constant)) {
+        // `def self.foo` / `def Foo.bar`
+        if matches!(state.peek_kind(), Some(Self_ | Identifier | Constant)) {
             state.bump();
+            if state.eat(Dot) {
+                if matches!(state.peek_kind(), Some(Identifier | Constant)) {
+                    state.bump();
+                }
+            }
         }
         if state.eat(LeftParen) {
             while state.not_at_end() && !state.at(RightParen) {
@@ -278,6 +370,10 @@ impl<'config> RubyParser<'config> {
                 }
                 if matches!(state.peek_kind(), Some(Identifier | Constant)) {
                     state.bump();
+                    // 默认参数 `a = expr`：吃掉默认值表达式，arity 仍按有名参数计。
+                    if state.eat(Assign) {
+                        PrattParser::parse(state, 0, self);
+                    }
                     continue;
                 }
                 break;
@@ -291,14 +387,18 @@ impl<'config> RubyParser<'config> {
 
     fn parse_body<'a, S: Source + ?Sized>(&self, state: &mut State<'a, S>) -> Result<(), OakError> {
         use crate::lexer::token_type::RubyTokenType::*;
-        while state.not_at_end()
-            && !state.at(End)
-            && !state.at(Else)
-            && !state.at(Elsif)
-            && !state.at(Rescue)
-            && !state.at(Ensure)
-            && !state.at(When)
-        {
+        loop {
+            self.skip_stmt_gap(state);
+            if !state.not_at_end()
+                || state.at(End)
+                || state.at(Else)
+                || state.at(Elsif)
+                || state.at(Rescue)
+                || state.at(Ensure)
+                || state.at(When)
+            {
+                break;
+            }
             self.parse_statement(state)?
         }
         state.eat(End);
@@ -311,13 +411,17 @@ impl<'config> RubyParser<'config> {
         state: &mut State<'a, S>,
     ) -> Result<(), OakError> {
         use crate::lexer::token_type::RubyTokenType::*;
-        while state.not_at_end()
-            && !state.at(End)
-            && !state.at(Else)
-            && !state.at(Elsif)
-            && !state.at(Rescue)
-            && !state.at(Ensure)
-        {
+        loop {
+            self.skip_stmt_gap(state);
+            if !state.not_at_end()
+                || state.at(End)
+                || state.at(Else)
+                || state.at(Elsif)
+                || state.at(Rescue)
+                || state.at(Ensure)
+            {
+                break;
+            }
             self.parse_statement(state)?
         }
         Ok(())
@@ -378,12 +482,82 @@ impl<'config> RubyParser<'config> {
         use crate::lexer::token_type::RubyTokenType::*;
         let cp = state.checkpoint();
         state.bump(); // return
+        // `return if cond` / `return unless cond`
+        if let Some(is_unless) = self.peek_same_line_modifier(state) {
+            state.bump();
+            self.skip_expr_gap(state);
+            PrattParser::parse(state, 0, self);
+            state.eat(Semicolon);
+            state.eat(Newline);
+            state.finish_at(
+                cp,
+                if is_unless {
+                    crate::parser::element_type::RubyElementType::UnlessStatement
+                } else {
+                    crate::parser::element_type::RubyElementType::IfStatement
+                },
+            );
+            return Ok(());
+        }
         if !matches!(state.peek_kind(), Some(End | Else | Elsif | Newline | Semicolon) | None) {
             PrattParser::parse(state, 0, self);
         }
+        state.eat(Semicolon);
+        state.eat(Newline);
         state.finish_at(cp, crate::parser::element_type::RubyElementType::ReturnStatement);
         Ok(())
     }
+}
+
+fn looks_like_parenless_arg<S: Source + ?Sized>(state: &State<'_, S>) -> bool {
+    use crate::lexer::token_type::RubyTokenType::*;
+    // 语句边界 / 修饰符关键字不能当无括号实参。
+    if matches!(
+        state.peek_kind(),
+        Some(
+            If | Unless
+                | While
+                | Until
+                | For
+                | Do
+                | End
+                | Else
+                | Elsif
+                | When
+                | Then
+                | Rescue
+                | Ensure
+                | Newline
+                | Semicolon
+                | RightParen
+                | RightBracket
+                | RightBrace
+                | Comma
+        ) | None
+    ) {
+        return false;
+    }
+    matches!(
+        state.peek_kind(),
+        Some(
+            IntegerLiteral
+                | FloatLiteral
+                | StringLiteral
+                | Symbol
+                | True
+                | False
+                | Nil
+                | Identifier
+                | Constant
+                | GlobalVariable
+                | InstanceVariable
+                | ClassVariable
+                | Self_
+                | LeftBracket
+                | LeftParen
+                | LeftBrace
+        )
+    )
 }
 
 impl<'config> Pratt<RubyLanguage> for RubyParser<'config> {
@@ -392,22 +566,85 @@ impl<'config> Pratt<RubyLanguage> for RubyParser<'config> {
         let cp = state.checkpoint();
         match state.peek_kind() {
             Some(Identifier) | Some(Constant) | Some(GlobalVariable) | Some(InstanceVariable) | Some(ClassVariable) => {
-                state.bump();
+                // 不要用 bump()：它会 skip_trivia 把换行吞掉，导致
+                // `unless base\n@skill=...` 把下一行当成无括号实参。
+                if let Some(token) = state.current() {
+                    let kind = token.kind;
+                    let len = token.length();
+                    state.sink.push_leaf(kind, len);
+                    state.tokens.advance();
+                }
+                while matches!(state.peek_kind(), Some(Whitespace | Comment)) {
+                    state.bump();
+                }
                 if state.eat(LeftParen) {
                     while state.not_at_end() && !state.at(RightParen) {
-                        if state.peek_kind().is_some_and(|kind| kind.is_ignored()) {
-                            state.bump();
-                            continue;
+                        self.skip_expr_gap(state);
+                        if state.at(RightParen) {
+                            break;
                         }
                         PrattParser::parse(state, 0, self);
                         state.eat(Comma);
                     }
                     let _ = state.expect(RightParen);
-                    // `foo() { }` / `foo() do ... end`
                     self.parse_optional_block(state);
                     state.finish_at(cp, crate::parser::element_type::RubyElementType::CallExpression)
                 } else {
-                    state.finish_at(cp, crate::parser::element_type::RubyElementType::Identifier)
+                    while matches!(state.peek_kind(), Some(Whitespace | Comment)) {
+                        state.bump();
+                    }
+                    // 换行 / 语句边界：绝不当无括号调用。
+                    if matches!(
+                        state.peek_kind(),
+                        Some(
+                            Newline
+                                | Semicolon
+                                | End
+                                | Else
+                                | Elsif
+                                | When
+                                | Rescue
+                                | Ensure
+                                | If
+                                | Unless
+                                | While
+                                | Until
+                                | Do
+                                | RightParen
+                                | RightBracket
+                                | RightBrace
+                                | Comma
+                        ) | None
+                    ) || !looks_like_parenless_arg(state)
+                    {
+                        state.skip_trivia();
+                        state.finish_at(cp, crate::parser::element_type::RubyElementType::Identifier)
+                    } else {
+                        loop {
+                            while matches!(state.peek_kind(), Some(Whitespace | Comment)) {
+                                state.bump();
+                            }
+                            if matches!(
+                                state.peek_kind(),
+                                Some(Newline | Semicolon | End | Else | Elsif | When | Rescue | Ensure) | None
+                            ) {
+                                break;
+                            }
+                            if !looks_like_parenless_arg(state) {
+                                break;
+                            }
+                            PrattParser::parse(state, 0, self);
+                            while matches!(state.peek_kind(), Some(Whitespace | Comment)) {
+                                state.bump();
+                            }
+                            if !state.eat(Comma) {
+                                break;
+                            }
+                        }
+                        self.parse_optional_block(state);
+                        state.skip_trivia();
+                        state.finish_at(cp, crate::parser::element_type::RubyElementType::CallExpression)
+                    }
                 }
             }
             Some(IntegerLiteral) | Some(FloatLiteral) | Some(StringLiteral) | Some(True) | Some(False) | Some(Nil) | Some(Self_) | Some(Symbol) => {
@@ -417,9 +654,9 @@ impl<'config> Pratt<RubyLanguage> for RubyParser<'config> {
             Some(LeftBracket) => {
                 state.bump();
                 while state.not_at_end() && !state.at(RightBracket) {
-                    if state.peek_kind().is_some_and(|kind| kind.is_ignored()) {
-                        state.bump();
-                        continue;
+                    self.skip_expr_gap(state);
+                    if state.at(RightBracket) {
+                        break;
                     }
                     PrattParser::parse(state, 0, self);
                     state.eat(Comma);
@@ -427,11 +664,52 @@ impl<'config> Pratt<RubyLanguage> for RubyParser<'config> {
                 let _ = state.expect(RightBracket);
                 state.finish_at(cp, crate::parser::element_type::RubyElementType::ArrayExpression)
             }
+            Some(LeftBrace) => {
+                // `{|a| ...}` 当块；`{}` / `{k => v}` 当哈希。
+                state.bump(); // {
+                self.skip_expr_gap(state);
+                if state.at(BitOr) {
+                    // 回退到块：已 bump `{`，继续吃块体。
+                    if state.eat(BitOr) {
+                        while state.not_at_end() && !state.at(BitOr) {
+                            self.skip_expr_gap(state);
+                            if matches!(state.peek_kind(), Some(Identifier | Constant)) {
+                                state.bump();
+                            }
+                            state.eat(Comma);
+                        }
+                        state.eat(BitOr);
+                    }
+                    while state.not_at_end() && !state.at(RightBrace) {
+                        self.skip_expr_gap(state);
+                        if state.at(RightBrace) {
+                            break;
+                        }
+                        let _ = self.parse_statement(state);
+                    }
+                    state.eat(RightBrace);
+                    state.finish_at(cp, crate::parser::element_type::RubyElementType::BlockExpression)
+                } else {
+                    while state.not_at_end() && !state.at(RightBrace) {
+                        self.skip_expr_gap(state);
+                        if state.at(RightBrace) {
+                            break;
+                        }
+                        PrattParser::parse(state, 0, self); // key
+                        if state.eat(EqualGreater) || state.eat(Colon) {
+                            PrattParser::parse(state, 0, self); // value
+                        }
+                        state.eat(Comma);
+                    }
+                    let _ = state.expect(RightBrace);
+                    state.finish_at(cp, crate::parser::element_type::RubyElementType::HashExpression)
+                }
+            }
             Some(LeftParen) => {
                 state.bump();
                 PrattParser::parse(state, 0, self);
                 state.expect(RightParen).ok();
-                state.finish_at(cp, crate::parser::element_type::RubyElementType::ParenExpression) // Simplified handling
+                state.finish_at(cp, crate::parser::element_type::RubyElementType::ParenExpression)
             }
             _ => {
                 state.bump();
@@ -444,7 +722,11 @@ impl<'config> Pratt<RubyLanguage> for RubyParser<'config> {
         use crate::lexer::token_type::RubyTokenType::*;
         match state.peek_kind() {
             Some(kind @ (Plus | Minus | Not | Tilde)) => {
-                unary(state, kind, 13, crate::parser::element_type::RubyElementType::UnaryExpression, |st, p| PrattParser::parse(st, p, self))
+                let cp = state.checkpoint();
+                state.expect(kind).ok();
+                self.skip_expr_gap(state);
+                let _right = PrattParser::parse(state, 13, self);
+                state.finish_at(cp, crate::parser::element_type::RubyElementType::UnaryExpression)
             }
             _ => self.primary(state),
         }
@@ -461,12 +743,17 @@ impl<'config> Pratt<RubyLanguage> for RubyParser<'config> {
                 }
                 let cp = state.checkpoint_before(left);
                 state.bump(); // .
+                self.skip_expr_gap(state);
                 // method name
                 if matches!(state.peek_kind(), Some(Identifier | Constant)) {
                     state.bump();
                 }
                 // `obj.foo = bar` → setter 调用
+                while matches!(state.peek_kind(), Some(Whitespace | Comment)) {
+                    state.bump();
+                }
                 if state.eat(Assign) {
+                    self.skip_expr_gap(state);
                     PrattParser::parse(state, 0, self);
                     state.eat(Semicolon);
                     state.eat(Newline);
@@ -474,14 +761,37 @@ impl<'config> Pratt<RubyLanguage> for RubyParser<'config> {
                 }
                 if state.eat(LeftParen) {
                     while state.not_at_end() && !state.at(RightParen) {
-                        if state.peek_kind().is_some_and(|k| k.is_ignored()) {
-                            state.bump();
-                            continue;
+                        self.skip_expr_gap(state);
+                        if state.at(RightParen) {
+                            break;
                         }
                         PrattParser::parse(state, 0, self);
                         state.eat(Comma);
                     }
                     let _ = state.expect(RightParen);
+                } else if looks_like_parenless_arg(state) {
+                    // `obj.foo a, b` 无括号实参
+                    loop {
+                        while matches!(state.peek_kind(), Some(Whitespace | Comment)) {
+                            state.bump();
+                        }
+                        if matches!(
+                            state.peek_kind(),
+                            Some(Newline | Semicolon | End | Else | Elsif | When | Rescue | Ensure) | None
+                        ) {
+                            break;
+                        }
+                        if !looks_like_parenless_arg(state) {
+                            break;
+                        }
+                        PrattParser::parse(state, 0, self);
+                        while matches!(state.peek_kind(), Some(Whitespace | Comment)) {
+                            state.bump();
+                        }
+                        if !state.eat(Comma) {
+                            break;
+                        }
+                    }
                 }
                 // `obj.foo { ... }` / `obj.foo do ... end`
                 self.parse_optional_block(state);
@@ -493,14 +803,15 @@ impl<'config> Pratt<RubyLanguage> for RubyParser<'config> {
                 }
                 let cp = state.checkpoint_before(left);
                 state.bump(); // ::
+                self.skip_expr_gap(state);
                 if matches!(state.peek_kind(), Some(Identifier | Constant)) {
                     state.bump();
                 }
                 if state.eat(LeftParen) {
                     while state.not_at_end() && !state.at(RightParen) {
-                        if state.peek_kind().is_some_and(|k| k.is_ignored()) {
-                            state.bump();
-                            continue;
+                        self.skip_expr_gap(state);
+                        if state.at(RightParen) {
+                            break;
                         }
                         PrattParser::parse(state, 0, self);
                         state.eat(Comma);
@@ -524,9 +835,9 @@ impl<'config> Pratt<RubyLanguage> for RubyParser<'config> {
                 let cp = state.checkpoint_before(left);
                 state.bump(); // [
                 while state.not_at_end() && !state.at(RightBracket) {
-                    if state.peek_kind().is_some_and(|k| k.is_ignored()) {
-                        state.bump();
-                        continue;
+                    self.skip_expr_gap(state);
+                    if state.at(RightBracket) {
+                        break;
                     }
                     PrattParser::parse(state, 0, self);
                     state.eat(Comma);
@@ -550,7 +861,16 @@ impl<'config> Pratt<RubyLanguage> for RubyParser<'config> {
             return None;
         }
 
-        Some(binary(state, left, kind, prec, assoc, crate::parser::element_type::RubyElementType::BinaryExpression, |s, p| PrattParser::parse(s, p, self)))
+        // 运算符后允许换行续行（不用 oak-core binary，因其不跳 Newline）。
+        let cp = state.checkpoint_before(left);
+        state.expect(kind).ok();
+        self.skip_expr_gap(state);
+        let next_prec = match assoc {
+            Associativity::Left | Associativity::None => prec.saturating_add(1),
+            Associativity::Right => prec,
+        };
+        let _right = PrattParser::parse(state, next_prec, self);
+        Some(state.finish_at(cp, crate::parser::element_type::RubyElementType::BinaryExpression))
     }
 }
 
@@ -560,9 +880,9 @@ impl<'config> Parser<RubyLanguage> for RubyParser<'config> {
         parse_with_lexer(&lexer, text, edits, cache, |state| {
             let cp = state.checkpoint();
             while state.not_at_end() {
-                if state.peek_kind().map(|k| k.is_ignored()).unwrap_or(false) {
-                    state.bump();
-                    continue;
+                self.skip_stmt_gap(state);
+                if !state.not_at_end() {
+                    break;
                 }
                 let _ = self.parse_statement(state);
             }
