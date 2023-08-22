@@ -237,6 +237,24 @@ impl<'config> RubyBuilder<'config> {
                         right: Box::new(rhs),
                         span: span.clone(),
                     },
+                    "||=" => ExpressionNode::BinaryOp {
+                        left: Box::new(ExpressionNode::Identifier {
+                            name: target.clone(),
+                            span: span.clone(),
+                        }),
+                        operator: "||".into(),
+                        right: Box::new(rhs),
+                        span: span.clone(),
+                    },
+                    "&&=" => ExpressionNode::BinaryOp {
+                        left: Box::new(ExpressionNode::Identifier {
+                            name: target.clone(),
+                            span: span.clone(),
+                        }),
+                        operator: "&&".into(),
+                        right: Box::new(rhs),
+                        span: span.clone(),
+                    },
                     _ => rhs,
                 };
                 Ok(Some(StatementNode::Assignment { target, value, span }))
@@ -247,6 +265,7 @@ impl<'config> RubyBuilder<'config> {
             | RubyElementType::Identifier
             | RubyElementType::CallExpression
             | RubyElementType::ArrayExpression
+            | RubyElementType::HashExpression
             | RubyElementType::ParenExpression
             | RubyElementType::ParenthesizedExpression => {
                 let expr = self.build_expression(node, source, offset)?;
@@ -293,12 +312,24 @@ impl<'config> RubyBuilder<'config> {
         source: &S,
         base: usize,
     ) -> Result<(ExpressionNode, Vec<StatementNode>, Option<Vec<StatementNode>>), oak_core::OakError> {
-        // 修饰符形式 `body unless/if cond`：关键字出现在第一个表达式结点之后。
+        // 修饰符形式：
+        // 1) `body if/unless cond`（body 为表达式）
+        // 2) `return/break/next if/unless cond`
         let mut offset_scan = base;
         let mut saw_expr = false;
+        let mut early_flow: Option<RubyTokenType> = None;
         let mut is_modifier = false;
         for child in node.children() {
             match child {
+                GreenTree::Leaf(leaf)
+                    if early_flow.is_none()
+                        && matches!(
+                            leaf.kind,
+                            RubyTokenType::Return | RubyTokenType::Break | RubyTokenType::Next
+                        ) =>
+                {
+                    early_flow = Some(leaf.kind);
+                }
                 GreenTree::Node(child_node)
                     if matches!(
                         child_node.kind,
@@ -309,12 +340,13 @@ impl<'config> RubyBuilder<'config> {
                             | RubyElementType::CallExpression
                             | RubyElementType::ParenExpression
                             | RubyElementType::ArrayExpression
+                            | RubyElementType::HashExpression
                     ) =>
                 {
                     saw_expr = true;
                 }
                 GreenTree::Leaf(leaf)
-                    if saw_expr
+                    if (saw_expr || early_flow.is_some())
                         && matches!(leaf.kind, RubyTokenType::If | RubyTokenType::Unless) =>
                 {
                     is_modifier = true;
@@ -329,34 +361,95 @@ impl<'config> RubyBuilder<'config> {
         if is_modifier {
             let mut body_expr = None;
             let mut condition = None;
+            let mut assign_target: Option<String> = None;
+            let mut saw_assign_op = false;
             let mut offset = base;
             for child in node.children() {
-                if let GreenTree::Node(child_node) = child {
-                    if matches!(
-                        child_node.kind,
-                        RubyElementType::BinaryExpression
-                            | RubyElementType::UnaryExpression
-                            | RubyElementType::LiteralExpression
-                            | RubyElementType::Identifier
-                            | RubyElementType::CallExpression
-                            | RubyElementType::ParenExpression
-                            | RubyElementType::ArrayExpression
-                    ) {
-                        if body_expr.is_none() {
-                            body_expr = self.build_expression(child_node, source, offset)?;
-                        } else if condition.is_none() {
-                            condition = self.build_expression(child_node, source, offset)?;
+                match child {
+                    GreenTree::Leaf(leaf) => {
+                        if !saw_assign_op
+                            && matches!(
+                                leaf.kind,
+                                RubyTokenType::Identifier
+                                    | RubyTokenType::Constant
+                                    | RubyTokenType::GlobalVariable
+                                    | RubyTokenType::InstanceVariable
+                                    | RubyTokenType::ClassVariable
+                            )
+                        {
+                            if assign_target.is_none() {
+                                assign_target = Some(text_at(source, offset, leaf.length));
+                            }
+                        } else if matches!(
+                            leaf.kind,
+                            RubyTokenType::Assign
+                                | RubyTokenType::PlusAssign
+                                | RubyTokenType::MinusAssign
+                                | RubyTokenType::MultiplyAssign
+                                | RubyTokenType::DivideAssign
+                                | RubyTokenType::OrOrAssign
+                                | RubyTokenType::AndAndAssign
+                        ) {
+                            saw_assign_op = true;
                         }
                     }
+                    GreenTree::Node(child_node) => {
+                        if matches!(
+                            child_node.kind,
+                            RubyElementType::BinaryExpression
+                                | RubyElementType::UnaryExpression
+                                | RubyElementType::LiteralExpression
+                                | RubyElementType::Identifier
+                                | RubyElementType::CallExpression
+                                | RubyElementType::ParenExpression
+                                | RubyElementType::ArrayExpression
+                                | RubyElementType::HashExpression
+                        ) {
+                            if early_flow.is_some() {
+                                if condition.is_none() {
+                                    condition = self.build_expression(child_node, source, offset)?;
+                                }
+                            } else if body_expr.is_none() {
+                                body_expr = self.build_expression(child_node, source, offset)?;
+                            } else if condition.is_none() {
+                                condition = self.build_expression(child_node, source, offset)?;
+                            }
+                        }
+                    }
+                    _ => {}
                 }
                 offset += child.len() as usize;
             }
             let condition = condition.unwrap_or(ExpressionNode::Literal(LiteralNode::Nil {
                 span: span.clone(),
             }));
-            let then_body = body_expr
-                .map(|e| vec![StatementNode::Expression(e)])
-                .unwrap_or_default();
+            let then_body = if let Some(kind) = early_flow {
+                match kind {
+                    RubyTokenType::Return => vec![StatementNode::Return {
+                        value: None,
+                        span: span.clone(),
+                    }],
+                    _ => vec![StatementNode::Break {
+                        span: span.clone(),
+                    }],
+                }
+            } else if saw_assign_op {
+                let target = assign_target.unwrap_or_else(|| "_".into());
+                let value = body_expr.unwrap_or(ExpressionNode::Literal(LiteralNode::Nil {
+                    span: span.clone(),
+                }));
+                // 修饰符赋值：`@x = expr unless cond` 的 then 体是赋值本身。
+                // 条件在 unless 时已由外层 `UnlessStatement` 处理；if 同理。
+                vec![StatementNode::Assignment {
+                    target,
+                    value,
+                    span: span.clone(),
+                }]
+            } else {
+                body_expr
+                    .map(|e| vec![StatementNode::Expression(e)])
+                    .unwrap_or_default()
+            };
             return Ok((condition, then_body, None));
         }
 
@@ -710,6 +803,25 @@ impl<'config> RubyBuilder<'config> {
                     child_offset += child.len() as usize;
                 }
                 Ok(Some(ExpressionNode::Array { elements, span }))
+            }
+            RubyElementType::HashExpression => {
+                let mut pairs = Vec::new();
+                let mut exprs = Vec::new();
+                let mut child_offset = offset;
+                for child in node.children() {
+                    if let GreenTree::Node(child_node) = child {
+                        if let Some(expr) = self.build_expression(child_node, source, child_offset)? {
+                            exprs.push(expr);
+                        }
+                    }
+                    child_offset += child.len() as usize;
+                }
+                let mut i = 0;
+                while i + 1 < exprs.len() {
+                    pairs.push((exprs[i].clone(), exprs[i + 1].clone()));
+                    i += 2;
+                }
+                Ok(Some(ExpressionNode::Hash { pairs, span }))
             }
             _ => Ok(None),
         }
