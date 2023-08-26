@@ -24,14 +24,14 @@ fn test_ecs_extension() {
 
         system MovementSystem {
             micro execute(world: World): Result<()> {
-                // system logic
+                # system logic
                 return Ok()
             }
         }
 
         system PlayerSystem {
             micro execute(world: World): Result<()> {
-                // system logic
+                # system logic
                 return Ok()
             }
         }

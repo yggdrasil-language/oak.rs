@@ -30,3 +30,8 @@ all-features = true
 [[test]]
 name = "main"
 required-features = ["serde"]
+
+[[test]]
+name = "lexer"
+path = "tests/lexer/mod.rs"
+required-features = ["serde"]
