@@ -109,3 +109,7 @@ class Animal {
 # Comments
 # Single line
 # Another line
+<#
+Multi
+line
+#>

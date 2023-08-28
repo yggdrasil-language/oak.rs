@@ -73,3 +73,45 @@ fn triple_slash_is_not_comment() {
         .collect();
     assert!(bad.is_empty(), "/// must not be LineComment: {bad:?}");
 }
+
+#[test]
+fn block_comment_hash_angles() {
+    let lang = ValkyrieLanguage::default();
+    let lexer = ValkyrieLexer::new(&lang);
+    let src = SourceText::new("<# keep #\n# nested line\n#>\nmicro f() {}\n");
+    let mut session = oak_core::ParseSession::<ValkyrieLanguage>::default();
+    let out = lexer.lex(&src, &[], &mut session);
+    assert!(out.result.is_ok(), "lex err={:?}", out.result.err());
+    let tokens = out.result.unwrap();
+    let blocks: Vec<_> = tokens
+        .iter()
+        .filter(|t| matches!(t.kind, ValkyrieTokenType::BlockComment))
+        .map(|t| src.get_text_in(t.span.clone()).to_string())
+        .collect();
+    assert_eq!(blocks.len(), 1, "tokens block={blocks:?}");
+    assert!(blocks[0].starts_with("<#"), "block={:?}", blocks[0]);
+    assert!(blocks[0].ends_with("#>"), "block={:?}", blocks[0]);
+
+    let builder = ValkyrieBuilder::new(&lang);
+    let mut session = oak_core::ParseSession::<ValkyrieLanguage>::default();
+    let built = builder.build(&src, &[], &mut session);
+    assert!(built.result.is_ok(), "build failed: {:?}", built.result.err());
+    let root = built.result.unwrap();
+    assert_eq!(root.items.len(), 1);
+    assert!(matches!(root.items[0], StatementNode::Micro(_)));
+}
+
+#[test]
+fn c_style_block_comment_is_not_comment() {
+    let lang = ValkyrieLanguage::default();
+    let lexer = ValkyrieLexer::new(&lang);
+    let src = SourceText::new("/* no */\nmicro f() {}\n");
+    let mut session = oak_core::ParseSession::<ValkyrieLanguage>::default();
+    let out = lexer.lex(&src, &[], &mut session);
+    assert!(out.result.is_ok(), "lex err={:?}", out.result.err());
+    let tokens = out.result.unwrap();
+    assert!(
+        !tokens.iter().any(|t| matches!(t.kind, ValkyrieTokenType::BlockComment | ValkyrieTokenType::LineComment)),
+        "/* */ must not be a comment"
+    );
+}
