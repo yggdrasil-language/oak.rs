@@ -39,6 +39,8 @@ impl<'config> MatlabBuilder<'config> {
             MatlabElementType::CommandStmt => self.build_command(node, source),
             MatlabElementType::GlobalStmt => self.build_name_declaration(node, source, true),
             MatlabElementType::PersistentStmt => self.build_name_declaration(node, source, false),
+            MatlabElementType::FunctionStmt => self.build_function(node, source),
+            MatlabElementType::ReturnStmt => self.build_return(node, source),
             MatlabElementType::Error => Ok(Statement::Error { span }),
             kind if crate::builder::utils::is_expr_kind(kind) => Ok(Statement::Expr(self.build_expr(node, source)?)),
             other => Err(source.syntax_error(format!("Unexpected MATLAB statement kind: {other:?}"), span.start)),
@@ -311,5 +313,33 @@ impl<'config> MatlabBuilder<'config> {
         }
 
         Ok(Statement::Try { body, catch_name, catch_body, span })
+    }
+
+    fn build_function<S: Source + ?Sized>(&self, node: RedNode<'_, MatlabLanguage>, source: &S) -> Result<Statement, OakError> {
+        let span = node.span();
+        let mut header = None;
+        let mut body = Vec::new();
+        for child in node.children() {
+            if let RedTree::Node(n) = child {
+                if header.is_none() {
+                    header = Some(self.build_expr(n, source)?);
+                } else {
+                    body.push(self.build_stmt(n, source)?);
+                }
+            }
+        }
+        let header = header.ok_or_else(|| source.syntax_error("Function missing header".into(), span.start))?;
+        Ok(Statement::Function { header, body, span })
+    }
+
+    fn build_return<S: Source + ?Sized>(&self, node: RedNode<'_, MatlabLanguage>, source: &S) -> Result<Statement, OakError> {
+        let span = node.span();
+        let mut value = None;
+        for child in node.children() {
+            if let RedTree::Node(n) = child {
+                value = Some(self.build_expr(n, source)?);
+            }
+        }
+        Ok(Statement::Return { value, span })
     }
 }

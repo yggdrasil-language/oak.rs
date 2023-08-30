@@ -51,6 +51,10 @@ pub enum MatlabElementType {
     GlobalStmt,
     /// `persistent x y` declaration.
     PersistentStmt,
+    /// `function … end` definition.
+    FunctionStmt,
+    /// `return` statement.
+    ReturnStmt,
     /// `@(x,y) expr` anonymous function.
     AnonymousFunction,
     /// `@name` function handle reference.

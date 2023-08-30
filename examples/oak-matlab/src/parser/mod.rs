@@ -56,6 +56,8 @@ impl<'config> MatlabParser<'config> {
             Some(MatlabTokenType::Try) => self.parse_try(state),
             Some(MatlabTokenType::Global) => self.parse_declaration(state, MatlabElementType::GlobalStmt),
             Some(MatlabTokenType::Persistent) => self.parse_declaration(state, MatlabElementType::PersistentStmt),
+            Some(MatlabTokenType::Function) => self.parse_function(state),
+            Some(MatlabTokenType::Return) => self.parse_return(state),
             Some(MatlabTokenType::Identifier) if Self::looks_like_command(state) => self.parse_command(state),
             _ => self.parse_expression(state),
         }
@@ -247,6 +249,30 @@ impl<'config> MatlabParser<'config> {
             state.bump();
         }
         state.finish_at(checkpoint, MatlabElementType::ForStmt)
+    }
+
+    fn parse_function<'a, S: Source + ?Sized>(&self, state: &mut State<'a, S>) -> &'a GreenNode<'a, MatlabLanguage> {
+        let checkpoint = state.checkpoint();
+        state.bump(); // function
+        self.parse_expression(state); // header (`out = f(a, b)` or `f(a, b)`)
+        self.parse_block_body(state);
+        if state.at(MatlabTokenType::End) {
+            state.bump();
+        }
+        state.finish_at(checkpoint, MatlabElementType::FunctionStmt)
+    }
+
+    fn parse_return<'a, S: Source + ?Sized>(&self, state: &mut State<'a, S>) -> &'a GreenNode<'a, MatlabLanguage> {
+        let checkpoint = state.checkpoint();
+        state.bump(); // return
+        if !Self::at_block_terminator(state)
+            && !state.at(MatlabTokenType::Semicolon)
+            && !state.at(MatlabTokenType::Comma)
+            && !state.at(MatlabTokenType::Newline)
+        {
+            self.parse_expression(state);
+        }
+        state.finish_at(checkpoint, MatlabElementType::ReturnStmt)
     }
 
     fn parse_parfor<'a, S: Source + ?Sized>(&self, state: &mut State<'a, S>) -> &'a GreenNode<'a, MatlabLanguage> {

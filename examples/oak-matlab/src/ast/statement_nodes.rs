@@ -110,6 +110,24 @@ pub enum Statement {
         #[cfg_attr(feature = "serde", serde(with = "oak_core::serde_range"))]
         span: Span,
     },
+    /// `function … end` definition.
+    Function {
+        /// Header expression (`out = f(a, b)` or `f(a, b)`).
+        header: Expression,
+        /// Function body.
+        body: Vec<Statement>,
+        /// Source span.
+        #[cfg_attr(feature = "serde", serde(with = "oak_core::serde_range"))]
+        span: Span,
+    },
+    /// `return` statement.
+    Return {
+        /// Optional return expression.
+        value: Option<Expression>,
+        /// Source span.
+        #[cfg_attr(feature = "serde", serde(with = "oak_core::serde_range"))]
+        span: Span,
+    },
     /// Recovery / error node.
     Error {
         /// Source span.
@@ -133,6 +151,8 @@ impl Statement {
             | Self::Command { span, .. }
             | Self::Global { span, .. }
             | Self::Persistent { span, .. }
+            | Self::Function { span, .. }
+            | Self::Return { span, .. }
             | Self::Error { span } => span.clone(),
         }
     }
@@ -225,6 +245,22 @@ impl Statement {
     pub fn as_try(&self) -> Option<TryView<'_>> {
         match self {
             Self::Try { body, catch_name, catch_body, .. } => Some(TryView { body: body.as_slice(), catch_name: catch_name.as_ref(), catch_body: catch_body.as_slice() }),
+            _ => None,
+        }
+    }
+
+    /// `function` statement parts.
+    pub fn as_function(&self) -> Option<(&Expression, &[Statement])> {
+        match self {
+            Self::Function { header, body, .. } => Some((header, body.as_slice())),
+            _ => None,
+        }
+    }
+
+    /// `return` value expression.
+    pub fn as_return(&self) -> Option<Option<&Expression>> {
+        match self {
+            Self::Return { value, .. } => Some(value.as_ref()),
             _ => None,
         }
     }

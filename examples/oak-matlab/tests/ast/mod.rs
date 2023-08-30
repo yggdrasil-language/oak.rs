@@ -371,3 +371,18 @@ fn ast_typed_accessors_matrix_ops() {
     let u = tr.as_transpose().expect("as_transpose");
     assert_eq!(u.operator, MatlabTokenType::Transpose);
 }
+
+#[test]
+fn ast_function_and_return_owned() {
+    let root = build("function out = f(x)\n    out = x;\n    return;\nend");
+    match &root.items[0] {
+        Statement::Function { header, body, .. } => {
+            match header {
+                Expression::Binary(bin) => assert_eq!(bin.operator, MatlabTokenType::Assign),
+                other => panic!("expected assign header, got {other:?}"),
+            }
+            assert!(body.iter().any(|s| matches!(s, Statement::Return { value: None, .. })));
+        }
+        other => panic!("expected Function, got {other:?}"),
+    }
+}
