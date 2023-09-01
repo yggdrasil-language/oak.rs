@@ -69,6 +69,11 @@ impl OakError {
         Self { kind: Box::new(kind) }
     }
 
+    /// Byte offset in the parsed source when the diagnostic is location-bearing.
+    pub fn source_offset(&self) -> Option<usize> {
+        self.kind.source_offset()
+    }
+
     /// Creates a new custom error with the given message.
     pub fn custom_error(message: impl Into<String>) -> Self {
         Self::new(OakErrorKind::CustomError { message: message.into() })
@@ -330,6 +335,20 @@ impl OakErrorKind {
             OakErrorKind::ZipError { .. } => "error.zip",
             OakErrorKind::ParseError { .. } => "error.parse",
             OakErrorKind::InternalError { .. } => "error.internal",
+        }
+    }
+
+    /// Byte offset in the parsed source when this diagnostic is location-bearing.
+    pub fn source_offset(&self) -> Option<usize> {
+        match self {
+            OakErrorKind::SyntaxError { offset, .. }
+            | OakErrorKind::UnexpectedCharacter { offset, .. }
+            | OakErrorKind::UnexpectedToken { offset, .. }
+            | OakErrorKind::UnexpectedEof { offset, .. }
+            | OakErrorKind::ExpectedToken { offset, .. }
+            | OakErrorKind::ExpectedName { offset, .. }
+            | OakErrorKind::TrailingCommaNotAllowed { offset, .. } => Some(*offset),
+            _ => None,
         }
     }
 }

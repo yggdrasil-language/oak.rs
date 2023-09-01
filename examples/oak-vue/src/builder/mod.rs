@@ -99,6 +99,14 @@ impl VueBuilder {
             }
         }
 
+        if name.is_empty() {
+            name = match node.kind {
+                VueElementType::TemplateElement => Range { start: offset + 1, end: offset + 9 },
+                VueElementType::Program => Range { start: offset + 1, end: offset + 7 },
+                _ => name,
+            };
+        }
+
         let result = VueBlock { name, attributes, children, span: Range { start: offset, end: offset + node.byte_length as usize } };
         Ok(result)
     }

@@ -121,7 +121,12 @@ impl<'config> VueParser<'config> {
             state.push_child(close_node);
         }
 
-        let node = state.finish_at(cp, crate::parser::element_type::VueElementType::Element);
+        let block_kind = match tag_name {
+            "template" => crate::parser::element_type::VueElementType::TemplateElement,
+            "script" => crate::parser::element_type::VueElementType::Program,
+            _ => crate::parser::element_type::VueElementType::Element,
+        };
+        let node = state.finish_at(cp, block_kind);
         state.sink.restore(cp.1);
         state.push_child(node);
     }
