@@ -297,7 +297,10 @@ impl<'config> VueParser<'config> {
             state.bump();
         }
 
-        if state.at(VueTokenType::Colon) {
+        if is_directive {
+            self.parse_optional_directive_arg(state);
+        }
+        else if state.at(VueTokenType::Colon) {
             state.bump();
             state.expect(VueTokenType::Identifier).ok();
         }
@@ -326,6 +329,31 @@ impl<'config> VueParser<'config> {
 
         let kind = if is_directive { crate::parser::element_type::VueElementType::Directive } else { crate::parser::element_type::VueElementType::Attribute };
         state.finish_at(cp, kind);
+    }
+
+    /// Static identifier or `[expr]` argument after a directive prefix (`:`, `@`, `#`, `v-*:`).
+    fn parse_optional_directive_arg<'a, S: Source + ?Sized>(&self, state: &mut State<'a, S>) {
+        if state.at(VueTokenType::Colon) {
+            state.bump();
+        }
+        if state.at(VueTokenType::LeftBracket) {
+            let arg_cp = state.checkpoint();
+            state.bump();
+            while state.not_at_end() && !state.at(VueTokenType::RightBracket) {
+                state.bump();
+            }
+            state.expect(VueTokenType::RightBracket).ok();
+            let node = state.finish_at(arg_cp, crate::parser::element_type::VueElementType::Identifier);
+            state.sink.restore(arg_cp.1);
+            state.push_child(node);
+        }
+        else if state.at(VueTokenType::Identifier) {
+            let arg_cp = state.checkpoint();
+            state.bump();
+            let node = state.finish_at(arg_cp, crate::parser::element_type::VueElementType::Identifier);
+            state.sink.restore(arg_cp.1);
+            state.push_child(node);
+        }
     }
 
     fn parse_directive_value<'a, S: Source + ?Sized>(&self, state: &mut State<'a, S>, directive_name: &str) {
