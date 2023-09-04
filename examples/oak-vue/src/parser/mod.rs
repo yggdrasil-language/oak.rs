@@ -17,6 +17,20 @@ use oak_core::{
 /// Parser state type alias.
 pub(crate) type State<'a, S> = ParserState<'a, VueLanguage, S>;
 
+/// HTML void elements (lowercase author tags only).
+///
+/// PascalCase tags such as `Link` are Vue components and must parse children.
+fn is_html_void_tag(raw: &str) -> bool {
+    if raw.chars().next().is_some_and(|c| c.is_ascii_uppercase()) {
+        return false;
+    }
+    matches!(
+        raw,
+        "area" | "base" | "br" | "col" | "embed" | "hr" | "img" | "input" | "link" | "meta" | "param" | "source"
+            | "track" | "wbr"
+    )
+}
+
 /// Vue parser.
 pub struct VueParser<'config> {
     pub(crate) config: &'config VueLanguage,
@@ -179,7 +193,7 @@ impl<'config> VueParser<'config> {
         if state.at(VueTokenType::Lt) {
             state.expect(VueTokenType::Lt).ok();
             if state.at(VueTokenType::Identifier) {
-                tag_name = state.peek_text().unwrap_or_default().to_lowercase();
+                tag_name = state.peek_text().unwrap_or_default().to_string();
                 state.bump();
             }
         }
@@ -212,7 +226,8 @@ impl<'config> VueParser<'config> {
         }
 
         // Handle special blocks immediately
-        if tag_name == "script" || tag_name == "style" || tag_name == "template" {
+        let tag_cmp = tag_name.to_ascii_lowercase();
+        if tag_cmp == "script" || tag_cmp == "style" || tag_cmp == "template" {
             // Backtrack to use parse_special_block
             state.sink.restore(cp.1); // Restore the sink to before the start token
             // Note: We don't restore the state.lexer because that's not easily possible,
@@ -243,7 +258,7 @@ impl<'config> VueParser<'config> {
         state.sink.restore(tag_cp.1);
         state.push_child(tag_node);
 
-        if !is_self_closing && tag_name != "img" && tag_name != "br" && tag_name != "hr" && tag_name != "input" && tag_name != "meta" && tag_name != "link" {
+        if !is_self_closing && !is_html_void_tag(&tag_name) {
             while state.not_at_end() && !state.at(VueTokenType::LtSlash) {
                 self.parse_node(state);
             }
