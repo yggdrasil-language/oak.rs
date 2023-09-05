@@ -242,7 +242,12 @@ impl<'config> VueParser<'config> {
                 state.bump();
                 continue;
             }
+            let before = state.checkpoint().0;
             self.parse_attribute(state);
+            // Unknown / unconsumed tokens must not spin forever allocating green nodes.
+            if state.checkpoint().0 == before {
+                state.bump();
+            }
         }
 
         let mut is_self_closing = false;
@@ -303,13 +308,14 @@ impl<'config> VueParser<'config> {
         }
 
         let name_cp = state.checkpoint();
-        if state.at(VueTokenType::Identifier) {
-            let text = state.peek_text().map(|c| c.to_string()).unwrap_or_default();
+        // Lexer classifies bare words like `for`/`in`/`as` as keywords. HTML still uses them
+        // as attribute names (`:for`, `for=`). Treat those as name tokens, otherwise the
+        // attribute scan never advances and arena allocation spins without bound.
+        if let Some(text) = Self::bump_attr_name(state) {
             if text.starts_with("v-") {
                 is_directive = true;
                 directive_name = text;
             }
-            state.bump();
         }
 
         if is_directive {
@@ -317,13 +323,13 @@ impl<'config> VueParser<'config> {
         }
         else if state.at(VueTokenType::Colon) {
             state.bump();
-            state.expect(VueTokenType::Identifier).ok();
+            let _ = Self::bump_attr_name(state);
         }
 
         while state.at(VueTokenType::Dot) {
             let mod_cp = state.checkpoint();
             state.bump();
-            state.expect(VueTokenType::Identifier).ok();
+            let _ = Self::bump_attr_name(state);
             state.finish_at(mod_cp, crate::parser::element_type::VueElementType::Modifier);
         }
         state.finish_at(name_cp, crate::parser::element_type::VueElementType::AttributeName);
@@ -344,6 +350,34 @@ impl<'config> VueParser<'config> {
 
         let kind = if is_directive { crate::parser::element_type::VueElementType::Directive } else { crate::parser::element_type::VueElementType::Attribute };
         state.finish_at(cp, kind);
+
+        // Last-resort progress: empty attribute nodes must not be emitted forever.
+        if state.checkpoint().0 == cp.0 && state.not_at_end() {
+            state.bump();
+        }
+    }
+
+    /// Bump one attribute/directive name token (`Identifier` or keyword used as HTML name).
+    fn bump_attr_name<'a, S: Source + ?Sized>(state: &mut State<'a, S>) -> Option<String> {
+        use VueTokenType::*;
+        if state.at(Identifier) {
+            let text = state.peek_text().map(|c| c.to_string()).unwrap_or_default();
+            state.bump();
+            return Some(text);
+        }
+        // Keywords that appear as HTML / Vue attribute names in the wild.
+        if matches!(
+            state.peek_kind(),
+            Some(
+                For | In | Of | As | If | Else | From | Default | Const | Let | Var | Function | Return | Break
+                    | Continue | Switch | Try | Throw | True | False | Null | Import | Export | While
+            )
+        ) {
+            let text = state.peek_text().map(|c| c.to_string()).unwrap_or_default();
+            state.bump();
+            return Some(text);
+        }
+        None
     }
 
     /// Static identifier or `[expr]` argument after a directive prefix (`:`, `@`, `#`, `v-*:`).
@@ -362,13 +396,24 @@ impl<'config> VueParser<'config> {
             state.sink.restore(arg_cp.1);
             state.push_child(node);
         }
-        else if state.at(VueTokenType::Identifier) {
+        else if state.at(VueTokenType::Identifier) || Self::bump_attr_name_is_keyword(state.peek_kind()) {
             let arg_cp = state.checkpoint();
             state.bump();
             let node = state.finish_at(arg_cp, crate::parser::element_type::VueElementType::Identifier);
             state.sink.restore(arg_cp.1);
             state.push_child(node);
         }
+    }
+
+    fn bump_attr_name_is_keyword(kind: Option<VueTokenType>) -> bool {
+        use VueTokenType::*;
+        matches!(
+            kind,
+            Some(
+                For | In | Of | As | If | Else | From | Default | Const | Let | Var | Function | Return | Break
+                    | Continue | Switch | Try | Throw | True | False | Null | Import | Export | While
+            )
+        )
     }
 
     fn parse_directive_value<'a, S: Source + ?Sized>(&self, state: &mut State<'a, S>, directive_name: &str) {
