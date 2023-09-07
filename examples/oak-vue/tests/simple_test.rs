@@ -109,6 +109,18 @@ export default class Page {
 }
 
 #[test]
+fn boolean_null_literals_in_bind_expr_parse() {
+    let source = SourceText::new(
+        r#"<template><div :a="true" :b="false" :c="null">x</div></template>"#,
+    );
+    let language = VueLanguage::default();
+    let parser = VueParser::new(&language);
+    let mut session = ParseSession::default();
+    let parsed = parser.parse(&source, &[], &mut session);
+    assert!(!parsed.has_errors(), "parse errors: {:?}", parsed.diagnostics);
+}
+
+#[test]
 fn pascal_case_link_component_parses_children() {
     let source = SourceText::new(
         "<template><main><Link to=\"IndexPage\">Home</Link></main></template>",

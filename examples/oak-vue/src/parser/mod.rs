@@ -561,6 +561,10 @@ impl<'config> Pratt<VueLanguage> for VueParser<'config> {
             state.expect(Identifier).ok();
             state.finish_at(cp, crate::parser::element_type::VueElementType::Identifier)
         }
+        else if matches!(state.peek_kind(), Some(True | False | Null)) {
+            state.bump();
+            state.finish_at(cp, crate::parser::element_type::VueElementType::Literal)
+        }
         else if state.at(StringLiteral) {
             state.expect(StringLiteral).ok();
             state.finish_at(cp, crate::parser::element_type::VueElementType::Literal)
