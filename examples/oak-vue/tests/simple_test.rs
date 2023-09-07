@@ -68,6 +68,47 @@ fn autocomplete_like_template_parses_without_hang() {
 }
 
 #[test]
+fn mismatched_closing_tag_reports_diagnostic() {
+    let source = SourceText::new("<template><div><span></div></template>");
+    let language = VueLanguage::default();
+    let parser = VueParser::new(&language);
+    let mut session = ParseSession::default();
+    let parsed = parser.parse(&source, &[], &mut session);
+    assert!(
+        parsed.diagnostics.iter().any(|d| d.to_string().contains("mismatched closing tag")),
+        "expected mismatch diagnostic, got: {:?}",
+        parsed.diagnostics
+    );
+}
+
+#[test]
+fn minimal_sfc_with_script_and_style_does_not_hang() {
+    let source = SourceText::new(
+        r#"<template>
+  <p>{{ msg }}</p>
+</template>
+<script>
+export default class Page {
+  msg = 'hi';
+}
+</script>
+<style>
+.p { color: red; }
+</style>"#,
+    );
+    let language = VueLanguage::default();
+    let parser = VueParser::new(&language);
+    let mut session = ParseSession::default();
+    let parsed = parser.parse(&source, &[], &mut session);
+    assert!(!parsed.has_errors(), "parse errors: {:?}", parsed.diagnostics);
+
+    let builder = VueBuilder::new();
+    let mut cache = ParseSession::default();
+    let built = Builder::build(&builder, &source, &[], &mut cache);
+    assert!(built.result.is_ok(), "build failed: {:?}", built.diagnostics);
+}
+
+#[test]
 fn pascal_case_link_component_parses_children() {
     let source = SourceText::new(
         "<template><main><Link to=\"IndexPage\">Home</Link></main></template>",

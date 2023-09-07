@@ -128,7 +128,12 @@ impl<'config> VueParser<'config> {
         if state.at(VueTokenType::LtSlash) {
             let close_cp = state.checkpoint();
             state.expect(VueTokenType::LtSlash).ok();
-            state.expect(VueTokenType::Identifier).ok();
+            if state.at(VueTokenType::Identifier) {
+                state.bump();
+            }
+            else {
+                let _ = Self::bump_attr_name(state);
+            }
             state.expect(VueTokenType::Gt).ok();
             let close_node = state.finish_at(close_cp, crate::parser::element_type::VueElementType::CloseTag);
             state.sink.restore(close_cp.1);
@@ -271,10 +276,27 @@ impl<'config> VueParser<'config> {
             if state.at(VueTokenType::LtSlash) {
                 let close_cp = state.checkpoint();
                 state.expect(VueTokenType::LtSlash).ok();
-                if state.at(VueTokenType::Identifier) {
+                let close_name = if state.at(VueTokenType::Identifier) {
+                    let name = state.peek_text().map(|s| s.to_string()).unwrap_or_default();
                     state.bump();
+                    name
                 }
+                else if let Some(name) = Self::bump_attr_name(state) {
+                    // Keywords used as tag names (rare) still need consumption.
+                    name
+                }
+                else {
+                    String::new()
+                };
                 state.expect(VueTokenType::Gt).ok();
+                if !tag_name.is_empty()
+                    && !close_name.is_empty()
+                    && !tag_name.eq_ignore_ascii_case(&close_name)
+                {
+                    let _ = state.syntax_error(format!(
+                        "mismatched closing tag: expected `</{tag_name}>`, found `</{close_name}>`"
+                    ));
+                }
                 let close_node = state.finish_at(close_cp, crate::parser::element_type::VueElementType::CloseTag);
                 state.sink.restore(close_cp.1);
                 state.push_child(close_node);
@@ -514,8 +536,12 @@ impl<'config> VueParser<'config> {
         }
     }
 
-    fn parse_program<'a, S: Source + ?Sized>(&self, _state: &mut State<'a, S>) {
-        // Implementation for script content parsing
+    fn parse_program<'a, S: Source + ?Sized>(&self, state: &mut State<'a, S>) {
+        // Raw-consume script body until `</script>`. Do not parse JS as template nodes —
+        // otherwise root-level `parse_node` can hang or mis-structure SFC walks.
+        while state.not_at_end() && !state.at(VueTokenType::LtSlash) {
+            state.bump();
+        }
     }
 }
 
