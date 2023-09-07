@@ -626,10 +626,12 @@ impl<'config> Pratt<VueLanguage> for VueParser<'config> {
             Dot | LeftBracket | LeftParen => (100, Associativity::Left),
             Star | Slash => (80, Associativity::Left),
             Plus | Minus => (70, Associativity::Left),
-            Lt | Gt => (60, Associativity::Left),
+            Lt | Gt | LtEq | GtEq | NotEq => (60, Associativity::Left),
             EqEq => (50, Associativity::Left),
             And => (40, Associativity::Left),
             Or => (30, Associativity::Left),
+            // Ternary `cond ? then : else` — between logical OR and assignment.
+            Question => (20, Associativity::Right),
             Eq => (10, Associativity::Right),
             _ => {
                 state.restore(start_cp);
@@ -686,6 +688,23 @@ impl<'config> Pratt<VueLanguage> for VueParser<'config> {
                 }
                 state.expect(RightParen).ok();
                 state.finish_at(op_cp, crate::parser::element_type::VueElementType::CallExpr)
+            }
+            Question => {
+                state.expect(Question).ok();
+                let next_prec = match assoc {
+                    Associativity::Left => prec + 1,
+                    Associativity::Right => prec,
+                    Associativity::None => prec + 1,
+                };
+                self.skip_whitespace(state);
+                let then_expr = PrattParser::parse(state, 0, self);
+                state.push_child(then_expr);
+                self.skip_whitespace(state);
+                state.expect(Colon).ok();
+                self.skip_whitespace(state);
+                let else_expr = PrattParser::parse(state, next_prec, self);
+                state.push_child(else_expr);
+                state.finish_at(op_cp, crate::parser::element_type::VueElementType::ConditionalExpr)
             }
             _ => {
                 state.expect(kind).ok();
