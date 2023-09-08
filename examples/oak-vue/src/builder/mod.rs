@@ -179,25 +179,25 @@ impl VueBuilder {
             for child in node.children {
                 match child {
                     GreenTree::Leaf(t) => {
-                        match t.kind {
-                            VueTokenType::Identifier => {
-                                if name.is_empty() {
-                                    name = Range { start: current_offset, end: current_offset + t.length as usize };
-                                }
-                                else {
-                                    let range = Range { start: current_offset, end: current_offset + t.length as usize };
-                                    modifiers.push(Modifier { name: range.clone(), span: range });
-                                }
+                        if Self::is_name_token(t.kind) {
+                            if name.is_empty() {
+                                name = Range { start: current_offset, end: current_offset + t.length as usize };
                             }
-                            VueTokenType::StringLiteral => {
-                                value = Some(Range { start: current_offset + 1, end: current_offset + t.length as usize - 1 });
+                            else {
+                                let range = Range { start: current_offset, end: current_offset + t.length as usize };
+                                modifiers.push(Modifier { name: range.clone(), span: range });
                             }
-                            _ => {}
+                        }
+                        else if t.kind == VueTokenType::StringLiteral {
+                            value = Some(Range { start: current_offset + 1, end: current_offset + t.length as usize - 1 });
                         }
                         current_offset += t.length as usize;
                     }
                     GreenTree::Node(n) => {
-                        if n.kind == VueElementType::AttributeValue {
+                        if n.kind == VueElementType::AttributeName && name.is_empty() {
+                            name = Self::name_range_from_attr_name_node(n, current_offset);
+                        }
+                        else if n.kind == VueElementType::AttributeValue {
                             let mut sub_offset = current_offset;
                             for sub_child in n.children {
                                 if let GreenTree::Leaf(t) = sub_child {
@@ -207,6 +207,10 @@ impl VueBuilder {
                                 }
                                 sub_offset += sub_child.len() as usize;
                             }
+                        }
+                        else if n.kind == VueElementType::Modifier {
+                            let range = Range { start: current_offset, end: current_offset + n.byte_length as usize };
+                            modifiers.push(Modifier { name: range.clone(), span: range });
                         }
                         current_offset += n.byte_length as usize;
                     }
@@ -221,16 +225,16 @@ impl VueBuilder {
             for child in node.children {
                 match child {
                     GreenTree::Leaf(t) => {
-                        match t.kind {
-                            VueTokenType::Identifier => {
-                                name = Range { start: current_offset, end: current_offset + t.length as usize };
-                            }
-                            _ => {}
+                        if Self::is_name_token(t.kind) {
+                            name = Range { start: current_offset, end: current_offset + t.length as usize };
                         }
                         current_offset += t.length as usize;
                     }
                     GreenTree::Node(n) => {
-                        if n.kind == VueElementType::AttributeValue {
+                        if n.kind == VueElementType::AttributeName && name.is_empty() {
+                            name = Self::name_range_from_attr_name_node(n, current_offset);
+                        }
+                        else if n.kind == VueElementType::AttributeValue {
                             let mut sub_offset = current_offset;
                             for sub_child in n.children {
                                 if let GreenTree::Leaf(t) = sub_child {
@@ -249,6 +253,52 @@ impl VueBuilder {
             VueAttribute::Attribute(Attribute { name, value, span: Range { start: offset, end: offset + node.byte_length as usize } })
         };
         Ok(result)
+    }
+
+    fn is_name_token(kind: VueTokenType) -> bool {
+        use VueTokenType::*;
+        matches!(
+            kind,
+            Identifier
+                | For
+                | In
+                | Of
+                | As
+                | If
+                | Else
+                | From
+                | Default
+                | Const
+                | Let
+                | Var
+                | Function
+                | Return
+                | Break
+                | Continue
+                | Switch
+                | Try
+                | Throw
+                | True
+                | False
+                | Null
+                | Import
+                | Export
+                | While
+        )
+    }
+
+    fn name_range_from_attr_name_node<'a>(node: &GreenNode<'a, VueLanguage>, offset: usize) -> Range<usize> {
+        let mut current = offset;
+        for child in node.children {
+            match child {
+                GreenTree::Leaf(t) if Self::is_name_token(t.kind) => {
+                    return Range { start: current, end: current + t.length as usize };
+                }
+                GreenTree::Leaf(t) => current += t.length as usize,
+                GreenTree::Node(n) => current += n.byte_length as usize,
+            }
+        }
+        Range { start: offset, end: offset }
     }
 
     fn build_interpolation<'a>(&self, node: &GreenNode<'a, VueLanguage>, offset: usize, _source: &SourceText) -> Result<VueInterpolation, OakError> {

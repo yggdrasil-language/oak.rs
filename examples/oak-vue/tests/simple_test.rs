@@ -1,4 +1,4 @@
-use oak_core::{Builder, ParseSession, Parser, SourceText};
+use oak_core::{Builder, ParseSession, Parser, Source, SourceText};
 use oak_vue::{VueBuilder, VueLanguage, VueParser};
 
 #[test]
@@ -146,5 +146,21 @@ fn pascal_case_link_component_parses_children() {
     let builder = VueBuilder::new();
     let mut cache = ParseSession::default();
     let built = Builder::build(&builder, &source, &[], &mut cache);
-    assert!(built.result.is_ok(), "build failed: {:?}", built.diagnostics);
+    let root = built.result.expect("build failed");
+    let template = root.blocks.iter().find(|b| source.get_text_in(b.name.clone()) == "template").expect("template");
+    let main = match &template.children[0] {
+        oak_vue::VueNode::Element(el) => el,
+        other => panic!("expected main element, got {other:?}"),
+    };
+    let link = match &main.children[0] {
+        oak_vue::VueNode::Element(el) => el,
+        other => panic!("expected Link element, got {other:?}"),
+    };
+    assert_eq!(source.get_text_in(link.tag_name.clone()), "Link");
+    let oak_vue::VueAttribute::Attribute(attr) = &link.attributes[0] else {
+        panic!("expected static attribute, got {:?}", link.attributes);
+    };
+    assert_eq!(source.get_text_in(attr.name.clone()), "to");
+    let value = attr.value.as_ref().expect("value");
+    assert_eq!(source.get_text_in(value.span.clone()), "IndexPage");
 }
