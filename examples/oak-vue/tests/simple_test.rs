@@ -164,3 +164,26 @@ fn pascal_case_link_component_parses_children() {
     let value = attr.value.as_ref().expect("value");
     assert_eq!(source.get_text_in(value.span.clone()), "IndexPage");
 }
+
+#[test]
+fn text_before_interpolation_is_retained() {
+    let source = SourceText::new("<template><p>Hi {{ name }}</p></template>");
+    let builder = VueBuilder::new();
+    let mut cache = ParseSession::default();
+    let built = Builder::build(&builder, &source, &[], &mut cache);
+    let root = built.result.expect("build failed");
+    let template = root.blocks.iter().find(|b| source.get_text_in(b.name.clone()) == "template").expect("template");
+    let p = match &template.children[0] {
+        oak_vue::VueNode::Element(el) => el,
+        other => panic!("expected p element, got {other:?}"),
+    };
+    assert!(
+        p.children.iter().any(|c| matches!(c, oak_vue::VueNode::Text(t) if source.get_text_in(t.span.clone()).contains("Hi"))),
+        "expected text child with Hi, got {:?}",
+        p.children
+    );
+    assert!(
+        p.children.iter().any(|c| matches!(c, oak_vue::VueNode::Interpolation(_))),
+        "expected interpolation child"
+    );
+}

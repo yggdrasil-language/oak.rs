@@ -75,6 +75,20 @@ impl VueBuilder {
                         VueElementType::Interpolation => {
                             children.push(VueNode::Interpolation(self.build_interpolation(n, current_offset, source)?));
                         }
+                        VueElementType::TextNode => {
+                            let content = source.get_text_in(Range {
+                                start: current_offset,
+                                end: current_offset + n.byte_length as usize,
+                            });
+                            if !content.trim().is_empty() {
+                                children.push(VueNode::Text(VueText {
+                                    span: Range {
+                                        start: current_offset,
+                                        end: current_offset + n.byte_length as usize,
+                                    },
+                                }));
+                            }
+                        }
                         _ => {}
                     }
                     current_offset += n.byte_length as usize;
@@ -143,6 +157,20 @@ impl VueBuilder {
                         }
                         VueElementType::Interpolation => {
                             children.push(VueNode::Interpolation(self.build_interpolation(n, current_offset, source)?));
+                        }
+                        VueElementType::TextNode => {
+                            let content = source.get_text_in(Range {
+                                start: current_offset,
+                                end: current_offset + n.byte_length as usize,
+                            });
+                            if !content.trim().is_empty() {
+                                children.push(VueNode::Text(VueText {
+                                    span: Range {
+                                        start: current_offset,
+                                        end: current_offset + n.byte_length as usize,
+                                    },
+                                }));
+                            }
                         }
                         _ => {}
                     }
