@@ -187,3 +187,81 @@ fn text_before_interpolation_is_retained() {
         "expected interpolation child"
     );
 }
+
+#[test]
+fn nested_template_hash_slot_builds_usable_ast() {
+    let source = SourceText::new(
+        r#"<template><Comp><template #title>T</template></Comp></template>"#,
+    );
+    let builder = VueBuilder::new();
+    let mut cache = ParseSession::default();
+    let built = Builder::build(&builder, &source, &[], &mut cache);
+    assert!(built.result.is_ok(), "build failed: {:?}", built.diagnostics);
+    let root = built.result.unwrap();
+    let template = root
+        .blocks
+        .iter()
+        .find(|b| source.get_text_in(b.name.clone()) == "template")
+        .expect("template");
+    let comp = match &template.children[0] {
+        oak_vue::VueNode::Element(el) => el,
+        other => panic!("expected Comp, got {other:?}"),
+    };
+    assert_eq!(source.get_text_in(comp.tag_name.clone()), "Comp");
+    let slot_tpl = match &comp.children[0] {
+        oak_vue::VueNode::Element(el) => el,
+        other => panic!("expected nested template element, got {other:?}"),
+    };
+    let tag_text = source.get_text_in(slot_tpl.tag_name.clone());
+    let span_text = source.get_text_in(slot_tpl.span.clone());
+    assert_eq!(
+        tag_text,
+        "template",
+        "nested <template> tag_name broken (TemplateStart leaf?). tag_range={:?} span_text={span_text:?} attrs={:?}",
+        slot_tpl.tag_name,
+        slot_tpl.attributes
+    );
+    assert!(
+        !slot_tpl.attributes.is_empty(),
+        "expected #title directive attr, got none"
+    );
+    let oak_vue::VueAttribute::Directive(dir) = &slot_tpl.attributes[0] else {
+        panic!("expected Directive for #title, got {:?}", slot_tpl.attributes);
+    };
+    let dir_span = source.get_text_in(dir.span.clone());
+    assert_eq!(dir_span, "#title", "directive span misaligned: {dir_span:?}");
+    assert!(
+        slot_tpl.children.iter().any(|c| matches!(c, oak_vue::VueNode::Text(t) if source.get_text_in(t.span.clone()).contains('T'))),
+        "expected text child T, got {:?}",
+        slot_tpl.children
+    );
+}
+
+#[test]
+fn nested_template_v_slot_directive_builds() {
+    let source = SourceText::new(
+        r#"<template><Card><template v-slot:footer>f</template></Card></template>"#,
+    );
+    let builder = VueBuilder::new();
+    let mut cache = ParseSession::default();
+    let built = Builder::build(&builder, &source, &[], &mut cache);
+    let root = built.result.expect("build failed");
+    let template = root
+        .blocks
+        .iter()
+        .find(|b| source.get_text_in(b.name.clone()) == "template")
+        .expect("template");
+    let card = match &template.children[0] {
+        oak_vue::VueNode::Element(el) => el,
+        other => panic!("expected Card, got {other:?}"),
+    };
+    let slot_tpl = match &card.children[0] {
+        oak_vue::VueNode::Element(el) => el,
+        other => panic!("expected nested template, got {other:?}"),
+    };
+    assert_eq!(source.get_text_in(slot_tpl.tag_name.clone()), "template");
+    let oak_vue::VueAttribute::Directive(dir) = &slot_tpl.attributes[0] else {
+        panic!("expected Directive, got {:?}", slot_tpl.attributes);
+    };
+    assert_eq!(source.get_text_in(dir.span.clone()), "v-slot:footer");
+}

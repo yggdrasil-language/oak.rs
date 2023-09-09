@@ -230,17 +230,11 @@ impl<'config> VueParser<'config> {
             return;
         }
 
-        // Handle special blocks immediately
-        let tag_cmp = tag_name.to_ascii_lowercase();
-        if tag_cmp == "script" || tag_cmp == "style" || tag_cmp == "template" {
-            // Backtrack to use parse_special_block
-            state.sink.restore(cp.1); // Restore the sink to before the start token
-            // Note: We don't restore the state.lexer because that's not easily possible,
-            // but the start tokens are single tokens that we just consumed.
-            // Since we're about to call parse_special_block which expects the start token,
-            // we need to be careful. Actually, it's easier to just call it.
-            // But we already consumed the token. Let's fix this logic.
-        }
+        // Nested `<template>` / `<script>` / `<style>` are ordinary elements here.
+        // Top-level SFC blocks are handled by `parse_root` → `parse_special_block`.
+        // Do **not** sink.restore after consuming TemplateStart/ScriptStart/StyleStart:
+        // that drops the keyword leaf while the lexer has already advanced, so Tag
+        // attributes (#slot) get wrong source offsets and tag_name stays empty.
 
         while state.not_at_end() && !state.at(VueTokenType::Gt) && !state.at(VueTokenType::SlashGt) {
             if state.at(VueTokenType::Whitespace) {

@@ -144,6 +144,22 @@ impl VueBuilder {
                                             tag_name = Range { start: sub_offset, end: sub_offset + t.length as usize };
                                         }
                                     }
+                                    GreenTree::Leaf(t)
+                                        if tag_name.is_empty()
+                                            && matches!(
+                                                t.kind,
+                                                VueTokenType::TemplateStart
+                                                    | VueTokenType::ScriptStart
+                                                    | VueTokenType::StyleStart
+                                            ) =>
+                                    {
+                                        // Lexer emits `<template` / `<script` / `<style` as one
+                                        // keyword leaf (no separate Identifier). Name span skips `<`.
+                                        tag_name = Range {
+                                            start: sub_offset + 1,
+                                            end: sub_offset + t.length as usize,
+                                        };
+                                    }
                                     GreenTree::Node(attr_node) if attr_node.kind == VueElementType::Attribute || attr_node.kind == VueElementType::Directive => {
                                         attributes.push(self.build_attribute(attr_node, sub_offset, source)?);
                                     }
