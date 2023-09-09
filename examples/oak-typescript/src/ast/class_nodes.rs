@@ -61,6 +61,8 @@ pub enum ClassMember {
         is_static: bool,
         /// Whether the method is abstract.
         is_abstract: bool,
+        /// Whether the method is `async`.
+        is_async: bool,
         /// Whether the method is a getter.
         is_getter: bool,
         /// Whether the method is a setter.
