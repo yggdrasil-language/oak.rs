@@ -711,7 +711,9 @@ impl<'config> TypeScriptBuilder<'config> {
                                                     for ns_child in clause_node.children() {
                                                         if let RedTree::Node(ns_node) = ns_child {
                                                             if ns_node.green.kind == TypeScriptElementType::IdentifierName {
-                                                                specifiers.push(ImportSpecifier::Namespace(source.get_text_in(ns_node.span().into()).to_string()))
+                                                                specifiers.push(ImportSpecifier::Namespace(
+                                                                    source.get_text_in(ns_node.span().into()).trim().to_string(),
+                                                                ))
                                                             }
                                                         }
                                                     }
@@ -725,7 +727,8 @@ impl<'config> TypeScriptBuilder<'config> {
                                                                 for spec_child in named_node.children() {
                                                                     if let RedTree::Node(spec_node) = spec_child {
                                                                         if spec_node.green.kind == TypeScriptElementType::IdentifierName {
-                                                                            if imported.is_empty() { imported = source.get_text_in(spec_node.span().into()).to_string() } else { local = source.get_text_in(spec_node.span().into()).to_string() }
+                                                                            let name = source.get_text_in(spec_node.span().into()).trim().to_string();
+                                                                            if imported.is_empty() { imported = name } else { local = name }
                                                                         }
                                                                     }
                                                                 }
@@ -736,7 +739,6 @@ impl<'config> TypeScriptBuilder<'config> {
                                                             }
                                                         }
                                                     }
-                                                    specifiers.push(ImportSpecifier::Namespace(source.get_text_in(clause_node.span().into()).to_string()))
                                                 }
                                                 _ => {}
                                             }
@@ -753,6 +755,12 @@ impl<'config> TypeScriptBuilder<'config> {
                         RedTree::Leaf(leaf) => {
                             if leaf.kind == TypeScriptTokenType::Type {
                                 is_type_only = true
+                            }
+                            else if leaf.kind == TypeScriptTokenType::StringLiteral && source_str.is_empty() {
+                                let text = source.get_text_in(leaf.span.into());
+                                if text.len() >= 2 {
+                                    source_str = text[1..text.len() - 1].to_string();
+                                }
                             }
                         }
                     }
