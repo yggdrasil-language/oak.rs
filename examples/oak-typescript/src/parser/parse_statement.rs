@@ -374,50 +374,78 @@ impl<'config> TypeScriptParser<'config> {
 
     pub(crate) fn parse_export_declaration<'a, S: Source + ?Sized>(&self, state: &mut State<'a, S>) -> Result<(), OakError> {
         use crate::lexer::token_type::TypeScriptTokenType::*;
+        use crate::parser::element_type::TypeScriptElementType;
         let cp = state.checkpoint();
         state.bump(); // export
 
         self.skip_trivia(state);
+        // `export type …`
+        if self.at(state, Type) {
+            state.bump();
+            self.skip_trivia(state);
+        }
+
         if self.eat(state, Default) {
+            self.skip_trivia(state);
             self.parse_statement(state)?;
         }
         else if self.at(state, LeftBrace) {
-            // export { a, b as c }
-            state.bump();
-            while state.not_at_end() && !self.at(state, RightBrace) {
-                self.skip_trivia(state);
-                if self.at(state, IdentifierName) {
-                    state.bump();
-                    if self.eat(state, As) {
-                        self.expect(state, IdentifierName).ok();
-                    }
-                }
-                if !self.eat(state, Comma) {
-                    break;
-                }
-            }
-            self.expect(state, RightBrace).ok();
+            self.parse_named_exports(state);
+            self.skip_trivia(state);
             if self.eat(state, From) {
-                self.expect(state, StringLiteral).ok();
+                self.skip_trivia(state);
+                self.parse_import_string_literal(state);
             }
             self.eat(state, Semicolon);
         }
         else if self.at(state, Star) {
-            // export * from '...'
-            state.bump();
+            // `export * from '…'` / `export * as ns from '…'`
+            let star_cp = state.checkpoint();
+            state.bump(); // *
+            self.skip_trivia(state);
             if self.eat(state, As) {
-                self.expect(state, IdentifierName).ok();
+                self.skip_trivia(state);
+                self.parse_import_identifier(state);
             }
+            state.finish_at(star_cp, TypeScriptElementType::NamespaceImport);
+            self.skip_trivia(state);
             self.expect(state, From).ok();
-            self.expect(state, StringLiteral).ok();
+            self.skip_trivia(state);
+            self.parse_import_string_literal(state);
             self.eat(state, Semicolon);
         }
         else {
             self.parse_statement(state)?
         }
 
-        state.finish_at(cp, crate::parser::element_type::TypeScriptElementType::ExportDeclaration);
+        state.finish_at(cp, TypeScriptElementType::ExportDeclaration);
         Ok(())
+    }
+
+    fn parse_named_exports<'a, S: Source + ?Sized>(&self, state: &mut State<'a, S>) {
+        use crate::lexer::token_type::TypeScriptTokenType::*;
+        use crate::parser::element_type::TypeScriptElementType;
+        let named_cp = state.checkpoint();
+        self.expect(state, LeftBrace).ok();
+        while state.not_at_end() && !self.at(state, RightBrace) {
+            self.skip_trivia(state);
+            if self.at(state, IdentifierName) {
+                let spec_cp = state.checkpoint();
+                self.parse_import_identifier(state);
+                self.skip_trivia(state);
+                if self.eat(state, As) {
+                    self.skip_trivia(state);
+                    self.parse_import_identifier(state);
+                }
+                state.finish_at(spec_cp, TypeScriptElementType::ExportSpecifier);
+            }
+            if !self.eat(state, Comma) {
+                break;
+            }
+            self.skip_trivia(state);
+        }
+        self.expect(state, RightBrace).ok();
+        state.finish_at(named_cp, TypeScriptElementType::NamedExports);
     }
 
     pub(crate) fn parse_if_statement<'a, S: Source + ?Sized>(&self, state: &mut State<'a, S>) -> Result<(), OakError> {

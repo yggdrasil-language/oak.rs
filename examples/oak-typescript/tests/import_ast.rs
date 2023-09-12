@@ -48,3 +48,42 @@ export default class Page { x = 1; }
     assert_eq!(imports[3].module_specifier, "./def");
     assert!(matches!(&imports[3].specifiers[..], [ImportSpecifier::Default(n)] if n == "def"));
 }
+
+#[test]
+fn export_from_builds_source_and_specifiers() {
+    let source = SourceText::new(
+        r#"
+export { a, b as c } from './mod';
+export * from '../star';
+export type { T } from '@pkg/types';
+"#,
+    );
+    let language = TypeScriptLanguage::default();
+    let builder = TypeScriptBuilder::new(&language);
+    let mut cache = ParseSession::default();
+    let built = Builder::build(&builder, &source, &[], &mut cache);
+    let root = built.result.expect("build ok");
+
+    let exports: Vec<_> = root
+        .statements
+        .iter()
+        .filter_map(|s| match s {
+            Statement::ExportDeclaration(d) => Some(d),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(exports.len(), 3, "exports={exports:?}");
+
+    assert_eq!(exports[0].source.as_deref(), Some("./mod"));
+    assert_eq!(exports[0].specifiers.len(), 2);
+    assert_eq!(exports[0].specifiers[0].local, "a");
+    assert_eq!(exports[0].specifiers[0].exported, "a");
+    assert_eq!(exports[0].specifiers[1].local, "b");
+    assert_eq!(exports[0].specifiers[1].exported, "c");
+
+    assert_eq!(exports[1].source.as_deref(), Some("../star"));
+    assert!(exports[1].specifiers.is_empty());
+
+    assert_eq!(exports[2].source.as_deref(), Some("@pkg/types"));
+    assert!(exports[2].is_type_only);
+}

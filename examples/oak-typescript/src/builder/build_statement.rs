@@ -788,7 +788,8 @@ impl<'config> TypeScriptBuilder<'config> {
                                                 for spec_child in named_node.children() {
                                                     if let RedTree::Node(spec_node) = spec_child {
                                                         if spec_node.green.kind == TypeScriptElementType::IdentifierName {
-                                                            if local.is_empty() { local = source.get_text_in(spec_node.span().into()).to_string() } else { exported = source.get_text_in(spec_node.span().into()).to_string() }
+                                                            let name = source.get_text_in(spec_node.span().into()).trim().to_string();
+                                                            if local.is_empty() { local = name } else { exported = name }
                                                         }
                                                     }
                                                 }
@@ -810,6 +811,12 @@ impl<'config> TypeScriptBuilder<'config> {
                         RedTree::Leaf(leaf) => match leaf.kind {
                             TypeScriptTokenType::Default => is_default = true,
                             TypeScriptTokenType::Type => is_type_only = true,
+                            TypeScriptTokenType::StringLiteral if source_str.is_none() => {
+                                let text = source.get_text_in(leaf.span.into());
+                                if text.len() >= 2 {
+                                    source_str = Some(text[1..text.len() - 1].to_string());
+                                }
+                            }
                             _ => {}
                         },
                     }
