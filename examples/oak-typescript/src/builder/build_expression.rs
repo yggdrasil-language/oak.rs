@@ -7,11 +7,18 @@ impl<'config> TypeScriptBuilder<'config> {
         let span = node.span();
 
         match kind {
-            TypeScriptElementType::IdentifierName => {
+            TypeScriptElementType::IdentifierName
+            | TypeScriptElementType::This
+            | TypeScriptElementType::Super => {
                 let mut name = String::new();
                 for child in node.children() {
                     if let RedTree::Leaf(leaf) = child {
-                        if leaf.kind == TypeScriptTokenType::IdentifierName {
+                        if matches!(
+                            leaf.kind,
+                            TypeScriptTokenType::IdentifierName
+                                | TypeScriptTokenType::This
+                                | TypeScriptTokenType::Super
+                        ) {
                             name = source.get_text_in(leaf.span.into()).trim().to_string();
                             break;
                         }

@@ -15,6 +15,15 @@ impl<'config> TypeScriptParser<'config> {
                 self.expect(state, IdentifierName).ok();
                 state.finish_at(cp, crate::parser::element_type::TypeScriptElementType::IdentifierName)
             }
+            // Keywords that are valid primary expressions (not Error leaves).
+            Some(This) => {
+                self.expect(state, This).ok();
+                state.finish_at(cp, crate::parser::element_type::TypeScriptElementType::This)
+            }
+            Some(Super) => {
+                self.expect(state, Super).ok();
+                state.finish_at(cp, crate::parser::element_type::TypeScriptElementType::Super)
+            }
             Some(NumericLiteral) | Some(StringLiteral) | Some(BigIntLiteral) | Some(TemplateString) | Some(True) | Some(False) | Some(Null) | Some(RegexLiteral) => {
                 let kind = state.peek_kind().unwrap();
                 state.bump();
@@ -88,6 +97,11 @@ impl<'config> TypeScriptParser<'config> {
         let kind = self.peek_kind(state);
         let cp = state.checkpoint();
         match kind {
+            Some(PlusPlus) | Some(MinusMinus) => {
+                state.bump();
+                PrattParser::parse(state, 15, self);
+                state.finish_at(cp, crate::parser::element_type::TypeScriptElementType::UpdateExpression.into())
+            }
             Some(Plus) | Some(Minus) | Some(Exclamation) | Some(Tilde) | Some(Typeof) | Some(Void) | Some(Delete) | Some(Await) => {
                 state.bump();
                 PrattParser::parse(state, 15, self); // High precedence for prefix
@@ -154,6 +168,8 @@ impl<'config> TypeScriptParser<'config> {
             As => (14, Associativity::Left),
             Arrow => (15, Associativity::Right),
             LeftParen | Dot | LeftBracket | QuestionDot => (16, Associativity::Left),
+            // Postfix ++ / -- bind tighter than call/member so `this.count++` is UpdateExpression.
+            PlusPlus | MinusMinus => (17, Associativity::Left),
             _ => return None,
         };
 
@@ -162,6 +178,11 @@ impl<'config> TypeScriptParser<'config> {
         }
 
         match kind {
+            PlusPlus | MinusMinus => {
+                let cp = state.checkpoint_before(left);
+                state.bump();
+                Some(state.finish_at(cp, crate::parser::element_type::TypeScriptElementType::UpdateExpression.into()))
+            }
             LeftParen => {
                 let cp = state.checkpoint_before(left);
                 self.expect(state, LeftParen).ok();

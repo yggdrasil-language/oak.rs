@@ -284,26 +284,54 @@ impl<'config> TypeScriptLexer<'config> {
         let start = state.get_position();
 
         if let Some(ch) = state.peek() {
-            if ch.is_alphabetic() || ch == '_' || ch == '$' {
-                state.advance(ch.len_utf8());
-
-                while let Some(ch) = state.peek() {
-                    if ch.is_alphanumeric() || ch == '_' || ch == '$' {
-                        state.advance(ch.len_utf8());
-                    }
-                    else {
-                        break;
-                    }
+            // Private identifiers (`#load`) as a single IdentifierName token including `#`.
+            let private = ch == '#';
+            if private {
+                state.advance(1);
+                let Some(next) = state.peek() else {
+                    return false;
+                };
+                if !(next.is_alphabetic() || next == '_' || next == '$') {
+                    // Lone `#` is not an identifier; back out so other lexers can try.
+                    state.set_position(start);
+                    return false;
                 }
-
-                // Get identifier text and check if it's a keyword
-                let end = state.get_position();
-                let text = state.get_text_in(oak_core::Range { start, end });
-                let kind = self.keyword_or_identifier(&text);
-
-                state.add_token(kind, start, state.get_position());
-                return true;
             }
+            else if !(ch.is_alphabetic() || ch == '_' || ch == '$') {
+                return false;
+            }
+
+            if !private {
+                state.advance(ch.len_utf8());
+            }
+            else {
+                // Consume the first identifier char after `#`.
+                if let Some(next) = state.peek() {
+                    state.advance(next.len_utf8());
+                }
+            }
+
+            while let Some(ch) = state.peek() {
+                if ch.is_alphanumeric() || ch == '_' || ch == '$' {
+                    state.advance(ch.len_utf8());
+                }
+                else {
+                    break;
+                }
+            }
+
+            // Get identifier text and check if it's a keyword (private names stay IdentifierName).
+            let end = state.get_position();
+            let text = state.get_text_in(oak_core::Range { start, end });
+            let kind = if private {
+                TypeScriptTokenType::IdentifierName
+            }
+            else {
+                self.keyword_or_identifier(&text)
+            };
+
+            state.add_token(kind, start, state.get_position());
+            return true;
         }
 
         false
