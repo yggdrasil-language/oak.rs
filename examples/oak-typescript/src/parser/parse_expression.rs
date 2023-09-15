@@ -11,6 +11,10 @@ impl<'config> TypeScriptParser<'config> {
         let kind = self.peek_kind(state);
         let cp = state.checkpoint();
         match kind {
+            Some(Function) => {
+                self.parse_function_declaration_content(state).ok();
+                state.finish_at(cp, crate::parser::element_type::TypeScriptElementType::FunctionExpression)
+            }
             Some(IdentifierName) => {
                 self.expect(state, IdentifierName).ok();
                 state.finish_at(cp, crate::parser::element_type::TypeScriptElementType::IdentifierName)
