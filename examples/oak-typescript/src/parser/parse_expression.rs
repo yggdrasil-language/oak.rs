@@ -45,6 +45,10 @@ impl<'config> TypeScriptParser<'config> {
                     let acp = state.checkpoint();
                     PrattParser::parse(state, 0, self);
                     state.finish_at(acp, crate::parser::element_type::TypeScriptElementType::Parameter);
+                    if state.checkpoint().0 == acp.0 {
+                        state.bump();
+                        break;
+                    }
                     if !self.eat(state, Comma) {
                         break;
                     }
@@ -191,6 +195,10 @@ impl<'config> TypeScriptParser<'config> {
                     let acp = state.checkpoint();
                     PrattParser::parse(state, 0, self);
                     state.finish_at(acp, crate::parser::element_type::TypeScriptElementType::CallArgument);
+                    if state.checkpoint().0 == acp.0 {
+                        state.bump();
+                        break;
+                    }
                     self.eat(state, Comma);
                 }
                 self.expect(state, RightParen).ok();
