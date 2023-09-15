@@ -433,29 +433,23 @@ impl<'config> VueParser<'config> {
     }
 
     fn parse_directive_value<'a, S: Source + ?Sized>(&self, state: &mut State<'a, S>, directive_name: &str) {
-        if state.at(VueTokenType::StringLiteral) {
-            if let Some(text) = state.peek_text() {
-                if text.len() >= 2 {
-                    let inner_text = &text[1..text.len() - 1];
-                    let _inner_source = SourceText::new(inner_text.to_string());
-
-                    let _lexer = VueLexer::new(self.config);
-                    let mut _temp_cache: oak_core::parser::ParseSession<VueLanguage> = oak_core::parser::ParseSession::default();
-                    // let _lex_output = lexer.lex(&inner_source, &[], &mut temp_cache);
-
-                    // Use the standardized ParserState constructor for nested parsing
-                    let mut inner_state = state.nested();
-
-                    if directive_name == "v-for" {
-                        self.parse_v_for_expression(&mut inner_state);
-                    }
-                    else {
-                        self.parse_expression(&mut inner_state);
-                    }
-                }
-            }
-            state.bump();
+        if !state.at(VueTokenType::StringLiteral) {
+            return;
         }
+        if let Some(text) = state.peek_text() {
+            if text.len() >= 2 {
+                let inner_owned = text[1..text.len() - 1].to_string();
+                let inner_source = SourceText::new(inner_owned);
+                let mut sub_session = oak_core::parser::ParseSession::default();
+                let _parsed = if directive_name == "v-for" {
+                    self.parse_v_for_only(&inner_source, &mut sub_session)
+                }
+                else {
+                    self.parse_expression_only(&inner_source, &mut sub_session)
+                };
+            }
+        }
+        state.bump();
     }
 
     /// Parses a `v-for` expression.
@@ -669,8 +663,13 @@ impl<'config> Pratt<VueLanguage> for VueParser<'config> {
                 self.skip_whitespace(state);
                 if !state.at(RightParen) {
                     loop {
+                        let before = state.checkpoint().0;
                         let arg = PrattParser::parse(state, 0, self);
                         state.push_child(arg);
+                        if state.checkpoint().0 == before {
+                            state.finish_at(state.checkpoint(), crate::parser::element_type::VueElementType::Error);
+                            break;
+                        }
                         self.skip_whitespace(state);
                         if state.expect(Comma).is_ok() {
                             self.skip_whitespace(state);
