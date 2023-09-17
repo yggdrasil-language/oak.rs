@@ -5,12 +5,27 @@
 //! This crate provides structures and traits for representing and managing
 //! diagnostics (errors, warnings, advice) in a way that is compatible with
 //! various frontends like LSP or CLI output.
+//!
+//! Legacy presentation types remain for existing emitters. New integrations should
+//! prefer [`unified`] adapters on top of the shared `diagnostic` crate.
 
 use oak_core::{
     errors::{OakError, OakErrorKind},
     source::Source,
 };
 use oak_vfs::LineMap;
+
+mod unified;
+
+pub use unified::{
+    diagnostic_set_from_output, from_oak_error, oak_severity, oak_wire_code,
+};
+pub use diagnostic::{
+    Diagnostic as UnifiedDiagnostic, DiagnosticCode as UnifiedDiagnosticCode,
+    DiagnosticLabel as UnifiedDiagnosticLabel, DiagnosticLocation as UnifiedDiagnosticLocation,
+    DiagnosticOrigin as UnifiedDiagnosticOrigin, DiagnosticSet, DiagnosticSeverity as UnifiedSeverity,
+    DiagnosticSink, Message as UnifiedMessage,
+};
 
 /// Severity of a diagnostic.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
