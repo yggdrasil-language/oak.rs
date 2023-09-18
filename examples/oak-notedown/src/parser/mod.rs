@@ -45,11 +45,25 @@ impl<'p> Parser<NotedownLanguage> for NoteParser<'p> {
 
 impl<'p> NoteParser<'p> {
     fn parse_block<'a, S: Source + ?Sized>(&self, state: &mut State<'a, S>) {
+        while state.not_at_end()
+            && (state.at(NoteTokenType::Newline) || state.at(NoteTokenType::Whitespace))
+        {
+            state.bump();
+        }
+        if !state.not_at_end() {
+            return;
+        }
+
         let kind = state.peek_kind();
         match kind {
+            Some(token) if heading_level_from_token(token).is_some() => self.parse_heading(state),
             Some(NoteTokenType::Hash) => self.parse_heading(state),
-            Some(NoteTokenType::Asterisk) | Some(NoteTokenType::Dash) | Some(NoteTokenType::Plus) => self.parse_list_item(state),
+            Some(NoteTokenType::ListMarker) => self.parse_list_item(state),
+            Some(NoteTokenType::Asterisk) | Some(NoteTokenType::Dash) | Some(NoteTokenType::Plus) => {
+                self.parse_list_item(state)
+            }
             Some(NoteTokenType::Pipe) => self.parse_table(state),
+            Some(NoteTokenType::CodeFence) => self.parse_fenced_code_block(state),
             Some(NoteTokenType::Backtick) => self.parse_code_block(state),
             _ => self.parse_paragraph(state),
         }
@@ -57,13 +71,26 @@ impl<'p> NoteParser<'p> {
 
     fn parse_heading<'a, S: Source + ?Sized>(&self, state: &mut State<'a, S>) {
         let checkpoint = state.checkpoint();
-        let mut level = 0;
-        while state.at(NoteTokenType::Hash) {
-            state.bump();
-            level += 1;
-        }
+        let level = if let Some(token) = state.peek_kind() {
+            if let Some(level) = heading_level_from_token(token) {
+                state.bump();
+                level
+            } else {
+                let mut level = 0;
+                while state.at(NoteTokenType::Hash) {
+                    state.bump();
+                    level += 1;
+                }
+                level
+            }
+        } else {
+            0
+        };
 
         self.parse_inline_content(state);
+        if state.at(NoteTokenType::Newline) {
+            state.bump();
+        }
 
         let kind = match level {
             1..=6 => NoteElementType::Heading,
@@ -76,6 +103,9 @@ impl<'p> NoteParser<'p> {
         let checkpoint = state.checkpoint();
         state.bump(); // marker
         self.parse_inline_content(state);
+        if state.at(NoteTokenType::Newline) {
+            state.bump();
+        }
         state.finish_at(checkpoint, NoteElementType::ListItem);
     }
 
@@ -163,5 +193,36 @@ impl<'p> NoteParser<'p> {
             state.bump();
         }
         state.finish_at(checkpoint, NoteElementType::CodeBlock);
+    }
+
+    fn parse_fenced_code_block<'a, S: Source + ?Sized>(&self, state: &mut State<'a, S>) {
+        let checkpoint = state.checkpoint();
+        state.bump(); // opening fence
+        if state.at(NoteTokenType::CodeLanguage) {
+            state.bump();
+        }
+        while state.not_at_end() {
+            if state.at(NoteTokenType::CodeFence) {
+                state.bump();
+                break;
+            }
+            state.bump();
+        }
+        while state.at(NoteTokenType::Newline) || state.at(NoteTokenType::Whitespace) {
+            state.bump();
+        }
+        state.finish_at(checkpoint, NoteElementType::CodeBlock);
+    }
+}
+
+fn heading_level_from_token(token: NoteTokenType) -> Option<u8> {
+    match token {
+        NoteTokenType::Heading1 => Some(1),
+        NoteTokenType::Heading2 => Some(2),
+        NoteTokenType::Heading3 => Some(3),
+        NoteTokenType::Heading4 => Some(4),
+        NoteTokenType::Heading5 => Some(5),
+        NoteTokenType::Heading6 => Some(6),
+        _ => None,
     }
 }
