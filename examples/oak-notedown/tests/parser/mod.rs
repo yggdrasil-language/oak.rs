@@ -27,6 +27,31 @@ fn parses_heading_list_and_paragraph_blocks() {
 }
 
 #[test]
+fn parses_inline_links() {
+    let kinds = block_kinds("Visit [home](https://example.com) today.\n");
+    assert!(kinds.contains(&NoteElementType::Paragraph));
+    let source = SourceText::new("Visit [home](https://example.com) today.\n");
+    let language = NoteLanguage::default();
+    let mut cache = ParseSession::<NoteLanguage>::default();
+    let parser = NoteParser::new(&language);
+    let parsed = parser.parse(&source, &[], &mut cache);
+    let green_tree = parsed.result.expect("parse notedown");
+    let root = RedNode::new(&green_tree, 0);
+    let paragraph = root
+        .children()
+        .find_map(|child| match child {
+            RedTree::Node(node) if node.element_type() == NoteElementType::Paragraph => Some(node),
+            _ => None,
+        })
+        .expect("paragraph");
+    let has_link = paragraph.children().any(|child| match child {
+        RedTree::Node(node) => node.element_type() == NoteElementType::Link,
+        _ => false,
+    });
+    assert!(has_link, "expected Link inline node in paragraph");
+}
+
+#[test]
 fn parses_fenced_code_block() {
     let kinds = block_kinds("```rust\nfn main() {}\n```\n");
     assert!(kinds.contains(&NoteElementType::CodeBlock));

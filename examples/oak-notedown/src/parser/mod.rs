@@ -166,15 +166,14 @@ impl<'p> NoteParser<'p> {
                     }
                     state.finish_at(checkpoint, NoteElementType::Root);
                 }
+                Some(NoteTokenType::Link) => {
+                    self.parse_markdown_link(state, false);
+                }
+                Some(NoteTokenType::Image) => {
+                    self.parse_markdown_link(state, true);
+                }
                 Some(NoteTokenType::LeftBracket) => {
-                    state.bump(); // [
-                    while state.not_at_end() && !state.at(NoteTokenType::RightBracket) && !state.at(NoteTokenType::Newline) {
-                        self.parse_inline_content(state);
-                    }
-                    if state.at(NoteTokenType::RightBracket) {
-                        state.bump();
-                    }
-                    state.finish_at(checkpoint, NoteElementType::Link);
+                    self.parse_markdown_link(state, false);
                 }
                 _ => {
                     state.bump();
@@ -193,6 +192,42 @@ impl<'p> NoteParser<'p> {
             state.bump();
         }
         state.finish_at(checkpoint, NoteElementType::CodeBlock);
+    }
+
+    fn parse_markdown_link<'a, S: Source + ?Sized>(&self, state: &mut State<'a, S>, is_image: bool) {
+        let checkpoint = state.checkpoint();
+        if !state.at(NoteTokenType::Link) && !state.at(NoteTokenType::Image) {
+            state.bump(); // legacy `[` token
+        } else {
+            state.bump();
+        }
+        while state.not_at_end()
+            && !state.at(NoteTokenType::RightBracket)
+            && !state.at(NoteTokenType::Newline)
+        {
+            self.parse_inline_content(state);
+        }
+        if state.at(NoteTokenType::RightBracket) {
+            state.bump();
+        }
+        if state.at(NoteTokenType::LeftParen) {
+            state.bump();
+            while state.not_at_end()
+                && !state.at(NoteTokenType::RightParen)
+                && !state.at(NoteTokenType::Newline)
+            {
+                state.bump();
+            }
+            if state.at(NoteTokenType::RightParen) {
+                state.bump();
+            }
+        }
+        let kind = if is_image {
+            NoteElementType::Image
+        } else {
+            NoteElementType::Link
+        };
+        state.finish_at(checkpoint, kind);
     }
 
     fn parse_fenced_code_block<'a, S: Source + ?Sized>(&self, state: &mut State<'a, S>) {
