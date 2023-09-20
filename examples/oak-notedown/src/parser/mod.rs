@@ -65,6 +65,7 @@ impl<'p> NoteParser<'p> {
             Some(NoteTokenType::Pipe) => self.parse_table(state),
             Some(NoteTokenType::CodeFence) => self.parse_fenced_code_block(state),
             Some(NoteTokenType::Backtick) => self.parse_code_block(state),
+            Some(NoteTokenType::BlockquoteMarker) => self.parse_blockquote(state),
             _ => self.parse_paragraph(state),
         }
     }
@@ -228,6 +229,21 @@ impl<'p> NoteParser<'p> {
             NoteElementType::Link
         };
         state.finish_at(checkpoint, kind);
+    }
+
+    fn parse_blockquote<'a, S: Source + ?Sized>(&self, state: &mut State<'a, S>) {
+        let checkpoint = state.checkpoint();
+        while state.at(NoteTokenType::BlockquoteMarker) {
+            state.bump();
+            while state.at(NoteTokenType::Whitespace) {
+                state.bump();
+            }
+        }
+        self.parse_inline_content(state);
+        if state.at(NoteTokenType::Newline) {
+            state.bump();
+        }
+        state.finish_at(checkpoint, NoteElementType::Blockquote);
     }
 
     fn parse_fenced_code_block<'a, S: Source + ?Sized>(&self, state: &mut State<'a, S>) {

@@ -52,6 +52,13 @@ fn parses_inline_links() {
 }
 
 #[test]
+fn parses_blockquote_blocks() {
+    let kinds = block_kinds("> Quoted line\n\nBody.\n");
+    assert!(kinds.contains(&NoteElementType::Blockquote));
+    assert!(kinds.contains(&NoteElementType::Paragraph));
+}
+
+#[test]
 fn parses_fenced_code_block() {
     let kinds = block_kinds("```rust\nfn main() {}\n```\n");
     assert!(kinds.contains(&NoteElementType::CodeBlock));
