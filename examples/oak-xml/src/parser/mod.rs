@@ -98,9 +98,8 @@ impl<'config> XmlParser<'config> {
         self.skip_trivia(state);
         let is_self_closing = state.at(XmlTokenType::SlashRightAngle);
         if is_self_closing {
-            let self_closing_checkpoint = state.checkpoint();
             state.expect(XmlTokenType::SlashRightAngle)?;
-            state.finish_at(self_closing_checkpoint, element_type::XmlElementType::SelfClosingTag);
+            state.finish_at(start_tag_checkpoint, element_type::XmlElementType::SelfClosingTag);
             state.finish_at(checkpoint, XmlElementType::Element);
             return Ok(());
         }
@@ -118,7 +117,7 @@ impl<'config> XmlParser<'config> {
                 self.parse_element(state)?;
             }
             else {
-                state.advance();
+                state.bump();
             }
         }
 

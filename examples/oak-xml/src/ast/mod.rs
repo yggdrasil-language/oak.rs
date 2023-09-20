@@ -189,7 +189,9 @@ impl<'a> XmlNodeExt<'a> for RedNode<'a, XmlLanguage> {
                                         if leaf.kind == XmlTokenType::Identifier {
                                             name = source.get_text_in(leaf.span).into_owned();
                                         }
-                                        else if leaf.kind == XmlTokenType::AttributeValue {
+                                        else if leaf.kind == XmlTokenType::AttributeValue
+                                            || leaf.kind == XmlTokenType::StringLiteral
+                                        {
                                             let v = source.get_text_in(leaf.span);
                                             value = v.trim_matches('"').trim_matches('\'').to_string();
                                         }

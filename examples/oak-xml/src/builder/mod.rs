@@ -13,6 +13,17 @@ use oak_core::{
 /// XML AST builder.
 pub struct XmlBuilder;
 
+fn push_text_child(children: &mut Vec<XmlValue>, text: String) {
+    if text.is_empty() {
+        return;
+    }
+    if let Some(XmlValue::Text(last)) = children.last_mut() {
+        last.push_str(&text);
+        return;
+    }
+    children.push(XmlValue::Text(text));
+}
+
 impl XmlBuilder {
     /// Creates a new `XmlBuilder`.
     pub fn new() -> Self {
@@ -63,7 +74,14 @@ impl XmlBuilder {
                             for sub_child in n.children {
                                 match sub_child {
                                     GreenTree::Leaf(t) if t.kind == XmlTokenType::Identifier => {
-                                        name = source.get_text_in(Range { start: sub_offset, end: sub_offset + t.length as usize }).to_string();
+                                        if name.is_empty() {
+                                            name = source
+                                                .get_text_in(Range {
+                                                    start: sub_offset,
+                                                    end: sub_offset + t.length as usize,
+                                                })
+                                                .to_string();
+                                        }
                                     }
                                     GreenTree::Node(attr_node) if attr_node.kind == XmlElementType::Attribute => {
                                         attributes.push(self.build_attribute(attr_node, sub_offset, source)?);
@@ -81,11 +99,21 @@ impl XmlBuilder {
                     current_offset += n.byte_length as usize;
                 }
                 GreenTree::Leaf(t) => {
+                    let text = source
+                        .get_text_in(Range {
+                            start: current_offset,
+                            end: current_offset + t.length as usize,
+                        })
+                        .to_string();
                     match t.kind {
-                        XmlTokenType::Text => {
-                            let text = source.get_text_in(Range { start: current_offset, end: current_offset + t.length as usize });
-                            if !text.trim().is_empty() {
-                                children.push(XmlValue::Text(text.to_string()));
+                        XmlTokenType::Text | XmlTokenType::Identifier => {
+                            push_text_child(&mut children, text);
+                        }
+                        XmlTokenType::Whitespace if !children.is_empty() => {
+                            if let Some(XmlValue::Text(last)) = children.last() {
+                                if !last.ends_with(' ') {
+                                    push_text_child(&mut children, " ".to_string());
+                                }
                             }
                         }
                         _ => {}
