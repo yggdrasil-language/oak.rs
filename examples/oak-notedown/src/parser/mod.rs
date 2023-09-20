@@ -133,13 +133,40 @@ impl<'p> NoteParser<'p> {
     }
 
     fn parse_table_cell<'a, S: Source + ?Sized>(&self, state: &mut State<'a, S>) {
+        state.bump(); // leading |
         let checkpoint = state.checkpoint();
-        state.bump(); // |
         while state.not_at_end() && !state.at(NoteTokenType::Pipe) && !state.at(NoteTokenType::Newline) {
-            self.parse_inline_content(state);
+            self.parse_table_cell_inline(state);
         }
-        // ElementType for cell is not explicitly in NoteElementType, using Token(Pipe) as placeholder or just Root
         state.finish_at(checkpoint, NoteElementType::Root);
+    }
+
+    fn parse_table_cell_inline<'a, S: Source + ?Sized>(&self, state: &mut State<'a, S>) {
+        let checkpoint = state.checkpoint();
+        let kind = state.peek_kind();
+        match kind {
+            Some(NoteTokenType::Asterisk) | Some(NoteTokenType::Underscore) => {
+                let marker = kind.unwrap();
+                state.bump();
+                while state.not_at_end()
+                    && !state.at(marker)
+                    && !state.at(NoteTokenType::Newline)
+                    && !state.at(NoteTokenType::Pipe)
+                {
+                    self.parse_table_cell_inline(state);
+                }
+                if state.at(marker) {
+                    state.bump();
+                }
+                state.finish_at(checkpoint, NoteElementType::Root);
+            }
+            Some(NoteTokenType::Link) => self.parse_markdown_link(state, false),
+            Some(NoteTokenType::Image) => self.parse_markdown_link(state, true),
+            Some(NoteTokenType::LeftBracket) => self.parse_markdown_link(state, false),
+            _ => {
+                state.bump();
+            }
+        }
     }
 
     fn parse_paragraph<'a, S: Source + ?Sized>(&self, state: &mut State<'a, S>) {
