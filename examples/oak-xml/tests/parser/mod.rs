@@ -63,6 +63,35 @@ fn parses_plain_dc_title_element() {
 }
 
 #[test]
+fn preserves_leading_whitespace_in_element_text() {
+    let value = parse_xml(
+        r#"<w:t xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"> for details.</w:t>"#,
+    );
+    let text = value.as_element().expect("w:t");
+    assert_eq!(
+        text.children
+            .iter()
+            .filter_map(XmlValue::as_str)
+            .collect::<String>(),
+        " for details."
+    );
+}
+
+#[test]
+fn preserves_internal_whitespace_in_element_text() {
+    let value = parse_xml("<title>Sample  Book</title>");
+    let title = value.as_element().expect("title");
+    assert_eq!(
+        title
+            .children
+            .iter()
+            .filter_map(XmlValue::as_str)
+            .collect::<String>(),
+        "Sample  Book"
+    );
+}
+
+#[test]
 fn parses_namespaced_dc_metadata() {
     let value = parse_xml(
         r#"<metadata xmlns:dc="http://purl.org/dc/elements/1.1/"><dc:title>Sample Book</dc:title><dc:language>en</dc:language></metadata>"#,

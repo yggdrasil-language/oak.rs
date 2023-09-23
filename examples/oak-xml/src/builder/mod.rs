@@ -109,12 +109,8 @@ impl XmlBuilder {
                         XmlTokenType::Text | XmlTokenType::Identifier => {
                             push_text_child(&mut children, text);
                         }
-                        XmlTokenType::Whitespace if !children.is_empty() => {
-                            if let Some(XmlValue::Text(last)) = children.last() {
-                                if !last.ends_with(' ') {
-                                    push_text_child(&mut children, " ".to_string());
-                                }
-                            }
+                        XmlTokenType::Whitespace | XmlTokenType::Newline => {
+                            push_text_child(&mut children, text);
                         }
                         _ => {}
                     }

@@ -53,6 +53,30 @@ impl<'config> XmlParser<'config> {
         Self { config }
     }
 
+    /// Consumes the current token into the CST without running post-token trivia skip.
+    ///
+    /// Used at the `>` boundary so element text whitespace stays in content, not inside
+    /// the start tag node.
+    fn bump_without_skipping_trivia<'a, S: Source + ?Sized>(state: &mut State<'a, S>) {
+        if let Some(token) = state.current() {
+            state.sink.push_leaf(token.kind, token.length());
+            state.tokens.advance();
+        }
+    }
+
+    fn close_start_tag<'a, S: Source + ?Sized>(
+        state: &mut State<'a, S>,
+        start_tag_checkpoint: (usize, usize),
+    ) -> Result<(), OakError> {
+        if state.at(XmlTokenType::RightAngle) {
+            Self::bump_without_skipping_trivia(state);
+        } else {
+            state.expect(XmlTokenType::RightAngle)?;
+        }
+        state.finish_at(start_tag_checkpoint, element_type::XmlElementType::StartTag);
+        Ok(())
+    }
+
     pub(crate) fn parse_prolog<'a, S: Source + ?Sized>(&self, state: &mut State<'a, S>) -> Result<(), OakError> {
         let checkpoint = state.checkpoint();
         state.expect(XmlTokenType::LeftAngle)?;
@@ -104,19 +128,24 @@ impl<'config> XmlParser<'config> {
             return Ok(());
         }
 
-        state.expect(XmlTokenType::RightAngle)?;
-        state.finish_at(start_tag_checkpoint, element_type::XmlElementType::StartTag);
+        Self::close_start_tag(state, start_tag_checkpoint)?;
 
-        // Content
+        // Content — `bump()` attaches meaningful text plus following trivia into the CST.
         while state.not_at_end() {
-            self.skip_trivia(state);
             if state.at(XmlTokenType::LeftAngleSlash) {
                 break;
             }
             if state.at(XmlTokenType::LeftAngle) {
-                self.parse_element(state)?;
+                self.skip_comments_and_pi(state);
+                if state.at(XmlTokenType::LeftAngleSlash) {
+                    break;
+                }
+                if state.at(XmlTokenType::LeftAngle) {
+                    self.parse_element(state)?;
+                }
+                continue;
             }
-            else {
+            if state.not_at_end() {
                 state.bump();
             }
         }
@@ -153,6 +182,15 @@ impl<'config> XmlParser<'config> {
             }
             else {
                 break;
+            }
+        }
+    }
+
+    fn skip_comments_and_pi<'a, S: Source + ?Sized>(&self, state: &mut State<'a, S>) {
+        while let Some(token) = state.current() {
+            match token.kind {
+                XmlTokenType::Comment | XmlTokenType::ProcessingInstruction => state.bump(),
+                _ => break,
             }
         }
     }
