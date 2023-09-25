@@ -265,10 +265,16 @@ impl<'p> NoteParser<'p> {
             while state.at(NoteTokenType::Whitespace) {
                 state.bump();
             }
-        }
-        self.parse_inline_content(state);
-        if state.at(NoteTokenType::Newline) {
-            state.bump();
+            self.parse_inline_content(state);
+            if state.at(NoteTokenType::Newline) {
+                state.bump();
+            }
+            while state.at(NoteTokenType::Whitespace) {
+                state.bump();
+            }
+            if !state.at(NoteTokenType::BlockquoteMarker) {
+                break;
+            }
         }
         state.finish_at(checkpoint, NoteElementType::Blockquote);
     }

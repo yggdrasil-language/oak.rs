@@ -59,6 +59,40 @@ fn parses_blockquote_blocks() {
 }
 
 #[test]
+fn parses_multiline_blockquote_as_single_block() {
+    let kinds = block_kinds("> Line one\n> Line two\n\nBody.\n");
+    assert_eq!(
+        kinds
+            .iter()
+            .filter(|kind| *kind == &NoteElementType::Blockquote)
+            .count(),
+        1,
+        "expected one blockquote block, got {kinds:?}"
+    );
+    assert!(
+        kinds.contains(&NoteElementType::Paragraph),
+        "expected trailing paragraph, got {kinds:?}"
+    );
+
+    let source = SourceText::new("> Line one\n> Line two\n");
+    let language = NoteLanguage::default();
+    let mut cache = ParseSession::<NoteLanguage>::default();
+    let parser = NoteParser::new(&language);
+    let parsed = parser.parse(&source, &[], &mut cache);
+    let root = RedNode::new(parsed.result.expect("parse notedown"), 0);
+    let quote = root
+        .children()
+        .find_map(|child| match child {
+            RedTree::Node(node) if node.element_type() == NoteElementType::Blockquote => Some(node),
+            _ => None,
+        })
+        .expect("blockquote");
+    let text = quote.text(&source);
+    assert!(text.contains("Line one"), "text was {text:?}");
+    assert!(text.contains("Line two"), "text was {text:?}");
+}
+
+#[test]
 fn parses_fenced_code_block() {
     let kinds = block_kinds("```rust\nfn main() {}\n```\n");
     assert!(kinds.contains(&NoteElementType::CodeBlock));
