@@ -93,6 +93,13 @@ fn parses_multiline_blockquote_as_single_block() {
 }
 
 #[test]
+fn parses_horizontal_rule_block() {
+    let kinds = block_kinds("Paragraph.\n\n---\n\nAfter.\n");
+    assert!(kinds.contains(&NoteElementType::HorizontalRule));
+    assert!(kinds.contains(&NoteElementType::Paragraph));
+}
+
+#[test]
 fn parses_fenced_code_block() {
     let kinds = block_kinds("```rust\nfn main() {}\n```\n");
     assert!(kinds.contains(&NoteElementType::CodeBlock));

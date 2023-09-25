@@ -66,6 +66,7 @@ impl<'p> NoteParser<'p> {
             Some(NoteTokenType::CodeFence) => self.parse_fenced_code_block(state),
             Some(NoteTokenType::Backtick) => self.parse_code_block(state),
             Some(NoteTokenType::BlockquoteMarker) => self.parse_blockquote(state),
+            Some(NoteTokenType::HorizontalRule) => self.parse_horizontal_rule(state),
             _ => self.parse_paragraph(state),
         }
     }
@@ -277,6 +278,15 @@ impl<'p> NoteParser<'p> {
             }
         }
         state.finish_at(checkpoint, NoteElementType::Blockquote);
+    }
+
+    fn parse_horizontal_rule<'a, S: Source + ?Sized>(&self, state: &mut State<'a, S>) {
+        let checkpoint = state.checkpoint();
+        state.bump();
+        if state.at(NoteTokenType::Newline) {
+            state.bump();
+        }
+        state.finish_at(checkpoint, NoteElementType::HorizontalRule);
     }
 
     fn parse_fenced_code_block<'a, S: Source + ?Sized>(&self, state: &mut State<'a, S>) {
