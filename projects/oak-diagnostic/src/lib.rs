@@ -18,7 +18,7 @@ use oak_vfs::LineMap;
 mod unified;
 
 pub use unified::{
-    diagnostic_set_from_output, from_oak_error, oak_severity, oak_wire_code,
+    diagnostic_set_from_output, from_oak_error, oak_severity, oak_wire_code, OakDiagnosticsExt,
 };
 pub use diagnostic::{
     Diagnostic as UnifiedDiagnostic, DiagnosticCode as UnifiedDiagnosticCode,

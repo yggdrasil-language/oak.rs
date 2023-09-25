@@ -78,12 +78,24 @@ pub fn from_oak_error(error: &OakError) -> Diagnostic {
 
 /// Collect unified diagnostics from an Oak parse output.
 pub fn diagnostic_set_from_output<T>(output: &OakDiagnostics<T>) -> DiagnosticSet {
-    let mut set = DiagnosticSet::new();
-    if let Err(error) = &output.result {
-        set.push(from_oak_error(error));
+    output.unified_set()
+}
+
+/// Extension methods for exporting Oak parser output to the shared diagnostic contract.
+pub trait OakDiagnosticsExt<T> {
+    /// Collect fatal and non-fatal parser errors into a [`DiagnosticSet`].
+    fn unified_set(&self) -> DiagnosticSet;
+}
+
+impl<T> OakDiagnosticsExt<T> for OakDiagnostics<T> {
+    fn unified_set(&self) -> DiagnosticSet {
+        let mut set = DiagnosticSet::new();
+        if let Err(error) = &self.result {
+            set.push(from_oak_error(error));
+        }
+        for error in &self.diagnostics {
+            set.push(from_oak_error(error));
+        }
+        set
     }
-    for error in &output.diagnostics {
-        set.push(from_oak_error(error));
-    }
-    set
 }

@@ -1,6 +1,6 @@
 use diagnostic::DiagnosticSeverity;
 use oak_core::errors::{OakDiagnostics, OakError};
-use oak_diagnostic::{diagnostic_set_from_output, from_oak_error, oak_wire_code};
+use oak_diagnostic::{diagnostic_set_from_output, from_oak_error, oak_wire_code, OakDiagnosticsExt};
 
 #[test]
 fn oak_error_maps_to_dotted_wire_code() {
@@ -15,11 +15,12 @@ fn oak_error_maps_to_dotted_wire_code() {
 fn oak_diagnostics_collect_fatal_and_non_fatal() {
     let mut output = OakDiagnostics::success(());
     output.diagnostics.push(OakError::syntax_error("warn", 4, None));
-    let set = diagnostic_set_from_output(&output);
+    let set = output.unified_set();
     assert_eq!(set.diagnostics().len(), 1);
+    assert_eq!(diagnostic_set_from_output(&output).diagnostics().len(), 1);
 
     let fatal: OakDiagnostics<()> = OakDiagnostics::error(OakError::unexpected_eof(0, None));
-    let set = diagnostic_set_from_output(&fatal);
+    let set = fatal.unified_set();
     assert_eq!(set.diagnostics().len(), 1);
     assert_eq!(
         oak_wire_code(fatal.result.as_ref().err().unwrap().kind()).as_str(),
