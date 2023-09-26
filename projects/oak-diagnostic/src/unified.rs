@@ -2,7 +2,7 @@
 
 use diagnostic::{
     ByteRange, Diagnostic, DiagnosticCode, DiagnosticLabel, DiagnosticLocation, DiagnosticOrigin,
-    DiagnosticSet, DiagnosticSeverity, LabelRole, Message, SourceRef,
+    DiagnosticSet, DiagnosticSeverity, LabelRole, Message, MessageArg, SourceRef,
 };
 use oak_core::errors::{OakDiagnostics, OakError, OakErrorKind};
 
@@ -43,6 +43,67 @@ fn text_label(source_id: Option<u32>, offset: usize, span_len: usize) -> Option<
     ))
 }
 
+fn message_for_kind(kind: &OakErrorKind) -> Message {
+    let key = kind.key();
+    let fallback = kind.to_string();
+    let mut message = Message::new(key).with_fallback(fallback);
+    if let Some(offset) = kind.source_offset() {
+        message = message.with_arg("offset", MessageArg::U64(offset as u64));
+    }
+    match kind {
+        OakErrorKind::IoError { source_id, .. } => {
+            if let Some(id) = source_id {
+                message = message.with_arg("source_id", MessageArg::U64(*id as u64));
+            }
+        }
+        OakErrorKind::SyntaxError { message: text, .. } => {
+            message = message.with_arg("message", MessageArg::Text(text.clone()));
+        }
+        OakErrorKind::UnexpectedCharacter { character, .. } => {
+            message = message.with_arg("character", MessageArg::Text(character.to_string()));
+        }
+        OakErrorKind::UnexpectedToken { token, .. } => {
+            message = message.with_arg("token", MessageArg::Text(token.clone()));
+        }
+        OakErrorKind::ExpectedToken { expected, .. } => {
+            message = message.with_arg("expected", MessageArg::Text(expected.clone()));
+        }
+        OakErrorKind::ExpectedName { name_kind, .. } => {
+            message = message.with_arg("name_kind", MessageArg::Text(name_kind.clone()));
+        }
+        OakErrorKind::CustomError { message: text }
+        | OakErrorKind::InvalidTheme { message: text }
+        | OakErrorKind::FormatError { message: text }
+        | OakErrorKind::SemanticError { message: text }
+        | OakErrorKind::ProtocolError { message: text }
+        | OakErrorKind::SerdeError { message: text }
+        | OakErrorKind::DeserializeError { message: text }
+        | OakErrorKind::XmlError { message: text }
+        | OakErrorKind::ZipError { message: text }
+        | OakErrorKind::ParseError { message: text }
+        | OakErrorKind::InternalError { message: text } => {
+            message = message.with_arg("message", MessageArg::Text(text.clone()));
+        }
+        OakErrorKind::UnsupportedFormat { format } => {
+            message = message.with_arg("format", MessageArg::Text(format.clone()));
+        }
+        OakErrorKind::ColorParseError { color } => {
+            message = message.with_arg("color", MessageArg::Text(color.clone()));
+        }
+        OakErrorKind::TestFailure { path, expected, actual } => {
+            message = message
+                .with_arg("path", MessageArg::Text(path.display().to_string()))
+                .with_arg("expected", MessageArg::Text(expected.clone()))
+                .with_arg("actual", MessageArg::Text(actual.clone()));
+        }
+        OakErrorKind::TestRegenerated { path } => {
+            message = message.with_arg("path", MessageArg::Text(path.display().to_string()));
+        }
+        OakErrorKind::UnexpectedEof { .. } | OakErrorKind::TrailingCommaNotAllowed { .. } => {}
+    }
+    message
+}
+
 fn primary_label(kind: &OakErrorKind) -> Option<DiagnosticLabel> {
     match kind {
         OakErrorKind::SyntaxError { offset, source_id, .. }
@@ -63,12 +124,11 @@ pub fn from_oak_error(error: &OakError) -> Diagnostic {
     let kind = error.kind();
     let wire = oak_wire_code(kind);
     let severity = oak_severity(kind);
-    let fallback = kind.to_string();
     let mut diagnostic = Diagnostic::new(
         wire,
         severity,
         DiagnosticOrigin::new("oak", "parser"),
-        Message::new(kind.key()).with_fallback(fallback),
+        message_for_kind(kind),
     );
     if let Some(label) = primary_label(kind) {
         diagnostic = diagnostic.with_primary(label);

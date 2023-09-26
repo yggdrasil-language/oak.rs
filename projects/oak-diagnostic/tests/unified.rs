@@ -1,4 +1,4 @@
-use diagnostic::DiagnosticSeverity;
+use diagnostic::{DiagnosticSeverity, MessageArg};
 use oak_core::errors::{OakDiagnostics, OakError};
 use oak_diagnostic::{diagnostic_set_from_output, from_oak_error, oak_wire_code, OakDiagnosticsExt};
 
@@ -9,6 +9,18 @@ fn oak_error_maps_to_dotted_wire_code() {
     assert_eq!(diagnostic.code().as_str(), "oak.syntax.unexpected_token");
     assert_eq!(diagnostic.severity(), DiagnosticSeverity::Error);
     assert!(diagnostic.primary().is_some());
+    let args = diagnostic.message().args();
+    assert!(args.iter().any(|(name, value)| name == "token" && matches!(value, MessageArg::Text(text) if text == "foo")));
+    assert!(args.iter().any(|(name, value)| name == "offset" && matches!(value, MessageArg::U64(12))));
+}
+
+#[test]
+fn oak_error_expected_token_carries_structured_args() {
+    let error = OakError::expected_token("Semicolon", 8, None);
+    let diagnostic = from_oak_error(&error);
+    let args = diagnostic.message().args();
+    assert!(args.iter().any(|(name, value)| name == "expected" && matches!(value, MessageArg::Text(text) if text == "Semicolon")));
+    assert!(args.iter().any(|(name, value)| name == "offset" && matches!(value, MessageArg::U64(8))));
 }
 
 #[test]
