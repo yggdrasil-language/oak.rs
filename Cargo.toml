@@ -64,7 +64,6 @@ oak-macros = { path = "projects/oak-macros", version = "0.0.12" }
 oak-vfs = { path = "projects/oak-vfs", version = "0.0.12" }
 oak-symbols = { path = "projects/oak-symbols", version = "0.0.12" }
 oak-resolver = { path = "projects/oak-resolver", version = "0.0.12" }
-oak-diagnostic = { path = "projects/oak-diagnostic", version = "0.0.12" }
 oak-highlight = { path = "projects/oak-highlight", version = "0.0.12" }
 oak-pretty-print = { path = "projects/oak-pretty-print", version = "0.0.12" }
 oak-formatter = { path = "projects/oak-formatter", version = "0.0.12" }
