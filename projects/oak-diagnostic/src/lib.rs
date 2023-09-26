@@ -1,13 +1,10 @@
 #![feature(new_range_api)]
 #![warn(missing_docs)]
-//! Diagnostic reporting for the Oak language framework.
+//! Deprecated transitional facade for Oak diagnostics.
 //!
-//! This crate provides structures and traits for representing and managing
-//! diagnostics (errors, warnings, advice) in a way that is compatible with
-//! various frontends like LSP or CLI output.
-//!
-//! Legacy presentation types remain for existing emitters. New integrations should
-//! prefer [`unified`] adapters on top of the shared `diagnostic` crate.
+//! Unified parser diagnostics live in [`oak_core::diagnostic`]. Terminal rendering
+//! uses the shared `diagnostic` crate. This crate only keeps legacy emitters until
+//! downstream examples migrate, then it will be removed.
 
 use oak_core::{
     errors::{OakError, OakErrorKind},
@@ -15,19 +12,16 @@ use oak_core::{
 };
 use oak_vfs::LineMap;
 
-mod unified;
-
-pub use unified::{
+pub use oak_core::diagnostic::{
     diagnostic_set_from_output, from_oak_error, oak_severity, oak_wire_code, OakDiagnosticsExt,
-};
-pub use diagnostic::{
-    Diagnostic as UnifiedDiagnostic, DiagnosticCode as UnifiedDiagnosticCode,
-    DiagnosticLabel as UnifiedDiagnosticLabel, DiagnosticLocation as UnifiedDiagnosticLocation,
-    DiagnosticOrigin as UnifiedDiagnosticOrigin, DiagnosticSet, DiagnosticSeverity as UnifiedSeverity,
-    DiagnosticSink, Message as UnifiedMessage,
+    Diagnostic as UnifiedDiagnostic, DiagnosticAction, DiagnosticEnvelope,
+    DiagnosticCode as UnifiedDiagnosticCode, DiagnosticSet, DiagnosticSink, SCHEMA_VERSION,
+    UnifiedDiagnosticLabel, UnifiedDiagnosticLocation, UnifiedDiagnosticOrigin, UnifiedMessage,
+    UnifiedSeverity,
 };
 
 /// Severity of a diagnostic.
+#[deprecated(note = "use `diagnostic::DiagnosticSeverity` or `oak_core::diagnostic` instead")]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum Severity {
@@ -53,6 +47,7 @@ pub struct Label {
 }
 
 /// A diagnostic message.
+#[deprecated(note = "use `diagnostic::Diagnostic` or `oak_core::diagnostic::from_oak_error` instead")]
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Diagnostic {

@@ -19,7 +19,7 @@ serde = ["dep:serde", "dep:serde_json", "oak-core/serde", "oak-vfs/serde"]
 
 [dependencies]
 diagnostic = { workspace = true, default-features = false, features = ["std", "serde"] }
-oak-core = { workspace = true }
+oak-core = { workspace = true, features = ["diagnostic", "serde"] }
 oak-vfs = { workspace = true }
 serde = { workspace = true, optional = true }
 serde_json = { workspace = true, optional = true }

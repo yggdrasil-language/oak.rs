@@ -17,6 +17,9 @@
 pub mod builder;
 /// Error handling and diagnostic reporting for the parsing system.
 pub mod errors;
+/// Unified `diagnostic` adapters for Oak parser output.
+#[cfg(feature = "diagnostic")]
+pub mod diagnostic;
 /// Language definition trait for coordinating language-specific components.
 pub mod language;
 /// Lexical analysis and tokenization functionality.

@@ -1,10 +1,17 @@
 //! Adapters from Oak parser errors to the shared `diagnostic` contract.
 
-use diagnostic::{
-    ByteRange, Diagnostic, DiagnosticCode, DiagnosticLabel, DiagnosticLocation, DiagnosticOrigin,
-    DiagnosticSet, DiagnosticSeverity, LabelRole, Message, MessageArg, SourceRef,
+pub use diagnostic::{
+    Diagnostic, DiagnosticCode, DiagnosticAction, DiagnosticEnvelope,
+    DiagnosticLabel as UnifiedDiagnosticLabel, DiagnosticLocation as UnifiedDiagnosticLocation,
+    DiagnosticOrigin as UnifiedDiagnosticOrigin, DiagnosticSet,
+    DiagnosticSeverity as UnifiedSeverity, DiagnosticSink, Message as UnifiedMessage, SCHEMA_VERSION,
 };
-use oak_core::errors::{OakDiagnostics, OakError, OakErrorKind};
+use diagnostic::{
+    ByteRange, DiagnosticLabel, DiagnosticLocation, DiagnosticOrigin,
+    DiagnosticSeverity, LabelRole, Message, MessageArg, SourceRef,
+};
+
+use crate::errors::{OakDiagnostics, OakError, OakErrorKind};
 
 /// Convert an Oak i18n key (`error.*`) to a dotted wire code (`oak.syntax.*`).
 pub fn oak_wire_code(kind: &OakErrorKind) -> DiagnosticCode {

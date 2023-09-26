@@ -17,6 +17,7 @@ triomphe = { workspace = true }
 smallvec = { workspace = true }
 tracing = { workspace = true }
 twox-hash.workspace = true
+diagnostic = { workspace = true, optional = true, default-features = false, features = ["std", "serde"] }
 
 [dev-dependencies]
 serde_json = { workspace = true }
@@ -24,6 +25,11 @@ serde_json = { workspace = true }
 [features]
 default = []
 serde = ["dep:serde"]
+diagnostic = ["dep:diagnostic", "serde"]
+
+[[test]]
+name = "diagnostic_unified"
+required-features = ["diagnostic"]
 
 [package.metadata.docs.rs]
 all-features = true
