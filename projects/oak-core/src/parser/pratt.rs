@@ -263,7 +263,12 @@ impl<L: Language, T: Pratt<L>> PrattParser<L, T> {
     /// Static version of parse_expr that takes a specification reference.
     pub fn parse<'a, S: Source + ?Sized>(state: &mut ParserState<'a, L, S>, min_precedence: u8, spec: &T) -> &'a GreenNode<'a, L> {
         let mut left = spec.prefix(state);
-        while let Some(node) = spec.infix(state, left, min_precedence) {
+        while state.not_at_end() {
+            let before = state.checkpoint();
+            let Some(node) = spec.infix(state, left, min_precedence) else { break };
+            if state.checkpoint().0 == before.0 {
+                break;
+            }
             left = node
         }
         left

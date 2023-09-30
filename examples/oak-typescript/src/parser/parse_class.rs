@@ -87,10 +87,7 @@ impl<'config> TypeScriptParser<'config> {
                 }
                 else {
                     if self.eat(state, Colon) {
-                        // Skip type
-                        while state.not_at_end() && !self.at(state, Equal) && !self.at(state, Semicolon) && !self.at(state, RightBrace) {
-                            state.bump();
-                        }
+                        self.skip_type_until_member_boundary(state);
                     }
                     if self.eat(state, Equal) {
                         PrattParser::parse(state, 0, self);
@@ -119,9 +116,46 @@ impl<'config> TypeScriptParser<'config> {
             else {
                 break;
             }
+
+            if state.checkpoint().0 == mcp.0 && state.not_at_end() {
+                state.bump();
+            }
         }
         self.expect(state, RightBrace).ok();
         state.finish_at(cp, crate::parser::element_type::TypeScriptElementType::ClassBody);
         Ok(())
+    }
+
+    fn skip_type_until_member_boundary<'a, S: Source + ?Sized>(&self, state: &mut State<'a, S>) {
+        use crate::lexer::token_type::TypeScriptTokenType::*;
+
+        let mut parens = 0usize;
+        let mut brackets = 0usize;
+        let mut braces = 0usize;
+        let mut angles = 0usize;
+        let mut previous = None;
+        while state.not_at_end() {
+            let Some(kind) = self.peek_kind(state) else { break };
+            match kind {
+                Equal if previous != Some(Greater)
+                    && parens == 0
+                    && brackets == 0
+                    && braces == 0
+                    && angles == 0 => break,
+                Semicolon if parens == 0 && brackets == 0 && braces == 0 && angles == 0 => break,
+                RightBrace if parens == 0 && brackets == 0 && braces == 0 && angles == 0 => break,
+                LeftParen => parens += 1,
+                RightParen if parens > 0 => parens -= 1,
+                LeftBracket => brackets += 1,
+                RightBracket if brackets > 0 => brackets -= 1,
+                LeftBrace => braces += 1,
+                RightBrace if braces > 0 => braces -= 1,
+                Less => angles += 1,
+                Greater if angles > 0 => angles -= 1,
+                _ => {}
+            }
+            previous = Some(kind);
+            state.bump();
+        }
     }
 }

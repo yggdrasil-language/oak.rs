@@ -68,7 +68,11 @@ impl<'config> TypeScriptParser<'config> {
         let cp = state.checkpoint();
         self.expect(state, LeftBrace).ok();
         while state.not_at_end() && !self.at(state, RightBrace) {
+            let before = state.checkpoint();
             self.parse_statement(state)?;
+            if state.checkpoint().0 == before.0 && state.not_at_end() {
+                state.bump();
+            }
         }
         self.expect(state, RightBrace).ok();
         state.finish_at(cp, crate::parser::element_type::TypeScriptElementType::BlockStatement);

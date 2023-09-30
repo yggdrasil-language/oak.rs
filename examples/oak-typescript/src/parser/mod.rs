@@ -50,7 +50,11 @@ impl<'config> Parser<TypeScriptLanguage> for TypeScriptParser<'config> {
             while state.not_at_end() {
                 self.skip_trivia(state);
                 if state.not_at_end() {
+                    let before = state.checkpoint();
                     self.parse_statement(state).ok();
+                    if state.checkpoint().0 == before.0 && state.not_at_end() {
+                        state.bump();
+                    }
                 }
             }
             Ok(state.finish_at(checkpoint, crate::parser::element_type::TypeScriptElementType::SourceFile))
