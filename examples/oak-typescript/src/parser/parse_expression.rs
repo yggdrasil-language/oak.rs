@@ -64,8 +64,12 @@ impl<'config> TypeScriptParser<'config> {
             Some(LeftBracket) => {
                 state.bump();
                 while state.not_at_end() && !self.at(state, RightBracket) {
+                    let before = state.checkpoint();
                     PrattParser::parse(state, 0, self);
                     self.eat(state, Comma);
+                    if state.checkpoint().0 == before.0 && state.not_at_end() {
+                        state.bump();
+                    }
                 }
                 self.expect(state, RightBracket).ok();
                 state.finish_at(cp, crate::parser::element_type::TypeScriptElementType::ArrayExpression)
@@ -79,7 +83,24 @@ impl<'config> TypeScriptParser<'config> {
                         state.finish_at(pcp, crate::parser::element_type::TypeScriptElementType::SpreadElement);
                     }
                     else {
-                        self.expect(state, IdentifierName).ok();
+                        match self.peek_kind(state) {
+                            Some(IdentifierName) => {
+                                self.expect(state, IdentifierName).ok();
+                            }
+                            Some(StringLiteral) | Some(NumericLiteral) => {
+                                state.bump();
+                            }
+                            Some(LeftBracket) => {
+                                state.bump();
+                                PrattParser::parse(state, 0, self);
+                                self.expect(state, RightBracket).ok();
+                            }
+                            _ => {
+                                state.bump();
+                                state.finish_at(pcp, crate::parser::element_type::TypeScriptElementType::Error);
+                                continue;
+                            }
+                        }
                         if self.eat(state, Colon) {
                             PrattParser::parse(state, 0, self);
                             state.finish_at(pcp, crate::parser::element_type::TypeScriptElementType::PropertyAssignment);
@@ -89,6 +110,9 @@ impl<'config> TypeScriptParser<'config> {
                         }
                     }
                     self.eat(state, Comma);
+                    if state.checkpoint().0 == pcp.0 && state.not_at_end() {
+                        state.bump();
+                    }
                 }
                 self.expect(state, RightBrace).ok();
                 state.finish_at(cp, crate::parser::element_type::TypeScriptElementType::ObjectExpression)
