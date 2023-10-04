@@ -217,7 +217,7 @@ impl VueBuilder {
         let mut current_offset = offset;
 
         let result = if node.kind == VueElementType::Directive {
-            let arg: Option<DirectiveArgument> = None;
+            let mut arg: Option<DirectiveArgument> = None;
             let mut modifiers = Vec::new();
 
             for child in node.children {
@@ -251,6 +251,10 @@ impl VueBuilder {
                                 }
                                 sub_offset += sub_child.len() as usize;
                             }
+                        }
+                        else if n.kind == VueElementType::Identifier && arg.is_none() {
+                            let range = Range { start: current_offset, end: current_offset + n.byte_length as usize };
+                            arg = Some(DirectiveArgument { span: range });
                         }
                         else if n.kind == VueElementType::Modifier {
                             let range = Range { start: current_offset, end: current_offset + n.byte_length as usize };
