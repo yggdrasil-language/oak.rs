@@ -57,15 +57,28 @@ pub fn from_str<T: ::serde::de::DeserializeOwned>(s: &str) -> Result<T, String> 
     from_value(xml_value).map_err(String::from)
 }
 
-/// Parses an XML string into an `XmlValue`.
-pub fn parse(xml: &str) -> Result<XmlValue, String> {
+fn build_output(xml: &str) -> oak_core::builder::BuildOutput<XmlLanguage> {
     use crate::builder::XmlBuilder;
     use oak_core::{Builder, parser::session::ParseSession, source::SourceText};
     let builder = XmlBuilder::new();
     let source = SourceText::new(xml.to_string());
     let mut cache = ParseSession::default();
-    let result = builder.build(&source, &[], &mut cache);
-    result.result.map(|root| root.value).map_err(|e| format!("Parse failed: {:?}, diagnostics: {:?}", e, result.diagnostics))
+    builder.build(&source, &[], &mut cache)
+}
+
+/// Parses an XML string into an `XmlValue`.
+pub fn parse(xml: &str) -> Result<XmlValue, String> {
+    let output = build_output(xml);
+    output
+        .result
+        .map(|root| root.value)
+        .map_err(|error| format!("Parse failed: {:?}, diagnostics: {:?}", error, output.diagnostics))
+}
+
+/// Collect unified diagnostics from an XML parse without rendering to stderr.
+#[cfg(feature = "diagnostic")]
+pub fn diagnostic_set_from_xml(xml: &str) -> oak_core::diagnostic::DiagnosticSet {
+    oak_core::diagnostic::diagnostic_set_from_output(&build_output(xml))
 }
 
 pub use parser::element_type::XmlElementType;

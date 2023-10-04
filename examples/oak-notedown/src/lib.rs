@@ -35,3 +35,18 @@ pub use crate::lsp::NoteLanguageService;
 #[cfg(feature = "mcp")]
 pub use crate::mcp::serve_note_mcp;
 pub use parser::element_type::NoteElementType;
+
+fn build_output(source: &str) -> oak_core::builder::BuildOutput<NoteLanguage> {
+    use oak_core::{Builder, parser::session::ParseSession, source::SourceText};
+    let config = NoteLanguage::default();
+    let builder = NoteBuilder::new(&config);
+    let text = SourceText::new(source.to_string());
+    let mut cache = ParseSession::default();
+    builder.build(&text, &[], &mut cache)
+}
+
+/// Collect unified diagnostics from a Notedown parse without rendering to stderr.
+#[cfg(feature = "diagnostic")]
+pub fn diagnostic_set_from_notedown(source: &str) -> oak_core::diagnostic::DiagnosticSet {
+    oak_core::diagnostic::diagnostic_set_from_output(&build_output(source))
+}

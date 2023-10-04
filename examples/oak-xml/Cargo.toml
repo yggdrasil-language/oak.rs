@@ -28,6 +28,7 @@ oak-testing = { workspace = true }
 [features]
 default = ["serde"]
 serde = ["dep:serde", "oak-core/serde"]
+diagnostic = ["oak-core/diagnostic"]
 lsp = ["dep:oak-lsp", "dep:oak-hover", "dep:oak-vfs", "oak-highlight", "oak-pretty-print", "dep:futures"]
 mcp = ["lsp", "oak-mcp/io-std"]
 
@@ -37,3 +38,7 @@ all-features = true
 [[test]]
 name = "main"
 required-features = ["serde"]
+
+[[test]]
+name = "unified_diagnostic"
+required-features = ["diagnostic"]
