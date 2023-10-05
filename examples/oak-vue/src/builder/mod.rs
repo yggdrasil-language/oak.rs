@@ -211,7 +211,7 @@ impl VueBuilder {
         Ok(result)
     }
 
-    fn build_attribute<'a>(&self, node: &GreenNode<'a, VueLanguage>, offset: usize, _source: &SourceText) -> Result<VueAttribute, OakError> {
+    fn build_attribute<'a>(&self, node: &GreenNode<'a, VueLanguage>, offset: usize, source: &SourceText) -> Result<VueAttribute, OakError> {
         let mut name = Range { start: offset, end: offset };
         let mut value = None;
         let mut current_offset = offset;
@@ -261,6 +261,21 @@ impl VueBuilder {
                             modifiers.push(Modifier { name: range.clone(), span: range });
                         }
                         current_offset += n.byte_length as usize;
+                    }
+                }
+            }
+
+            if arg.is_none() {
+                let raw = source.get_text_in(Range { start: offset, end: offset + node.byte_length as usize });
+                if let Some(colon) = raw.find(':') {
+                    let start = colon + 1;
+                    let end = raw[start..]
+                        .find(|ch: char| matches!(ch, '.' | '=' | ' ' | '\t' | '\r' | '\n'))
+                        .map_or(raw.len(), |relative| start + relative);
+                    if start < end {
+                        arg = Some(DirectiveArgument {
+                            span: Range { start: offset + start, end: offset + end },
+                        });
                     }
                 }
             }
