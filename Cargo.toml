@@ -25,7 +25,7 @@ walkdir = { version = "2.5.0" }
 serde = { version = "1.0.228", features = ["derive", "rc"] }
 serde_json = { version = "1.0.149" }
 schemars = { version = "1.2.1", features = ["derive"] }
-tracing = { version = "0.1.44" }
+logger = { git = "https://github.com/oovm/rust-boost", branch = "dev", package = "logger" }
 unicode-ident = { version = "1.0.24" }
 url = { version = "2.5.8", features = ["serde"] }
 triomphe = { version = "0.1.15", default-features = false, features = ["serde"] }
@@ -34,7 +34,6 @@ proc-macro2 = { version = "1.0.106" }
 quote = { version = "1.0.45" }
 syn = { version = "2.0.117", features = ["full"] }
 tokio = { version = "1.50.0", default-features = false }
-tracing-subscriber = { version = "0.3.22", features = ["env-filter"] }
 futures = { version = "0.3.32" }
 dashmap = { version = "6.1.0" }
 lazy_static = "1.5.0"

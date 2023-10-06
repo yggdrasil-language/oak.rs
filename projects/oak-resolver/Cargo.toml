@@ -1,4 +1,4 @@
-[package]
+﻿[package]
 name = "oak-resolver"
 version.workspace = true
 authors.workspace = true
@@ -14,7 +14,6 @@ oak-symbols = { workspace = true }
 serde = { workspace = true, optional = true }
 dashmap = { workspace = true }
 url = { workspace = true }
-tracing = { workspace = true }
 
 [features]
 serde = ["dep:serde", "oak-core/serde"]

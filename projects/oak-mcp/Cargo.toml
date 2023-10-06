@@ -1,4 +1,4 @@
-[package]
+﻿[package]
 name = "oak-mcp"
 version.workspace = true
 authors.workspace = true
@@ -21,8 +21,6 @@ oak-symbols = { workspace = true }
 oak-hover = { workspace = true }
 oak-navigation = { workspace = true }
 oak-semantic-search = { workspace = true }
-tracing = { workspace = true }
-tracing-subscriber = { workspace = true }
 futures = { workspace = true }
 
 

@@ -1,4 +1,4 @@
-[package]
+﻿[package]
 name = "oak-apl"
 version.workspace = true
 authors.workspace = true
@@ -21,7 +21,6 @@ serde = { workspace = true, optional = true }
 oak-vfs = { workspace = true, optional = true }
 oak-mcp = { workspace = true, optional = true }
 futures = { workspace = true, optional = true }
-tracing = { workspace = true }
 tokio = { workspace = true, optional = true }
 
 [dev-dependencies]

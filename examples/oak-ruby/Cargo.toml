@@ -1,4 +1,4 @@
-[package]
+﻿[package]
 name = "oak-ruby"
 version.workspace = true
 authors.workspace = true
@@ -16,7 +16,6 @@ oak-core = { workspace = true }
 oak-highlight = { workspace = true, optional = true }
 oak-pretty-print = { workspace = true, optional = true }
 serde = { workspace = true, optional = true }
-tracing = { workspace = true }
 
 [dev-dependencies]
 oak-testing = { workspace = true }

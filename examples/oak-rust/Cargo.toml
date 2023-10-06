@@ -1,4 +1,4 @@
-[package]
+﻿[package]
 name = "oak-rust"
 version.workspace = true
 authors.workspace = true
@@ -23,7 +23,6 @@ oak-mcp = { workspace = true, optional = true }
 dashmap = { workspace = true }
 serde = { workspace = true, optional = true }
 futures = { workspace = true, optional = true }
-tracing = { workspace = true }
 unicode-ident = { workspace = true }
 tokio = { workspace = true, optional = true }
 

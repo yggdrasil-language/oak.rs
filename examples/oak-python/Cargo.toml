@@ -1,4 +1,4 @@
-[package]
+﻿[package]
 name = "oak-python"
 version.workspace = true
 authors.workspace = true
@@ -19,7 +19,6 @@ oak-vfs = { workspace = true, optional = true }
 oak-mcp = { workspace = true, optional = true }
 serde = { workspace = true, optional = true }
 futures = { workspace = true, optional = true }
-tracing = { workspace = true }
 tokio = { workspace = true, optional = true }
 
 [dev-dependencies]

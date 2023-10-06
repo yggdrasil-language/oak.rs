@@ -15,7 +15,6 @@ keywords = ["parser", "parser-combinators", "core", "primitive"]
 serde = { workspace = true, optional = true }
 triomphe = { workspace = true }
 smallvec = { workspace = true }
-tracing = { workspace = true }
 twox-hash.workspace = true
 diagnostic = { workspace = true, optional = true, default-features = false, features = ["std", "serde"] }
 

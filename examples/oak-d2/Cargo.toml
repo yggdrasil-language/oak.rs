@@ -1,4 +1,4 @@
-[package]
+﻿[package]
 name = "oak-d2"
 version.workspace = true
 authors.workspace = true
@@ -20,7 +20,6 @@ oak-hover = { workspace = true, optional = true }
 serde = { workspace = true, optional = true }
 oak-vfs = { workspace = true, optional = true }
 oak-mcp = { workspace = true, optional = true, features = ["io-std"] }
-tracing = { workspace = true }
 tokio = { workspace = true, optional = true }
 futures = { workspace = true, optional = true }
 
