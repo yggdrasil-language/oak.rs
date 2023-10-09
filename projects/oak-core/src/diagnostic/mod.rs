@@ -30,10 +30,13 @@ pub fn oak_severity(kind: &OakErrorKind) -> DiagnosticSeverity {
 }
 
 fn source_ref(source_id: Option<u32>) -> SourceRef {
-    match source_id {
-        Some(id) => SourceRef::new("oak", format!("source-{id}")),
-        None => SourceRef::new("oak", "anonymous"),
-    }
+    let id = match source_id {
+        Some(id) => format!("source-{id}"),
+        None => "anonymous".to_string(),
+    };
+    SourceRef::new("oak", id).unwrap_or_else(|_| {
+        SourceRef::new("oak", "anonymous").expect("oak fallback source identity")
+    })
 }
 
 fn text_label(source_id: Option<u32>, offset: usize, span_len: usize) -> Option<DiagnosticLabel> {
@@ -165,4 +168,20 @@ impl<T> OakDiagnosticsExt<T> for OakDiagnostics<T> {
         }
         set
     }
+}
+
+/// Project parser output into unified diagnostics and emit each record through [`logger`].
+#[cfg(feature = "logger")]
+pub fn emit_unified_output<T>(output: &OakDiagnostics<T>) {
+    diagnostic::emit_diagnostic_set(&output.unified_set());
+}
+
+/// Project Oak parser errors and emit each unified diagnostic through [`logger`].
+#[cfg(feature = "logger")]
+pub fn emit_oak_errors(errors: &[OakError]) {
+    let mut set = DiagnosticSet::new();
+    for error in errors {
+        set.push(from_oak_error(error));
+    }
+    diagnostic::emit_diagnostic_set(&set);
 }

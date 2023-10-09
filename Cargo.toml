@@ -26,6 +26,7 @@ serde = { version = "1.0.228", features = ["derive", "rc"] }
 serde_json = { version = "1.0.149" }
 schemars = { version = "1.2.1", features = ["derive"] }
 logger = { git = "https://github.com/oovm/rust-boost", branch = "dev", package = "logger" }
+serial_test = { version = "3.2.0" }
 unicode-ident = { version = "1.0.24" }
 url = { version = "2.5.8", features = ["serde"] }
 triomphe = { version = "0.1.15", default-features = false, features = ["serde"] }
