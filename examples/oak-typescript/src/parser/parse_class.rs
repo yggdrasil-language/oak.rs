@@ -66,8 +66,12 @@ impl<'config> TypeScriptParser<'config> {
                 state.bump();
             }
 
-            if self.at(state, IdentifierName) {
-                self.expect(state, IdentifierName).ok();
+            let member_kind = self.peek_kind(state);
+            let keyword_name = state.peek_text().is_some_and(|text| TypeScriptTokenType::from_keyword(&text).is_some());
+            if member_kind == Some(IdentifierName) || (keyword_name && member_kind != Some(Constructor)) {
+                let name_cp = state.checkpoint();
+                state.bump();
+                state.finish_at(name_cp, crate::parser::element_type::TypeScriptElementType::IdentifierName);
                 if self.at(state, LeftParen) {
                     self.parse_parameters(state)?;
                     self.skip_trivia(state);

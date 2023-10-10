@@ -30,7 +30,7 @@ impl<'config> TypeScriptBuilder<'config> {
                             let child_kind = child_node.green.kind;
                             match child_kind {
                                 TypeScriptElementType::IdentifierName => {
-                                    name = source.get_text_in(child_node.span().into()).to_string();
+                                    name = source.get_text_in(child_node.span().into()).trim().to_string();
                                 }
                                 TypeScriptElementType::TypeAnnotation => {
                                     if !self.erase_types {
@@ -109,7 +109,7 @@ impl<'config> TypeScriptBuilder<'config> {
                             match child_kind {
                                 TypeScriptElementType::IdentifierName => {
                                     if name.is_empty() {
-                                        name = source.get_text_in(child_node.span().into()).to_string();
+                                        name = source.get_text_in(child_node.span().into()).trim().to_string();
                                     }
                                 }
                                 TypeScriptElementType::TypeParameter => {
