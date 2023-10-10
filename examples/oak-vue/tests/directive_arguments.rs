@@ -19,3 +19,18 @@ fn builder_preserves_directive_arguments() {
     assert_eq!(source.get_text_in(click.name.clone()), "click");
     assert!(click.arg.is_none());
 }
+
+#[test]
+fn valueless_directive_does_not_consume_next_attribute() {
+    let source = SourceText::new(r#"<template><button v-else :type="type" disabled @click="run" /></template>"#);
+    let mut session = ParseSession::default();
+    let root = VueBuilder::new().build(&source, &[], &mut session).result.unwrap();
+    let VueNode::Element(element) = &root.blocks[0].children[0] else { panic!("expected button") };
+    assert_eq!(element.attributes.len(), 4);
+    let VueAttribute::Directive(otherwise) = &element.attributes[0] else { panic!("expected else") };
+    assert_eq!(source.get_text_in(otherwise.span.clone()).trim(), "v-else");
+    assert!(otherwise.arg.is_none());
+    assert!(otherwise.value.is_none());
+    let VueAttribute::Directive(binding) = &element.attributes[1] else { panic!("expected binding") };
+    assert_eq!(source.get_text_in(binding.span.clone()).trim(), r#":type="type""#);
+}

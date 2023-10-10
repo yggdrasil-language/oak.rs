@@ -324,6 +324,7 @@ impl<'config> VueParser<'config> {
         }
 
         let name_cp = state.checkpoint();
+        let name_end = state.current().map(|token| token.span.end);
         // Lexer classifies bare words like `for`/`in`/`as` as keywords. HTML still uses them
         // as attribute names (`:for`, `for=`). Treat those as name tokens, otherwise the
         // attribute scan never advances and arena allocation spins without bound.
@@ -335,12 +336,14 @@ impl<'config> VueParser<'config> {
             }
         }
 
-        if !is_directive && state.at(VueTokenType::Colon) {
+        let adjacent_colon = state.at(VueTokenType::Colon)
+            && name_end == state.current().map(|token| token.span.start);
+        if !is_directive && adjacent_colon {
             is_directive = true;
             directive_name = attribute_name.unwrap_or_default();
         }
 
-        if is_directive {
+        if is_directive && (adjacent_colon || state.at(VueTokenType::LeftBracket)) {
             self.parse_optional_directive_arg(state);
         }
 
