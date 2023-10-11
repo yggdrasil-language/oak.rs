@@ -60,6 +60,8 @@ diagnostic = { git = "https://github.com/oovm/rust-boost", branch = "dev", packa
 
 # Internal project dependencies
 oak-core = { path = "projects/oak-core", version = "0.0.12" }
+oak-xpath = { path = "projects/oak-xpath", version = "0.0.12" }
+oak-css-selector = { path = "projects/oak-css-selector", version = "0.0.12" }
 oak-macros = { path = "projects/oak-macros", version = "0.0.12" }
 oak-vfs = { path = "projects/oak-vfs", version = "0.0.12" }
 oak-symbols = { path = "projects/oak-symbols", version = "0.0.12" }

@@ -1,0 +1,27 @@
+[package]
+name = "oak-css-selector"
+version.workspace = true
+authors.workspace = true
+description = "CSS selector subset DSL parser and AST for the Oak ecosystem."
+edition.workspace = true
+license.workspace = true
+homepage.workspace = true
+repository = "https://github.com/ygg-lang/oaks/tree/master/projects/oak-css-selector"
+documentation = "https://docs.rs/oak-css-selector"
+categories = ["parsing"]
+keywords = ["css", "selector", "html", "query"]
+
+[dependencies]
+diagnostic = { workspace = true, default-features = false, features = ["std", "serde"] }
+oak-core = { workspace = true, features = ["serde"] }
+serde = { workspace = true, optional = true }
+
+[dev-dependencies]
+serde_json = { workspace = true }
+
+[features]
+default = ["serde"]
+serde = ["dep:serde", "oak-core/serde"]
+
+[package.metadata.docs.rs]
+all-features = true
