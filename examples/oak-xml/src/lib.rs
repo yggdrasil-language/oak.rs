@@ -23,6 +23,8 @@ pub mod lsp;
 // pub mod mcp;
 /// Parser module.
 pub mod parser;
+/// XPath subset queries over parsed XML AST.
+pub mod query;
 
 pub use crate::{
     ast::{XmlNode, XmlValue},

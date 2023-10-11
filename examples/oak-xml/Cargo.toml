@@ -13,6 +13,7 @@ keywords = ["parser", "xml", "markup", "document"]
 
 [dependencies]
 oak-core = { workspace = true }
+oak-xpath = { workspace = true }
 oak-highlight = { workspace = true, optional = true }
 oak-pretty-print = { workspace = true, optional = true }
 serde = { workspace = true, optional = true }
