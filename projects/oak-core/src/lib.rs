@@ -44,6 +44,8 @@ pub mod ast;
 
 /// Helper utilities for common operations.
 pub mod helpers;
+/// Syntax-agnostic structured query primitives for document trees.
+pub mod query;
 
 pub use core::range::Range;
 
