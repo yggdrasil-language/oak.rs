@@ -13,6 +13,7 @@ keywords = ["parser", "html", "web", "markup"]
 
 [dependencies]
 oak-core = { workspace = true }
+oak-css-selector = { workspace = true }
 oak-highlight = { workspace = true, optional = true }
 oak-pretty-print = { workspace = true, optional = true }
 oak-lsp = { workspace = true, optional = true }

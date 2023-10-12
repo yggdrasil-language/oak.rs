@@ -24,6 +24,8 @@ pub mod mcp;
 
 /// Parser module for HTML syntax analysis.
 pub mod parser;
+/// CSS selector subset queries over parsed HTML AST.
+pub mod query;
 
 pub use crate::{ast::HtmlDocument, builder::HtmlBuilder, language::HtmlLanguage, lexer::HtmlLexer, parser::HtmlParser};
 
