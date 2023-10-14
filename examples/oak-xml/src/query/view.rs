@@ -5,9 +5,10 @@ use oak_core::Arc;
 
 /// Indexed read-only view over an XML AST for selector execution.
 #[derive(Debug, Clone)]
-pub struct XmlDocumentView {
+pub struct XmlDocumentView<'a> {
     revision: u64,
     nodes: Vec<XmlNodeData>,
+    sources: Vec<&'a XmlElement>,
 }
 
 #[derive(Debug, Clone)]
@@ -24,24 +25,25 @@ pub(crate) struct XmlNodeData {
 
 /// Element view bound to one node in a [`XmlDocumentView`] snapshot.
 #[derive(Debug, Clone)]
-pub struct XmlElementView {
-    document: XmlDocumentView,
+pub struct XmlElementView<'a> {
+    document: XmlDocumentView<'a>,
     node_id: u64,
 }
 
-impl XmlDocumentView {
+impl<'a> XmlDocumentView<'a> {
     /// Builds a view from a parsed XML root. Assigns stable node ids in document order.
     #[must_use]
-    pub fn from_root(root: &XmlRoot) -> Self {
+    pub fn from_root(root: &'a XmlRoot) -> Self {
         let mut nodes = Vec::new();
+        let mut sources = Vec::new();
         match &root.value {
             XmlValue::Element(element) => {
-                index_element(element, None, &mut nodes);
+                index_element(element, None, &mut nodes, &mut sources);
             }
             XmlValue::Fragment(values) => {
                 for value in values {
                     if let XmlValue::Element(element) = value {
-                        index_element(element, None, &mut nodes);
+                        index_element(element, None, &mut nodes, &mut sources);
                     }
                 }
             }
@@ -50,6 +52,20 @@ impl XmlDocumentView {
         Self {
             revision: 1,
             nodes,
+            sources,
+        }
+    }
+
+    /// Builds a view rooted at one element subtree.
+    #[must_use]
+    pub fn from_element(element: &'a XmlElement) -> Self {
+        let mut nodes = Vec::new();
+        let mut sources = Vec::new();
+        index_element(element, None, &mut nodes, &mut sources);
+        Self {
+            revision: 1,
+            nodes,
+            sources,
         }
     }
 
@@ -61,7 +77,7 @@ impl XmlDocumentView {
 
     /// Returns a view handle for a node id in this snapshot.
     #[must_use]
-    pub fn element(&self, node_id: u64) -> Option<XmlElementView> {
+    pub fn element(&self, node_id: u64) -> Option<XmlElementView<'a>> {
         if self.nodes.get(node_id as usize).is_some() {
             Some(XmlElementView {
                 document: self.clone(),
@@ -70,6 +86,21 @@ impl XmlDocumentView {
         } else {
             None
         }
+    }
+
+    /// Returns the source AST element for a node id in this snapshot.
+    #[must_use]
+    pub fn source_element(&self, node_id: u64) -> Option<&'a XmlElement> {
+        self.sources.get(node_id as usize).copied()
+    }
+
+    /// Maps selector matches back to source AST elements in match order.
+    #[must_use]
+    pub fn source_elements(&self, references: &[ElementRef]) -> Vec<&'a XmlElement> {
+        references
+            .iter()
+            .filter_map(|reference| self.source_element(reference.node_id))
+            .collect()
     }
 
     /// Returns all element node ids in document order.
@@ -90,8 +121,14 @@ impl XmlDocumentView {
     }
 }
 
-fn index_element(element: &XmlElement, parent: Option<u64>, nodes: &mut Vec<XmlNodeData>) -> u64 {
+fn index_element<'a>(
+    element: &'a XmlElement,
+    parent: Option<u64>,
+    nodes: &mut Vec<XmlNodeData>,
+    sources: &mut Vec<&'a XmlElement>,
+) -> u64 {
     let node_id = nodes.len() as u64;
+    sources.push(element);
     let local = split_local_name(&element.name);
     let expanded_name = ExpandedName::local(local);
     let attributes = element
@@ -114,7 +151,7 @@ fn index_element(element: &XmlElement, parent: Option<u64>, nodes: &mut Vec<XmlN
     });
     for child in &element.children {
         if let XmlValue::Element(child_element) = child {
-            let child_id = index_element(child_element, Some(node_id), nodes);
+            let child_id = index_element(child_element, Some(node_id), nodes, sources);
             children.push(child_id);
         }
     }
@@ -157,7 +194,7 @@ fn collect_descendant_text_values(children: &[XmlValue]) -> String {
     out
 }
 
-impl ElementView for XmlElementView {
+impl<'a> ElementView for XmlElementView<'a> {
     fn element_ref(&self) -> ElementRef {
         ElementRef {
             node_id: self.node_id,

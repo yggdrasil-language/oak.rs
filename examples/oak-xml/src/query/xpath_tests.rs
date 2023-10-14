@@ -1,7 +1,7 @@
 #[cfg(test)]
 mod tests {
     use crate::ast::{XmlAttribute, XmlElement, XmlRoot, XmlValue};
-    use crate::query::{select_xpath, XmlDocumentView};
+    use crate::query::{select_xpath, select_xpath_elements, XmlDocumentView};
     use core::range::Range;
     use oak_core::query::QueryBudget;
 
@@ -35,15 +35,28 @@ mod tests {
 
     #[test]
     fn selects_child_paragraphs() {
-        let view = XmlDocumentView::from_root(&sample_root());
+        let root = sample_root();
+        let view = XmlDocumentView::from_root(&root);
         let result = select_xpath(&view, "/w:body/w:p", QueryBudget::default()).expect("parse");
         assert_eq!(result.matches.len(), 2);
     }
 
     #[test]
     fn selects_with_attribute_predicate() {
-        let view = XmlDocumentView::from_root(&sample_root());
+        let root = sample_root();
+        let view = XmlDocumentView::from_root(&root);
         let result = select_xpath(&view, "//w:p[@w14:paraId=\"abc\"]", QueryBudget::default()).expect("parse");
         assert_eq!(result.matches.len(), 1);
+    }
+    #[test]
+    fn maps_matches_back_to_source_elements() {
+        let root = sample_root();
+        let view = XmlDocumentView::from_root(&root);
+        let (result, elements) =
+            select_xpath_elements(&view, "/w:body/w:p", QueryBudget::default()).expect("parse");
+        assert_eq!(result.matches.len(), 2);
+        assert_eq!(elements.len(), 2);
+        assert_eq!(elements[0].name, "w:p");
+        assert!(view.source_element(result.matches[0].node_id).is_some());
     }
 }

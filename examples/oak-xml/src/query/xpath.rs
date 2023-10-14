@@ -25,8 +25,8 @@ impl XmlNamespaceContext {
 }
 
 /// Executes an XPath subset against an XML document view.
-pub fn select_xpath(
-    document: &XmlDocumentView,
+pub fn select_xpath<'a>(
+    document: &XmlDocumentView<'a>,
     selector: &str,
     budget: QueryBudget,
 ) -> Result<SelectorResult, XpathParseError> {
@@ -34,7 +34,18 @@ pub fn select_xpath(
     Ok(execute_xpath(document, &expr, budget))
 }
 
-fn execute_xpath(document: &XmlDocumentView, expr: &XpathExpr, budget: QueryBudget) -> SelectorResult {
+/// Executes XPath and maps matches back to source AST elements.
+pub fn select_xpath_elements<'a>(
+    document: &XmlDocumentView<'a>,
+    selector: &str,
+    budget: QueryBudget,
+) -> Result<(SelectorResult, Vec<&'a crate::ast::XmlElement>), XpathParseError> {
+    let result = select_xpath(document, selector, budget)?;
+    let elements = document.source_elements(&result.matches);
+    Ok((result, elements))
+}
+
+fn execute_xpath<'a>(document: &XmlDocumentView<'a>, expr: &XpathExpr, budget: QueryBudget) -> SelectorResult {
     let mut matches = Vec::new();
     let mut predicates_used = 0usize;
 
@@ -61,7 +72,7 @@ fn execute_xpath(document: &XmlDocumentView, expr: &XpathExpr, budget: QueryBudg
     }
 }
 
-fn root_elements(document: &XmlDocumentView) -> Vec<ElementRef> {
+fn root_elements<'a>(document: &XmlDocumentView<'a>) -> Vec<ElementRef> {
     document
         .all_elements()
         .into_iter()
@@ -69,8 +80,8 @@ fn root_elements(document: &XmlDocumentView) -> Vec<ElementRef> {
         .collect()
 }
 
-fn evaluate_path(
-    document: &XmlDocumentView,
+fn evaluate_path<'a>(
+    document: &XmlDocumentView<'a>,
     path: &PathExpr,
     context: &[ElementRef],
     budget: QueryBudget,
@@ -91,8 +102,8 @@ fn evaluate_path(
     current
 }
 
-fn evaluate_step(
-    document: &XmlDocumentView,
+fn evaluate_step<'a>(
+    document: &XmlDocumentView<'a>,
     step: &Step,
     context: &[ElementRef],
     budget: QueryBudget,
@@ -140,7 +151,7 @@ fn evaluate_step(
     candidates
 }
 
-fn descendants(document: &XmlDocumentView, root: ElementRef) -> Vec<ElementRef> {
+fn descendants<'a>(document: &XmlDocumentView<'a>, root: ElementRef) -> Vec<ElementRef> {
     let mut out = Vec::new();
     let mut stack = document
         .node(root.node_id)
@@ -169,9 +180,9 @@ fn node_test_matches(node: &XmlNodeData, test: &NodeTest) -> bool {
     }
 }
 
-fn predicates_match(
-    document: &XmlDocumentView,
-    view: &XmlElementView,
+fn predicates_match<'a>(
+    document: &XmlDocumentView<'a>,
+    view: &XmlElementView<'a>,
     predicates: &[Predicate],
     budget: QueryBudget,
     predicates_used: &mut usize,
@@ -205,7 +216,7 @@ fn predicates_match(
     true
 }
 
-fn sibling_elements(document: &XmlDocumentView, reference: ElementRef) -> Vec<ElementRef> {
+fn sibling_elements<'a>(document: &XmlDocumentView<'a>, reference: ElementRef) -> Vec<ElementRef> {
     let parent = document
         .element(reference.node_id)
         .and_then(|view| view.parent())
