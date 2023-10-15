@@ -48,9 +48,8 @@ impl<'config> TypeScriptBuilder<'config> {
                 }
             }
             TypeScriptElementType::StringLiteral => {
-                let text = source.get_text_in(span.into());
-                let content = if (text.starts_with('"') && text.ends_with('"')) || (text.starts_with('\'') && text.ends_with('\'')) { &text[1..text.len() - 1] } else { &text };
-                Ok(Some(Expression::new(ExpressionKind::StringLiteral(content.to_string()), span.into())))
+                let content = decode_string_literal_text(&source.get_text_in(span.into()));
+                Ok(Some(Expression::new(ExpressionKind::StringLiteral(content), span.into())))
             }
             TypeScriptElementType::BigIntLiteral => {
                 let text = source.get_text_in(span.into());
@@ -528,5 +527,14 @@ impl<'config> TypeScriptBuilder<'config> {
                 Ok(None)
             }
         }
+    }
+}
+
+fn decode_string_literal_text(raw: &str) -> String {
+    let text = raw.trim();
+    if (text.starts_with('"') && text.ends_with('"')) || (text.starts_with('\'') && text.ends_with('\'')) {
+        text[1..text.len() - 1].to_string()
+    } else {
+        text.to_string()
     }
 }
