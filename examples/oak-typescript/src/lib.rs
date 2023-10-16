@@ -14,6 +14,8 @@ pub mod lexer;
 
 /// Parser for TypeScript.
 pub mod parser;
+/// AST printer / formatter entry for TypeScript.
+pub mod print;
 
 // Re-exports
 pub use crate::{
