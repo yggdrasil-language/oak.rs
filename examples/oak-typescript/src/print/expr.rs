@@ -166,11 +166,16 @@ fn print_expr(expr: &Expression, min_prec: Prec) -> Option<String> {
         ExpressionKind::NonNullExpression(inner) => {
             wrap_prec(format!("{}!", print_expr(inner, Prec::Postfix)?), Prec::Postfix, min_prec)
         }
-        ExpressionKind::FunctionExpression { .. }
-        | ExpressionKind::TaggedTemplateExpression { .. }
-        | ExpressionKind::JsxElement(_)
-        | ExpressionKind::JsxFragment(_)
-        | ExpressionKind::JsxSelfClosingElement(_) => None,
+        ExpressionKind::FunctionExpression { .. } | ExpressionKind::TaggedTemplateExpression { .. } => None,
+        ExpressionKind::JsxElement(element) => {
+            wrap_prec(super::jsx::print_jsx_element(element)?, Prec::Primary, min_prec)
+        }
+        ExpressionKind::JsxFragment(fragment) => {
+            wrap_prec(super::jsx::print_jsx_fragment(fragment)?, Prec::Primary, min_prec)
+        }
+        ExpressionKind::JsxSelfClosingElement(element) => {
+            wrap_prec(super::jsx::print_jsx_self_closing(element)?, Prec::Primary, min_prec)
+        }
     }
 }
 

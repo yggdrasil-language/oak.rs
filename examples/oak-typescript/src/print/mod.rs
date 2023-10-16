@@ -1,9 +1,10 @@
 //! Oak TypeScript source formatter (AST print path).
 //!
-//! Returns [`Err`] when parse fails or the AST contains unprintable nodes — callers
-//! may fall back to another formatter during migration.
+//! Returns [`Err`] when parse fails or the AST contains unprintable nodes. Product
+//! adapters must treat that as a coverage gap to close in Oak, not a permanent dual stack.
 
 mod expr;
+mod jsx;
 mod stmt;
 
 use oak_core::{Builder, ParseSession, SourceText};
@@ -68,5 +69,19 @@ mod tests {
         let once = format_source("const x = 1", &FormatOptions::default()).expect("once");
         let twice = format_source(&once, &FormatOptions::default()).expect("twice");
         assert_eq!(once, twice);
+    }
+
+    #[test]
+    fn formats_jsx_const_declaration() {
+        let out = format_source(
+            r#"const el = <div className="foo">bar</div>;"#,
+            &FormatOptions::default(),
+        )
+        .expect("format");
+        assert!(
+            out.contains("<div className='foo'>bar</div>"),
+            "output: {:?}",
+            out
+        );
     }
 }
