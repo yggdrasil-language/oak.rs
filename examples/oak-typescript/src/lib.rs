@@ -14,7 +14,9 @@ pub mod lexer;
 
 /// Parser for TypeScript.
 pub mod parser;
-/// AST printer / formatter entry for TypeScript.
+/// CST-oriented formatter (green-tree spans + trivia gaps).
+pub mod cst_format;
+/// Transitional AST print (`source` → AST → text).
 pub mod print;
 
 // Re-exports
