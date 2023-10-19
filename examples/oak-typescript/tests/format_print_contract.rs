@@ -1,7 +1,7 @@
-//! Shared Oak format-print contract fixtures for VMZ and Nifty adapters.
+//! Shared format contract fixtures for VMZ/Nifty capability matrix row
+//! `oak-typescript::print::format_source` (transitional AST print, not CST).
 //!
-//! Each case documents whether Oak AST print can format the input today.
-//! Gaps must be closed in Oak — not papered over with permanent oxc paths.
+//! Gaps must be closed in real CST/language formatters — not permanent oxc paths.
 
 use oak_typescript::print::{FormatOptions, format_source};
 

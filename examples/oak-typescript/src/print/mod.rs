@@ -1,7 +1,8 @@
-//! Oak TypeScript source formatter (AST print path).
+//! Transitional TypeScript **AST print** (`source` → parse → AST → text).
 //!
-//! Returns [`Err`] when parse fails or the AST contains unprintable nodes. Product
-//! adapters must treat that as a coverage gap to close in Oak, not a permanent dual stack.
+//! This is **not** a CST-faithful formatter and does not use `oak-pretty-print` /
+//! `oak-formatter`. See `tests/format_print_contract.rs` and the VMZ capability matrix.
+//! Returns [`Err`] when parse fails or the AST contains unprintable nodes.
 
 mod expr;
 mod jsx;
