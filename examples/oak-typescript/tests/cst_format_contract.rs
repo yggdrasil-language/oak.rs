@@ -15,3 +15,17 @@ fn preserves_leading_line_comment_and_normalizes_const() {
 fn rejects_unsupported_top_level_class() {
     assert!(format_source("class Foo {}", &CstFormatOptions::default()).is_err());
 }
+
+#[test]
+fn preserves_trailing_comment_and_block_comment_in_statement() {
+    let input = "const x = 1 /* mid */ // end";
+    let out = format_source(input, &CstFormatOptions::default()).expect("format");
+    assert_eq!(out, input);
+}
+
+#[test]
+fn preserves_asi_sensitive_continuation_line() {
+    let input = "const total = base\n+ extra";
+    let out = format_source(input, &CstFormatOptions::default()).expect("format");
+    assert_eq!(out, input);
+}
