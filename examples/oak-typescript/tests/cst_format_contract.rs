@@ -29,3 +29,17 @@ fn preserves_asi_sensitive_continuation_line() {
     let out = format_source(input, &CstFormatOptions::default()).expect("format");
     assert_eq!(out, input);
 }
+
+#[test]
+fn preserves_block_comment_between_statements() {
+    let input = "const a = 1\n/* between */\nconst b = 2";
+    let out = format_source(input, &CstFormatOptions::default()).expect("format");
+    assert_eq!(out, "const a = 1\n/* between */\nconst b = 2");
+}
+
+#[test]
+fn formats_scoped_import_without_comments() {
+    let input = "import  {  foo }  from 'pkg'";
+    let out = format_source(input, &CstFormatOptions::default()).expect("format");
+    assert_eq!(out, "import { foo } from 'pkg';");
+}
