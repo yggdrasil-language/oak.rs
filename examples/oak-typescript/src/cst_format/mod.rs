@@ -14,12 +14,12 @@ use crate::{
     print::{FormatOptions, format_source as ast_print_source},
 };
 
-/// Options for the CST format path (reserved for indent/width wiring to `PrinterConfig`).
-#[derive(Debug, Clone, Default)]
-pub struct CstFormatOptions {}
+mod options;
+
+pub use options::CstFormatOptions;
 
 /// Format TypeScript/JavaScript source with trivia between top-level statements preserved.
-pub fn format_source(source: &str, _options: &CstFormatOptions) -> Result<String, String> {
+pub fn format_source(source: &str, options: &CstFormatOptions) -> Result<String, String> {
     if source.is_empty() {
         return Ok(String::new());
     }
@@ -85,11 +85,7 @@ pub fn format_source(source: &str, _options: &CstFormatOptions) -> Result<String
         out.push_str(slice_source(source, cursor, source.len()));
     }
 
-    if source.ends_with('\n') && !out.ends_with('\n') {
-        out.push('\n');
-    }
-
-    Ok(out)
+    Ok(options.finalize_output(source, out))
 }
 
 fn slice_source(source: &str, start: usize, end: usize) -> &str {

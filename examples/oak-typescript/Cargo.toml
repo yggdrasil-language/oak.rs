@@ -11,6 +11,7 @@ keywords = ["frontend", "language", "typescript"]
 
 [dependencies]
 oak-core = { workspace = true }
+oak-pretty-print = { workspace = true }
 serde = { workspace = true, optional = true }
 
 [features]
