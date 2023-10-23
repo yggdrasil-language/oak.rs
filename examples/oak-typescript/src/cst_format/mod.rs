@@ -93,10 +93,27 @@ fn slice_source(source: &str, start: usize, end: usize) -> &str {
 }
 
 fn format_statement_snippet(snippet: &str) -> Result<String, String> {
-    if snippet_contains_comment(snippet) || snippet_needs_asi_preservation(snippet) {
+    if snippet_contains_comment(snippet)
+        || snippet_has_decorator(snippet)
+        || snippet_needs_asi_preservation(snippet)
+    {
         return Ok(snippet.to_string());
     }
     ast_print_source(snippet, &FormatOptions::default())
+}
+
+fn snippet_has_decorator(snippet: &str) -> bool {
+    let text = SourceText::new(snippet);
+    let language = TypeScriptLanguage::default();
+    let lexer = TypeScriptLexer::new(&language);
+    let mut cache = ParseSession::default();
+    let output = lexer.lex(&text, &[], &mut cache);
+    match output.result {
+        Ok(tokens) => tokens.iter().any(|token| {
+            matches!(token.kind, TypeScriptTokenType::At | TypeScriptTokenType::Decorator)
+        }),
+        Err(_) => snippet.trim_start().starts_with('@'),
+    }
 }
 
 fn snippet_contains_comment(snippet: &str) -> bool {
@@ -170,6 +187,13 @@ mod tests {
     #[test]
     fn preserves_trailing_line_comment_in_statement() {
         let input = "const x = 1 // keep";
+        let out = format_source(input, &CstFormatOptions::default()).expect("format");
+        assert_eq!(out, input);
+    }
+
+    #[test]
+    fn preserves_decorated_const_statement() {
+        let input = "@Component()\nconst  x=1";
         let out = format_source(input, &CstFormatOptions::default()).expect("format");
         assert_eq!(out, input);
     }

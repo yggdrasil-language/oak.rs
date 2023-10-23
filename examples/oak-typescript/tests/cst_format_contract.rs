@@ -43,3 +43,10 @@ fn formats_scoped_import_without_comments() {
     let out = format_source(input, &CstFormatOptions::default()).expect("format");
     assert_eq!(out, "import { foo } from 'pkg';");
 }
+
+#[test]
+fn preserves_decorated_const_statement() {
+    let input = "@Component()\nconst  x=1";
+    let out = format_source(input, &CstFormatOptions::default()).expect("format");
+    assert_eq!(out, input);
+}
