@@ -14,34 +14,18 @@ use crate::{
     print::{FormatOptions, format_source as ast_print_source},
 };
 
+mod formatter_bridge;
 mod options;
 
+pub use formatter_bridge::TypeScriptCstFormatter;
 pub use options::CstFormatOptions;
 
-/// Format TypeScript/JavaScript source with trivia between top-level statements preserved.
-pub fn format_source(source: &str, options: &CstFormatOptions) -> Result<String, String> {
-    if source.is_empty() {
-        return Ok(String::new());
-    }
-
-    let text = SourceText::new(source);
-    let language = TypeScriptLanguage::default();
-    let parser = TypeScriptParser::new(&language);
-    let mut session = ParseSession::default();
-    let parsed = parser.parse(&text, &[], &mut session);
-
-    if let Err(err) = &parsed.result {
-        return Err(format!("oak parse failed: {err:?}"));
-    }
-    if !parsed.diagnostics.is_empty() {
-        return Err(format!("oak diagnostics: {:?}", parsed.diagnostics));
-    }
-
-    let root_green = parsed
-        .result
-        .ok()
-        .ok_or_else(|| "oak parse returned no root".to_string())?;
-    let file = RedNode::new(root_green, 0);
+/// Format a parsed `SourceFile` red node with companion source text.
+pub fn format_source_file(
+    source: &str,
+    file: &RedNode<'_, TypeScriptLanguage>,
+    options: &CstFormatOptions,
+) -> Result<String, String> {
     if file.element_type() != TypeScriptElementType::SourceFile {
         return Err(format!(
             "expected SourceFile root, got {:?}",
@@ -81,11 +65,37 @@ pub fn format_source(source: &str, options: &CstFormatOptions) -> Result<String,
     if cursor < file_span.end {
         out.push_str(slice_source(source, cursor, file_span.end));
     } else if cursor < source.len() {
-        // SourceFile span may exclude trailing file trivia outside the root.
         out.push_str(slice_source(source, cursor, source.len()));
     }
 
     Ok(options.finalize_output(source, out))
+}
+
+/// Format TypeScript/JavaScript source with trivia between top-level statements preserved.
+pub fn format_source(source: &str, options: &CstFormatOptions) -> Result<String, String> {
+    if source.is_empty() {
+        return Ok(String::new());
+    }
+
+    let text = SourceText::new(source);
+    let language = TypeScriptLanguage::default();
+    let parser = TypeScriptParser::new(&language);
+    let mut session = ParseSession::default();
+    let parsed = parser.parse(&text, &[], &mut session);
+
+    if let Err(err) = &parsed.result {
+        return Err(format!("oak parse failed: {err:?}"));
+    }
+    if !parsed.diagnostics.is_empty() {
+        return Err(format!("oak diagnostics: {:?}", parsed.diagnostics));
+    }
+
+    let root_green = parsed
+        .result
+        .ok()
+        .ok_or_else(|| "oak parse returned no root".to_string())?;
+    let file = RedNode::new(root_green, 0);
+    format_source_file(source, &file, options)
 }
 
 fn slice_source(source: &str, start: usize, end: usize) -> &str {
@@ -203,5 +213,26 @@ mod tests {
         let input = "const x = 1\n+ 2";
         let out = format_source(input, &CstFormatOptions::default()).expect("format");
         assert_eq!(out, input);
+    }
+
+    #[test]
+    fn rejects_unclosed_brace_without_rewrite() {
+        let err = format_source("const x = {", &CstFormatOptions::default()).unwrap_err();
+        assert!(err.contains("diagnostics"), "err={err}");
+    }
+
+    #[test]
+    fn format_source_file_matches_format_source() {
+        let input = "// keep\nconst  x=1";
+        let text = SourceText::new(input);
+        let language = TypeScriptLanguage::default();
+        let parser = TypeScriptParser::new(&language);
+        let mut session = ParseSession::default();
+        let parsed = parser.parse(&text, &[], &mut session).result.expect("parse");
+        let file = RedNode::new(parsed, 0);
+        let options = CstFormatOptions::default();
+        let direct = format_source(input, &options).expect("format_source");
+        let from_file = format_source_file(input, &file, &options).expect("format_source_file");
+        assert_eq!(direct, from_file);
     }
 }

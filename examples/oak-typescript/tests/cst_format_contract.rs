@@ -45,6 +45,14 @@ fn formats_scoped_import_without_comments() {
 }
 
 #[test]
+fn rejects_unclosed_brace_without_rewrite() {
+    let result = format_source("const x = {", &CstFormatOptions::default());
+    assert!(result.is_err(), "expected Err, got {:?}", result);
+    let err = result.unwrap_err();
+    assert!(err.contains("diagnostics"), "err={err}");
+}
+
+#[test]
 fn preserves_decorated_const_statement() {
     let input = "@Component()\nconst  x=1";
     let out = format_source(input, &CstFormatOptions::default()).expect("format");
