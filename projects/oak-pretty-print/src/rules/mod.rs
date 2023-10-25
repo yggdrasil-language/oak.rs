@@ -1,4 +1,4 @@
-use crate::{Document, FormatContext, FormatResult};
+use crate::{Document, FormatResult, state::FormatContext};
 use alloc::{boxed::Box, vec::Vec};
 use oak_core::{
     errors::OakError,
@@ -13,7 +13,7 @@ use oak_core::{
 /// 
 /// The `C` type parameter represents the language-specific configuration.
 /// The `S` type parameter represents the formatting state.
-pub trait FormatRule<L: Language, C, S = crate::FormatState> {
+pub trait FormatRule<L: Language, C: Clone, S: Clone = crate::state::FormatState> {
     /// The name of the rule
     fn name(&self) -> &str;
 
@@ -68,17 +68,17 @@ pub trait FormatRule<L: Language, C, S = crate::FormatState> {
 /// 
 /// The `C` type parameter represents the language-specific configuration.
 /// The `S` type parameter represents the formatting state.
-pub struct RuleSet<L: Language, C, S = crate::FormatState> {
+pub struct RuleSet<L: Language, C: Clone, S: Clone = crate::state::FormatState> {
     rules: Vec<Box<dyn FormatRule<L, C, S>>>,
 }
 
-impl<L: Language, C, S> Default for RuleSet<L, C, S> {
+impl<L: Language, C: Clone, S: Clone> Default for RuleSet<L, C, S> {
     fn default() -> Self {
         Self { rules: Vec::new() }
     }
 }
 
-impl<L: Language, C, S> RuleSet<L, C, S> {
+impl<L: Language, C: Clone, S: Clone> RuleSet<L, C, S> {
     /// Creates a new rule set
     pub fn new() -> Self {
         Self::default()

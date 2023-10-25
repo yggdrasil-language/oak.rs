@@ -5,20 +5,21 @@
 //! This is the path toward real `oak-formatter` / `oak-pretty-print` integration — not a
 //! finished CST formatter yet.
 
-use oak_core::{Lexer, ParseSession, Parser, RedNode, RedTree, SourceText};
+use oak_core::{ParseSession, Parser, RedNode, RedTree, SourceText};
 
 use crate::{
     language::TypeScriptLanguage,
-    lexer::{TypeScriptLexer, token_type::TypeScriptTokenType},
     parser::{TypeScriptParser, element_type::TypeScriptElementType},
-    print::{FormatOptions, format_source as ast_print_source},
 };
 
 mod formatter_bridge;
 mod options;
+mod red_tree;
+mod trivia_guard;
 
 pub use formatter_bridge::TypeScriptCstFormatter;
 pub use options::CstFormatOptions;
+pub use red_tree::TypeScriptRedTreeFormatter;
 
 /// Format a parsed `SourceFile` red node with companion source text.
 pub fn format_source_file(
@@ -55,8 +56,9 @@ pub fn format_source_file(
                 if !is_supported_top_level(kind) {
                     return Err(format!("unsupported top-level CST node: {kind:?}"));
                 }
-                let snippet = slice_source(source, child_span.start, child_span.end);
-                out.push_str(&format_statement_snippet(snippet)?);
+                out.push_str(
+                    &TypeScriptRedTreeFormatter::new().format_statement(source, &stmt, options)?,
+                );
             }
         }
         cursor = child_span.end;
@@ -100,64 +102,6 @@ pub fn format_source(source: &str, options: &CstFormatOptions) -> Result<String,
 
 fn slice_source(source: &str, start: usize, end: usize) -> &str {
     source.get(start..end).unwrap_or("")
-}
-
-fn format_statement_snippet(snippet: &str) -> Result<String, String> {
-    if snippet_contains_comment(snippet)
-        || snippet_has_decorator(snippet)
-        || snippet_needs_asi_preservation(snippet)
-    {
-        return Ok(snippet.to_string());
-    }
-    ast_print_source(snippet, &FormatOptions::default())
-}
-
-fn snippet_has_decorator(snippet: &str) -> bool {
-    let text = SourceText::new(snippet);
-    let language = TypeScriptLanguage::default();
-    let lexer = TypeScriptLexer::new(&language);
-    let mut cache = ParseSession::default();
-    let output = lexer.lex(&text, &[], &mut cache);
-    match output.result {
-        Ok(tokens) => tokens.iter().any(|token| {
-            matches!(token.kind, TypeScriptTokenType::At | TypeScriptTokenType::Decorator)
-        }),
-        Err(_) => snippet.trim_start().starts_with('@'),
-    }
-}
-
-fn snippet_contains_comment(snippet: &str) -> bool {
-    let text = SourceText::new(snippet);
-    let language = TypeScriptLanguage::default();
-    let lexer = TypeScriptLexer::new(&language);
-    let mut cache = ParseSession::default();
-    let output = lexer.lex(&text, &[], &mut cache);
-    match output.result {
-        Ok(tokens) => tokens.iter().any(|token| {
-            matches!(
-                token.kind,
-                TypeScriptTokenType::LineComment | TypeScriptTokenType::BlockComment
-            )
-        }),
-        Err(_) => snippet.contains("//") || snippet.contains("/*"),
-    }
-}
-
-/// Preserve snippets where a line break may change ASI grouping if rewritten on one line.
-fn snippet_needs_asi_preservation(snippet: &str) -> bool {
-    let mut lines = snippet.lines();
-    lines.next();
-    for line in lines {
-        let trimmed = line.trim_start();
-        if trimmed.is_empty() {
-            continue;
-        }
-        let first = trimmed.as_bytes()[0];
-        if matches!(first, b'+' | b'-' | b'(' | b'[' | b'.' | b'/') {
-            return true;
-        }
-    }
-    false
 }
 
 fn is_supported_top_level(kind: TypeScriptElementType) -> bool {

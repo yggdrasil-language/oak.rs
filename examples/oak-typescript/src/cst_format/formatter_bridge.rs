@@ -1,9 +1,8 @@
 //! Bridge from `cst_format` toward `oak-formatter` on `RedTree`.
 //!
-//! `oak_formatter::Formatter` formats a `RedTree` without source text. TypeScript CST
-//! formatting needs both the red-green tree and the original `source`, so the product
-//! entry remains `format_source` / `format_source_file` until `oak-formatter` carries
-//! source context or pretty-print rules consume trivia-aware documents end to end.
+//! RedTree formatting rules live in [`super::red_tree::TypeScriptRedTreeFormatter`].
+//! `oak_formatter::Formatter` still lacks companion source text, so product callers use
+//! `format_source` / `format_source_file` until `oak-formatter` carries source context.
 
 use oak_core::RedNode;
 

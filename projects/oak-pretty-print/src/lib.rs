@@ -25,13 +25,16 @@ pub mod state;
 pub mod to_doc;
 /// Whitespace handling and processing
 pub mod whitespace;
+/// RedTree formatting rules
+pub mod rules;
 
 // Re-export commonly used types
 pub use crate::{
     comment::{Comment, CommentCollector, CommentKind, CommentProcessor},
     document::{Document, IndentStyle, LineEnding, Printer, PrinterConfig},
     errors::FormatResult,
-    state::DefaultFormatState,
+    rules::{FormatRule, RuleSet},
+    state::{DefaultFormatState, FormatContext, FormatState},
     to_doc::{AsDocument, ToDocument},
     whitespace::WhitespaceProcessor,
 };
