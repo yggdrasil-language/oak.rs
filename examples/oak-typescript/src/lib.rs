@@ -2,10 +2,15 @@
 #![feature(new_range_api)]
 #![warn(missing_docs)]
 
+mod cst_format;
+mod print;
+
 /// AST module for TypeScript.
 pub mod ast;
 /// Builder module for TypeScript.
 pub mod builder;
+/// Public source formatting entry (`format_source`, `FormatOptions`).
+pub mod format;
 
 /// Language definition for TypeScript.
 pub mod language;
@@ -14,15 +19,12 @@ pub mod lexer;
 
 /// Parser for TypeScript.
 pub mod parser;
-/// CST-oriented formatter (green-tree spans + trivia gaps).
-pub mod cst_format;
-/// Transitional AST print (`source` → AST → text).
-pub mod print;
 
 // Re-exports
 pub use crate::{
     ast::TypeScriptRoot,
     builder::TypeScriptBuilder,
+    format::{FormatError, FormatOptions, format_source},
     language::TypeScriptLanguage,
     lexer::{TypeScriptLexer, token_type::TypeScriptTokenType},
     parser::{TypeScriptParser, element_type::TypeScriptElementType},

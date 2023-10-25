@@ -12,7 +12,7 @@ use oak_core::{Builder, ParseSession, SourceText};
 
 use crate::{TypeScriptBuilder, TypeScriptLanguage};
 
-pub use expr::print_expression;
+use expr::print_expression;
 
 /// Minimal formatter options for the Oak print path.
 #[derive(Debug, Clone, Default)]
@@ -73,16 +73,9 @@ mod tests {
     }
 
     #[test]
-    fn formats_jsx_const_declaration() {
-        let out = format_source(
-            r#"const el = <div className="foo">bar</div>;"#,
-            &FormatOptions::default(),
-        )
-        .expect("format");
-        assert!(
-            out.contains("<div className='foo'>bar</div>"),
-            "output: {:?}",
-            out
-        );
+    fn ast_print_drops_leading_line_comment() {
+        let out = format_source("// keep\nconst x = 1", &FormatOptions::default()).expect("format");
+        assert_eq!(out, "const x = 1");
+        assert!(!out.contains("keep"));
     }
 }

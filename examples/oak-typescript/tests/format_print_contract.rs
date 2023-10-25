@@ -1,14 +1,15 @@
 //! Shared format contract fixtures for VMZ/Nifty capability matrix row
-//! `oak-typescript::print::format_source` (transitional AST print, not CST).
+//! `oak-typescript::format::format_source`.
 //!
-//! Gaps must be closed in real CST/language formatters — not permanent oxc paths.
+//! Covers supported syntax, idempotence, and documented gaps. AST-only trivia behavior
+//! is tested in the private `print` module.
 
-use oak_typescript::print::{FormatOptions, format_source};
+use oak_typescript::{FormatOptions, format_source};
 
 struct FormatCase {
     name: &'static str,
     input: &'static str,
-    /// Expected formatted output when Oak print succeeds.
+    /// Expected formatted output when format succeeds.
     expect_output: Option<&'static str>,
     /// When true, `format_source` must return `Err` (coverage gap).
     expect_err: bool,
@@ -90,9 +91,8 @@ fn unsupported_syntax_returns_err() {
 }
 
 #[test]
-fn line_comment_trivia_is_not_preserved_yet() {
+fn leading_line_comment_is_preserved() {
     let input = "// keep\nconst x = 1";
-    let out = format_source(input, &FormatOptions::default()).expect("formats without comment");
-    assert_eq!(out, "const x = 1");
-    assert!(!out.contains("keep"), "CST trivia preservation gap: comment dropped");
+    let out = format_source(input, &FormatOptions::default()).expect("format");
+    assert_eq!(out, "// keep\nconst x = 1");
 }

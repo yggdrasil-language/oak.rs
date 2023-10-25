@@ -17,9 +17,9 @@ mod options;
 mod red_tree;
 mod trivia_guard;
 
-pub use formatter_bridge::TypeScriptCstFormatter;
+use red_tree::TypeScriptRedTreeFormatter;
+
 pub use options::CstFormatOptions;
-pub use red_tree::TypeScriptRedTreeFormatter;
 
 /// Format a parsed `SourceFile` red node with companion source text.
 pub fn format_source_file(
