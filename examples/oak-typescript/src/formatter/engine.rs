@@ -27,12 +27,14 @@ pub fn format_source(source: &str, options: &FormatOptions) -> Result<String, Fo
 }
 
 #[cfg(test)]
-mod tests {
+mod smoke {
     use super::*;
 
     #[test]
-    fn rejects_unclosed_brace_without_ast_fallback() {
-        let err = format_source("const x = {", &FormatOptions::default()).unwrap_err();
-        assert!(err.message().contains("diagnostics"), "err={err}");
+    fn formats_const_spacing_and_idempotent() {
+        let out = format_source("const  x=1", &FormatOptions::default()).expect("format");
+        assert_eq!(out, "const x = 1");
+        let again = format_source(&out, &FormatOptions::default()).expect("twice");
+        assert_eq!(out, again);
     }
 }

@@ -9,8 +9,8 @@ mod print;
 pub mod ast;
 /// Builder module for TypeScript.
 pub mod builder;
-/// Public source formatting entry (`format_source`, `FormatOptions`).
-pub mod format;
+/// Source formatting (`format_source`, `FormatOptions`).
+pub mod formatter;
 
 /// Language definition for TypeScript.
 pub mod language;
@@ -24,7 +24,7 @@ pub mod parser;
 pub use crate::{
     ast::TypeScriptRoot,
     builder::TypeScriptBuilder,
-    format::{FormatError, FormatOptions, format_source},
+    formatter::{FormatError, FormatOptions, format_source},
     language::TypeScriptLanguage,
     lexer::{TypeScriptLexer, token_type::TypeScriptTokenType},
     parser::{TypeScriptParser, element_type::TypeScriptElementType},

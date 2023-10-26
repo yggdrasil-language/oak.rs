@@ -1,9 +1,7 @@
 //! Bridge from `cst_format` toward `oak-formatter` on `RedTree`.
 //!
 //! RedTree formatting rules live in [`super::red_tree::TypeScriptRedTreeFormatter`].
-//! `oak_formatter::Formatter` still lacks companion source text, so product callers use
-//! `format_source` / `format_source_file` until `oak-formatter` carries source context.
-
+//! Product callers use [`crate::formatter::format_source`].
 use oak_core::RedNode;
 
 use crate::language::TypeScriptLanguage;
