@@ -1,4 +1,5 @@
 use super::view::{HtmlDocumentView, HtmlNodeData};
+use crate::ast::Element;
 use oak_core::query::{ElementRef, ElementView, QueryBudget, SelectorOutcome, SelectorResult};
 use oak_css_selector::{
     parse_css_selector, AttributeOperator, Combinator, CompoundSelector, CssSelectorParseError,
@@ -6,8 +7,8 @@ use oak_css_selector::{
 };
 
 /// Executes a CSS selector list against an HTML document view.
-pub fn select_css(
-    document: &HtmlDocumentView,
+pub fn select_css<'a>(
+    document: &HtmlDocumentView<'a>,
     selector: &str,
     budget: QueryBudget,
 ) -> Result<SelectorResult, CssSelectorParseError> {
@@ -15,7 +16,22 @@ pub fn select_css(
     Ok(execute_css(document, &list, budget))
 }
 
-fn execute_css(document: &HtmlDocumentView, list: &SelectorList, budget: QueryBudget) -> SelectorResult {
+/// Executes CSS selectors and maps matches back to source AST elements.
+pub fn select_css_elements<'a>(
+    document: &HtmlDocumentView<'a>,
+    selector: &str,
+    budget: QueryBudget,
+) -> Result<(SelectorResult, Vec<&'a Element>), CssSelectorParseError> {
+    let result = select_css(document, selector, budget)?;
+    let elements = document.source_elements(&result.matches);
+    Ok((result, elements))
+}
+
+fn execute_css<'a>(
+    document: &HtmlDocumentView<'a>,
+    list: &SelectorList,
+    budget: QueryBudget,
+) -> SelectorResult {
     let mut matches = Vec::new();
     for reference in document.all_elements() {
         if matches.len() >= budget.max_matches {
@@ -38,7 +54,11 @@ fn execute_css(document: &HtmlDocumentView, list: &SelectorList, budget: QueryBu
     }
 }
 
-fn matches_selector(document: &HtmlDocumentView, reference: ElementRef, selector: &Selector) -> bool {
+fn matches_selector<'a>(
+    document: &HtmlDocumentView<'a>,
+    reference: ElementRef,
+    selector: &Selector,
+) -> bool {
     if !matches_compound(document, reference, &selector.compound) {
         return false;
     }
@@ -52,8 +72,8 @@ fn matches_selector(document: &HtmlDocumentView, reference: ElementRef, selector
     true
 }
 
-fn find_relative_match(
-    document: &HtmlDocumentView,
+fn find_relative_match<'a>(
+    document: &HtmlDocumentView<'a>,
     reference: ElementRef,
     combinator: &Combinator,
     compound: &CompoundSelector,
@@ -73,11 +93,27 @@ fn find_relative_match(
             }
             None
         }
-        Combinator::NextSibling | Combinator::SubsequentSibling => None,
+        Combinator::NextSibling => document
+            .previous_element_sibling(reference)
+            .filter(|sibling| matches_compound(document, *sibling, compound)),
+        Combinator::SubsequentSibling => {
+            let mut current = document.previous_element_sibling(reference);
+            while let Some(sibling) = current {
+                if matches_compound(document, sibling, compound) {
+                    return Some(sibling);
+                }
+                current = document.previous_element_sibling(sibling);
+            }
+            None
+        }
     }
 }
 
-fn matches_compound(document: &HtmlDocumentView, reference: ElementRef, compound: &CompoundSelector) -> bool {
+fn matches_compound<'a>(
+    document: &HtmlDocumentView<'a>,
+    reference: ElementRef,
+    compound: &CompoundSelector,
+) -> bool {
     let Some(node) = document.node(reference.node_id) else {
         return false;
     };

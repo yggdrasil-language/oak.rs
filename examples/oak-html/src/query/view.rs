@@ -5,9 +5,10 @@ use oak_core::Arc;
 
 /// Indexed read-only view over an HTML AST for selector execution.
 #[derive(Debug, Clone)]
-pub struct HtmlDocumentView {
+pub struct HtmlDocumentView<'a> {
     revision: u64,
     nodes: Vec<HtmlNodeData>,
+    sources: Vec<&'a Element>,
 }
 
 #[derive(Debug, Clone)]
@@ -25,24 +26,39 @@ pub(crate) struct HtmlNodeData {
 
 /// Element view bound to one node in a [`HtmlDocumentView`] snapshot.
 #[derive(Debug, Clone)]
-pub struct HtmlElementView {
-    document: HtmlDocumentView,
+pub struct HtmlElementView<'a> {
+    document: HtmlDocumentView<'a>,
     node_id: u64,
 }
 
-impl HtmlDocumentView {
+impl<'a> HtmlDocumentView<'a> {
     /// Builds a view from a parsed HTML document.
     #[must_use]
-    pub fn from_document(document: &HtmlDocument) -> Self {
+    pub fn from_document(document: &'a HtmlDocument) -> Self {
         let mut nodes = Vec::new();
+        let mut sources = Vec::new();
         for node in &document.nodes {
             if let HtmlNode::Element(element) = node {
-                index_element(element, None, &mut nodes);
+                index_element(element, None, &mut nodes, &mut sources);
             }
         }
         Self {
             revision: 1,
             nodes,
+            sources,
+        }
+    }
+
+    /// Builds a view rooted at one element subtree.
+    #[must_use]
+    pub fn from_element(element: &'a Element) -> Self {
+        let mut nodes = Vec::new();
+        let mut sources = Vec::new();
+        index_element(element, None, &mut nodes, &mut sources);
+        Self {
+            revision: 1,
+            nodes,
+            sources,
         }
     }
 
@@ -52,7 +68,7 @@ impl HtmlDocumentView {
     }
 
     #[must_use]
-    pub fn element(&self, node_id: u64) -> Option<HtmlElementView> {
+    pub fn element(&self, node_id: u64) -> Option<HtmlElementView<'a>> {
         if self.nodes.get(node_id as usize).is_some() {
             Some(HtmlElementView {
                 document: self.clone(),
@@ -61,6 +77,21 @@ impl HtmlDocumentView {
         } else {
             None
         }
+    }
+
+    /// Returns the source AST element for a node id in this snapshot.
+    #[must_use]
+    pub fn source_element(&self, node_id: u64) -> Option<&'a Element> {
+        self.sources.get(node_id as usize).copied()
+    }
+
+    /// Maps selector matches back to source AST elements in match order.
+    #[must_use]
+    pub fn source_elements(&self, references: &[ElementRef]) -> Vec<&'a Element> {
+        references
+            .iter()
+            .filter_map(|reference| self.source_element(reference.node_id))
+            .collect()
     }
 
     #[must_use]
@@ -78,9 +109,31 @@ impl HtmlDocumentView {
     pub(crate) fn node(&self, node_id: u64) -> Option<&HtmlNodeData> {
         self.nodes.get(node_id as usize)
     }
+
+    pub(crate) fn previous_element_sibling(&self, reference: ElementRef) -> Option<ElementRef> {
+        let node = self.node(reference.node_id)?;
+        let parent_id = node.parent?;
+        let parent = self.node(parent_id)?;
+        let position = parent
+            .children
+            .iter()
+            .position(|child| *child == reference.node_id)?;
+        if position == 0 {
+            return None;
+        }
+        Some(ElementRef {
+            node_id: parent.children[position - 1],
+            revision: reference.revision,
+        })
+    }
 }
 
-fn index_element(element: &Element, parent: Option<u64>, nodes: &mut Vec<HtmlNodeData>) -> u64 {
+fn index_element<'a>(
+    element: &'a Element,
+    parent: Option<u64>,
+    nodes: &mut Vec<HtmlNodeData>,
+    sources: &mut Vec<&'a Element>,
+) -> u64 {
     let node_id = nodes.len() as u64;
     let attributes = element
         .attributes
@@ -111,9 +164,10 @@ fn index_element(element: &Element, parent: Option<u64>, nodes: &mut Vec<HtmlNod
         descendant_text,
         span: element.span,
     });
+    sources.push(element);
     for child in &element.children {
         if let HtmlNode::Element(child_element) = child {
-            children.push(index_element(child_element, Some(node_id), nodes));
+            children.push(index_element(child_element, Some(node_id), nodes, sources));
         }
     }
     nodes[node_id as usize].children = children;
@@ -142,7 +196,7 @@ fn collect_descendant_text(children: &[HtmlNode]) -> String {
     out
 }
 
-impl ElementView for HtmlElementView {
+impl<'a> ElementView for HtmlElementView<'a> {
     fn element_ref(&self) -> ElementRef {
         ElementRef {
             node_id: self.node_id,

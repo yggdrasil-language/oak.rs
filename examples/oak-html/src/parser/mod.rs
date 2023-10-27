@@ -38,9 +38,9 @@ impl<'config> HtmlParser<'config> {
         state.expect(TagName).ok();
 
         while state.not_at_end() && !matches!(state.peek_kind(), Some(TagClose) | Some(TagSelfClose)) {
-            if state.at(AttributeName) {
+            if state.at(AttributeName) || state.at(TagName) {
                 let attr_cp = state.checkpoint();
-                state.bump(); // AttributeName
+                state.bump(); // attribute name token
                 if state.eat(Equal) {
                     state.eat(Quote);
                     state.eat(AttributeValue);

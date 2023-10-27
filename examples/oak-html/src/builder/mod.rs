@@ -1,5 +1,7 @@
+mod from_red;
+
 use crate::{HtmlParser, ast::HtmlDocument, language::HtmlLanguage};
-use oak_core::{Builder, BuilderCache, GreenNode, OakDiagnostics, Parser, RedNode, SourceText, TextEdit, builder::BuildOutput, source::Source};
+use oak_core::{Builder, BuilderCache, GreenNode, OakDiagnostics, Parser, SourceText, TextEdit, builder::BuildOutput, source::Source};
 
 /// A builder for HTML documents that coordinates parsing and AST construction.
 #[derive(Clone)]
@@ -33,9 +35,11 @@ impl Builder<HtmlLanguage> for HtmlBuilder {
 }
 
 impl HtmlBuilder {
-    pub(crate) fn build_root<'a>(&self, green_tree: &'a GreenNode<'a, HtmlLanguage>, _source: &SourceText) -> HtmlDocument {
-        let _red_root = RedNode::new(green_tree, 0);
-        // Simplified AST building for now
-        HtmlDocument { nodes: Vec::new() }
+    pub(crate) fn build_root<'a>(
+        &self,
+        green_tree: &'a GreenNode<'a, HtmlLanguage>,
+        source: &SourceText,
+    ) -> HtmlDocument {
+        from_red::build_document(green_tree, source)
     }
 }
