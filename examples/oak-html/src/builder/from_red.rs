@@ -1,7 +1,7 @@
 use crate::ast::{Attribute, Element, HtmlDocument, HtmlNode, Text};
 use crate::lexer::token_type::HtmlTokenType;
 use crate::parser::element_type::HtmlElementType;
-use oak_core::{RedNode, RedTree, SourceText};
+use oak_core::{RedNode, RedTree, SourceText, TokenType};
 
 use super::HtmlLanguage;
 
@@ -149,15 +149,20 @@ fn collect_attributes(node: RedNode<HtmlLanguage>, source: &SourceText) -> Vec<A
 
 fn element_body_children<'a>(
     node: RedNode<'a, HtmlLanguage>,
-    _source: &SourceText,
+    source: &SourceText,
 ) -> Vec<RedTree<'a, HtmlLanguage>> {
+    let tag_name = element_tag_name(node, source);
+    let node_children: Vec<RedTree<'a, HtmlLanguage>> = node.children().collect();
     let mut children = Vec::new();
     let mut past_opening_tag = false;
-    for child in node.children() {
+    let mut index = 0;
+    while index < node_children.len() {
+        let child = node_children[index];
         match child {
             RedTree::Node(child_node) => {
-                let kind = child_node.element_type();
-                if kind == HtmlElementType::TagSlashOpen {
+                if child_node.element_type() == HtmlElementType::TagSlashOpen
+                    && closes_current_element(&node_children, index, tag_name.as_deref(), source)
+                {
                     break;
                 }
                 if past_opening_tag {
@@ -169,13 +174,57 @@ fn element_body_children<'a>(
                     if !past_opening_tag {
                         past_opening_tag = true;
                     }
+                } else if leaf.kind == HtmlTokenType::TagSlashOpen {
+                    if closes_current_element(&node_children, index, tag_name.as_deref(), source) {
+                        break;
+                    }
                 } else if past_opening_tag {
                     children.push(child);
                 }
             }
         }
+        index += 1;
     }
     children
+}
+
+fn closes_current_element<'a>(
+    children: &[RedTree<'a, HtmlLanguage>],
+    slash_index: usize,
+    tag_name: Option<&str>,
+    source: &SourceText,
+) -> bool {
+    let Some(expected) = tag_name else {
+        return true;
+    };
+    closing_tag_name_at(children, slash_index, source)
+        .is_some_and(|name| name == expected)
+}
+
+fn closing_tag_name_at<'a>(
+    children: &[RedTree<'a, HtmlLanguage>],
+    slash_index: usize,
+    source: &SourceText,
+) -> Option<String> {
+    for child in children.iter().skip(slash_index + 1) {
+        match child {
+            RedTree::Leaf(leaf) if leaf.kind == HtmlTokenType::TagName => {
+                return Some(leaf.text(source).trim().to_ascii_lowercase());
+            }
+            RedTree::Node(node) if node.element_type() == HtmlElementType::TagName => {
+                return Some(node.text(source).trim().to_ascii_lowercase());
+            }
+            RedTree::Leaf(leaf) if !HtmlTokenType::is_ignored(&leaf.kind) => return None,
+            RedTree::Node(node)
+                if node.element_type() != HtmlElementType::TagName
+                    && node.element_type() != HtmlElementType::TagSlashOpen =>
+            {
+                return None;
+            }
+            _ => {}
+        }
+    }
+    None
 }
 
 fn element_tag_name(node: RedNode<HtmlLanguage>, source: &SourceText) -> Option<String> {
@@ -276,5 +325,200 @@ mod tests {
         let matched = crate::query::select_css(&view, "nav a[href]", oak_core::query::QueryBudget::default())
             .expect("css selector");
         assert_eq!(matched.matches.len(), 1);
+    }
+
+    #[test]
+    fn lexes_nested_nav_closing_tags() {
+        use oak_core::Lexer;
+        use oak_core::Source;
+        use crate::{HtmlLexer, HtmlLanguage};
+        const SOURCE: &str = r#"<li><a href="part.xhtml">Part One</a>
+    <ol>
+      <li><a href="part.xhtml#ch1">Chapter 1</a></li>
+    </ol>
+  </li>"#;
+        let language = HtmlLanguage::default();
+        let source = SourceText::new(SOURCE);
+        let lexer = HtmlLexer::new(&language);
+        let mut cache = ParseSession::<HtmlLanguage>::default();
+        let tokens = lexer.lex(&source, &[], &mut cache).result.expect("lex");
+        let rendered = tokens
+            .iter()
+            .map(|token| format!("{:?}:{}", token.kind, source.get_text_in(token.span.clone())))
+            .collect::<Vec<_>>()
+            .join("\n");
+        assert!(
+            rendered.contains("TagSlashOpen:</"),
+            "missing closing tags in token stream:\n{rendered}"
+        );
+        assert!(
+            rendered.contains("Text:Part One"),
+            "missing anchor text token:\n{rendered}"
+        );
+    }
+
+    #[test]
+    fn parser_builds_nested_nav_green_tree() {
+        use crate::HtmlParser;
+        const SOURCE: &str = r#"<nav epub:type="toc">
+<ol>
+  <li><a href="part.xhtml">Part One</a>
+    <ol>
+      <li><a href="part.xhtml#ch1">Chapter 1</a></li>
+    </ol>
+  </li>
+</ol>
+</nav>"#;
+        let language = HtmlLanguage::default();
+        let source = SourceText::new(SOURCE);
+        let mut cache = ParseSession::<HtmlLanguage>::default();
+        let parsed = HtmlParser::new(&language).parse(&source, &[], &mut cache);
+        let green = parsed.result.expect("parse html");
+        let document = build_document(green, &source);
+        let HtmlNode::Element(nav) = &document.nodes[0] else {
+            panic!("expected nav root element");
+        };
+        fn count_tag(element: &Element, tag: &str) -> usize {
+            let mut count = if element.tag_name.eq_ignore_ascii_case(tag) {
+                1
+            } else {
+                0
+            };
+            for child in &element.children {
+                if let HtmlNode::Element(child_element) = child {
+                    count += count_tag(child_element, tag);
+                }
+            }
+            count
+        }
+        assert_eq!(nav.tag_name, "nav");
+        assert_eq!(count_tag(nav, "a"), 2);
+    }
+
+    #[test]
+    fn builder_lowers_html_body_section_paragraph() {
+        const SOURCE: &str = r#"<html><body><section><div><p>Wrapped</p></div></section></body></html>"#;
+        let language = HtmlLanguage::default();
+        let source = SourceText::new(SOURCE);
+        let mut cache = ParseSession::<HtmlLanguage>::default();
+        let built = HtmlBuilder::new(language).build(&source, &[], &mut cache);
+        let document = built.result.expect("build html ast");
+        fn find_p_text(element: &Element) -> Option<String> {
+            if element.tag_name.eq_ignore_ascii_case("p") {
+                for child in &element.children {
+                    if let HtmlNode::Text(text) = child {
+                        return Some(text.content.clone());
+                    }
+                }
+            }
+            for child in &element.children {
+                if let HtmlNode::Element(child_element) = child {
+                    if let Some(found) = find_p_text(child_element) {
+                        return Some(found);
+                    }
+                }
+            }
+            None
+        }
+        let text = document
+            .nodes
+            .iter()
+            .filter_map(|node| match node {
+                HtmlNode::Element(element) => find_p_text(element),
+                _ => None,
+            })
+            .next()
+            .expect("paragraph text");
+        assert_eq!(text, "Wrapped");
+    }
+
+    #[test]
+    fn builder_lowers_nested_nav_anchor_text() {
+        const SOURCE: &str = r#"<nav epub:type="toc">
+<ol>
+  <li><a href="part.xhtml">Part One</a>
+    <ol>
+      <li><a href="part.xhtml#ch1">Chapter 1</a></li>
+    </ol>
+  </li>
+</ol>
+</nav>"#;
+        let language = HtmlLanguage::default();
+        let source = SourceText::new(SOURCE);
+        let mut cache = ParseSession::<HtmlLanguage>::default();
+        let built = HtmlBuilder::new(language).build(&source, &[], &mut cache);
+        let document = built.result.expect("build html ast");
+        fn count_tag(element: &Element, tag: &str) -> usize {
+            let mut count = if element.tag_name.eq_ignore_ascii_case(tag) {
+                1
+            } else {
+                0
+            };
+            for child in &element.children {
+                if let HtmlNode::Element(child_element) = child {
+                    count += count_tag(child_element, tag);
+                }
+            }
+            count
+        }
+        let HtmlNode::Element(nav) = &document.nodes[0] else {
+            panic!("expected nav root");
+        };
+        fn dump(element: &Element, depth: usize) -> String {
+            let mut out = format!("{}{}\n", "  ".repeat(depth), element.tag_name);
+            for child in &element.children {
+                match child {
+                    HtmlNode::Element(child_element) => out.push_str(&dump(child_element, depth + 1)),
+                    HtmlNode::Text(text) => out.push_str(&format!("{}\"{}\"\n", "  ".repeat(depth + 1), text.content)),
+                    HtmlNode::Comment(_) => {}
+                }
+            }
+            out
+        }
+        let tree_dump = dump(nav, 0);
+        assert_eq!(count_tag(nav, "a"), 2, "expected two anchors in nav tree:\n{tree_dump}");
+        let view = crate::query::HtmlDocumentView::from_document(&document);
+        let (_, anchors) = crate::query::select_css_elements(
+            &view,
+            "nav a[href]",
+            oak_core::query::QueryBudget::default(),
+        )
+        .expect("css selector");
+        assert_eq!(anchors.len(), 2);
+        let labels = anchors
+            .iter()
+            .map(|anchor| {
+                anchor
+                    .children
+                    .iter()
+                    .filter_map(|child| match child {
+                        HtmlNode::Text(text) => Some(text.content.as_str()),
+                        _ => None,
+                    })
+                    .collect::<Vec<_>>()
+                    .join("")
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(labels, vec!["Part One", "Chapter 1"]);
+    }
+    #[test]
+    fn lexes_text_content_outside_tags() {
+        use oak_core::Lexer;
+        use oak_core::parser::session::ParseSession;
+        use oak_core::{Source, SourceText};
+        use crate::{HtmlLexer, HtmlLanguage};
+        use crate::lexer::token_type::HtmlTokenType;
+        const SOURCE: &str = r#"<a href="part.xhtml">Part One</a>"#;
+        let language = HtmlLanguage::default();
+        let source = SourceText::new(SOURCE);
+        let lexer = HtmlLexer::new(&language);
+        let mut cache = ParseSession::<HtmlLanguage>::default();
+        let lexed = lexer.lex(&source, &[], &mut cache);
+        let tokens = lexed.result.expect("lex");
+        let text = tokens
+            .iter()
+            .find(|token| token.kind == HtmlTokenType::Text)
+            .map(|token| source.get_text_in(token.span.clone()).to_string());
+        assert_eq!(text.as_deref(), Some("Part One"));
     }
 }

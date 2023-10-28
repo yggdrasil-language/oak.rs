@@ -1,6 +1,6 @@
 {
     "success": true,
-    "count": 745,
+    "count": 596,
     "tokens": [
         {
             "kind": "Doctype",
@@ -171,27 +171,9 @@
             "end": 153
         },
         {
-            "kind": "TagName",
-            "text": "HTML",
+            "kind": "Text",
+            "text": "HTML Lexer Test Page",
             "start": 153,
-            "end": 157
-        },
-        {
-            "kind": "TagName",
-            "text": "Lexer",
-            "start": 158,
-            "end": 163
-        },
-        {
-            "kind": "TagName",
-            "text": "Test",
-            "start": 164,
-            "end": 168
-        },
-        {
-            "kind": "TagName",
-            "text": "Page",
-            "start": 169,
             "end": 173
         },
         {
@@ -231,628 +213,10 @@
             "end": 193
         },
         {
-            "kind": "TagName",
-            "text": "body",
+            "kind": "Text",
+            "text": "body {\n            font-family: Arial, sans-serif;\n            margin: 0;\n            padding: 20px;\n            background-color: #f5f5f5;\n        }\n        .container {\n            max-width: 800px;\n            margin: 0 auto;\n            background: white;\n            padding: 20px;\n            border-radius: 8px;\n            box-shadow: 0 2px 10px rgba(0,0,0,0.1);\n        }\n        h1 {\n            color: #333;\n            text-align: center;\n        }\n        .form-group {\n            margin-bottom: 15px;\n        }\n        label {\n            display: block;\n            margin-bottom: 5px;\n            font-weight: bold;\n        }\n        input, textarea, select {\n            width: 100%;\n            padding: 8px;\n            border: 1px solid #ddd;\n            border-radius: 4px;\n            box-sizing: border-box;\n        }\n        button {\n            background-color: #007bff;\n            color: white;\n            padding: 10px 20px;\n            border: none;\n            border-radius: 4px;\n            cursor: pointer;\n        }\n        button:hover {\n            background-color: #0056b3;\n        }\n    ",
             "start": 202,
-            "end": 206
-        },
-        {
-            "kind": "Text",
-            "text": "{",
-            "start": 207,
-            "end": 208
-        },
-        {
-            "kind": "TagName",
-            "text": "font-family:",
-            "start": 221,
-            "end": 233
-        },
-        {
-            "kind": "TagName",
-            "text": "Arial",
-            "start": 234,
-            "end": 239
-        },
-        {
-            "kind": "Text",
-            "text": ",",
-            "start": 239,
-            "end": 240
-        },
-        {
-            "kind": "TagName",
-            "text": "sans-serif",
-            "start": 241,
-            "end": 251
-        },
-        {
-            "kind": "Text",
-            "text": ";",
-            "start": 251,
-            "end": 252
-        },
-        {
-            "kind": "TagName",
-            "text": "margin:",
-            "start": 265,
-            "end": 272
-        },
-        {
-            "kind": "Text",
-            "text": "0;",
-            "start": 273,
-            "end": 275
-        },
-        {
-            "kind": "TagName",
-            "text": "padding:",
-            "start": 288,
-            "end": 296
-        },
-        {
-            "kind": "Text",
-            "text": "20px;",
-            "start": 297,
-            "end": 302
-        },
-        {
-            "kind": "TagName",
-            "text": "background-color:",
-            "start": 315,
-            "end": 332
-        },
-        {
-            "kind": "Text",
-            "text": "#f5f5f5;",
-            "start": 333,
-            "end": 341
-        },
-        {
-            "kind": "Text",
-            "text": "}",
-            "start": 350,
-            "end": 351
-        },
-        {
-            "kind": "Text",
-            "text": ".container",
-            "start": 360,
-            "end": 370
-        },
-        {
-            "kind": "Text",
-            "text": "{",
-            "start": 371,
-            "end": 372
-        },
-        {
-            "kind": "TagName",
-            "text": "max-width:",
-            "start": 385,
-            "end": 395
-        },
-        {
-            "kind": "Text",
-            "text": "800px;",
-            "start": 396,
-            "end": 402
-        },
-        {
-            "kind": "TagName",
-            "text": "margin:",
-            "start": 415,
-            "end": 422
-        },
-        {
-            "kind": "Text",
-            "text": "0",
-            "start": 423,
-            "end": 424
-        },
-        {
-            "kind": "TagName",
-            "text": "auto",
-            "start": 425,
-            "end": 429
-        },
-        {
-            "kind": "Text",
-            "text": ";",
-            "start": 429,
-            "end": 430
-        },
-        {
-            "kind": "TagName",
-            "text": "background:",
-            "start": 443,
-            "end": 454
-        },
-        {
-            "kind": "TagName",
-            "text": "white",
-            "start": 455,
-            "end": 460
-        },
-        {
-            "kind": "Text",
-            "text": ";",
-            "start": 460,
-            "end": 461
-        },
-        {
-            "kind": "TagName",
-            "text": "padding:",
-            "start": 474,
-            "end": 482
-        },
-        {
-            "kind": "Text",
-            "text": "20px;",
-            "start": 483,
-            "end": 488
-        },
-        {
-            "kind": "TagName",
-            "text": "border-radius:",
-            "start": 501,
-            "end": 515
-        },
-        {
-            "kind": "Text",
-            "text": "8px;",
-            "start": 516,
-            "end": 520
-        },
-        {
-            "kind": "TagName",
-            "text": "box-shadow:",
-            "start": 533,
-            "end": 544
-        },
-        {
-            "kind": "Text",
-            "text": "0",
-            "start": 545,
-            "end": 546
-        },
-        {
-            "kind": "Text",
-            "text": "2px",
-            "start": 547,
-            "end": 550
-        },
-        {
-            "kind": "Text",
-            "text": "10px",
-            "start": 551,
-            "end": 555
-        },
-        {
-            "kind": "TagName",
-            "text": "rgba",
-            "start": 556,
-            "end": 560
-        },
-        {
-            "kind": "Text",
-            "text": "(0,0,0,0.1);",
-            "start": 560,
-            "end": 572
-        },
-        {
-            "kind": "Text",
-            "text": "}",
-            "start": 581,
-            "end": 582
-        },
-        {
-            "kind": "TagName",
-            "text": "h1",
-            "start": 591,
-            "end": 593
-        },
-        {
-            "kind": "Text",
-            "text": "{",
-            "start": 594,
-            "end": 595
-        },
-        {
-            "kind": "TagName",
-            "text": "color:",
-            "start": 608,
-            "end": 614
-        },
-        {
-            "kind": "Text",
-            "text": "#333;",
-            "start": 615,
-            "end": 620
-        },
-        {
-            "kind": "TagName",
-            "text": "text-align:",
-            "start": 633,
-            "end": 644
-        },
-        {
-            "kind": "TagName",
-            "text": "center",
-            "start": 645,
-            "end": 651
-        },
-        {
-            "kind": "Text",
-            "text": ";",
-            "start": 651,
-            "end": 652
-        },
-        {
-            "kind": "Text",
-            "text": "}",
-            "start": 661,
-            "end": 662
-        },
-        {
-            "kind": "Text",
-            "text": ".form-group",
-            "start": 671,
-            "end": 682
-        },
-        {
-            "kind": "Text",
-            "text": "{",
-            "start": 683,
-            "end": 684
-        },
-        {
-            "kind": "TagName",
-            "text": "margin-bottom:",
-            "start": 697,
-            "end": 711
-        },
-        {
-            "kind": "Text",
-            "text": "15px;",
-            "start": 712,
-            "end": 717
-        },
-        {
-            "kind": "Text",
-            "text": "}",
-            "start": 726,
-            "end": 727
-        },
-        {
-            "kind": "TagName",
-            "text": "label",
-            "start": 736,
-            "end": 741
-        },
-        {
-            "kind": "Text",
-            "text": "{",
-            "start": 742,
-            "end": 743
-        },
-        {
-            "kind": "TagName",
-            "text": "display:",
-            "start": 756,
-            "end": 764
-        },
-        {
-            "kind": "TagName",
-            "text": "block",
-            "start": 765,
-            "end": 770
-        },
-        {
-            "kind": "Text",
-            "text": ";",
-            "start": 770,
-            "end": 771
-        },
-        {
-            "kind": "TagName",
-            "text": "margin-bottom:",
-            "start": 784,
-            "end": 798
-        },
-        {
-            "kind": "Text",
-            "text": "5px;",
-            "start": 799,
-            "end": 803
-        },
-        {
-            "kind": "TagName",
-            "text": "font-weight:",
-            "start": 816,
-            "end": 828
-        },
-        {
-            "kind": "TagName",
-            "text": "bold",
-            "start": 829,
-            "end": 833
-        },
-        {
-            "kind": "Text",
-            "text": ";",
-            "start": 833,
-            "end": 834
-        },
-        {
-            "kind": "Text",
-            "text": "}",
-            "start": 843,
-            "end": 844
-        },
-        {
-            "kind": "TagName",
-            "text": "input",
-            "start": 853,
-            "end": 858
-        },
-        {
-            "kind": "Text",
-            "text": ",",
-            "start": 858,
-            "end": 859
-        },
-        {
-            "kind": "TagName",
-            "text": "textarea",
-            "start": 860,
-            "end": 868
-        },
-        {
-            "kind": "Text",
-            "text": ",",
-            "start": 868,
-            "end": 869
-        },
-        {
-            "kind": "TagName",
-            "text": "select",
-            "start": 870,
-            "end": 876
-        },
-        {
-            "kind": "Text",
-            "text": "{",
-            "start": 877,
-            "end": 878
-        },
-        {
-            "kind": "TagName",
-            "text": "width:",
-            "start": 891,
-            "end": 897
-        },
-        {
-            "kind": "Text",
-            "text": "100%;",
-            "start": 898,
-            "end": 903
-        },
-        {
-            "kind": "TagName",
-            "text": "padding:",
-            "start": 916,
-            "end": 924
-        },
-        {
-            "kind": "Text",
-            "text": "8px;",
-            "start": 925,
-            "end": 929
-        },
-        {
-            "kind": "TagName",
-            "text": "border:",
-            "start": 942,
-            "end": 949
-        },
-        {
-            "kind": "Text",
-            "text": "1px",
-            "start": 950,
-            "end": 953
-        },
-        {
-            "kind": "TagName",
-            "text": "solid",
-            "start": 954,
-            "end": 959
-        },
-        {
-            "kind": "Text",
-            "text": "#ddd;",
-            "start": 960,
-            "end": 965
-        },
-        {
-            "kind": "TagName",
-            "text": "border-radius:",
-            "start": 978,
-            "end": 992
-        },
-        {
-            "kind": "Text",
-            "text": "4px;",
-            "start": 993,
-            "end": 997
-        },
-        {
-            "kind": "TagName",
-            "text": "box-sizing:",
-            "start": 1010,
-            "end": 1021
-        },
-        {
-            "kind": "TagName",
-            "text": "border-box",
-            "start": 1022,
-            "end": 1032
-        },
-        {
-            "kind": "Text",
-            "text": ";",
-            "start": 1032,
-            "end": 1033
-        },
-        {
-            "kind": "Text",
-            "text": "}",
-            "start": 1042,
-            "end": 1043
-        },
-        {
-            "kind": "TagName",
-            "text": "button",
-            "start": 1052,
-            "end": 1058
-        },
-        {
-            "kind": "Text",
-            "text": "{",
-            "start": 1059,
-            "end": 1060
-        },
-        {
-            "kind": "TagName",
-            "text": "background-color:",
-            "start": 1073,
-            "end": 1090
-        },
-        {
-            "kind": "Text",
-            "text": "#007bff;",
-            "start": 1091,
-            "end": 1099
-        },
-        {
-            "kind": "TagName",
-            "text": "color:",
-            "start": 1112,
-            "end": 1118
-        },
-        {
-            "kind": "TagName",
-            "text": "white",
-            "start": 1119,
-            "end": 1124
-        },
-        {
-            "kind": "Text",
-            "text": ";",
-            "start": 1124,
-            "end": 1125
-        },
-        {
-            "kind": "TagName",
-            "text": "padding:",
-            "start": 1138,
-            "end": 1146
-        },
-        {
-            "kind": "Text",
-            "text": "10px",
-            "start": 1147,
-            "end": 1151
-        },
-        {
-            "kind": "Text",
-            "text": "20px;",
-            "start": 1152,
-            "end": 1157
-        },
-        {
-            "kind": "TagName",
-            "text": "border:",
-            "start": 1170,
-            "end": 1177
-        },
-        {
-            "kind": "TagName",
-            "text": "none",
-            "start": 1178,
-            "end": 1182
-        },
-        {
-            "kind": "Text",
-            "text": ";",
-            "start": 1182,
-            "end": 1183
-        },
-        {
-            "kind": "TagName",
-            "text": "border-radius:",
-            "start": 1196,
-            "end": 1210
-        },
-        {
-            "kind": "Text",
-            "text": "4px;",
-            "start": 1211,
-            "end": 1215
-        },
-        {
-            "kind": "TagName",
-            "text": "cursor:",
-            "start": 1228,
-            "end": 1235
-        },
-        {
-            "kind": "TagName",
-            "text": "pointer",
-            "start": 1236,
-            "end": 1243
-        },
-        {
-            "kind": "Text",
-            "text": ";",
-            "start": 1243,
-            "end": 1244
-        },
-        {
-            "kind": "Text",
-            "text": "}",
-            "start": 1253,
-            "end": 1254
-        },
-        {
-            "kind": "TagName",
-            "text": "button:hover",
-            "start": 1263,
-            "end": 1275
-        },
-        {
-            "kind": "Text",
-            "text": "{",
-            "start": 1276,
-            "end": 1277
-        },
-        {
-            "kind": "TagName",
-            "text": "background-color:",
-            "start": 1290,
-            "end": 1307
-        },
-        {
-            "kind": "Text",
-            "text": "#0056b3;",
-            "start": 1308,
-            "end": 1316
-        },
-        {
-            "kind": "Text",
-            "text": "}",
-            "start": 1325,
-            "end": 1326
+            "end": 1331
         },
         {
             "kind": "TagSlashOpen",
@@ -963,27 +327,9 @@
             "end": 1395
         },
         {
-            "kind": "TagName",
-            "text": "HTML",
+            "kind": "Text",
+            "text": "HTML Lexer Test Form",
             "start": 1395,
-            "end": 1399
-        },
-        {
-            "kind": "TagName",
-            "text": "Lexer",
-            "start": 1400,
-            "end": 1405
-        },
-        {
-            "kind": "TagName",
-            "text": "Test",
-            "start": 1406,
-            "end": 1410
-        },
-        {
-            "kind": "TagName",
-            "text": "Form",
-            "start": 1411,
             "end": 1415
         },
         {
@@ -1131,7 +477,7 @@
             "end": 1547
         },
         {
-            "kind": "TagName",
+            "kind": "Text",
             "text": "Name:",
             "start": 1547,
             "end": 1552
@@ -1341,7 +687,7 @@
             "end": 1762
         },
         {
-            "kind": "TagName",
+            "kind": "Text",
             "text": "Email:",
             "start": 1762,
             "end": 1768
@@ -1551,7 +897,7 @@
             "end": 1980
         },
         {
-            "kind": "TagName",
+            "kind": "Text",
             "text": "Age:",
             "start": 1980,
             "end": 1984
@@ -1791,7 +1137,7 @@
             "end": 2204
         },
         {
-            "kind": "TagName",
+            "kind": "Text",
             "text": "Country:",
             "start": 2204,
             "end": 2212
@@ -1905,21 +1251,9 @@
             "end": 2311
         },
         {
-            "kind": "TagName",
-            "text": "Select",
+            "kind": "Text",
+            "text": "Select a country",
             "start": 2311,
-            "end": 2317
-        },
-        {
-            "kind": "TagName",
-            "text": "a",
-            "start": 2318,
-            "end": 2319
-        },
-        {
-            "kind": "TagName",
-            "text": "country",
-            "start": 2320,
             "end": 2327
         },
         {
@@ -1977,15 +1311,9 @@
             "end": 2376
         },
         {
-            "kind": "TagName",
-            "text": "United",
+            "kind": "Text",
+            "text": "United States",
             "start": 2376,
-            "end": 2382
-        },
-        {
-            "kind": "TagName",
-            "text": "States",
-            "start": 2383,
             "end": 2389
         },
         {
@@ -2043,15 +1371,9 @@
             "end": 2438
         },
         {
-            "kind": "TagName",
-            "text": "United",
+            "kind": "Text",
+            "text": "United Kingdom",
             "start": 2438,
-            "end": 2444
-        },
-        {
-            "kind": "TagName",
-            "text": "Kingdom",
-            "start": 2445,
             "end": 2452
         },
         {
@@ -2109,7 +1431,7 @@
             "end": 2501
         },
         {
-            "kind": "TagName",
+            "kind": "Text",
             "text": "Canada",
             "start": 2501,
             "end": 2507
@@ -2169,7 +1491,7 @@
             "end": 2556
         },
         {
-            "kind": "TagName",
+            "kind": "Text",
             "text": "Australia",
             "start": 2556,
             "end": 2565
@@ -2229,7 +1551,7 @@
             "end": 2614
         },
         {
-            "kind": "TagName",
+            "kind": "Text",
             "text": "Germany",
             "start": 2614,
             "end": 2621
@@ -2289,7 +1611,7 @@
             "end": 2670
         },
         {
-            "kind": "TagName",
+            "kind": "Text",
             "text": "France",
             "start": 2670,
             "end": 2676
@@ -2349,7 +1671,7 @@
             "end": 2725
         },
         {
-            "kind": "TagName",
+            "kind": "Text",
             "text": "Japan",
             "start": 2725,
             "end": 2730
@@ -2409,7 +1731,7 @@
             "end": 2779
         },
         {
-            "kind": "TagName",
+            "kind": "Text",
             "text": "China",
             "start": 2779,
             "end": 2784
@@ -2541,7 +1863,7 @@
             "end": 2926
         },
         {
-            "kind": "TagName",
+            "kind": "Text",
             "text": "Message:",
             "start": 2926,
             "end": 2934
@@ -2817,22 +2139,10 @@
             "end": 3225
         },
         {
-            "kind": "TagName",
-            "text": "Subscribe",
+            "kind": "Text",
+            "text": "Subscribe to newsletter\n                ",
             "start": 3246,
-            "end": 3255
-        },
-        {
-            "kind": "TagName",
-            "text": "to",
-            "start": 3256,
-            "end": 3258
-        },
-        {
-            "kind": "TagName",
-            "text": "newsletter",
-            "start": 3259,
-            "end": 3269
+            "end": 3286
         },
         {
             "kind": "TagSlashOpen",
@@ -2907,15 +2217,9 @@
             "end": 3361
         },
         {
-            "kind": "TagName",
-            "text": "Submit",
+            "kind": "Text",
+            "text": "Submit Form",
             "start": 3361,
-            "end": 3367
-        },
-        {
-            "kind": "TagName",
-            "text": "Form",
-            "start": 3368,
             "end": 3372
         },
         {
@@ -2991,15 +2295,9 @@
             "end": 3441
         },
         {
-            "kind": "TagName",
-            "text": "Sample",
+            "kind": "Text",
+            "text": "Sample Content",
             "start": 3441,
-            "end": 3447
-        },
-        {
-            "kind": "TagName",
-            "text": "Content",
-            "start": 3448,
             "end": 3455
         },
         {
@@ -3039,22 +2337,10 @@
             "end": 3472
         },
         {
-            "kind": "TagName",
-            "text": "This",
+            "kind": "Text",
+            "text": "This is a ",
             "start": 3472,
-            "end": 3476
-        },
-        {
-            "kind": "TagName",
-            "text": "is",
-            "start": 3477,
-            "end": 3479
-        },
-        {
-            "kind": "TagName",
-            "text": "a",
-            "start": 3480,
-            "end": 3481
+            "end": 3482
         },
         {
             "kind": "TagOpen",
@@ -3075,7 +2361,7 @@
             "end": 3490
         },
         {
-            "kind": "TagName",
+            "kind": "Text",
             "text": "paragraph",
             "start": 3490,
             "end": 3499
@@ -3099,10 +2385,10 @@
             "end": 3508
         },
         {
-            "kind": "TagName",
-            "text": "with",
+            "kind": "Text",
+            "text": "with ",
             "start": 3509,
-            "end": 3513
+            "end": 3514
         },
         {
             "kind": "TagOpen",
@@ -3123,7 +2409,7 @@
             "end": 3518
         },
         {
-            "kind": "TagName",
+            "kind": "Text",
             "text": "emphasis",
             "start": 3518,
             "end": 3526
@@ -3147,10 +2433,10 @@
             "end": 3531
         },
         {
-            "kind": "TagName",
-            "text": "and",
+            "kind": "Text",
+            "text": "and ",
             "start": 3532,
-            "end": 3535
+            "end": 3536
         },
         {
             "kind": "TagOpen",
@@ -3225,15 +2511,9 @@
             "end": 3603
         },
         {
-            "kind": "TagName",
-            "text": "a",
+            "kind": "Text",
+            "text": "a link",
             "start": 3603,
-            "end": 3604
-        },
-        {
-            "kind": "TagName",
-            "text": "link",
-            "start": 3605,
             "end": 3609
         },
         {
@@ -3315,15 +2595,9 @@
             "end": 3657
         },
         {
-            "kind": "TagName",
-            "text": "First",
+            "kind": "Text",
+            "text": "First item",
             "start": 3657,
-            "end": 3662
-        },
-        {
-            "kind": "TagName",
-            "text": "item",
-            "start": 3663,
             "end": 3667
         },
         {
@@ -3363,22 +2637,10 @@
             "end": 3689
         },
         {
-            "kind": "TagName",
-            "text": "Second",
+            "kind": "Text",
+            "text": "Second item with ",
             "start": 3689,
-            "end": 3695
-        },
-        {
-            "kind": "TagName",
-            "text": "item",
-            "start": 3696,
-            "end": 3700
-        },
-        {
-            "kind": "TagName",
-            "text": "with",
-            "start": 3701,
-            "end": 3705
+            "end": 3706
         },
         {
             "kind": "TagOpen",
@@ -3399,15 +2661,9 @@
             "end": 3712
         },
         {
-            "kind": "TagName",
-            "text": "inline",
+            "kind": "Text",
+            "text": "inline code",
             "start": 3712,
-            "end": 3718
-        },
-        {
-            "kind": "TagName",
-            "text": "code",
-            "start": 3719,
             "end": 3723
         },
         {
@@ -3465,15 +2721,9 @@
             "end": 3752
         },
         {
-            "kind": "TagName",
-            "text": "Third",
+            "kind": "Text",
+            "text": "Third item",
             "start": 3752,
-            "end": 3757
-        },
-        {
-            "kind": "TagName",
-            "text": "item",
-            "start": 3758,
             "end": 3762
         },
         {
@@ -3639,7 +2889,7 @@
             "end": 3916
         },
         {
-            "kind": "TagName",
+            "kind": "Text",
             "text": "Feature",
             "start": 3916,
             "end": 3923
@@ -3681,7 +2931,7 @@
             "end": 3953
         },
         {
-            "kind": "TagName",
+            "kind": "Text",
             "text": "Support",
             "start": 3953,
             "end": 3960
@@ -3795,7 +3045,7 @@
             "end": 4074
         },
         {
-            "kind": "TagName",
+            "kind": "Text",
             "text": "HTML5",
             "start": 4074,
             "end": 4079
@@ -3837,7 +3087,7 @@
             "end": 4109
         },
         {
-            "kind": "TagName",
+            "kind": "Text",
             "text": "Yes",
             "start": 4109,
             "end": 4112
@@ -3915,7 +3165,7 @@
             "end": 4185
         },
         {
-            "kind": "TagName",
+            "kind": "Text",
             "text": "CSS3",
             "start": 4185,
             "end": 4189
@@ -3957,7 +3207,7 @@
             "end": 4219
         },
         {
-            "kind": "TagName",
+            "kind": "Text",
             "text": "Yes",
             "start": 4219,
             "end": 4222
@@ -4186,44 +3436,8 @@
         },
         {
             "kind": "Text",
-            "text": "2024",
+            "text": "2024 HTML Lexer Test. All rights reserved.",
             "start": 4457,
-            "end": 4461
-        },
-        {
-            "kind": "TagName",
-            "text": "HTML",
-            "start": 4462,
-            "end": 4466
-        },
-        {
-            "kind": "TagName",
-            "text": "Lexer",
-            "start": 4467,
-            "end": 4472
-        },
-        {
-            "kind": "TagName",
-            "text": "Test.",
-            "start": 4473,
-            "end": 4478
-        },
-        {
-            "kind": "TagName",
-            "text": "All",
-            "start": 4479,
-            "end": 4482
-        },
-        {
-            "kind": "TagName",
-            "text": "rights",
-            "start": 4483,
-            "end": 4489
-        },
-        {
-            "kind": "TagName",
-            "text": "reserved.",
-            "start": 4490,
             "end": 4499
         },
         {
@@ -4300,117 +3514,9 @@
         },
         {
             "kind": "Text",
-            "text": "//",
+            "text": "// Simple JavaScript for form validation\n        document.querySelector('form').addEventListener('submit', function(e) {\n            e.preventDefault();\n            alert('Form submitted successfully!');\n        });\n    ",
             "start": 4556,
-            "end": 4558
-        },
-        {
-            "kind": "TagName",
-            "text": "Simple",
-            "start": 4559,
-            "end": 4565
-        },
-        {
-            "kind": "TagName",
-            "text": "JavaScript",
-            "start": 4566,
-            "end": 4576
-        },
-        {
-            "kind": "TagName",
-            "text": "for",
-            "start": 4577,
-            "end": 4580
-        },
-        {
-            "kind": "TagName",
-            "text": "form",
-            "start": 4581,
-            "end": 4585
-        },
-        {
-            "kind": "TagName",
-            "text": "validation",
-            "start": 4586,
-            "end": 4596
-        },
-        {
-            "kind": "TagName",
-            "text": "document.querySelector",
-            "start": 4605,
-            "end": 4627
-        },
-        {
-            "kind": "Text",
-            "text": "('form').addEventListener('submit',",
-            "start": 4627,
-            "end": 4662
-        },
-        {
-            "kind": "TagName",
-            "text": "function",
-            "start": 4663,
-            "end": 4671
-        },
-        {
-            "kind": "Text",
-            "text": "(e)",
-            "start": 4671,
-            "end": 4674
-        },
-        {
-            "kind": "Text",
-            "text": "{",
-            "start": 4675,
-            "end": 4676
-        },
-        {
-            "kind": "TagName",
-            "text": "e.preventDefault",
-            "start": 4689,
-            "end": 4705
-        },
-        {
-            "kind": "Text",
-            "text": "();",
-            "start": 4705,
-            "end": 4708
-        },
-        {
-            "kind": "TagName",
-            "text": "alert",
-            "start": 4721,
-            "end": 4726
-        },
-        {
-            "kind": "Text",
-            "text": "('Form",
-            "start": 4726,
-            "end": 4732
-        },
-        {
-            "kind": "TagName",
-            "text": "submitted",
-            "start": 4733,
-            "end": 4742
-        },
-        {
-            "kind": "TagName",
-            "text": "successfully",
-            "start": 4743,
-            "end": 4755
-        },
-        {
-            "kind": "Text",
-            "text": "!');",
-            "start": 4755,
-            "end": 4759
-        },
-        {
-            "kind": "Text",
-            "text": "});",
-            "start": 4768,
-            "end": 4771
+            "end": 4776
         },
         {
             "kind": "TagSlashOpen",

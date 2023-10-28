@@ -44,6 +44,7 @@ impl<'config> HtmlLexer<'config> {
 
     /// The main lexing loop that iterates through the source text.
     fn run<'a, S: Source + ?Sized>(&self, state: &mut State<'a, S>) -> Result<(), OakError> {
+        let mut in_markup = false;
         while state.not_at_end() {
             let safe_point = state.get_position();
 
@@ -61,47 +62,38 @@ impl<'config> HtmlLexer<'config> {
                                 else if state.starts_with("<![CDATA[") {
                                     self.lex_cdata(state);
                                 }
-                                else {
-                                    // Try Doctype
-                                    if !self.lex_doctype(state) {
-                                        // Fallback to tag operator (TagOpen) or Text?
-                                        // Original loop: tries doctype, cdata, then tag_operators.
-                                        // If doctype fails (e.g. <!FOO>), tag_operators will see < and consume it as TagOpen.
-                                        self.lex_tag_operators(state);
-                                    }
+                                else if !self.lex_doctype(state) {
+                                    self.apply_tag_operator(state, &mut in_markup);
                                 }
                             }
                             else if next == '?' {
                                 self.lex_processing_instruction(state);
                             }
                             else {
-                                self.lex_tag_operators(state);
+                                self.apply_tag_operator(state, &mut in_markup);
                             }
                         }
                         else {
-                            self.lex_tag_operators(state);
+                            self.apply_tag_operator(state, &mut in_markup);
                         }
                     }
-                    '/' | '>' => {
-                        if self.lex_tag_operators(state) {
-                            continue;
-                        }
-                        self.lex_text(state);
+                    '/' | '>' if in_markup => {
+                        self.apply_tag_operator(state, &mut in_markup);
                     }
                     '&' => {
                         self.lex_entity_reference(state);
                     }
-                    '"' | '\'' => {
+                    '"' | '\'' if in_markup => {
                         self.lex_string_literal(state);
                     }
-                    'a'..='z' | 'A'..='Z' | '_' | ':' => {
+                    'a'..='z' | 'A'..='Z' | '_' | ':' if in_markup => {
                         self.lex_identifier(state);
                     }
-                    '=' => {
+                    '=' if in_markup => {
                         self.lex_single_char_tokens(state);
                     }
                     _ => {
-                        if self.lex_text(state) {
+                        if self.lex_text(state, in_markup) {
                             continue;
                         }
 
@@ -116,6 +108,20 @@ impl<'config> HtmlLexer<'config> {
         }
 
         Ok(())
+    }
+
+    fn apply_tag_operator<'a, S: Source + ?Sized>(
+        &self,
+        state: &mut State<'a, S>,
+        in_markup: &mut bool,
+    ) {
+        if let Some(kind) = self.lex_tag_operators(state) {
+            match kind {
+                HtmlTokenType::TagOpen | HtmlTokenType::TagSlashOpen => *in_markup = true,
+                HtmlTokenType::TagClose | HtmlTokenType::TagSelfClose => *in_markup = false,
+                _ => {}
+            }
+        }
     }
 
     fn skip_whitespace<'a, S: Source + ?Sized>(&self, state: &mut State<'a, S>) -> bool {
@@ -314,39 +320,40 @@ impl<'config> HtmlLexer<'config> {
         false
     }
 
-    fn lex_tag_operators<'a, S: Source + ?Sized>(&self, state: &mut State<'a, S>) -> bool {
+    fn lex_tag_operators<'a, S: Source + ?Sized>(
+        &self,
+        state: &mut State<'a, S>,
+    ) -> Option<HtmlTokenType> {
         let start_pos = state.get_position();
 
-        match state.peek() {
+        let kind = match state.peek() {
             Some('<') => {
                 if let Some('/') = state.peek_next_n(1) {
                     state.advance(2);
-                    state.add_token(HtmlTokenType::TagSlashOpen, start_pos, state.get_position());
-                    true
+                    HtmlTokenType::TagSlashOpen
                 }
                 else {
                     state.advance(1);
-                    state.add_token(HtmlTokenType::TagOpen, start_pos, state.get_position());
-                    true
+                    HtmlTokenType::TagOpen
                 }
             }
             Some('/') => {
                 if let Some('>') = state.peek_next_n(1) {
                     state.advance(2);
-                    state.add_token(HtmlTokenType::TagSelfClose, start_pos, state.get_position());
-                    true
+                    HtmlTokenType::TagSelfClose
                 }
                 else {
-                    false
+                    return None;
                 }
             }
             Some('>') => {
                 state.advance(1);
-                state.add_token(HtmlTokenType::TagClose, start_pos, state.get_position());
-                true
+                HtmlTokenType::TagClose
             }
-            _ => false,
-        }
+            _ => return None,
+        };
+        state.add_token(kind, start_pos, state.get_position());
+        Some(kind)
     }
 
     fn lex_entity_reference<'a, S: Source + ?Sized>(&self, state: &mut State<'a, S>) -> bool {
@@ -479,7 +486,11 @@ impl<'config> HtmlLexer<'config> {
         }
     }
 
-    fn lex_text<'a, S: Source + ?Sized>(&self, state: &mut State<'a, S>) -> bool {
+    fn lex_text<'a, S: Source + ?Sized>(
+        &self,
+        state: &mut State<'a, S>,
+        in_markup: bool,
+    ) -> bool {
         let start_pos = state.get_position();
         let bytes = state.rest_bytes();
         let mut i = 0;
@@ -491,9 +502,12 @@ impl<'config> HtmlLexer<'config> {
 
             let is_lt = chunk.simd_eq(Simd::splat(b'<'));
             let is_amp = chunk.simd_eq(Simd::splat(b'&'));
-            let is_le_space = chunk.simd_le(Simd::splat(32));
-
-            let stop = is_lt | is_amp | is_le_space;
+            let stop = if in_markup {
+                let is_le_space = chunk.simd_le(Simd::splat(32));
+                is_lt | is_amp | is_le_space
+            } else {
+                is_lt | is_amp
+            };
 
             if stop.any() {
                 let idx = stop.first_set().unwrap();
@@ -506,7 +520,7 @@ impl<'config> HtmlLexer<'config> {
         }
         while i < len {
             let ch = unsafe { *bytes.get_unchecked(i) };
-            if ch == b'<' || ch == b'&' || ch <= 32 {
+            if ch == b'<' || ch == b'&' || (in_markup && ch <= 32) {
                 break;
             }
             i += 1
