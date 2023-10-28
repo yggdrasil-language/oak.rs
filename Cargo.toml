@@ -60,8 +60,6 @@ diagnostic = { git = "https://github.com/oovm/rust-boost", branch = "dev", packa
 
 # Internal project dependencies
 oak-core = { path = "projects/oak-core", version = "0.0.12" }
-oak-xpath = { path = "projects/oak-xpath", version = "0.0.12" }
-oak-css-selector = { path = "projects/oak-css-selector", version = "0.0.12" }
 oak-macros = { path = "projects/oak-macros", version = "0.0.12" }
 oak-vfs = { path = "projects/oak-vfs", version = "0.0.12" }
 oak-symbols = { path = "projects/oak-symbols", version = "0.0.12" }
@@ -100,6 +98,7 @@ oak-cpp = { path = "examples/oak-cpp", version = "0.0.12" }
 oak-crystal = { path = "examples/oak-crystal", version = "0.0.12" }
 oak-csharp = { path = "examples/oak-csharp", version = "0.0.12" }
 oak-css = { path = "examples/oak-css", version = "0.0.12" }
+oak-css-selector = { path = "examples/oak-css-selector", version = "0.0.12" }
 oak-csv = { path = "examples/oak-csv", version = "0.0.12" }
 oak-d = { path = "examples/oak-d", version = "0.0.12" }
 oak-d2 = { path = "examples/oak-d2", version = "0.0.12" }
@@ -204,6 +203,7 @@ oak-wgsl = { path = "examples/oak-wgsl", version = "0.0.12" }
 oak-wit-component = { path = "examples/oak-wit-component", version = "0.0.12" }
 oak-wolfram = { path = "examples/oak-wolfram", version = "0.0.12" }
 oak-xml = { path = "examples/oak-xml", version = "0.0.12" }
+oak-xpath = { path = "examples/oak-xpath", version = "0.0.12" }
 oak-yaml = { path = "examples/oak-yaml", version = "0.0.12" }
 oak-zig = { path = "examples/oak-zig", version = "0.0.12" }
 
