@@ -5,7 +5,7 @@ authors.workspace = true
 description = "Hand-written Python frontend"
 edition.workspace = true
 license.workspace = true
-repository = "https://github.com/ygg-lang/oaks/tree/master/examples/oak-python"
+repository = "https://github.com/yggdrasil-language/oak.rs/tree/master/examples/oak-python"
 categories = ["compilers", "development-tools"]
 keywords = ["frontend", "language", "python"]
 

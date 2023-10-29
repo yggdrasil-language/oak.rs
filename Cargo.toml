@@ -16,8 +16,8 @@ version = "0.0.12"
 authors = ["Yggdrasill Team <192607617@qq.com>"]
 edition = "2024"
 license = "MPL-2.0"
-homepage = "https://github.com/ygg-lang/oaks"
-repository = "https://github.com/ygg-lang/oaks"
+homepage = "https://github.com/yggdrasil-language/oak.rs"
+repository = "https://github.com/yggdrasil-language/oak.rs"
 
 [workspace.dependencies]
 # External dependencies removed to achieve architectural independence

@@ -6,7 +6,7 @@ description = "Procedural macros for the Oak framework to simplify parser and AS
 edition.workspace = true
 license.workspace = true
 homepage.workspace = true
-repository = "https://github.com/ygg-lang/oaks/tree/master/projects/oak-macros"
+repository = "https://github.com/yggdrasil-language/oak.rs/tree/master/projects/oak-macros"
 categories = ["development-tools", "rust-patterns"]
 keywords = ["macros", "proc-macro", "codegen"]
 

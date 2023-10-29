@@ -5,7 +5,7 @@ authors.workspace = true
 description = "JavaScript frontend for Oak (reuses TypeScript implementation)"
 edition.workspace = true
 license.workspace = true
-repository = "https://github.com/ygg-lang/oaks/tree/master/examples/oak-javascript"
+repository = "https://github.com/yggdrasil-language/oak.rs/tree/master/examples/oak-javascript"
 categories = ["compilers", "development-tools"]
 keywords = ["frontend", "language", "javascript"]
 

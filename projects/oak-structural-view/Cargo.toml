@@ -5,7 +5,7 @@ authors.workspace = true
 description = "AST-based document structure and structure generation for the Oak framework."
 edition.workspace = true
 license.workspace = true
-repository = "https://github.com/ygg-lang/oaks/tree/master/projects/oak-structural-view"
+repository = "https://github.com/yggdrasil-language/oak.rs/tree/master/projects/oak-structural-view"
 categories = ["development-tools"]
 keywords = ["structure", "outline", "ast", "symbols"]
 

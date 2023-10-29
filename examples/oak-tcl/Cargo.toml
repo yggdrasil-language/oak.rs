@@ -6,7 +6,7 @@ description = "Tcl language parser with support for scripting, command substitut
 edition.workspace = true
 license.workspace = true
 homepage.workspace = true
-repository = "https://github.com/ygg-lang/oaks/tree/master/examples/oak-tcl"
+repository = "https://github.com/yggdrasil-language/oak.rs/tree/master/examples/oak-tcl"
 documentation = "https://docs.rs/oak-tcl"
 categories = ["parsing"]
 

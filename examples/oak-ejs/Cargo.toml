@@ -5,7 +5,7 @@ authors.workspace = true
 description = "EJS template language for Oak"
 edition.workspace = true
 license.workspace = true
-repository = "https://github.com/ygg-lang/oaks/tree/master/examples/oak-ejs"
+repository = "https://github.com/yggdrasil-language/oak.rs/tree/master/examples/oak-ejs"
 categories = ["parsing", "template-engine"]
 keywords = ["parser", "ejs", "template", "syntax-analysis"]
 

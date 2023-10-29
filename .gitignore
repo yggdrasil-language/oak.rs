@@ -9,10 +9,13 @@ time-travel.*
 .trae/
 .vs/
 *.iml
+*.log
+*.txt
 
 # Rust
 target/
 Cargo.lock
+.cargo/config.toml
 
 # Windows
 *.pdb

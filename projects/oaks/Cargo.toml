@@ -6,7 +6,7 @@ description = "Unified parser combinator library and IDE feature facade."
 edition.workspace = true
 license.workspace = true
 publish = false
-repository = "https://github.com/ygg-lang/oaks/tree/master/projects/oaks"
+repository = "https://github.com/yggdrasil-language/oak.rs/tree/master/projects/oaks"
 categories = ["parsing", "development-tools"]
 keywords = ["parser", "combinator", "lsp", "ide", "multi-language"]
 

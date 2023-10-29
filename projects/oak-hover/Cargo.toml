@@ -5,7 +5,7 @@ authors.workspace = true
 description = "Hover information and documentation lookup support for the Oak framework."
 edition.workspace = true
 license.workspace = true
-repository = "https://github.com/ygg-lang/oaks/tree/master/projects/oak-hover"
+repository = "https://github.com/yggdrasil-language/oak.rs/tree/master/projects/oak-hover"
 categories = ["development-tools"]
 keywords = ["hover", "documentation", "lsp"]
 

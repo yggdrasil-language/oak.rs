@@ -6,7 +6,7 @@ description = "High-performance incremental RBQ parser for the oak ecosystem."
 edition.workspace = true
 license.workspace = true
 homepage.workspace = true
-repository = "https://github.com/ygg-lang/oaks/tree/master/examples/oak-rbq"
+repository = "https://github.com/yggdrasil-language/oak.rs/tree/master/examples/oak-rbq"
 categories = ["parsing"]
 keywords = ["parser", "rbq", "streaming", "validation"]
 

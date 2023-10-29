@@ -5,7 +5,7 @@ authors.workspace = true
 description = "Code folding logic and AST-based region detection for the Oak framework."
 edition.workspace = true
 license.workspace = true
-repository = "https://github.com/ygg-lang/oaks/tree/master/projects/oak-folding"
+repository = "https://github.com/yggdrasil-language/oak.rs/tree/master/projects/oak-folding"
 categories = ["development-tools"]
 keywords = ["folding", "code-folding", "ast"]
 

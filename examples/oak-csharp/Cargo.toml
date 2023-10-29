@@ -5,7 +5,7 @@ authors.workspace = true
 description = "C# frontend for Oak"
 edition.workspace = true
 license.workspace = true
-repository = "https://github.com/ygg-lang/oaks/tree/master/examples/oak-csharp"
+repository = "https://github.com/yggdrasil-language/oak.rs/tree/master/examples/oak-csharp"
 categories = ["compilers", "development-tools"]
 keywords = ["frontend", "language", "csharp"]
 

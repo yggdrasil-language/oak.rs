@@ -5,7 +5,7 @@ authors.workspace = true
 description = "Mojo frontend for Oak"
 edition.workspace = true
 license.workspace = true
-repository = "https://github.com/ygg-lang/oaks/tree/master/examples/oak-mojo"
+repository = "https://github.com/yggdrasil-language/oak.rs/tree/master/examples/oak-mojo"
 categories = ["compilers", "development-tools"]
 keywords = ["frontend", "language", "mojo"]
 

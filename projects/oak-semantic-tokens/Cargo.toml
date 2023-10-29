@@ -5,7 +5,7 @@ authors.workspace = true
 description = "Semantic syntax highlighting and token classification for the Oak framework."
 edition.workspace = true
 license.workspace = true
-repository = "https://github.com/ygg-lang/oaks/tree/master/projects/oak-semantic-tokens"
+repository = "https://github.com/yggdrasil-language/oak.rs/tree/master/projects/oak-semantic-tokens"
 categories = ["development-tools"]
 keywords = ["semantic-tokens", "highlighting", "lsp"]
 

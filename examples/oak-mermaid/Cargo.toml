@@ -6,7 +6,7 @@ description = "Mermaid diagramming language parser for Oak"
 edition.workspace = true
 license.workspace = true
 homepage.workspace = true
-repository = "https://github.com/ygg-lang/oaks/tree/master/examples/oak-mermaid"
+repository = "https://github.com/yggdrasil-language/oak.rs/tree/master/examples/oak-mermaid"
 
 [dependencies]
 oak-core = { workspace = true }

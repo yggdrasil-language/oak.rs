@@ -5,7 +5,7 @@ authors.workspace = true
 description = "Module resolution and global symbol management for the Oaks framework."
 edition.workspace = true
 license.workspace = true
-repository = "https://github.com/ygg-lang/oaks/tree/master/projects/oak-resolver"
+repository = "https://github.com/yggdrasil-language/oak.rs/tree/master/projects/oak-resolver"
 
 [dependencies]
 oak-core = { workspace = true }

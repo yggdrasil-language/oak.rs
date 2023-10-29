@@ -6,7 +6,7 @@ description = "D2 diagramming language parser for Oak"
 edition.workspace = true
 license.workspace = true
 homepage.workspace = true
-repository = "https://github.com/ygg-lang/oaks/tree/master/examples/oak-d2"
+repository = "https://github.com/yggdrasil-language/oak.rs/tree/master/examples/oak-d2"
 
 [lib]
 path = "src/lib.rs"

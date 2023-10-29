@@ -1,0 +1,9 @@
+# Copy to `config.toml` (gitignored) for local overrides.
+# Committed `Cargo.toml` uses git `branch = "dev"` so CI and fresh clones resolve from remote.
+
+[registries.crates-io]
+protocol = "sparse"
+
+[patch."https://github.com/oovm/rust-boost"]
+diagnostic = { path = "../path/rust-boost/projects/diagnostic" }
+logger = { path = "../path/rust-boost/projects/logger" }
