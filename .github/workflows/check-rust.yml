@@ -1,4 +1,4 @@
-name: CI
+name: Check Rust
 
 on:
     push:
@@ -41,7 +41,7 @@ jobs:
               run: cargo check --all-targets --all-features
 
     rust-test:
-        name: Rust Test
+        name: Rust Test (${{ matrix.os }}, ${{ matrix.feature }})
         strategy:
             fail-fast: false
             matrix:
