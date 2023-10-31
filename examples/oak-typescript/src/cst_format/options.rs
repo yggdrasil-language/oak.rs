@@ -13,19 +13,14 @@ pub struct CstFormatOptions {
 
 impl Default for CstFormatOptions {
     fn default() -> Self {
-        Self {
-            indent_width: 4,
-            line_width: 144,
-        }
+        Self { indent_width: 4, line_width: 144 }
     }
 }
 
 impl CstFormatOptions {
     /// Map product-facing options to `oak-pretty-print` printer configuration.
     pub fn printer_config(&self) -> PrinterConfig {
-        PrinterConfig::new()
-            .with_indent_style(IndentStyle::Spaces(self.indent_width))
-            .with_max_width(self.line_width)
+        PrinterConfig::new().with_indent_style(IndentStyle::Spaces(self.indent_width)).with_max_width(self.line_width)
     }
 
     /// Apply printer finalization (trailing whitespace trim and final newline policy).
@@ -43,10 +38,7 @@ mod tests {
 
     #[test]
     fn maps_indent_and_line_width_to_printer_config() {
-        let options = CstFormatOptions {
-            indent_width: 2,
-            line_width: 100,
-        };
+        let options = CstFormatOptions { indent_width: 2, line_width: 100 };
         let config = options.printer_config();
         assert_eq!(config.indent_size, 2);
         assert_eq!(config.max_width, 100);

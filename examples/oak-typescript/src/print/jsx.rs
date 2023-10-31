@@ -1,9 +1,6 @@
 //! Oak TypeScript JSX → canonical text.
 
-use crate::ast::{
-    Expression, JsxAttribute, JsxAttributeOrSpread, JsxAttributeValue, JsxChild, JsxClosingElement,
-    JsxElement, JsxFragment, JsxOpeningElement, JsxSelfClosingElement, JsxTagName,
-};
+use crate::ast::{Expression, JsxAttribute, JsxAttributeOrSpread, JsxAttributeValue, JsxChild, JsxClosingElement, JsxElement, JsxFragment, JsxOpeningElement, JsxSelfClosingElement, JsxTagName};
 
 use super::expr::{print_expression, print_string};
 
@@ -39,9 +36,7 @@ fn print_jsx_closing(closing: &JsxClosingElement) -> Option<String> {
 fn print_jsx_tag_name(name: &JsxTagName) -> Option<String> {
     match name {
         JsxTagName::Identifier(id) => Some(id.trim().to_string()),
-        JsxTagName::MemberExpression { object, property } => {
-            Some(format!("{}.{property}", print_jsx_tag_name(object)?))
-        }
+        JsxTagName::MemberExpression { object, property } => Some(format!("{}.{property}", print_jsx_tag_name(object)?)),
     }
 }
 
@@ -63,9 +58,7 @@ fn print_jsx_attributes(attributes: &[JsxAttributeOrSpread]) -> Option<String> {
 fn print_jsx_attribute_or_spread(attr: &JsxAttributeOrSpread) -> Option<String> {
     match attr {
         JsxAttributeOrSpread::Attribute(attribute) => print_jsx_attribute(attribute),
-        JsxAttributeOrSpread::Spread(expression) => {
-            Some(format!("{{...{}}}", print_expression(expression)?))
-        }
+        JsxAttributeOrSpread::Spread(expression) => Some(format!("{{...{}}}", print_expression(expression)?)),
     }
 }
 
@@ -81,11 +74,7 @@ fn print_jsx_attribute(attribute: &JsxAttribute) -> Option<String> {
 }
 
 fn decode_jsx_string_literal(raw: &str) -> String {
-    raw.strip_prefix('"')
-        .and_then(|s| s.strip_suffix('"'))
-        .or_else(|| raw.strip_prefix('\'').and_then(|s| s.strip_suffix('\'')))
-        .map(str::to_string)
-        .unwrap_or_else(|| raw.to_string())
+    raw.strip_prefix('"').and_then(|s| s.strip_suffix('"')).or_else(|| raw.strip_prefix('\'').and_then(|s| s.strip_suffix('\''))).map(str::to_string).unwrap_or_else(|| raw.to_string())
 }
 
 fn print_jsx_attribute_value(value: &JsxAttributeValue) -> Option<String> {
@@ -126,8 +115,7 @@ fn print_jsx_expression_container(expr: &Option<Expression>) -> Option<String> {
 mod tests {
     use oak_core::{Builder, ParseSession, SourceText};
 
-    use crate::ast::Statement;
-    use crate::{TypeScriptBuilder, TypeScriptLanguage};
+    use crate::{TypeScriptBuilder, TypeScriptLanguage, ast::Statement};
 
     use super::*;
 
@@ -149,10 +137,7 @@ mod tests {
     #[test]
     fn prints_jsx_element_with_string_attribute() {
         let expr = parse_expr_snippet(r#"<div className="foo">bar</div>"#).expect("parse");
-        assert_eq!(
-            print_expression(&expr).as_deref(),
-            Some(r#"<div className='foo'>bar</div>"#)
-        );
+        assert_eq!(print_expression(&expr).as_deref(), Some(r#"<div className='foo'>bar</div>"#));
     }
 
     #[test]

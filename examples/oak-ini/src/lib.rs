@@ -24,7 +24,13 @@ pub mod mcp;
 /// Parser module.
 pub mod parser;
 
-pub use crate::{ast::IniRoot, builder::IniBuilder, language::{IniLanguage, IniValueStyle}, lexer::IniLexer, parser::IniParser};
+pub use crate::{
+    ast::IniRoot,
+    builder::IniBuilder,
+    language::{IniLanguage, IniValueStyle},
+    lexer::IniLexer,
+    parser::IniParser,
+};
 
 /// Parses an INI string with the default dialect.
 pub fn parse(ini: &str) -> Result<crate::ast::IniRoot, String> {

@@ -184,10 +184,7 @@ fn is_eof_only_expr_stmt(node: &RedNode<ValkyrieLanguage>) -> bool {
     for child in node.children() {
         match child {
             RedTree::Leaf(t) => match t.kind {
-                ValkyrieTokenType::Whitespace
-                | ValkyrieTokenType::Newline
-                | ValkyrieTokenType::LineComment
-                | ValkyrieTokenType::BlockComment => {}
+                ValkyrieTokenType::Whitespace | ValkyrieTokenType::Newline | ValkyrieTokenType::LineComment | ValkyrieTokenType::BlockComment => {}
                 ValkyrieTokenType::Eof => saw_eof = true,
                 _ => return false,
             },

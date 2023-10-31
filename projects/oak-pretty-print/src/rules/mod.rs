@@ -7,10 +7,10 @@ use oak_core::{
 };
 
 /// Trait for defining formatting rules
-/// 
+///
 /// This trait is used to define custom formatting rules for AST nodes and tokens.
 /// It supports language-specific configuration and custom formatting state.
-/// 
+///
 /// The `C` type parameter represents the language-specific configuration.
 /// The `S` type parameter represents the formatting state.
 pub trait FormatRule<L: Language, C: Clone, S: Clone = crate::state::FormatState> {
@@ -33,24 +33,24 @@ pub trait FormatRule<L: Language, C: Clone, S: Clone = crate::state::FormatState
     }
 
     /// Applies the formatting rule to a node, returning an optional Document
-    /// 
+    ///
     /// # Parameters
     /// - `node`: The AST node to format
     /// - `context`: The formatting context, including configuration and state
     /// - `source`: The source code string
     /// - `format_children`: A closure to format child nodes
-    /// 
+    ///
     /// # Returns
     /// An optional `Document` representing the formatted node
     fn apply_node<'a>(&self, node: &RedNode<L>, context: &FormatContext<L, C, S>, source: &'a str, format_children: &dyn Fn(&RedNode<L>) -> FormatResult<Document<'a>>) -> FormatResult<Option<Document<'a>>>;
 
     /// Applies the formatting rule to a token, returning an optional Document
-    /// 
+    ///
     /// # Parameters
     /// - `token`: The AST token to format
     /// - `context`: The formatting context, including configuration and state
     /// - `source`: The source code string
-    /// 
+    ///
     /// # Returns
     /// An optional `Document` representing the formatted token
     fn apply_token<'a>(&self, token: &RedLeaf<L>, context: &FormatContext<L, C, S>, source: &'a str) -> FormatResult<Option<Document<'a>>>;
@@ -62,10 +62,10 @@ pub trait FormatRule<L: Language, C: Clone, S: Clone = crate::state::FormatState
 }
 
 /// A collection of formatting rules
-/// 
+///
 /// This struct holds a collection of formatting rules that can be applied to AST nodes.
 /// It supports language-specific configuration and custom formatting state.
-/// 
+///
 /// The `C` type parameter represents the language-specific configuration.
 /// The `S` type parameter represents the formatting state.
 pub struct RuleSet<L: Language, C: Clone, S: Clone = crate::state::FormatState> {

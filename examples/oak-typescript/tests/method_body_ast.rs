@@ -1,8 +1,10 @@
 //! Class method bodies must lower `this` / update / private idents for VMZ FieldRw.
 
 use oak_core::{Builder, ParseSession, SourceText};
-use oak_typescript::ast::{ClassMember, ExpressionKind, Statement};
-use oak_typescript::{TypeScriptBuilder, TypeScriptLanguage};
+use oak_typescript::{
+    TypeScriptBuilder, TypeScriptLanguage,
+    ast::{ClassMember, ExpressionKind, Statement},
+};
 
 fn build_root(src: &str) -> oak_typescript::TypeScriptRoot {
     let source = SourceText::new(src);
@@ -45,20 +47,22 @@ export default class C {
 "#,
     );
     let methods = class_methods(&root);
-    let ClassMember::Method { name, body, .. } = methods[0] else {
+    let ClassMember::Method { name, body, .. } = methods[0]
+    else {
         panic!("expected method");
     };
     assert_eq!(name, "bump");
     assert_eq!(body.len(), 1, "body={body:?}");
-    let Statement::ExpressionStatement(es) = &body[0] else {
+    let Statement::ExpressionStatement(es) = &body[0]
+    else {
         panic!("expected expr stmt, got {:?}", body[0]);
     };
-    let ExpressionKind::UpdateExpression { argument, operator, .. } = es.expression.kind.as_ref() else {
+    let ExpressionKind::UpdateExpression { argument, operator, .. } = es.expression.kind.as_ref()
+    else {
         panic!("expected update, got {:?}", es.expression.kind);
     };
     assert_eq!(operator, "++");
-    let ExpressionKind::MemberExpression { object, property, computed: false, .. } =
-        argument.kind.as_ref()
+    let ExpressionKind::MemberExpression { object, property, computed: false, .. } = argument.kind.as_ref()
     else {
         panic!("expected member, got {:?}", argument.kind);
     };
@@ -91,11 +95,9 @@ export default class Card {
     assert!(names.contains(&"onClick"), "names={names:?}");
     assert!(names.contains(&"#load"), "names={names:?}");
 
-    let on_click = methods
-        .iter()
-        .find(|m| matches!(m, ClassMember::Method { name, .. } if name == "onClick"))
-        .expect("onClick");
-    let ClassMember::Method { body, .. } = on_click else {
+    let on_click = methods.iter().find(|m| matches!(m, ClassMember::Method { name, .. } if name == "onClick")).expect("onClick");
+    let ClassMember::Method { body, .. } = on_click
+    else {
         unreachable!()
     };
     assert!(body.len() >= 2, "body={body:?}");

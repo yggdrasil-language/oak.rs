@@ -135,9 +135,11 @@ impl<'config> RubyLexer<'config> {
 
             state.add_token(RubyTokenType::Comment, start_pos, state.get_position());
             true
-        } else if self.skip_begin_end_comment(state) {
+        }
+        else if self.skip_begin_end_comment(state) {
             true
-        } else {
+        }
+        else {
             false
         }
     }
@@ -434,7 +436,8 @@ impl<'config> RubyLexer<'config> {
 
     /// `@ivar` / `@@cvar` / `$global` 整词。
     fn lex_sigil_variable<'a, S: Source + ?Sized>(&self, state: &mut State<'a, S>) -> bool {
-        let Some(sigil) = state.peek() else {
+        let Some(sigil) = state.peek()
+        else {
             return false;
         };
         if sigil != '@' && sigil != '$' {
@@ -442,17 +445,14 @@ impl<'config> RubyLexer<'config> {
         }
         let start_pos = state.get_position();
         state.advance(1);
-        let mut kind = if sigil == '$' {
-            RubyTokenType::GlobalVariable
-        } else {
-            RubyTokenType::InstanceVariable
-        };
+        let mut kind = if sigil == '$' { RubyTokenType::GlobalVariable } else { RubyTokenType::InstanceVariable };
         if sigil == '@' && state.peek() == Some('@') {
             state.advance(1);
             kind = RubyTokenType::ClassVariable;
         }
         // `$1` 等 digit 全局；其余需标识符首字符。
-        let Some(first) = state.peek() else {
+        let Some(first) = state.peek()
+        else {
             state.set_position(start_pos);
             return false;
         };
@@ -464,7 +464,8 @@ impl<'config> RubyLexer<'config> {
         while let Some(ch) = state.peek() {
             if ch.is_ascii_alphanumeric() || ch == '_' || ch == '?' || ch == '!' {
                 state.advance(1);
-            } else {
+            }
+            else {
                 break;
             }
         }

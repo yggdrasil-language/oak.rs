@@ -30,11 +30,7 @@ pub struct IniLanguage {
 
 impl Default for IniLanguage {
     fn default() -> Self {
-        Self {
-            numeric_keys: false,
-            hash_comments: true,
-            value_style: IniValueStyle::Typed,
-        }
+        Self { numeric_keys: false, hash_comments: true, value_style: IniValueStyle::Typed }
     }
 }
 
@@ -50,11 +46,7 @@ impl IniLanguage {
     /// - only `;` starts a line comment (`#` is data)
     /// - values run to end of line
     pub fn westwood() -> Self {
-        Self {
-            numeric_keys: true,
-            hash_comments: false,
-            value_style: IniValueStyle::LineRemainder,
-        }
+        Self { numeric_keys: true, hash_comments: false, value_style: IniValueStyle::LineRemainder }
     }
 }
 

@@ -1,6 +1,8 @@
-﻿use oak_core::{Builder, ParseSession, SourceText};
-use oak_typescript::ast::{ImportSpecifier, Statement};
-use oak_typescript::{TypeScriptBuilder, TypeScriptLanguage};
+use oak_core::{Builder, ParseSession, SourceText};
+use oak_typescript::{
+    TypeScriptBuilder, TypeScriptLanguage,
+    ast::{ImportSpecifier, Statement},
+};
 
 #[test]
 fn static_imports_build_module_specifier_and_bindings() {

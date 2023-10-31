@@ -1,8 +1,5 @@
-﻿use oak_core::{Builder, Source, SourceText};
-use oak_valkyrie::{
-    ValkyrieBuilder, ValkyrieLanguage, ValkyrieLexer, ValkyrieTokenType, ast::StatementNode,
-};
-use oak_core::Lexer;
+use oak_core::{Builder, Lexer, Source, SourceText};
+use oak_valkyrie::{ValkyrieBuilder, ValkyrieLanguage, ValkyrieLexer, ValkyrieTokenType, ast::StatementNode};
 
 #[test]
 fn hash_is_line_comment_slash_is_not() {
@@ -21,18 +18,9 @@ fn hash_is_line_comment_slash_is_not() {
             (format!("{:?}", t.kind), text)
         })
         .collect();
-    assert!(
-        texts.iter().any(|(k, t)| k == "LineComment" && t.starts_with('#')),
-        "texts={texts:?}"
-    );
-    assert!(
-        texts.iter().any(|(k, _)| k == "Slash"),
-        "// must lex as Slash, texts={texts:?}"
-    );
-    assert!(
-        !texts.iter().any(|(k, t)| k == "LineComment" && t.contains("//")),
-        "// must not be LineComment, texts={texts:?}"
-    );
+    assert!(texts.iter().any(|(k, t)| k == "LineComment" && t.starts_with('#')), "texts={texts:?}");
+    assert!(texts.iter().any(|(k, _)| k == "Slash"), "// must lex as Slash, texts={texts:?}");
+    assert!(!texts.iter().any(|(k, t)| k == "LineComment" && t.contains("//")), "// must not be LineComment, texts={texts:?}");
 }
 
 #[test]
@@ -66,11 +54,7 @@ fn triple_slash_is_not_comment() {
     let out = lexer.lex(&src, &[], &mut session);
     assert!(out.result.is_ok(), "lex err={:?}", out.result.err());
     let tokens = out.result.unwrap();
-    let bad: Vec<_> = tokens
-        .iter()
-        .filter(|t| matches!(t.kind, ValkyrieTokenType::LineComment))
-        .map(|t| src.get_text_in(t.span.clone()).to_string())
-        .collect();
+    let bad: Vec<_> = tokens.iter().filter(|t| matches!(t.kind, ValkyrieTokenType::LineComment)).map(|t| src.get_text_in(t.span.clone()).to_string()).collect();
     assert!(bad.is_empty(), "/// must not be LineComment: {bad:?}");
 }
 
@@ -83,11 +67,7 @@ fn block_comment_hash_angles() {
     let out = lexer.lex(&src, &[], &mut session);
     assert!(out.result.is_ok(), "lex err={:?}", out.result.err());
     let tokens = out.result.unwrap();
-    let blocks: Vec<_> = tokens
-        .iter()
-        .filter(|t| matches!(t.kind, ValkyrieTokenType::BlockComment))
-        .map(|t| src.get_text_in(t.span.clone()).to_string())
-        .collect();
+    let blocks: Vec<_> = tokens.iter().filter(|t| matches!(t.kind, ValkyrieTokenType::BlockComment)).map(|t| src.get_text_in(t.span.clone()).to_string()).collect();
     assert_eq!(blocks.len(), 1, "tokens block={blocks:?}");
     assert!(blocks[0].starts_with("<#"), "block={:?}", blocks[0]);
     assert!(blocks[0].ends_with("#>"), "block={:?}", blocks[0]);
@@ -110,8 +90,5 @@ fn c_style_block_comment_is_not_comment() {
     let out = lexer.lex(&src, &[], &mut session);
     assert!(out.result.is_ok(), "lex err={:?}", out.result.err());
     let tokens = out.result.unwrap();
-    assert!(
-        !tokens.iter().any(|t| matches!(t.kind, ValkyrieTokenType::BlockComment | ValkyrieTokenType::LineComment)),
-        "/* */ must not be a comment"
-    );
+    assert!(!tokens.iter().any(|t| matches!(t.kind, ValkyrieTokenType::BlockComment | ValkyrieTokenType::LineComment)), "/* */ must not be a comment");
 }

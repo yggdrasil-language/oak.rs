@@ -1,8 +1,7 @@
-use crate::ast::{
-    AttributeOperator, AttributeSelector, Combinator, CompoundSelector, Selector, SelectorList,
-    SimpleSelector,
+use crate::{
+    ast::{AttributeOperator, AttributeSelector, Combinator, CompoundSelector, Selector, SelectorList, SimpleSelector},
+    diag::CssSelectorParseError,
 };
-use crate::diag::CssSelectorParseError;
 
 enum SimpleStart {
     Universal,
@@ -61,13 +60,16 @@ impl<'a> Parser<'a> {
             let combinator = if self.peek() == Some('>') {
                 self.pos += 1;
                 Combinator::Child
-            } else if self.peek() == Some('+') {
+            }
+            else if self.peek() == Some('+') {
                 self.pos += 1;
                 Combinator::NextSibling
-            } else if self.peek() == Some('~') {
+            }
+            else if self.peek() == Some('~') {
                 self.pos += 1;
                 Combinator::SubsequentSibling
-            } else {
+            }
+            else {
                 Combinator::Descendant
             };
             self.skip_ws();
@@ -75,10 +77,7 @@ impl<'a> Parser<'a> {
             ancestors.push((combinator, current));
             current = ancestor;
         }
-        Ok(Selector {
-            compound: current,
-            ancestors,
-        })
+        Ok(Selector { compound: current, ancestors })
     }
 
     fn parse_compound(&mut self) -> Result<CompoundSelector, CssSelectorParseError> {
@@ -119,11 +118,7 @@ impl<'a> Parser<'a> {
         self.skip_ws();
         if self.peek() == Some(']') {
             self.pos += 1;
-            return Ok(AttributeSelector {
-                name,
-                operator: AttributeOperator::Present,
-                value: None,
-            });
+            return Ok(AttributeSelector { name, operator: AttributeOperator::Present, value: None });
         }
         let (operator, value) = match self.peek() {
             Some('=') => {
@@ -158,17 +153,11 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_string_or_ident(&mut self) -> Result<String, CssSelectorParseError> {
-        if self.peek() == Some('"') || self.peek() == Some('\'') {
-            self.parse_string_literal()
-        } else {
-            self.parse_ident()
-        }
+        if self.peek() == Some('"') || self.peek() == Some('\'') { self.parse_string_literal() } else { self.parse_ident() }
     }
 
     fn parse_string_literal(&mut self) -> Result<String, CssSelectorParseError> {
-        let quote = self
-            .peek()
-            .ok_or_else(|| CssSelectorParseError::unexpected_eof("string literal", self.pos))?;
+        let quote = self.peek().ok_or_else(|| CssSelectorParseError::unexpected_eof("string literal", self.pos))?;
         if quote != '"' && quote != '\'' {
             return Err(CssSelectorParseError::invalid_ident("expected string literal", self.pos));
         }
@@ -192,7 +181,8 @@ impl<'a> Parser<'a> {
             if ch.is_ascii_alphanumeric() || ch == '_' || ch == '-' {
                 out.push(ch);
                 self.pos += 1;
-            } else {
+            }
+            else {
                 break;
             }
         }
@@ -218,28 +208,23 @@ impl<'a> Parser<'a> {
         if self.peek() == Some(expected) {
             self.pos += 1;
             Ok(())
-        } else {
-            Err(CssSelectorParseError::unexpected_eof(
-                format!("expected '{expected}'").as_str(),
-                self.pos,
-            ))
+        }
+        else {
+            Err(CssSelectorParseError::unexpected_eof(format!("expected '{expected}'").as_str(), self.pos))
         }
     }
 
     fn expect_end(&mut self) -> Result<(), CssSelectorParseError> {
         self.skip_ws();
-        if self.at_end() {
-            Ok(())
-        } else {
-            Err(CssSelectorParseError::unexpected_trailing(self.remaining(), self.pos))
-        }
+        if self.at_end() { Ok(()) } else { Err(CssSelectorParseError::unexpected_trailing(self.remaining(), self.pos)) }
     }
 
     fn skip_ws(&mut self) {
         while let Some(ch) = self.peek() {
             if ch.is_whitespace() {
                 self.pos += 1;
-            } else {
+            }
+            else {
                 break;
             }
         }
@@ -261,10 +246,7 @@ impl<'a> Parser<'a> {
 #[cfg(test)]
 mod tests {
     use super::parse_css_selector;
-    use crate::ast::{
-        AttributeOperator, AttributeSelector, Combinator, CompoundSelector, Selector, SelectorList,
-        SimpleSelector,
-    };
+    use crate::ast::{AttributeOperator, AttributeSelector, Combinator, CompoundSelector, Selector, SelectorList, SimpleSelector};
 
     #[test]
     fn parses_type_and_class() {
@@ -273,18 +255,8 @@ mod tests {
             list,
             SelectorList {
                 selectors: vec![Selector {
-                    compound: CompoundSelector {
-                        simple: vec![
-                            SimpleSelector::Type("h1".to_string()),
-                            SimpleSelector::Class("title".to_string()),
-                        ],
-                    },
-                    ancestors: vec![(
-                        Combinator::Child,
-                        CompoundSelector {
-                            simple: vec![SimpleSelector::Type("article".to_string())],
-                        },
-                    )],
+                    compound: CompoundSelector { simple: vec![SimpleSelector::Type("h1".to_string()), SimpleSelector::Class("title".to_string()),] },
+                    ancestors: vec![(Combinator::Child, CompoundSelector { simple: vec![SimpleSelector::Type("article".to_string())] },)],
                 }],
             }
         );

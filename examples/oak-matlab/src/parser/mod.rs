@@ -165,11 +165,7 @@ impl<'config> MatlabParser<'config> {
     }
 
     /// `global x y` / `persistent a b` — keyword then same-line identifiers.
-    fn parse_declaration<'a, S: Source + ?Sized>(
-        &self,
-        state: &mut State<'a, S>,
-        kind: MatlabElementType,
-    ) -> &'a GreenNode<'a, MatlabLanguage> {
+    fn parse_declaration<'a, S: Source + ?Sized>(&self, state: &mut State<'a, S>, kind: MatlabElementType) -> &'a GreenNode<'a, MatlabLanguage> {
         let checkpoint = state.checkpoint();
         state.bump(); // global / persistent
         while Self::peek_same_line_kind_at(state, 0) == Some(MatlabTokenType::Identifier) {
@@ -265,11 +261,7 @@ impl<'config> MatlabParser<'config> {
     fn parse_return<'a, S: Source + ?Sized>(&self, state: &mut State<'a, S>) -> &'a GreenNode<'a, MatlabLanguage> {
         let checkpoint = state.checkpoint();
         state.bump(); // return
-        if !Self::at_block_terminator(state)
-            && !state.at(MatlabTokenType::Semicolon)
-            && !state.at(MatlabTokenType::Comma)
-            && !state.at(MatlabTokenType::Newline)
-        {
+        if !Self::at_block_terminator(state) && !state.at(MatlabTokenType::Semicolon) && !state.at(MatlabTokenType::Comma) && !state.at(MatlabTokenType::Newline) {
             self.parse_expression(state);
         }
         state.finish_at(checkpoint, MatlabElementType::ReturnStmt)
@@ -325,11 +317,7 @@ impl<'config> MatlabParser<'config> {
     }
 
     fn at_switch_arm_terminator(state: &State<'_, impl Source + ?Sized>) -> bool {
-        state.at(MatlabTokenType::Case)
-            || state.at(MatlabTokenType::Otherwise)
-            || state.at(MatlabTokenType::End)
-            || state.at(MatlabTokenType::Eof)
-            || !state.not_at_end()
+        state.at(MatlabTokenType::Case) || state.at(MatlabTokenType::Otherwise) || state.at(MatlabTokenType::End) || state.at(MatlabTokenType::Eof) || !state.not_at_end()
     }
 
     fn parse_try<'a, S: Source + ?Sized>(&self, state: &mut State<'a, S>) -> &'a GreenNode<'a, MatlabLanguage> {
@@ -466,10 +454,7 @@ impl<'config> Pratt<MatlabLanguage> for MatlabParser<'config> {
             }
         }
         // Class introspection builtins share spellings with classdef section keywords.
-        else if matches!(
-            state.peek_kind(),
-            Some(MatlabTokenType::Methods | MatlabTokenType::Properties | MatlabTokenType::Events)
-        ) {
+        else if matches!(state.peek_kind(), Some(MatlabTokenType::Methods | MatlabTokenType::Properties | MatlabTokenType::Events)) {
             state.bump();
             if state.at(MatlabTokenType::LeftParen) {
                 while state.at(MatlabTokenType::LeftParen) {

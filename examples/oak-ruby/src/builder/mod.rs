@@ -2,7 +2,7 @@ use crate::{
     ast::{ExpressionNode, LiteralNode, RubyRoot, StatementNode},
     language::RubyLanguage,
     lexer::token_type::RubyTokenType,
-    parser::{element_type::RubyElementType, RubyParser},
+    parser::{RubyParser, element_type::RubyElementType},
 };
 use core::range::Range;
 use oak_core::{
@@ -25,12 +25,7 @@ impl<'config> RubyBuilder<'config> {
 }
 
 impl<'config> Builder<RubyLanguage> for RubyBuilder<'config> {
-    fn build<'a, S: Source + ?Sized>(
-        &self,
-        source: &'a S,
-        edits: &[TextEdit],
-        _cache: &'a mut impl BuilderCache<RubyLanguage>,
-    ) -> BuildOutput<RubyLanguage> {
+    fn build<'a, S: Source + ?Sized>(&self, source: &'a S, edits: &[TextEdit], _cache: &'a mut impl BuilderCache<RubyLanguage>) -> BuildOutput<RubyLanguage> {
         let parser = RubyParser::new(self.config);
         let lexer = crate::lexer::RubyLexer::new(self.config);
 
@@ -40,23 +35,14 @@ impl<'config> Builder<RubyLanguage> for RubyBuilder<'config> {
 
         match parse_result.result {
             Ok(green_tree) => match self.build_root(green_tree, source) {
-                Ok(ast_root) => oak_core::errors::OakDiagnostics {
-                    result: Ok(ast_root),
-                    diagnostics: parse_result.diagnostics,
-                },
+                Ok(ast_root) => oak_core::errors::OakDiagnostics { result: Ok(ast_root), diagnostics: parse_result.diagnostics },
                 Err(build_error) => {
                     let mut diagnostics = parse_result.diagnostics;
                     diagnostics.push(build_error.clone());
-                    oak_core::errors::OakDiagnostics {
-                        result: Err(build_error),
-                        diagnostics,
-                    }
+                    oak_core::errors::OakDiagnostics { result: Err(build_error), diagnostics }
                 }
             },
-            Err(parse_error) => oak_core::errors::OakDiagnostics {
-                result: Err(parse_error),
-                diagnostics: parse_result.diagnostics,
-            },
+            Err(parse_error) => oak_core::errors::OakDiagnostics { result: Err(parse_error), diagnostics: parse_result.diagnostics },
         }
     }
 }
@@ -64,13 +50,7 @@ impl<'config> Builder<RubyLanguage> for RubyBuilder<'config> {
 impl<'config> RubyBuilder<'config> {
     fn build_root<S: Source + ?Sized>(&self, green_tree: &GreenNode<RubyLanguage>, source: &S) -> Result<RubyRoot, oak_core::OakError> {
         let statements = self.build_statement_list(green_tree, source, 0)?;
-        Ok(RubyRoot {
-            statements,
-            span: Range {
-                start: 0,
-                end: source.length(),
-            },
-        })
+        Ok(RubyRoot { statements, span: Range { start: 0, end: source.length() } })
     }
 
     fn build_statement_list<S: Source + ?Sized>(&self, node: &GreenNode<RubyLanguage>, source: &S, base: usize) -> Result<Vec<StatementNode>, oak_core::OakError> {
@@ -80,7 +60,8 @@ impl<'config> RubyBuilder<'config> {
             if let GreenTree::Node(child_node) = child {
                 if child_node.kind == RubyElementType::BeginStatement {
                     statements.extend(self.build_begin_body(child_node, source, offset)?);
-                } else if let Some(stmt) = self.build_statement(child_node, source, offset)? {
+                }
+                else if let Some(stmt) = self.build_statement(child_node, source, offset)? {
                     statements.push(stmt);
                 }
             }
@@ -90,25 +71,18 @@ impl<'config> RubyBuilder<'config> {
     }
 
     /// `begin ... rescue ... end`：本阶段只展开 begin 主体，rescue / ensure 暂跳过。
-    fn build_begin_body<S: Source + ?Sized>(
-        &self,
-        node: &GreenNode<RubyLanguage>,
-        source: &S,
-        base: usize,
-    ) -> Result<Vec<StatementNode>, oak_core::OakError> {
+    fn build_begin_body<S: Source + ?Sized>(&self, node: &GreenNode<RubyLanguage>, source: &S, base: usize) -> Result<Vec<StatementNode>, oak_core::OakError> {
         let mut statements = Vec::new();
         let mut offset = base;
         for child in node.children() {
             if let GreenTree::Node(child_node) = child {
-                if matches!(
-                    child_node.kind,
-                    RubyElementType::RescueClause | RubyElementType::EnsureClause
-                ) {
+                if matches!(child_node.kind, RubyElementType::RescueClause | RubyElementType::EnsureClause) {
                     break;
                 }
                 if child_node.kind == RubyElementType::BeginStatement {
                     statements.extend(self.build_begin_body(child_node, source, offset)?);
-                } else if let Some(stmt) = self.build_statement(child_node, source, offset)? {
+                }
+                else if let Some(stmt) = self.build_statement(child_node, source, offset)? {
                     statements.push(stmt);
                 }
             }
@@ -127,30 +101,12 @@ impl<'config> RubyBuilder<'config> {
             RubyElementType::ClassDefinition | RubyElementType::ModuleDefinition => {
                 let name = class_or_module_name(node, source, offset).unwrap_or_else(|| "_".into());
                 let body = self.build_statement_list(node, source, offset)?;
-                Ok(Some(StatementNode::ClassDef {
-                    name,
-                    superclass: None,
-                    body,
-                    span,
-                }))
+                Ok(Some(StatementNode::ClassDef { name, superclass: None, body, span }))
             }
             RubyElementType::IfStatement | RubyElementType::UnlessStatement => {
                 let (condition, then_body, else_body) = self.split_if(node, source, offset)?;
-                let condition = if node.kind == RubyElementType::UnlessStatement {
-                    ExpressionNode::UnaryOp {
-                        operator: "!".into(),
-                        operand: Box::new(condition),
-                        span: span.clone(),
-                    }
-                } else {
-                    condition
-                };
-                Ok(Some(StatementNode::If {
-                    condition,
-                    then_body,
-                    else_body,
-                    span,
-                }))
+                let condition = if node.kind == RubyElementType::UnlessStatement { ExpressionNode::UnaryOp { operator: "!".into(), operand: Box::new(condition), span: span.clone() } } else { condition };
+                Ok(Some(StatementNode::If { condition, then_body, else_body, span }))
             }
             RubyElementType::WhileStatement => {
                 let (condition, body) = self.split_cond_body(node, source, offset)?;
@@ -161,20 +117,10 @@ impl<'config> RubyBuilder<'config> {
                 Ok(Some(StatementNode::Until { condition, body, span }))
             }
             RubyElementType::ForStatement => {
-                let var = first_token_text(node, source, offset, |kind| {
-                    matches!(kind, RubyTokenType::Identifier | RubyTokenType::Constant)
-                })
-                .unwrap_or_else(|| "_".into());
-                let iterable = self
-                    .first_expr(node, source, offset)?
-                    .unwrap_or(ExpressionNode::Literal(LiteralNode::Nil { span: span.clone() }));
+                let var = first_token_text(node, source, offset, |kind| matches!(kind, RubyTokenType::Identifier | RubyTokenType::Constant)).unwrap_or_else(|| "_".into());
+                let iterable = self.first_expr(node, source, offset)?.unwrap_or(ExpressionNode::Literal(LiteralNode::Nil { span: span.clone() }));
                 let body = self.build_statement_list(node, source, offset)?;
-                Ok(Some(StatementNode::For {
-                    var,
-                    iterable,
-                    body,
-                    span,
-                }))
+                Ok(Some(StatementNode::For { var, iterable, body, span }))
             }
             RubyElementType::ReturnStatement => {
                 let value = self.first_expr(node, source, offset)?;
@@ -182,79 +128,19 @@ impl<'config> RubyBuilder<'config> {
             }
             RubyElementType::BreakStatement => Ok(Some(StatementNode::Break { span })),
             RubyElementType::AssignmentStatement => {
-                let target = first_token_text(node, source, offset, |kind| {
-                    matches!(
-                        kind,
-                        RubyTokenType::Identifier
-                            | RubyTokenType::Constant
-                            | RubyTokenType::GlobalVariable
-                            | RubyTokenType::InstanceVariable
-                            | RubyTokenType::ClassVariable
-                    )
-                })
-                .unwrap_or_else(|| "_".into());
+                let target = first_token_text(node, source, offset, |kind| matches!(kind, RubyTokenType::Identifier | RubyTokenType::Constant | RubyTokenType::GlobalVariable | RubyTokenType::InstanceVariable | RubyTokenType::ClassVariable))
+                    .unwrap_or_else(|| "_".into());
                 let op = first_token_text(node, source, offset, |kind| {
-                    matches!(
-                        kind,
-                        RubyTokenType::Assign
-                            | RubyTokenType::PlusAssign
-                            | RubyTokenType::MinusAssign
-                            | RubyTokenType::MultiplyAssign
-                            | RubyTokenType::DivideAssign
-                            | RubyTokenType::OrOrAssign
-                            | RubyTokenType::AndAndAssign
-                    )
+                    matches!(kind, RubyTokenType::Assign | RubyTokenType::PlusAssign | RubyTokenType::MinusAssign | RubyTokenType::MultiplyAssign | RubyTokenType::DivideAssign | RubyTokenType::OrOrAssign | RubyTokenType::AndAndAssign)
                 })
                 .unwrap_or_else(|| "=".into());
-                let rhs = self
-                    .first_expr(node, source, offset)?
-                    .unwrap_or(ExpressionNode::Literal(LiteralNode::Nil { span: span.clone() }));
+                let rhs = self.first_expr(node, source, offset)?.unwrap_or(ExpressionNode::Literal(LiteralNode::Nil { span: span.clone() }));
                 let value = match op.as_str() {
-                    "+=" => ExpressionNode::BinaryOp {
-                        left: Box::new(ExpressionNode::Identifier {
-                            name: target.clone(),
-                            span: span.clone(),
-                        }),
-                        operator: "+".into(),
-                        right: Box::new(rhs),
-                        span: span.clone(),
-                    },
-                    "-=" => ExpressionNode::BinaryOp {
-                        left: Box::new(ExpressionNode::Identifier {
-                            name: target.clone(),
-                            span: span.clone(),
-                        }),
-                        operator: "-".into(),
-                        right: Box::new(rhs),
-                        span: span.clone(),
-                    },
-                    "*=" => ExpressionNode::BinaryOp {
-                        left: Box::new(ExpressionNode::Identifier {
-                            name: target.clone(),
-                            span: span.clone(),
-                        }),
-                        operator: "*".into(),
-                        right: Box::new(rhs),
-                        span: span.clone(),
-                    },
-                    "||=" => ExpressionNode::BinaryOp {
-                        left: Box::new(ExpressionNode::Identifier {
-                            name: target.clone(),
-                            span: span.clone(),
-                        }),
-                        operator: "||".into(),
-                        right: Box::new(rhs),
-                        span: span.clone(),
-                    },
-                    "&&=" => ExpressionNode::BinaryOp {
-                        left: Box::new(ExpressionNode::Identifier {
-                            name: target.clone(),
-                            span: span.clone(),
-                        }),
-                        operator: "&&".into(),
-                        right: Box::new(rhs),
-                        span: span.clone(),
-                    },
+                    "+=" => ExpressionNode::BinaryOp { left: Box::new(ExpressionNode::Identifier { name: target.clone(), span: span.clone() }), operator: "+".into(), right: Box::new(rhs), span: span.clone() },
+                    "-=" => ExpressionNode::BinaryOp { left: Box::new(ExpressionNode::Identifier { name: target.clone(), span: span.clone() }), operator: "-".into(), right: Box::new(rhs), span: span.clone() },
+                    "*=" => ExpressionNode::BinaryOp { left: Box::new(ExpressionNode::Identifier { name: target.clone(), span: span.clone() }), operator: "*".into(), right: Box::new(rhs), span: span.clone() },
+                    "||=" => ExpressionNode::BinaryOp { left: Box::new(ExpressionNode::Identifier { name: target.clone(), span: span.clone() }), operator: "||".into(), right: Box::new(rhs), span: span.clone() },
+                    "&&=" => ExpressionNode::BinaryOp { left: Box::new(ExpressionNode::Identifier { name: target.clone(), span: span.clone() }), operator: "&&".into(), right: Box::new(rhs), span: span.clone() },
                     _ => rhs,
                 };
                 Ok(Some(StatementNode::Assignment { target, value, span }))
@@ -306,12 +192,7 @@ impl<'config> RubyBuilder<'config> {
         Ok((name, params, body))
     }
 
-    fn split_if<S: Source + ?Sized>(
-        &self,
-        node: &GreenNode<RubyLanguage>,
-        source: &S,
-        base: usize,
-    ) -> Result<(ExpressionNode, Vec<StatementNode>, Option<Vec<StatementNode>>), oak_core::OakError> {
+    fn split_if<S: Source + ?Sized>(&self, node: &GreenNode<RubyLanguage>, source: &S, base: usize) -> Result<(ExpressionNode, Vec<StatementNode>, Option<Vec<StatementNode>>), oak_core::OakError> {
         // 修饰符形式：
         // 1) `body if/unless cond`（body 为表达式）
         // 2) `return/break/next if/unless cond`
@@ -321,13 +202,7 @@ impl<'config> RubyBuilder<'config> {
         let mut is_modifier = false;
         for child in node.children() {
             match child {
-                GreenTree::Leaf(leaf)
-                    if early_flow.is_none()
-                        && matches!(
-                            leaf.kind,
-                            RubyTokenType::Return | RubyTokenType::Break | RubyTokenType::Next
-                        ) =>
-                {
+                GreenTree::Leaf(leaf) if early_flow.is_none() && matches!(leaf.kind, RubyTokenType::Return | RubyTokenType::Break | RubyTokenType::Next) => {
                     early_flow = Some(leaf.kind);
                 }
                 GreenTree::Node(child_node)
@@ -345,10 +220,7 @@ impl<'config> RubyBuilder<'config> {
                 {
                     saw_expr = true;
                 }
-                GreenTree::Leaf(leaf)
-                    if (saw_expr || early_flow.is_some())
-                        && matches!(leaf.kind, RubyTokenType::If | RubyTokenType::Unless) =>
-                {
+                GreenTree::Leaf(leaf) if (saw_expr || early_flow.is_some()) && matches!(leaf.kind, RubyTokenType::If | RubyTokenType::Unless) => {
                     is_modifier = true;
                     break;
                 }
@@ -367,29 +239,12 @@ impl<'config> RubyBuilder<'config> {
             for child in node.children() {
                 match child {
                     GreenTree::Leaf(leaf) => {
-                        if !saw_assign_op
-                            && matches!(
-                                leaf.kind,
-                                RubyTokenType::Identifier
-                                    | RubyTokenType::Constant
-                                    | RubyTokenType::GlobalVariable
-                                    | RubyTokenType::InstanceVariable
-                                    | RubyTokenType::ClassVariable
-                            )
-                        {
+                        if !saw_assign_op && matches!(leaf.kind, RubyTokenType::Identifier | RubyTokenType::Constant | RubyTokenType::GlobalVariable | RubyTokenType::InstanceVariable | RubyTokenType::ClassVariable) {
                             if assign_target.is_none() {
                                 assign_target = Some(text_at(source, offset, leaf.length));
                             }
-                        } else if matches!(
-                            leaf.kind,
-                            RubyTokenType::Assign
-                                | RubyTokenType::PlusAssign
-                                | RubyTokenType::MinusAssign
-                                | RubyTokenType::MultiplyAssign
-                                | RubyTokenType::DivideAssign
-                                | RubyTokenType::OrOrAssign
-                                | RubyTokenType::AndAndAssign
-                        ) {
+                        }
+                        else if matches!(leaf.kind, RubyTokenType::Assign | RubyTokenType::PlusAssign | RubyTokenType::MinusAssign | RubyTokenType::MultiplyAssign | RubyTokenType::DivideAssign | RubyTokenType::OrOrAssign | RubyTokenType::AndAndAssign) {
                             saw_assign_op = true;
                         }
                     }
@@ -409,9 +264,11 @@ impl<'config> RubyBuilder<'config> {
                                 if condition.is_none() {
                                     condition = self.build_expression(child_node, source, offset)?;
                                 }
-                            } else if body_expr.is_none() {
+                            }
+                            else if body_expr.is_none() {
                                 body_expr = self.build_expression(child_node, source, offset)?;
-                            } else if condition.is_none() {
+                            }
+                            else if condition.is_none() {
                                 condition = self.build_expression(child_node, source, offset)?;
                             }
                         }
@@ -420,35 +277,22 @@ impl<'config> RubyBuilder<'config> {
                 }
                 offset += child.len() as usize;
             }
-            let condition = condition.unwrap_or(ExpressionNode::Literal(LiteralNode::Nil {
-                span: span.clone(),
-            }));
+            let condition = condition.unwrap_or(ExpressionNode::Literal(LiteralNode::Nil { span: span.clone() }));
             let then_body = if let Some(kind) = early_flow {
                 match kind {
-                    RubyTokenType::Return => vec![StatementNode::Return {
-                        value: None,
-                        span: span.clone(),
-                    }],
-                    _ => vec![StatementNode::Break {
-                        span: span.clone(),
-                    }],
+                    RubyTokenType::Return => vec![StatementNode::Return { value: None, span: span.clone() }],
+                    _ => vec![StatementNode::Break { span: span.clone() }],
                 }
-            } else if saw_assign_op {
+            }
+            else if saw_assign_op {
                 let target = assign_target.unwrap_or_else(|| "_".into());
-                let value = body_expr.unwrap_or(ExpressionNode::Literal(LiteralNode::Nil {
-                    span: span.clone(),
-                }));
+                let value = body_expr.unwrap_or(ExpressionNode::Literal(LiteralNode::Nil { span: span.clone() }));
                 // 修饰符赋值：`@x = expr unless cond` 的 then 体是赋值本身。
                 // 条件在 unless 时已由外层 `UnlessStatement` 处理；if 同理。
-                vec![StatementNode::Assignment {
-                    target,
-                    value,
-                    span: span.clone(),
-                }]
-            } else {
-                body_expr
-                    .map(|e| vec![StatementNode::Expression(e)])
-                    .unwrap_or_default()
+                vec![StatementNode::Assignment { target, value, span: span.clone() }]
+            }
+            else {
+                body_expr.map(|e| vec![StatementNode::Expression(e)]).unwrap_or_default()
             };
             return Ok((condition, then_body, None));
         }
@@ -465,19 +309,16 @@ impl<'config> RubyBuilder<'config> {
                     if condition.is_none()
                         && matches!(
                             child_node.kind,
-                            RubyElementType::BinaryExpression
-                                | RubyElementType::UnaryExpression
-                                | RubyElementType::LiteralExpression
-                                | RubyElementType::Identifier
-                                | RubyElementType::CallExpression
-                                | RubyElementType::ParenExpression
+                            RubyElementType::BinaryExpression | RubyElementType::UnaryExpression | RubyElementType::LiteralExpression | RubyElementType::Identifier | RubyElementType::CallExpression | RubyElementType::ParenExpression
                         )
                     {
                         condition = self.build_expression(child_node, source, offset)?;
-                    } else if let Some(stmt) = self.build_statement(child_node, source, offset)? {
+                    }
+                    else if let Some(stmt) = self.build_statement(child_node, source, offset)? {
                         if in_else {
                             else_body.push(stmt);
-                        } else {
+                        }
+                        else {
                             then_body.push(stmt);
                         }
                     }
@@ -486,11 +327,7 @@ impl<'config> RubyBuilder<'config> {
             }
             offset += child.len() as usize;
         }
-        Ok((
-            condition.unwrap_or(ExpressionNode::Literal(LiteralNode::Nil { span })),
-            then_body,
-            if else_body.is_empty() { None } else { Some(else_body) },
-        ))
+        Ok((condition.unwrap_or(ExpressionNode::Literal(LiteralNode::Nil { span })), then_body, if else_body.is_empty() { None } else { Some(else_body) }))
     }
 
     fn split_cond_body<S: Source + ?Sized>(&self, node: &GreenNode<RubyLanguage>, source: &S, base: usize) -> Result<(ExpressionNode, Vec<StatementNode>), oak_core::OakError> {
@@ -511,12 +348,7 @@ impl<'config> RubyBuilder<'config> {
         Ok(None)
     }
 
-    fn split_block<S: Source + ?Sized>(
-        &self,
-        node: &GreenNode<RubyLanguage>,
-        source: &S,
-        base: usize,
-    ) -> Result<(Vec<String>, Vec<StatementNode>), oak_core::OakError> {
+    fn split_block<S: Source + ?Sized>(&self, node: &GreenNode<RubyLanguage>, source: &S, base: usize) -> Result<(Vec<String>, Vec<StatementNode>), oak_core::OakError> {
         let mut params = Vec::new();
         let mut in_params = false;
         let mut offset = base;
@@ -526,12 +358,8 @@ impl<'config> RubyBuilder<'config> {
                 GreenTree::Leaf(leaf) => {
                     if leaf.kind == RubyTokenType::BitOr {
                         in_params = !in_params;
-                    } else if in_params
-                        && matches!(
-                            leaf.kind,
-                            RubyTokenType::Identifier | RubyTokenType::Constant
-                        )
-                    {
+                    }
+                    else if in_params && matches!(leaf.kind, RubyTokenType::Identifier | RubyTokenType::Constant) {
                         let text = text_at(source, offset, leaf.length);
                         if !text.is_empty() {
                             params.push(text);
@@ -543,7 +371,8 @@ impl<'config> RubyBuilder<'config> {
                         let (p, b) = self.split_block(child_node, source, offset)?;
                         params.extend(p);
                         body.extend(b);
-                    } else if let Some(stmt) = self.build_statement(child_node, source, offset)? {
+                    }
+                    else if let Some(stmt) = self.build_statement(child_node, source, offset)? {
                         body.push(stmt);
                     }
                 }
@@ -562,24 +391,13 @@ impl<'config> RubyBuilder<'config> {
             }
             RubyElementType::LiteralExpression => {
                 // `self` 是标识符语义，不是 nil。
-                if first_token_kind(node) == Some(RubyTokenType::Self_) {
-                    Ok(Some(ExpressionNode::Identifier {
-                        name: "self".into(),
-                        span,
-                    }))
-                } else {
-                    Ok(Some(ExpressionNode::Literal(self.build_literal(node, source, offset))))
-                }
+                if first_token_kind(node) == Some(RubyTokenType::Self_) { Ok(Some(ExpressionNode::Identifier { name: "self".into(), span })) } else { Ok(Some(ExpressionNode::Literal(self.build_literal(node, source, offset)))) }
             }
             RubyElementType::ParenExpression | RubyElementType::ParenthesizedExpression => self.first_expr(node, source, offset),
             RubyElementType::UnaryExpression => {
                 let operator = first_token_text(node, source, offset, |kind| is_operator(kind)).unwrap_or_else(|| "!".into());
                 let operand = self.first_expr(node, source, offset)?.unwrap_or(ExpressionNode::Literal(LiteralNode::Nil { span: span.clone() }));
-                Ok(Some(ExpressionNode::UnaryOp {
-                    operator,
-                    operand: Box::new(operand),
-                    span,
-                }))
+                Ok(Some(ExpressionNode::UnaryOp { operator, operand: Box::new(operand), span }))
             }
             RubyElementType::BinaryExpression => {
                 let mut left = None;
@@ -595,7 +413,8 @@ impl<'config> RubyBuilder<'config> {
                             if let Some(expr) = self.build_expression(child_node, source, child_offset)? {
                                 if left.is_none() {
                                     left = Some(expr);
-                                } else {
+                                }
+                                else {
                                     right = Some(expr);
                                 }
                             }
@@ -605,12 +424,7 @@ impl<'config> RubyBuilder<'config> {
                     child_offset += child.len() as usize;
                 }
                 match (left, right) {
-                    (Some(left), Some(right)) => Ok(Some(ExpressionNode::BinaryOp {
-                        left: Box::new(left),
-                        operator,
-                        right: Box::new(right),
-                        span,
-                    })),
+                    (Some(left), Some(right)) => Ok(Some(ExpressionNode::BinaryOp { left: Box::new(left), operator, right: Box::new(right), span })),
                     (Some(expr), None) | (None, Some(expr)) => Ok(Some(expr)),
                     _ => Ok(None),
                 }
@@ -634,18 +448,20 @@ impl<'config> RubyBuilder<'config> {
                         GreenTree::Leaf(leaf) => {
                             if leaf.kind == RubyTokenType::Dot {
                                 saw_dot = true;
-                            } else if leaf.kind == RubyTokenType::DoubleColon {
+                            }
+                            else if leaf.kind == RubyTokenType::DoubleColon {
                                 saw_colon = true;
-                            } else if leaf.kind == RubyTokenType::LeftBracket {
+                            }
+                            else if leaf.kind == RubyTokenType::LeftBracket {
                                 saw_bracket = true;
-                            } else if leaf.kind == RubyTokenType::LeftParen {
+                            }
+                            else if leaf.kind == RubyTokenType::LeftParen {
                                 saw_paren = true;
-                            } else if leaf.kind == RubyTokenType::Assign {
+                            }
+                            else if leaf.kind == RubyTokenType::Assign {
                                 saw_assign = true;
-                            } else if matches!(
-                                leaf.kind,
-                                RubyTokenType::Identifier | RubyTokenType::Constant
-                            ) {
+                            }
+                            else if matches!(leaf.kind, RubyTokenType::Identifier | RubyTokenType::Constant) {
                                 let text = text_at(source, child_offset, leaf.length);
                                 if saw_dot || saw_colon {
                                     if method.is_empty() || saw_dot || saw_colon {
@@ -654,20 +470,19 @@ impl<'config> RubyBuilder<'config> {
                                         }
                                         method = text;
                                     }
-                                } else if method.is_empty() {
+                                }
+                                else if method.is_empty() {
                                     method = text;
                                 }
                             }
                         }
                         GreenTree::Node(child_node) => {
                             if child_node.kind == RubyElementType::BlockExpression {
-                                let (params, body) =
-                                    self.split_block(child_node, source, child_offset)?;
+                                let (params, body) = self.split_block(child_node, source, child_offset)?;
                                 block_params = params;
                                 block_body = Some(body);
-                            } else if let Some(expr) =
-                                self.build_expression(child_node, source, child_offset)?
-                            {
+                            }
+                            else if let Some(expr) = self.build_expression(child_node, source, child_offset)? {
                                 exprs.push(expr);
                             }
                         }
@@ -685,36 +500,30 @@ impl<'config> RubyBuilder<'config> {
                     for child in node.children() {
                         match child {
                             GreenTree::Leaf(leaf) => {
-                                if matches!(
-                                    leaf.kind,
-                                    RubyTokenType::Identifier | RubyTokenType::Constant
-                                ) {
+                                if matches!(leaf.kind, RubyTokenType::Identifier | RubyTokenType::Constant) {
                                     parts.push(text_at(source, path_offset, leaf.length));
-                                } else if leaf.kind == RubyTokenType::DoubleColon {
+                                }
+                                else if leaf.kind == RubyTokenType::DoubleColon {
                                     // 路径分隔，继续。
-                                } else if leaf.kind == RubyTokenType::Dot {
+                                }
+                                else if leaf.kind == RubyTokenType::Dot {
                                     // `A::B.method`：路径到此结束，方法名由外层 saw_dot 处理。
                                     break;
-                                } else if !leaf.kind.is_ignored()
-                                    && leaf.kind != RubyTokenType::LeftParen
-                                    && leaf.kind != RubyTokenType::RightParen
-                                    && leaf.kind != RubyTokenType::Comma
-                                {
+                                }
+                                else if !leaf.kind.is_ignored() && leaf.kind != RubyTokenType::LeftParen && leaf.kind != RubyTokenType::RightParen && leaf.kind != RubyTokenType::Comma {
                                     break;
                                 }
                             }
                             GreenTree::Node(child_node) => {
-                                if child_node.kind == RubyElementType::Identifier
-                                    || child_node.kind == RubyElementType::LiteralExpression
-                                {
-                                    if let Some(ExpressionNode::Identifier { name, .. }) =
-                                        self.build_expression(child_node, source, path_offset)?
-                                    {
+                                if child_node.kind == RubyElementType::Identifier || child_node.kind == RubyElementType::LiteralExpression {
+                                    if let Some(ExpressionNode::Identifier { name, .. }) = self.build_expression(child_node, source, path_offset)? {
                                         parts.push(name);
-                                    } else {
+                                    }
+                                    else {
                                         break;
                                     }
-                                } else {
+                                }
+                                else {
                                     // 参数 / 嵌套调用：路径结束。
                                     break;
                                 }
@@ -726,19 +535,13 @@ impl<'config> RubyBuilder<'config> {
                     // 注意：首遍可能把路径 Identifier 推进 exprs，不能靠 exprs.is_empty()。
                     if parts.len() >= 2 && !saw_paren && block_body.is_none() && !saw_dot {
                         let full = parts.join("::");
-                        return Ok(Some(ExpressionNode::Identifier {
-                            name: full,
-                            span,
-                        }));
+                        return Ok(Some(ExpressionNode::Identifier { name: full, span }));
                     }
                     // `RPG::Cache(x)`：路径前缀为接收者，末段为方法；exprs 里的路径 Identifier 丢掉。
                     if parts.len() >= 2 && !saw_dot && !saw_bracket {
                         let path = parts[..parts.len() - 1].join("::");
                         method = parts.last().cloned().unwrap_or_default();
-                        receiver = Some(ExpressionNode::Identifier {
-                            name: path,
-                            span: span.clone(),
-                        });
+                        receiver = Some(ExpressionNode::Identifier { name: path, span: span.clone() });
                         // 括号内实参：去掉前缀路径 Identifier。
                         let mut real = std::mem::take(&mut exprs);
                         if real.len() >= parts.len() {
@@ -749,7 +552,8 @@ impl<'config> RubyBuilder<'config> {
                                     real.remove(0);
                                 }
                             }
-                        } else {
+                        }
+                        else {
                             real.clear();
                         }
                         args = real;
@@ -760,36 +564,34 @@ impl<'config> RubyBuilder<'config> {
                     let mut iter = std::mem::take(&mut exprs).into_iter();
                     receiver = iter.next();
                     args = iter.collect();
-                } else if saw_dot {
+                }
+                else if saw_dot {
                     // `recv.method` / `RPG::Cache.title`（内层已是路径 Identifier）。
                     let mut iter = std::mem::take(&mut exprs).into_iter();
                     receiver = iter.next();
                     args = iter.collect();
-                } else if !saw_colon {
+                }
+                else if !saw_colon {
                     // `loop do ... end`：exprs 可能空，method 来自首标识符；块在 block_body。
                     let exprs = std::mem::take(&mut exprs);
                     if method.is_empty() {
                         if let Some(ExpressionNode::Identifier { name, .. }) = exprs.first() {
                             method = name.clone();
                             args = exprs.into_iter().skip(1).collect();
-                        } else {
+                        }
+                        else {
                             args = exprs;
                         }
-                    } else {
+                    }
+                    else {
                         args = exprs;
                     }
-                } else if receiver.is_none() {
+                }
+                else if receiver.is_none() {
                     // `::` 路径未吃掉 exprs 时的回退。
                     args = std::mem::take(&mut exprs);
                 }
-                Ok(Some(ExpressionNode::MethodCall {
-                    receiver: receiver.map(Box::new),
-                    method,
-                    args,
-                    block_params,
-                    block_body,
-                    span,
-                }))
+                Ok(Some(ExpressionNode::MethodCall { receiver: receiver.map(Box::new), method, args, block_params, block_body, span }))
             }
             RubyElementType::ArrayExpression => {
                 let mut elements = Vec::new();
@@ -834,51 +636,28 @@ impl<'config> RubyBuilder<'config> {
                 let span = span_at(child_offset, leaf.length);
                 let text = text_at(source, child_offset, leaf.length);
                 return match leaf.kind {
-                    RubyTokenType::IntegerLiteral => LiteralNode::Integer {
-                        value: parse_ruby_int(&text),
-                        span,
-                    },
-                    RubyTokenType::FloatLiteral => LiteralNode::Float {
-                        value: text.parse().unwrap_or(0.0),
-                        span,
-                    },
-                    RubyTokenType::StringLiteral => LiteralNode::String {
-                        value: unquote(&text),
-                        span,
-                    },
+                    RubyTokenType::IntegerLiteral => LiteralNode::Integer { value: parse_ruby_int(&text), span },
+                    RubyTokenType::FloatLiteral => LiteralNode::Float { value: text.parse().unwrap_or(0.0), span },
+                    RubyTokenType::StringLiteral => LiteralNode::String { value: unquote(&text), span },
                     RubyTokenType::True => LiteralNode::Boolean { value: true, span },
                     RubyTokenType::False => LiteralNode::Boolean { value: false, span },
                     RubyTokenType::Nil | RubyTokenType::Self_ => LiteralNode::Nil { span },
-                    RubyTokenType::Symbol => LiteralNode::Symbol {
-                        value: text.trim_start_matches(':').to_string(),
-                        span,
-                    },
+                    RubyTokenType::Symbol => LiteralNode::Symbol { value: text.trim_start_matches(':').to_string(), span },
                     _ => LiteralNode::Nil { span },
                 };
             }
             child_offset += child.len() as usize;
         }
-        LiteralNode::Nil {
-            span: span_at(offset, node.byte_length),
-        }
+        LiteralNode::Nil { span: span_at(offset, node.byte_length) }
     }
 }
 
 fn span_at(start: usize, len: u32) -> Range<usize> {
-    Range {
-        start,
-        end: start + len as usize,
-    }
+    Range { start, end: start + len as usize }
 }
 
 fn text_at<S: Source + ?Sized>(source: &S, start: usize, len: u32) -> String {
-    source
-        .get_text_in(oak_core::Range {
-            start,
-            end: start + len as usize,
-        })
-        .trim()
-        .to_string()
+    source.get_text_in(oak_core::Range { start, end: start + len as usize }).trim().to_string()
 }
 
 fn first_token_text<S: Source + ?Sized>(node: &GreenNode<RubyLanguage>, source: &S, base: usize, pred: impl Fn(RubyTokenType) -> bool) -> Option<String> {
@@ -924,12 +703,7 @@ fn class_or_module_name<S: Source + ?Sized>(node: &GreenNode<RubyLanguage>, sour
                     offset += child.len() as usize;
                     continue;
                 }
-                if saw_keyword
-                    && matches!(
-                        leaf.kind,
-                        RubyTokenType::Constant | RubyTokenType::Identifier
-                    )
-                {
+                if saw_keyword && matches!(leaf.kind, RubyTokenType::Constant | RubyTokenType::Identifier) {
                     let text = text_at(source, offset, leaf.length);
                     if !text.is_empty() {
                         return Some(text);
@@ -939,9 +713,7 @@ fn class_or_module_name<S: Source + ?Sized>(node: &GreenNode<RubyLanguage>, sour
             GreenTree::Node(child_node) => {
                 // 个别情况下常量被包进 Identifier 节点。
                 if saw_keyword {
-                    if let Some(text) = first_token_text(child_node, source, offset, |kind| {
-                        matches!(kind, RubyTokenType::Constant | RubyTokenType::Identifier)
-                    }) {
+                    if let Some(text) = first_token_text(child_node, source, offset, |kind| matches!(kind, RubyTokenType::Constant | RubyTokenType::Identifier)) {
                         if !text.is_empty() && text != "class" && text != "module" {
                             return Some(text);
                         }
@@ -984,11 +756,7 @@ fn token_operator(kind: RubyTokenType) -> Option<String> {
 
 fn unquote(text: &str) -> String {
     let bytes = text.as_bytes();
-    if bytes.len() >= 2 && ((bytes[0] == b'"' && bytes[bytes.len() - 1] == b'"') || (bytes[0] == b'\'' && bytes[bytes.len() - 1] == b'\'')) {
-        text[1..text.len() - 1].to_string()
-    } else {
-        text.to_string()
-    }
+    if bytes.len() >= 2 && ((bytes[0] == b'"' && bytes[bytes.len() - 1] == b'"') || (bytes[0] == b'\'' && bytes[bytes.len() - 1] == b'\'')) { text[1..text.len() - 1].to_string() } else { text.to_string() }
 }
 
 fn parse_ruby_int(text: &str) -> i64 {

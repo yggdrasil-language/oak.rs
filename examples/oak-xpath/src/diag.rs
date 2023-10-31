@@ -13,41 +13,25 @@ pub struct XpathParseError {
 
 impl XpathParseError {
     fn new(code: impl Into<String>, message: impl Into<String>, offset: Option<usize>) -> Self {
-        Self {
-            code: DiagnosticCode::new(code.into()),
-            message: message.into(),
-            offset,
-        }
+        Self { code: DiagnosticCode::new(code.into()), message: message.into(), offset }
     }
 
     /// Unexpected trailing input after a complete expression.
     #[must_use]
     pub fn unexpected_trailing(remaining: &str, offset: usize) -> Self {
-        Self::new(
-            "oak.xpath.unexpected-trailing",
-            format!("unexpected trailing input: {remaining}"),
-            Some(offset),
-        )
+        Self::new("oak.xpath.unexpected-trailing", format!("unexpected trailing input: {remaining}"), Some(offset))
     }
 
     /// Unexpected end of input while parsing a selector fragment.
     #[must_use]
     pub fn unexpected_eof(context: &str, offset: usize) -> Self {
-        Self::new(
-            "oak.xpath.unexpected-eof",
-            format!("unexpected end of input while parsing {context}"),
-            Some(offset),
-        )
+        Self::new("oak.xpath.unexpected-eof", format!("unexpected end of input while parsing {context}"), Some(offset))
     }
 
     /// Invalid qualified name token.
     #[must_use]
     pub fn invalid_qname(token: &str, offset: usize) -> Self {
-        Self::new(
-            "oak.xpath.invalid-qname",
-            format!("invalid qualified name: {token}"),
-            Some(offset),
-        )
+        Self::new("oak.xpath.invalid-qname", format!("invalid qualified name: {token}"), Some(offset))
     }
 
     /// Unclosed string literal in a predicate.
@@ -59,11 +43,7 @@ impl XpathParseError {
     /// Unsupported predicate retained for diagnostics.
     #[must_use]
     pub fn unsupported_predicate(fragment: &str, offset: usize) -> Self {
-        Self::new(
-            "oak.xpath.unsupported-predicate",
-            format!("unsupported predicate: {fragment}"),
-            Some(offset),
-        )
+        Self::new("oak.xpath.unsupported-predicate", format!("unsupported predicate: {fragment}"), Some(offset))
     }
 
     /// Returns the unified diagnostic severity for this parse error.

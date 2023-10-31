@@ -47,36 +47,25 @@ impl<'config> MatlabBuilder<'config> {
         }
     }
 
-    fn build_name_declaration<S: Source + ?Sized>(
-        &self,
-        node: RedNode<'_, MatlabLanguage>,
-        source: &S,
-        is_global: bool,
-    ) -> Result<Statement, OakError> {
+    fn build_name_declaration<S: Source + ?Sized>(&self, node: RedNode<'_, MatlabLanguage>, source: &S, is_global: bool) -> Result<Statement, OakError> {
         let span = node.span();
         let mut names = Vec::new();
         for child in node.children() {
             if crate::builder::utils::is_trivia(&child) {
                 continue;
             }
-            let RedTree::Node(n) = child else {
+            let RedTree::Node(n) = child
+            else {
                 continue;
             };
             match self.build_expr(n, source)? {
                 Expression::Symbol(id) => names.push(id),
                 other => {
-                    return Err(source.syntax_error(
-                        format!("Declaration name must be a symbol, got {other:?}"),
-                        span.start,
-                    ));
+                    return Err(source.syntax_error(format!("Declaration name must be a symbol, got {other:?}"), span.start));
                 }
             }
         }
-        if is_global {
-            Ok(Statement::Global { names, span })
-        } else {
-            Ok(Statement::Persistent { names, span })
-        }
+        if is_global { Ok(Statement::Global { names, span }) } else { Ok(Statement::Persistent { names, span }) }
     }
 
     fn build_command<S: Source + ?Sized>(&self, node: RedNode<'_, MatlabLanguage>, source: &S) -> Result<Statement, OakError> {
@@ -87,7 +76,8 @@ impl<'config> MatlabBuilder<'config> {
             if crate::builder::utils::is_trivia(&child) {
                 continue;
             }
-            let RedTree::Node(n) = child else {
+            let RedTree::Node(n) = child
+            else {
                 continue;
             };
             let expr = self.build_expr(n, source)?;
@@ -98,7 +88,8 @@ impl<'config> MatlabBuilder<'config> {
                         return Err(source.syntax_error(format!("Command name must be a symbol, got {other:?}"), span.start));
                     }
                 }
-            } else {
+            }
+            else {
                 args.push(expr);
             }
         }
@@ -200,7 +191,8 @@ impl<'config> MatlabBuilder<'config> {
             if let RedTree::Node(n) = child {
                 if header.is_none() {
                     header = Some(self.build_expr(n, source)?);
-                } else {
+                }
+                else {
                     body.push(self.build_stmt(n, source)?);
                 }
             }
@@ -323,7 +315,8 @@ impl<'config> MatlabBuilder<'config> {
             if let RedTree::Node(n) = child {
                 if header.is_none() {
                     header = Some(self.build_expr(n, source)?);
-                } else {
+                }
+                else {
                     body.push(self.build_stmt(n, source)?);
                 }
             }

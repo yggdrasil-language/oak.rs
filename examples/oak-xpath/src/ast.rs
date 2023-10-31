@@ -75,4 +75,3 @@ pub enum Predicate {
     /// Unsupported predicate retained for diagnostics.
     Unsupported(String),
 }
-

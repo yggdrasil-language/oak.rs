@@ -305,9 +305,7 @@ impl<'config> Pratt<WolframLanguage> for WolframParser<'config> {
             if info.precedence < min_precedence {
                 return None;
             }
-            return Some(binary(state, left, kind, info.precedence, info.associativity, WolframElementType::BinaryExpr, |s, p| {
-                self.parse_pratt(s, p)
-            }));
+            return Some(binary(state, left, kind, info.precedence, info.associativity, WolframElementType::BinaryExpr, |s, p| self.parse_pratt(s, p)));
         }
 
         // Implicit Times: `x y`, `2 x`, `Sin[x] Cos[x]` (Wolfram juxtaposition).
@@ -325,7 +323,8 @@ impl<'config> Pratt<WolframLanguage> for WolframParser<'config> {
 impl<'config> WolframParser<'config> {
     /// Tokens that may begin a primary after juxtaposition (no leading infix op).
     fn can_start_juxtaposition(kind: Option<WolframTokenType>) -> bool {
-        let Some(kind) = kind else {
+        let Some(kind) = kind
+        else {
             return false;
         };
         if Self::is_symbol_token(kind) {

@@ -139,13 +139,12 @@ impl<'config> TypeScriptParser<'config> {
         let mut angles = 0usize;
         let mut previous = None;
         while state.not_at_end() {
-            let Some(kind) = self.peek_kind(state) else { break };
+            let Some(kind) = self.peek_kind(state)
+            else {
+                break;
+            };
             match kind {
-                Equal if previous != Some(Greater)
-                    && parens == 0
-                    && brackets == 0
-                    && braces == 0
-                    && angles == 0 => break,
+                Equal if previous != Some(Greater) && parens == 0 && brackets == 0 && braces == 0 && angles == 0 => break,
                 Semicolon if parens == 0 && brackets == 0 && braces == 0 && angles == 0 => break,
                 RightBrace if parens == 0 && brackets == 0 && braces == 0 && angles == 0 => break,
                 LeftParen => parens += 1,

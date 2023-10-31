@@ -265,7 +265,10 @@ impl<L: Language, T: Pratt<L>> PrattParser<L, T> {
         let mut left = spec.prefix(state);
         while state.not_at_end() {
             let before = state.checkpoint();
-            let Some(node) = spec.infix(state, left, min_precedence) else { break };
+            let Some(node) = spec.infix(state, left, min_precedence)
+            else {
+                break;
+            };
             if state.checkpoint().0 == before.0 {
                 break;
             }

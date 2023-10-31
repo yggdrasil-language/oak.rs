@@ -3,11 +3,7 @@ use oak_vue::{VueBuilder, VueLanguage, VueParser};
 
 #[test]
 fn counter_directive_expressions_do_not_stall() {
-    let cases = [
-        r#"<button @input="((e) => note = e.target.value)">"#,
-        r#"<button @click="(() => count++)">"#,
-        r#"<select @change="((e) => plan = e.target.value)">"#,
-    ];
+    let cases = [r#"<button @input="((e) => note = e.target.value)">"#, r#"<button @click="(() => count++)">"#, r#"<select @change="((e) => plan = e.target.value)">"#];
     let language = VueLanguage::default();
     let parser = VueParser::new(&language);
     for source in cases {

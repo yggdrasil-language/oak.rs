@@ -19,14 +19,14 @@ pub mod comment;
 pub mod document;
 /// Error types for formatting
 pub mod errors;
+/// RedTree formatting rules
+pub mod rules;
 /// Formatting state
 pub mod state;
 /// Traits for converting types to documents
 pub mod to_doc;
 /// Whitespace handling and processing
 pub mod whitespace;
-/// RedTree formatting rules
-pub mod rules;
 
 // Re-export commonly used types
 pub use crate::{

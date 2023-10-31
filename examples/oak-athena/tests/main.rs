@@ -1,8 +1,7 @@
 #![feature(new_range_api)]
 
-use oak_core::{Builder, SourceText, parser::ParseSession};
 use oak_athena::{AthenaLanguage, AthenaParser};
-use oak_core::Parser;
+use oak_core::{Builder, Parser, SourceText, parser::ParseSession};
 
 #[test]
 fn ready() {

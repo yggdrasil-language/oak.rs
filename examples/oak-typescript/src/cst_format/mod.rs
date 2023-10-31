@@ -22,16 +22,9 @@ use red_tree::TypeScriptRedTreeFormatter;
 pub use options::CstFormatOptions;
 
 /// Format a parsed `SourceFile` red node with companion source text.
-pub fn format_source_file(
-    source: &str,
-    file: &RedNode<'_, TypeScriptLanguage>,
-    options: &CstFormatOptions,
-) -> Result<String, String> {
+pub fn format_source_file(source: &str, file: &RedNode<'_, TypeScriptLanguage>, options: &CstFormatOptions) -> Result<String, String> {
     if file.element_type() != TypeScriptElementType::SourceFile {
-        return Err(format!(
-            "expected SourceFile root, got {:?}",
-            file.element_type()
-        ));
+        return Err(format!("expected SourceFile root, got {:?}", file.element_type()));
     }
 
     let file_span = file.span();
@@ -56,9 +49,7 @@ pub fn format_source_file(
                 if !is_supported_top_level(kind) {
                     return Err(format!("unsupported top-level CST node: {kind:?}"));
                 }
-                out.push_str(
-                    &TypeScriptRedTreeFormatter::new().format_statement(source, &stmt, options)?,
-                );
+                out.push_str(&TypeScriptRedTreeFormatter::new().format_statement(source, &stmt, options)?);
             }
         }
         cursor = child_span.end;
@@ -66,7 +57,8 @@ pub fn format_source_file(
 
     if cursor < file_span.end {
         out.push_str(slice_source(source, cursor, file_span.end));
-    } else if cursor < source.len() {
+    }
+    else if cursor < source.len() {
         out.push_str(slice_source(source, cursor, source.len()));
     }
 
@@ -92,10 +84,7 @@ pub fn format_source(source: &str, options: &CstFormatOptions) -> Result<String,
         return Err(format!("oak diagnostics: {:?}", parsed.diagnostics));
     }
 
-    let root_green = parsed
-        .result
-        .ok()
-        .ok_or_else(|| "oak parse returned no root".to_string())?;
+    let root_green = parsed.result.ok().ok_or_else(|| "oak parse returned no root".to_string())?;
     let file = RedNode::new(root_green, 0);
     format_source_file(source, &file, options)
 }
@@ -105,11 +94,5 @@ fn slice_source(source: &str, start: usize, end: usize) -> &str {
 }
 
 fn is_supported_top_level(kind: TypeScriptElementType) -> bool {
-    matches!(
-        kind,
-        TypeScriptElementType::VariableDeclaration
-            | TypeScriptElementType::ImportDeclaration
-            | TypeScriptElementType::ExportDeclaration
-            | TypeScriptElementType::ExpressionStatement
-    )
+    matches!(kind, TypeScriptElementType::VariableDeclaration | TypeScriptElementType::ImportDeclaration | TypeScriptElementType::ExportDeclaration | TypeScriptElementType::ExpressionStatement)
 }

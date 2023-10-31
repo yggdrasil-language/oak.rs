@@ -217,11 +217,7 @@ fn ast_call_not_command() {
 fn ast_methods_call_keyword_head() {
     let root = build("methods('double')");
     assert_eq!(root.items.len(), 1, "got {root:?}");
-    let (head, args) = root
-        .primary()
-        .and_then(|s| s.as_expr())
-        .and_then(|e| e.as_call())
-        .expect("methods(...) call");
+    let (head, args) = root.primary().and_then(|s| s.as_expr()).and_then(|e| e.as_call()).expect("methods(...) call");
     match head {
         Expression::Symbol(id) => assert_eq!(id.name, "methods"),
         other => panic!("expected methods symbol head, got {other:?}"),
@@ -361,10 +357,7 @@ fn ast_typed_accessors_matrix_ops() {
     let prefix = neg_pow.as_prefix().expect("unary minus wraps power");
     assert_eq!(prefix.operator, MatlabTokenType::Minus);
     assert!(prefix.operand.as_binary().is_some(), "operand should be x^2 BinaryExpr");
-    assert_eq!(
-        prefix.operand.as_binary().map(|b| b.operator),
-        Some(MatlabTokenType::Power)
-    );
+    assert_eq!(prefix.operand.as_binary().map(|b| b.operator), Some(MatlabTokenType::Power));
 
     let tr_root = build("A'");
     let tr = tr_root.primary().expect("primary").as_expr().expect("expr");

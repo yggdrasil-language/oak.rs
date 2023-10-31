@@ -35,11 +35,7 @@ impl Builder<HtmlLanguage> for HtmlBuilder {
 }
 
 impl HtmlBuilder {
-    pub(crate) fn build_root<'a>(
-        &self,
-        green_tree: &'a GreenNode<'a, HtmlLanguage>,
-        source: &SourceText,
-    ) -> HtmlDocument {
+    pub(crate) fn build_root<'a>(&self, green_tree: &'a GreenNode<'a, HtmlLanguage>, source: &SourceText) -> HtmlDocument {
         from_red::build_document(green_tree, source)
     }
 }

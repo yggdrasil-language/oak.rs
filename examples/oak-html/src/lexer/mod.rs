@@ -110,11 +110,7 @@ impl<'config> HtmlLexer<'config> {
         Ok(())
     }
 
-    fn apply_tag_operator<'a, S: Source + ?Sized>(
-        &self,
-        state: &mut State<'a, S>,
-        in_markup: &mut bool,
-    ) {
+    fn apply_tag_operator<'a, S: Source + ?Sized>(&self, state: &mut State<'a, S>, in_markup: &mut bool) {
         if let Some(kind) = self.lex_tag_operators(state) {
             match kind {
                 HtmlTokenType::TagOpen | HtmlTokenType::TagSlashOpen => *in_markup = true,
@@ -320,10 +316,7 @@ impl<'config> HtmlLexer<'config> {
         false
     }
 
-    fn lex_tag_operators<'a, S: Source + ?Sized>(
-        &self,
-        state: &mut State<'a, S>,
-    ) -> Option<HtmlTokenType> {
+    fn lex_tag_operators<'a, S: Source + ?Sized>(&self, state: &mut State<'a, S>) -> Option<HtmlTokenType> {
         let start_pos = state.get_position();
 
         let kind = match state.peek() {
@@ -486,11 +479,7 @@ impl<'config> HtmlLexer<'config> {
         }
     }
 
-    fn lex_text<'a, S: Source + ?Sized>(
-        &self,
-        state: &mut State<'a, S>,
-        in_markup: bool,
-    ) -> bool {
+    fn lex_text<'a, S: Source + ?Sized>(&self, state: &mut State<'a, S>, in_markup: bool) -> bool {
         let start_pos = state.get_position();
         let bytes = state.rest_bytes();
         let mut i = 0;
@@ -505,7 +494,8 @@ impl<'config> HtmlLexer<'config> {
             let stop = if in_markup {
                 let is_le_space = chunk.simd_le(Simd::splat(32));
                 is_lt | is_amp | is_le_space
-            } else {
+            }
+            else {
                 is_lt | is_amp
             };
 

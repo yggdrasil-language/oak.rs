@@ -23,12 +23,7 @@ pub struct FormatContext<L: Language, C: Clone, S: Clone = FormatState> {
 impl<L: Language, C: Clone, S: Default + Clone> FormatContext<L, C, S> {
     /// Create a context with the given configuration, default state, and printer config.
     pub fn new(config: C, printer_config: PrinterConfig) -> Self {
-        Self {
-            config,
-            state: S::default(),
-            printer_config,
-            _language: PhantomData,
-        }
+        Self { config, state: S::default(), printer_config, _language: PhantomData }
     }
 }
 

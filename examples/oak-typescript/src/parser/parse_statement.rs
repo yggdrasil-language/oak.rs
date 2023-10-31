@@ -264,8 +264,7 @@ impl<'config> TypeScriptParser<'config> {
     }
 
     pub(crate) fn parse_import_declaration<'a, S: Source + ?Sized>(&self, state: &mut State<'a, S>) -> Result<(), OakError> {
-        use crate::lexer::token_type::TypeScriptTokenType::*;
-        use crate::parser::element_type::TypeScriptElementType;
+        use crate::{lexer::token_type::TypeScriptTokenType::*, parser::element_type::TypeScriptElementType};
         let cp = state.checkpoint();
         state.bump(); // import
 
@@ -319,24 +318,21 @@ impl<'config> TypeScriptParser<'config> {
     }
 
     fn parse_import_identifier<'a, S: Source + ?Sized>(&self, state: &mut State<'a, S>) {
-        use crate::lexer::token_type::TypeScriptTokenType::*;
-        use crate::parser::element_type::TypeScriptElementType;
+        use crate::{lexer::token_type::TypeScriptTokenType::*, parser::element_type::TypeScriptElementType};
         let id_cp = state.checkpoint();
         self.expect(state, IdentifierName).ok();
         state.finish_at(id_cp, TypeScriptElementType::IdentifierName);
     }
 
     fn parse_import_string_literal<'a, S: Source + ?Sized>(&self, state: &mut State<'a, S>) {
-        use crate::lexer::token_type::TypeScriptTokenType::*;
-        use crate::parser::element_type::TypeScriptElementType;
+        use crate::{lexer::token_type::TypeScriptTokenType::*, parser::element_type::TypeScriptElementType};
         let str_cp = state.checkpoint();
         self.expect(state, StringLiteral).ok();
         state.finish_at(str_cp, TypeScriptElementType::StringLiteral);
     }
 
     fn parse_named_imports<'a, S: Source + ?Sized>(&self, state: &mut State<'a, S>) {
-        use crate::lexer::token_type::TypeScriptTokenType::*;
-        use crate::parser::element_type::TypeScriptElementType;
+        use crate::{lexer::token_type::TypeScriptTokenType::*, parser::element_type::TypeScriptElementType};
         let named_cp = state.checkpoint();
         self.expect(state, LeftBrace).ok();
         while state.not_at_end() && !self.at(state, RightBrace) {
@@ -361,8 +357,7 @@ impl<'config> TypeScriptParser<'config> {
     }
 
     fn parse_namespace_import<'a, S: Source + ?Sized>(&self, state: &mut State<'a, S>) {
-        use crate::lexer::token_type::TypeScriptTokenType::*;
-        use crate::parser::element_type::TypeScriptElementType;
+        use crate::{lexer::token_type::TypeScriptTokenType::*, parser::element_type::TypeScriptElementType};
         let ns_cp = state.checkpoint();
         state.bump(); // *
         self.skip_trivia(state);
@@ -373,8 +368,7 @@ impl<'config> TypeScriptParser<'config> {
     }
 
     pub(crate) fn parse_export_declaration<'a, S: Source + ?Sized>(&self, state: &mut State<'a, S>) -> Result<(), OakError> {
-        use crate::lexer::token_type::TypeScriptTokenType::*;
-        use crate::parser::element_type::TypeScriptElementType;
+        use crate::{lexer::token_type::TypeScriptTokenType::*, parser::element_type::TypeScriptElementType};
         let cp = state.checkpoint();
         state.bump(); // export
 
@@ -423,8 +417,7 @@ impl<'config> TypeScriptParser<'config> {
     }
 
     fn parse_named_exports<'a, S: Source + ?Sized>(&self, state: &mut State<'a, S>) {
-        use crate::lexer::token_type::TypeScriptTokenType::*;
-        use crate::parser::element_type::TypeScriptElementType;
+        use crate::{lexer::token_type::TypeScriptTokenType::*, parser::element_type::TypeScriptElementType};
         let named_cp = state.checkpoint();
         self.expect(state, LeftBrace).ok();
         while state.not_at_end() && !self.at(state, RightBrace) {

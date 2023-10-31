@@ -3,9 +3,7 @@ use super::{FormatError, FormatOptions};
 /// Returns `true` when the tree-aware path failed for a reason that must not fall back to
 /// transitional AST output (invalid source, diagnostics, span integrity).
 fn is_hard_format_error(message: &str) -> bool {
-    message.contains("diagnostics")
-        || message.contains("parse failed")
-        || message.contains("overlapping CST spans")
+    message.contains("diagnostics") || message.contains("parse failed") || message.contains("overlapping CST spans")
 }
 
 /// Format TypeScript/JavaScript source text.
@@ -21,8 +19,7 @@ pub fn format_source(source: &str, options: &FormatOptions) -> Result<String, Fo
     match crate::cst_format::format_source(source, &cst) {
         Ok(out) => Ok(out),
         Err(err) if is_hard_format_error(&err) => Err(FormatError::new(err)),
-        Err(_) => crate::print::format_source(source, &crate::print::FormatOptions::default())
-            .map_err(FormatError::new),
+        Err(_) => crate::print::format_source(source, &crate::print::FormatOptions::default()).map_err(FormatError::new),
     }
 }
 

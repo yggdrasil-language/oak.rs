@@ -16,9 +16,7 @@ fn test_simple_vue() {
 
 #[test]
 fn dynamic_directive_args_parse_and_build_without_hang() {
-    let source = SourceText::new(
-        "<template><button :[attrName]=\"val\" @[eventName]=\"onEv\">x</button></template>",
-    );
+    let source = SourceText::new("<template><button :[attrName]=\"val\" @[eventName]=\"onEv\">x</button></template>");
     let language = VueLanguage::default();
     let parser = VueParser::new(&language);
     let mut session = ParseSession::default();
@@ -35,9 +33,7 @@ fn dynamic_directive_args_parse_and_build_without_hang() {
 fn keyword_attr_name_for_does_not_hang() {
     // `for` lexes as VueTokenType::For, not Identifier. Old parse_attribute never bumped
     // and the attribute loop allocated forever.
-    let source = SourceText::new(
-        r#"<template><label :for="controlId" class="x">{{ label }}</label></template>"#,
-    );
+    let source = SourceText::new(r#"<template><label :for="controlId" class="x">{{ label }}</label></template>"#);
     let language = VueLanguage::default();
     let parser = VueParser::new(&language);
     let mut session = ParseSession::default();
@@ -74,11 +70,7 @@ fn mismatched_closing_tag_reports_diagnostic() {
     let parser = VueParser::new(&language);
     let mut session = ParseSession::default();
     let parsed = parser.parse(&source, &[], &mut session);
-    assert!(
-        parsed.diagnostics.iter().any(|d| d.to_string().contains("mismatched closing tag")),
-        "expected mismatch diagnostic, got: {:?}",
-        parsed.diagnostics
-    );
+    assert!(parsed.diagnostics.iter().any(|d| d.to_string().contains("mismatched closing tag")), "expected mismatch diagnostic, got: {:?}", parsed.diagnostics);
 }
 
 #[test]
@@ -110,9 +102,7 @@ export default class Page {
 
 #[test]
 fn ternary_in_interpolation_parses() {
-    let source = SourceText::new(
-        r#"<template><button>{{ armed ? "ON" : "OFF" }}</button></template>"#,
-    );
+    let source = SourceText::new(r#"<template><button>{{ armed ? "ON" : "OFF" }}</button></template>"#);
     let language = VueLanguage::default();
     let parser = VueParser::new(&language);
     let mut session = ParseSession::default();
@@ -122,9 +112,7 @@ fn ternary_in_interpolation_parses() {
 
 #[test]
 fn boolean_null_literals_in_bind_expr_parse() {
-    let source = SourceText::new(
-        r#"<template><div :a="true" :b="false" :c="null">x</div></template>"#,
-    );
+    let source = SourceText::new(r#"<template><div :a="true" :b="false" :c="null">x</div></template>"#);
     let language = VueLanguage::default();
     let parser = VueParser::new(&language);
     let mut session = ParseSession::default();
@@ -134,9 +122,7 @@ fn boolean_null_literals_in_bind_expr_parse() {
 
 #[test]
 fn pascal_case_link_component_parses_children() {
-    let source = SourceText::new(
-        "<template><main><Link to=\"IndexPage\">Home</Link></main></template>",
-    );
+    let source = SourceText::new("<template><main><Link to=\"IndexPage\">Home</Link></main></template>");
     let language = VueLanguage::default();
     let parser = VueParser::new(&language);
     let mut session = ParseSession::default();
@@ -157,7 +143,8 @@ fn pascal_case_link_component_parses_children() {
         other => panic!("expected Link element, got {other:?}"),
     };
     assert_eq!(source.get_text_in(link.tag_name.clone()), "Link");
-    let oak_vue::VueAttribute::Attribute(attr) = &link.attributes[0] else {
+    let oak_vue::VueAttribute::Attribute(attr) = &link.attributes[0]
+    else {
         panic!("expected static attribute, got {:?}", link.attributes);
     };
     assert_eq!(source.get_text_in(attr.name.clone()), "to");
@@ -177,32 +164,19 @@ fn text_before_interpolation_is_retained() {
         oak_vue::VueNode::Element(el) => el,
         other => panic!("expected p element, got {other:?}"),
     };
-    assert!(
-        p.children.iter().any(|c| matches!(c, oak_vue::VueNode::Text(t) if source.get_text_in(t.span.clone()).contains("Hi"))),
-        "expected text child with Hi, got {:?}",
-        p.children
-    );
-    assert!(
-        p.children.iter().any(|c| matches!(c, oak_vue::VueNode::Interpolation(_))),
-        "expected interpolation child"
-    );
+    assert!(p.children.iter().any(|c| matches!(c, oak_vue::VueNode::Text(t) if source.get_text_in(t.span.clone()).contains("Hi"))), "expected text child with Hi, got {:?}", p.children);
+    assert!(p.children.iter().any(|c| matches!(c, oak_vue::VueNode::Interpolation(_))), "expected interpolation child");
 }
 
 #[test]
 fn nested_template_hash_slot_builds_usable_ast() {
-    let source = SourceText::new(
-        r#"<template><Comp><template #title>T</template></Comp></template>"#,
-    );
+    let source = SourceText::new(r#"<template><Comp><template #title>T</template></Comp></template>"#);
     let builder = VueBuilder::new();
     let mut cache = ParseSession::default();
     let built = Builder::build(&builder, &source, &[], &mut cache);
     assert!(built.result.is_ok(), "build failed: {:?}", built.diagnostics);
     let root = built.result.unwrap();
-    let template = root
-        .blocks
-        .iter()
-        .find(|b| source.get_text_in(b.name.clone()) == "template")
-        .expect("template");
+    let template = root.blocks.iter().find(|b| source.get_text_in(b.name.clone()) == "template").expect("template");
     let comp = match &template.children[0] {
         oak_vue::VueNode::Element(el) => el,
         other => panic!("expected Comp, got {other:?}"),
@@ -214,27 +188,15 @@ fn nested_template_hash_slot_builds_usable_ast() {
     };
     let tag_text = source.get_text_in(slot_tpl.tag_name.clone());
     let span_text = source.get_text_in(slot_tpl.span.clone());
-    assert_eq!(
-        tag_text,
-        "template",
-        "nested <template> tag_name broken (TemplateStart leaf?). tag_range={:?} span_text={span_text:?} attrs={:?}",
-        slot_tpl.tag_name,
-        slot_tpl.attributes
-    );
-    assert!(
-        !slot_tpl.attributes.is_empty(),
-        "expected #title directive attr, got none"
-    );
-    let oak_vue::VueAttribute::Directive(dir) = &slot_tpl.attributes[0] else {
+    assert_eq!(tag_text, "template", "nested <template> tag_name broken (TemplateStart leaf?). tag_range={:?} span_text={span_text:?} attrs={:?}", slot_tpl.tag_name, slot_tpl.attributes);
+    assert!(!slot_tpl.attributes.is_empty(), "expected #title directive attr, got none");
+    let oak_vue::VueAttribute::Directive(dir) = &slot_tpl.attributes[0]
+    else {
         panic!("expected Directive for #title, got {:?}", slot_tpl.attributes);
     };
     let dir_span = source.get_text_in(dir.span.clone());
     assert_eq!(dir_span, "#title", "directive span misaligned: {dir_span:?}");
-    assert!(
-        slot_tpl.children.iter().any(|c| matches!(c, oak_vue::VueNode::Text(t) if source.get_text_in(t.span.clone()).contains('T'))),
-        "expected text child T, got {:?}",
-        slot_tpl.children
-    );
+    assert!(slot_tpl.children.iter().any(|c| matches!(c, oak_vue::VueNode::Text(t) if source.get_text_in(t.span.clone()).contains('T'))), "expected text child T, got {:?}", slot_tpl.children);
 }
 
 #[test]
@@ -244,10 +206,7 @@ fn vmz_agreed_matrix_builds_without_hang() {
         ("void_input", r#"<input type="text" />"#),
         ("bind_on", r#"<button :disabled="busy" @click="go">Go</button>"#),
         ("v_if_else", r#"<p v-if="a">A</p><p v-else>B</p>"#),
-        (
-            "v_if_elseif_else",
-            r#"<p v-if="a">A</p><p v-else-if="b">B</p><p v-else>C</p>"#,
-        ),
+        ("v_if_elseif_else", r#"<p v-if="a">A</p><p v-else-if="b">B</p><p v-else>C</p>"#),
         ("v_for_key", r#"<li v-for="tag in tags" :key="tag.id">{{ tag.label }}</li>"#),
         ("slot_outlet", r#"<slot name="footer"><p>fallback</p></slot>"#),
         ("v_model", r#"<input v-model="q" />"#),
@@ -256,21 +215,12 @@ fn vmz_agreed_matrix_builds_without_hang() {
         ("ternary_interp", r#"<span>{{ ok ? 'y' : 'n' }}</span>"#),
         ("hash_slot", r#"<Comp><template #title>T</template></Comp>"#),
         ("v_slot", r#"<Comp><template v-slot:footer>F</template></Comp>"#),
-        (
-            "class_style_plans",
-            r#"<div class="a b" :class="extra" style="color:red" :style="dyn">x</div>"#,
-        ),
+        ("class_style_plans", r#"<div class="a b" :class="extra" style="color:red" :style="dyn">x</div>"#),
         ("on_modifier", r#"<button @click.stop.prevent="go">Go</button>"#),
-        (
-            "v_for_aliases",
-            r#"<li v-for="(item, index) in items" :key="index">{{ item }}</li>"#,
-        ),
+        ("v_for_aliases", r#"<li v-for="(item, index) in items" :key="index">{{ item }}</li>"#),
         ("v_model_arg", r#"<input v-model:title="doc.title" />"#),
         ("bind_object", r#"<div v-bind="attrs">x</div>"#),
-        (
-            "comment_in_if_chain",
-            r#"<p v-if="a">A</p><!-- between --><p v-else>B</p>"#,
-        ),
+        ("comment_in_if_chain", r#"<p v-if="a">A</p><!-- between --><p v-else>B</p>"#),
         ("nested_elements", r#"<main><section><p>{{ t }}</p></section></main>"#),
         ("counter_option_value", r#"<option value>—</option>"#),
     ];
@@ -355,18 +305,12 @@ fn event_shell_index_client_event_attr_builds_without_hang() {
 
 #[test]
 fn nested_template_v_slot_directive_builds() {
-    let source = SourceText::new(
-        r#"<template><Card><template v-slot:footer>f</template></Card></template>"#,
-    );
+    let source = SourceText::new(r#"<template><Card><template v-slot:footer>f</template></Card></template>"#);
     let builder = VueBuilder::new();
     let mut cache = ParseSession::default();
     let built = Builder::build(&builder, &source, &[], &mut cache);
     let root = built.result.expect("build failed");
-    let template = root
-        .blocks
-        .iter()
-        .find(|b| source.get_text_in(b.name.clone()) == "template")
-        .expect("template");
+    let template = root.blocks.iter().find(|b| source.get_text_in(b.name.clone()) == "template").expect("template");
     let card = match &template.children[0] {
         oak_vue::VueNode::Element(el) => el,
         other => panic!("expected Card, got {other:?}"),
@@ -376,7 +320,8 @@ fn nested_template_v_slot_directive_builds() {
         other => panic!("expected nested template, got {other:?}"),
     };
     assert_eq!(source.get_text_in(slot_tpl.tag_name.clone()), "template");
-    let oak_vue::VueAttribute::Directive(dir) = &slot_tpl.attributes[0] else {
+    let oak_vue::VueAttribute::Directive(dir) = &slot_tpl.attributes[0]
+    else {
         panic!("expected Directive, got {:?}", slot_tpl.attributes);
     };
     assert_eq!(source.get_text_in(dir.span.clone()), "v-slot:footer");

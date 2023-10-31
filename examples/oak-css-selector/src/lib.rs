@@ -11,9 +11,6 @@ mod ast;
 mod diag;
 mod parser;
 
-pub use ast::{
-    AttributeOperator, AttributeSelector, Combinator, CompoundSelector, Selector, SelectorList,
-    SimpleSelector,
-};
+pub use ast::{AttributeOperator, AttributeSelector, Combinator, CompoundSelector, Selector, SelectorList, SimpleSelector};
 pub use diag::CssSelectorParseError;
 pub use parser::parse_css_selector;

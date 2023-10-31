@@ -9,4 +9,4 @@ mod xpath;
 mod xpath_tests;
 
 pub use view::{XmlDocumentView, XmlElementView};
-pub use xpath::{select_xpath, select_xpath_elements, XmlNamespaceContext};
+pub use xpath::{XmlNamespaceContext, select_xpath, select_xpath_elements};

@@ -228,12 +228,7 @@ impl<'config> Parser<IniLanguage> for IniParser<'config> {
                     break;
                 }
 
-                if state.at(IniTokenType::LeftBracket) || state.at(IniTokenType::DoubleLeftBracket) {
-                    self.parse_table(state)?
-                }
-                else {
-                    self.parse_key_value(state)?
-                }
+                if state.at(IniTokenType::LeftBracket) || state.at(IniTokenType::DoubleLeftBracket) { self.parse_table(state)? } else { self.parse_key_value(state)? }
             }
 
             Ok(state.finish_at(checkpoint, element_type::IniElementType::Root))

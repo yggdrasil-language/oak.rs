@@ -1,8 +1,10 @@
 use oak_core::{ParseSession, Parser, Source, SourceText};
 use oak_typescript::{TypeScriptLanguage, TypeScriptParser};
-use std::alloc::{GlobalAlloc, Layout, System};
-use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
-use std::time::{Duration, Instant};
+use std::{
+    alloc::{GlobalAlloc, Layout, System},
+    sync::atomic::{AtomicBool, AtomicUsize, Ordering},
+    time::{Duration, Instant},
+};
 
 struct BoundedAllocator;
 
@@ -38,11 +40,7 @@ unsafe impl GlobalAlloc for BoundedAllocator {
 fn object_members_have_bounded_allocations() {
     let language = TypeScriptLanguage::default();
     let parser = TypeScriptParser::new(&language);
-    for text in [
-        r#"const value = { "key": 1 };"#,
-        r#"const value = { 0: 1, default: 2, [name]: 3 };"#,
-        r#"const value = { method() { return 1; }, ...other, plain };"#,
-    ] {
+    for text in [r#"const value = { "key": 1 };"#, r#"const value = { 0: 1, default: 2, [name]: 3 };"#, r#"const value = { method() { return 1; }, ...other, plain };"#] {
         eprintln!("parsing {text}");
         let source = SourceText::new(text);
         let mut session = ParseSession::default();

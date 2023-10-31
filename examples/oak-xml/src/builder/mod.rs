@@ -75,12 +75,7 @@ impl XmlBuilder {
                                 match sub_child {
                                     GreenTree::Leaf(t) if t.kind == XmlTokenType::Identifier => {
                                         if name.is_empty() {
-                                            name = source
-                                                .get_text_in(Range {
-                                                    start: sub_offset,
-                                                    end: sub_offset + t.length as usize,
-                                                })
-                                                .to_string();
+                                            name = source.get_text_in(Range { start: sub_offset, end: sub_offset + t.length as usize }).to_string();
                                         }
                                     }
                                     GreenTree::Node(attr_node) if attr_node.kind == XmlElementType::Attribute => {
@@ -99,12 +94,7 @@ impl XmlBuilder {
                     current_offset += n.byte_length as usize;
                 }
                 GreenTree::Leaf(t) => {
-                    let text = source
-                        .get_text_in(Range {
-                            start: current_offset,
-                            end: current_offset + t.length as usize,
-                        })
-                        .to_string();
+                    let text = source.get_text_in(Range { start: current_offset, end: current_offset + t.length as usize }).to_string();
                     match t.kind {
                         XmlTokenType::Text | XmlTokenType::Identifier => {
                             push_text_child(&mut children, text);

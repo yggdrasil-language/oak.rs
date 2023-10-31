@@ -1,14 +1,9 @@
 //! Adapters from Oak parser errors to the shared `diagnostic` contract.
 
+use diagnostic::{ByteRange, DiagnosticLabel, DiagnosticLocation, DiagnosticOrigin, DiagnosticSeverity, LabelRole, Message, MessageArg, SourceRef};
 pub use diagnostic::{
-    Diagnostic, DiagnosticCode, DiagnosticAction, DiagnosticEnvelope,
-    DiagnosticLabel as UnifiedDiagnosticLabel, DiagnosticLocation as UnifiedDiagnosticLocation,
-    DiagnosticOrigin as UnifiedDiagnosticOrigin, DiagnosticSet,
+    Diagnostic, DiagnosticAction, DiagnosticCode, DiagnosticEnvelope, DiagnosticLabel as UnifiedDiagnosticLabel, DiagnosticLocation as UnifiedDiagnosticLocation, DiagnosticOrigin as UnifiedDiagnosticOrigin, DiagnosticSet,
     DiagnosticSeverity as UnifiedSeverity, DiagnosticSink, Message as UnifiedMessage, SCHEMA_VERSION,
-};
-use diagnostic::{
-    ByteRange, DiagnosticLabel, DiagnosticLocation, DiagnosticOrigin,
-    DiagnosticSeverity, LabelRole, Message, MessageArg, SourceRef,
 };
 
 use crate::errors::{OakDiagnostics, OakError, OakErrorKind};
@@ -34,23 +29,14 @@ fn source_ref(source_id: Option<u32>) -> SourceRef {
         Some(id) => format!("source-{id}"),
         None => "anonymous".to_string(),
     };
-    SourceRef::new("oak", id).unwrap_or_else(|_| {
-        SourceRef::new("oak", "anonymous").expect("oak fallback source identity")
-    })
+    SourceRef::new("oak", id).unwrap_or_else(|_| SourceRef::new("oak", "anonymous").expect("oak fallback source identity"))
 }
 
 fn text_label(source_id: Option<u32>, offset: usize, span_len: usize) -> Option<DiagnosticLabel> {
     let end = offset.saturating_add(span_len.max(1));
     let range = ByteRange::new(offset as u64, end as u64).ok()?;
-    let location = DiagnosticLocation::Text {
-        source: source_ref(source_id),
-        range,
-    };
-    Some(DiagnosticLabel::new(
-        location,
-        Message::new("oak.label.here").with_fallback("here"),
-        LabelRole::Primary,
-    ))
+    let location = DiagnosticLocation::Text { source: source_ref(source_id), range };
+    Some(DiagnosticLabel::new(location, Message::new("oak.label.here").with_fallback("here"), LabelRole::Primary))
 }
 
 fn message_for_kind(kind: &OakErrorKind) -> Message {
@@ -101,10 +87,7 @@ fn message_for_kind(kind: &OakErrorKind) -> Message {
             message = message.with_arg("color", MessageArg::Text(color.clone()));
         }
         OakErrorKind::TestFailure { path, expected, actual } => {
-            message = message
-                .with_arg("path", MessageArg::Text(path.display().to_string()))
-                .with_arg("expected", MessageArg::Text(expected.clone()))
-                .with_arg("actual", MessageArg::Text(actual.clone()));
+            message = message.with_arg("path", MessageArg::Text(path.display().to_string())).with_arg("expected", MessageArg::Text(expected.clone())).with_arg("actual", MessageArg::Text(actual.clone()));
         }
         OakErrorKind::TestRegenerated { path } => {
             message = message.with_arg("path", MessageArg::Text(path.display().to_string()));
@@ -122,9 +105,7 @@ fn primary_label(kind: &OakErrorKind) -> Option<DiagnosticLabel> {
         | OakErrorKind::UnexpectedEof { offset, source_id, .. }
         | OakErrorKind::ExpectedToken { offset, source_id, .. }
         | OakErrorKind::ExpectedName { offset, source_id, .. }
-        | OakErrorKind::TrailingCommaNotAllowed { offset, source_id, .. } => {
-            text_label(*source_id, *offset, 1)
-        }
+        | OakErrorKind::TrailingCommaNotAllowed { offset, source_id, .. } => text_label(*source_id, *offset, 1),
         _ => None,
     }
 }
@@ -134,12 +115,7 @@ pub fn from_oak_error(error: &OakError) -> Diagnostic {
     let kind = error.kind();
     let wire = oak_wire_code(kind);
     let severity = oak_severity(kind);
-    let mut diagnostic = Diagnostic::new(
-        wire,
-        severity,
-        DiagnosticOrigin::new("oak", "parser"),
-        message_for_kind(kind),
-    );
+    let mut diagnostic = Diagnostic::new(wire, severity, DiagnosticOrigin::new("oak", "parser"), message_for_kind(kind));
     if let Some(label) = primary_label(kind) {
         diagnostic = diagnostic.with_primary(label);
     }

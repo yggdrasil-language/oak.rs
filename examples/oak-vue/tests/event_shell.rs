@@ -1,5 +1,8 @@
 use oak_core::{Builder, GreenNode, GreenTree, ParseSession, Parser, Source, SourceText};
-use oak_vue::{VueBuilder, VueLanguage, VueParser, ast::VueAttribute, ast::VueNode};
+use oak_vue::{
+    VueBuilder, VueLanguage, VueParser,
+    ast::{VueAttribute, VueNode},
+};
 use std::{
     alloc::{GlobalAlloc, Layout, System},
     sync::atomic::{AtomicBool, AtomicUsize, Ordering},
@@ -38,10 +41,14 @@ unsafe impl GlobalAlloc for CountingAllocator {
 }
 
 fn count_nodes(node: &GreenNode<'_, VueLanguage>) -> usize {
-    1 + node.children.iter().map(|child| match child {
-        GreenTree::Node(child) => count_nodes(child),
-        GreenTree::Leaf(_) => 0,
-    }).sum::<usize>()
+    1 + node
+        .children
+        .iter()
+        .map(|child| match child {
+            GreenTree::Node(child) => count_nodes(child),
+            GreenTree::Leaf(_) => 0,
+        })
+        .sum::<usize>()
 }
 
 #[test]
@@ -73,18 +80,22 @@ fn event_shell_directive_has_bounded_allocations_and_exact_spans() {
     let builder = VueBuilder::new();
     let mut session = ParseSession::default();
     let built = builder.build(&source, &[], &mut session).result.unwrap();
-    let VueNode::Element(button) = &built.blocks[0].children[0] else {
+    let VueNode::Element(button) = &built.blocks[0].children[0]
+    else {
         panic!("expected button");
     };
-    let VueAttribute::Directive(click) = &button.attributes[0] else {
+    let VueAttribute::Directive(click) = &button.attributes[0]
+    else {
         panic!("expected event directive");
     };
     assert_eq!(source.get_text_in(click.value.as_ref().unwrap().span.clone()), "(() => armed = !armed)");
-    let VueAttribute::Directive(title) = &button.attributes[1] else {
+    let VueAttribute::Directive(title) = &button.attributes[1]
+    else {
         panic!("expected title directive");
     };
     assert_eq!(source.get_text_in(title.value.as_ref().unwrap().span.clone()), "label");
-    let VueNode::Element(list) = &built.blocks[0].children[1] else {
+    let VueNode::Element(list) = &built.blocks[0].children[1]
+    else {
         panic!("expected list element");
     };
     assert_eq!(source.get_text_in(list.tag_name.clone()), "li");

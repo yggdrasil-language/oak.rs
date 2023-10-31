@@ -1,12 +1,8 @@
-use crate::parser::element_type::TypeScriptElementType;
-use crate::parser::{State, TypeScriptParser};
+use crate::parser::{State, TypeScriptParser, element_type::TypeScriptElementType};
 use oak_core::{GreenNode, parser::pratt::PrattParser, source::Source};
 
 impl<'config> TypeScriptParser<'config> {
-    pub(crate) fn parse_jsx_element<'a, S: Source + ?Sized>(
-        &self,
-        state: &mut State<'a, S>,
-    ) -> &'a GreenNode<'a, crate::language::TypeScriptLanguage> {
+    pub(crate) fn parse_jsx_element<'a, S: Source + ?Sized>(&self, state: &mut State<'a, S>) -> &'a GreenNode<'a, crate::language::TypeScriptLanguage> {
         use crate::lexer::token_type::TypeScriptTokenType::*;
         let cp = state.checkpoint();
 
@@ -78,7 +74,8 @@ impl<'config> TypeScriptParser<'config> {
             PrattParser::parse(state, 0, self);
             self.expect(state, RightBrace).ok();
             state.finish_at(cp, TypeScriptElementType::JsxSpreadAttribute);
-        } else {
+        }
+        else {
             let name_cp = state.checkpoint();
             self.expect(state, IdentifierName).ok();
             state.finish_at(name_cp, TypeScriptElementType::IdentifierName);
@@ -87,7 +84,8 @@ impl<'config> TypeScriptParser<'config> {
                     let lit_cp = state.checkpoint();
                     state.bump();
                     state.finish_at(lit_cp, TypeScriptElementType::StringLiteral);
-                } else if self.eat(state, LeftBrace) {
+                }
+                else if self.eat(state, LeftBrace) {
                     let expr_cp = state.checkpoint();
                     PrattParser::parse(state, 0, self);
                     self.expect(state, RightBrace).ok();

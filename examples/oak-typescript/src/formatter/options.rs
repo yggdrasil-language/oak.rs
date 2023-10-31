@@ -13,18 +13,12 @@ pub struct FormatOptions {
 
 impl Default for FormatOptions {
     fn default() -> Self {
-        Self {
-            indent_width: 4,
-            line_width: 144,
-        }
+        Self { indent_width: 4, line_width: 144 }
     }
 }
 
 impl FormatOptions {
     pub(crate) fn cst_options(&self) -> CstFormatOptions {
-        CstFormatOptions {
-            indent_width: self.indent_width,
-            line_width: self.line_width,
-        }
+        CstFormatOptions { indent_width: self.indent_width, line_width: self.line_width }
     }
 }

@@ -64,13 +64,11 @@ impl<'config> XmlParser<'config> {
         }
     }
 
-    fn close_start_tag<'a, S: Source + ?Sized>(
-        state: &mut State<'a, S>,
-        start_tag_checkpoint: (usize, usize),
-    ) -> Result<(), OakError> {
+    fn close_start_tag<'a, S: Source + ?Sized>(state: &mut State<'a, S>, start_tag_checkpoint: (usize, usize)) -> Result<(), OakError> {
         if state.at(XmlTokenType::RightAngle) {
             Self::bump_without_skipping_trivia(state);
-        } else {
+        }
+        else {
             state.expect(XmlTokenType::RightAngle)?;
         }
         state.finish_at(start_tag_checkpoint, element_type::XmlElementType::StartTag);

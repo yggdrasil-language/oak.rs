@@ -7,18 +7,11 @@ impl<'config> TypeScriptBuilder<'config> {
         let span = node.span();
 
         match kind {
-            TypeScriptElementType::IdentifierName
-            | TypeScriptElementType::This
-            | TypeScriptElementType::Super => {
+            TypeScriptElementType::IdentifierName | TypeScriptElementType::This | TypeScriptElementType::Super => {
                 let mut name = String::new();
                 for child in node.children() {
                     if let RedTree::Leaf(leaf) = child {
-                        if matches!(
-                            leaf.kind,
-                            TypeScriptTokenType::IdentifierName
-                                | TypeScriptTokenType::This
-                                | TypeScriptTokenType::Super
-                        ) {
+                        if matches!(leaf.kind, TypeScriptTokenType::IdentifierName | TypeScriptTokenType::This | TypeScriptTokenType::Super) {
                             name = source.get_text_in(leaf.span.into()).trim().to_string();
                             break;
                         }
@@ -532,9 +525,5 @@ impl<'config> TypeScriptBuilder<'config> {
 
 fn decode_string_literal_text(raw: &str) -> String {
     let text = raw.trim();
-    if (text.starts_with('"') && text.ends_with('"')) || (text.starts_with('\'') && text.ends_with('\'')) {
-        text[1..text.len() - 1].to_string()
-    } else {
-        text.to_string()
-    }
+    if (text.starts_with('"') && text.ends_with('"')) || (text.starts_with('\'') && text.ends_with('\'')) { text[1..text.len() - 1].to_string() } else { text.to_string() }
 }

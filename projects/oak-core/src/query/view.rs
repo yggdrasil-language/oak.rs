@@ -14,19 +14,13 @@ impl ExpandedName {
     /// Creates a name without namespace information.
     #[must_use]
     pub fn local(local_name: impl Into<String>) -> Self {
-        Self {
-            namespace_uri: None,
-            local_name: local_name.into(),
-        }
+        Self { namespace_uri: None, local_name: local_name.into() }
     }
 
     /// Creates a fully expanded name.
     #[must_use]
     pub fn namespaced(namespace_uri: impl Into<String>, local_name: impl Into<String>) -> Self {
-        Self {
-            namespace_uri: Some(namespace_uri.into()),
-            local_name: local_name.into(),
-        }
+        Self { namespace_uri: Some(namespace_uri.into()), local_name: local_name.into() }
     }
 }
 

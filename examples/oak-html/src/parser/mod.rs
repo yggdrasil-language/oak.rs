@@ -39,10 +39,7 @@ impl<'config> HtmlParser<'config> {
             state.finish_at(cp, HtmlElementType::Element);
             return Ok(());
         }
-        let tag_name = state
-            .peek_text()
-            .map(|text| text.trim().to_ascii_lowercase())
-            .unwrap_or_default();
+        let tag_name = state.peek_text().map(|text| text.trim().to_ascii_lowercase()).unwrap_or_default();
         state.bump();
 
         while state.not_at_end() && !matches!(state.peek_kind(), Some(TagClose) | Some(TagSelfClose)) {
@@ -88,21 +85,13 @@ impl<'config> HtmlParser<'config> {
         Ok(())
     }
 
-    fn peek_closing_tag_name<'a, S: Source + ?Sized>(
-        state: &State<'a, S>,
-    ) -> Option<String> {
+    fn peek_closing_tag_name<'a, S: Source + ?Sized>(state: &State<'a, S>) -> Option<String> {
         use crate::lexer::token_type::HtmlTokenType::*;
         if !state.at(TagSlashOpen) {
             return None;
         }
         match state.peek_kind_at(1) {
-            Some(TagName) => state.peek_at(1).map(|token| {
-                state
-                    .source
-                    .get_text_in(token.span.clone())
-                    .trim()
-                    .to_ascii_lowercase()
-            }),
+            Some(TagName) => state.peek_at(1).map(|token| state.source.get_text_in(token.span.clone()).trim().to_ascii_lowercase()),
             _ => None,
         }
     }
@@ -137,8 +126,7 @@ impl<'config> Parser<HtmlLanguage> for HtmlParser<'config> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use oak_core::parser::session::ParseSession;
-    use oak_core::{Parser, RedNode, RedTree, SourceText};
+    use oak_core::{Parser, RedNode, RedTree, SourceText, parser::session::ParseSession};
 
     #[test]
     fn parse_simple_anchor() {
@@ -193,14 +181,7 @@ mod tests {
                 walk(child_node, &source, &mut element_tags);
             }
         }
-        assert_eq!(
-            element_tags
-                .iter()
-                .filter(|tag| tag.starts_with("<a"))
-                .count(),
-            2,
-            "anchors: {element_tags:?}"
-        );
+        assert_eq!(element_tags.iter().filter(|tag| tag.starts_with("<a")).count(), 2, "anchors: {element_tags:?}");
     }
 
     #[test]

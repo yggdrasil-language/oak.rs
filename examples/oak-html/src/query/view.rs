@@ -1,7 +1,9 @@
 use crate::ast::{Element, HtmlDocument, HtmlNode};
 use core::range::Range;
-use oak_core::query::{ElementRef, ElementView, ExpandedName, TextPolicy};
-use oak_core::Arc;
+use oak_core::{
+    Arc,
+    query::{ElementRef, ElementView, ExpandedName, TextPolicy},
+};
 
 /// Indexed read-only view over an HTML AST for selector execution.
 #[derive(Debug, Clone)]
@@ -42,11 +44,7 @@ impl<'a> HtmlDocumentView<'a> {
                 index_element(element, None, &mut nodes, &mut sources);
             }
         }
-        Self {
-            revision: 1,
-            nodes,
-            sources,
-        }
+        Self { revision: 1, nodes, sources }
     }
 
     /// Builds a view rooted at one element subtree.
@@ -55,11 +53,7 @@ impl<'a> HtmlDocumentView<'a> {
         let mut nodes = Vec::new();
         let mut sources = Vec::new();
         index_element(element, None, &mut nodes, &mut sources);
-        Self {
-            revision: 1,
-            nodes,
-            sources,
-        }
+        Self { revision: 1, nodes, sources }
     }
 
     #[must_use]
@@ -69,14 +63,7 @@ impl<'a> HtmlDocumentView<'a> {
 
     #[must_use]
     pub fn element(&self, node_id: u64) -> Option<HtmlElementView<'a>> {
-        if self.nodes.get(node_id as usize).is_some() {
-            Some(HtmlElementView {
-                document: self.clone(),
-                node_id,
-            })
-        } else {
-            None
-        }
+        if self.nodes.get(node_id as usize).is_some() { Some(HtmlElementView { document: self.clone(), node_id }) } else { None }
     }
 
     /// Returns the source AST element for a node id in this snapshot.
@@ -88,22 +75,12 @@ impl<'a> HtmlDocumentView<'a> {
     /// Maps selector matches back to source AST elements in match order.
     #[must_use]
     pub fn source_elements(&self, references: &[ElementRef]) -> Vec<&'a Element> {
-        references
-            .iter()
-            .filter_map(|reference| self.source_element(reference.node_id))
-            .collect()
+        references.iter().filter_map(|reference| self.source_element(reference.node_id)).collect()
     }
 
     #[must_use]
     pub fn all_elements(&self) -> Vec<ElementRef> {
-        self.nodes
-            .iter()
-            .enumerate()
-            .map(|(index, _)| ElementRef {
-                node_id: index as u64,
-                revision: self.revision,
-            })
-            .collect()
+        self.nodes.iter().enumerate().map(|(index, _)| ElementRef { node_id: index as u64, revision: self.revision }).collect()
     }
 
     pub(crate) fn node(&self, node_id: u64) -> Option<&HtmlNodeData> {
@@ -114,56 +91,23 @@ impl<'a> HtmlDocumentView<'a> {
         let node = self.node(reference.node_id)?;
         let parent_id = node.parent?;
         let parent = self.node(parent_id)?;
-        let position = parent
-            .children
-            .iter()
-            .position(|child| *child == reference.node_id)?;
+        let position = parent.children.iter().position(|child| *child == reference.node_id)?;
         if position == 0 {
             return None;
         }
-        Some(ElementRef {
-            node_id: parent.children[position - 1],
-            revision: reference.revision,
-        })
+        Some(ElementRef { node_id: parent.children[position - 1], revision: reference.revision })
     }
 }
 
-fn index_element<'a>(
-    element: &'a Element,
-    parent: Option<u64>,
-    nodes: &mut Vec<HtmlNodeData>,
-    sources: &mut Vec<&'a Element>,
-) -> u64 {
+fn index_element<'a>(element: &'a Element, parent: Option<u64>, nodes: &mut Vec<HtmlNodeData>, sources: &mut Vec<&'a Element>) -> u64 {
     let node_id = nodes.len() as u64;
-    let attributes = element
-        .attributes
-        .iter()
-        .map(|attr| (attr.name.clone(), attr.value.clone()))
-        .collect::<Vec<_>>();
-    let classes = attributes
-        .iter()
-        .find(|(name, _)| name.eq_ignore_ascii_case("class"))
-        .and_then(|(_, value)| value.as_ref())
-        .map(|value| value.split_whitespace().map(str::to_string).collect())
-        .unwrap_or_default();
-    let id = attributes
-        .iter()
-        .find(|(name, _)| name.eq_ignore_ascii_case("id"))
-        .and_then(|(_, value)| value.clone());
+    let attributes = element.attributes.iter().map(|attr| (attr.name.clone(), attr.value.clone())).collect::<Vec<_>>();
+    let classes = attributes.iter().find(|(name, _)| name.eq_ignore_ascii_case("class")).and_then(|(_, value)| value.as_ref()).map(|value| value.split_whitespace().map(str::to_string).collect()).unwrap_or_default();
+    let id = attributes.iter().find(|(name, _)| name.eq_ignore_ascii_case("id")).and_then(|(_, value)| value.clone());
     let direct_text = collect_direct_text(&element.children);
     let descendant_text = collect_descendant_text(&element.children);
     let mut children = Vec::new();
-    nodes.push(HtmlNodeData {
-        tag_name: element.tag_name.clone(),
-        attributes,
-        classes,
-        id,
-        parent,
-        children: Vec::new(),
-        direct_text,
-        descendant_text,
-        span: element.span,
-    });
+    nodes.push(HtmlNodeData { tag_name: element.tag_name.clone(), attributes, classes, id, parent, children: Vec::new(), direct_text, descendant_text, span: element.span });
     sources.push(element);
     for child in &element.children {
         if let HtmlNode::Element(child_element) = child {
@@ -198,45 +142,20 @@ fn collect_descendant_text(children: &[HtmlNode]) -> String {
 
 impl<'a> ElementView for HtmlElementView<'a> {
     fn element_ref(&self) -> ElementRef {
-        ElementRef {
-            node_id: self.node_id,
-            revision: self.document.revision,
-        }
+        ElementRef { node_id: self.node_id, revision: self.document.revision }
     }
 
     fn expanded_name(&self) -> ExpandedName {
-        ExpandedName::local(
-            self.document
-                .node(self.node_id)
-                .map(|node| node.tag_name.clone())
-                .unwrap_or_default(),
-        )
+        ExpandedName::local(self.document.node(self.node_id).map(|node| node.tag_name.clone()).unwrap_or_default())
     }
 
     fn parent(&self) -> Option<ElementRef> {
-        self.document
-            .node(self.node_id)
-            .and_then(|node| node.parent)
-            .map(|parent| ElementRef {
-                node_id: parent,
-                revision: self.document.revision,
-            })
+        self.document.node(self.node_id).and_then(|node| node.parent).map(|parent| ElementRef { node_id: parent, revision: self.document.revision })
     }
 
     fn element_children(&self) -> Vec<ElementRef> {
         let revision = self.document.revision;
-        self.document
-            .node(self.node_id)
-            .map(|node| {
-                node.children
-                    .iter()
-                    .map(|child| ElementRef {
-                        node_id: *child,
-                        revision,
-                    })
-                    .collect()
-            })
-            .unwrap_or_default()
+        self.document.node(self.node_id).map(|node| node.children.iter().map(|child| ElementRef { node_id: *child, revision }).collect()).unwrap_or_default()
     }
 
     fn resolve(&self, reference: ElementRef) -> Option<Self> {
@@ -248,15 +167,12 @@ impl<'a> ElementView for HtmlElementView<'a> {
 
     fn attribute(&self, name: &ExpandedName) -> Option<Arc<str>> {
         let node = self.document.node(self.node_id)?;
-        node.attributes
-            .iter()
-            .find(|(attr_name, _)| attr_name.eq_ignore_ascii_case(&name.local_name))
-            .and_then(|(_, value)| value.as_ref())
-            .map(|value| Arc::from(value.as_str()))
+        node.attributes.iter().find(|(attr_name, _)| attr_name.eq_ignore_ascii_case(&name.local_name)).and_then(|(_, value)| value.as_ref()).map(|value| Arc::from(value.as_str()))
     }
 
     fn text_content(&self, policy: TextPolicy) -> Arc<str> {
-        let Some(node) = self.document.node(self.node_id) else {
+        let Some(node) = self.document.node(self.node_id)
+        else {
             return Arc::from("");
         };
         match policy {
@@ -272,9 +188,6 @@ impl<'a> ElementView for HtmlElementView<'a> {
 
 impl HtmlNodeData {
     pub(crate) fn attribute_value(&self, name: &str) -> Option<&str> {
-        self.attributes
-            .iter()
-            .find(|(attr_name, _)| attr_name.eq_ignore_ascii_case(name))
-            .and_then(|(_, value)| value.as_deref())
+        self.attributes.iter().find(|(attr_name, _)| attr_name.eq_ignore_ascii_case(name)).and_then(|(_, value)| value.as_deref())
     }
 }

@@ -9,9 +9,7 @@ use crate::{
 
 /// Keep snippet text when comments, decorators, or ASI-sensitive layout must survive.
 pub fn should_preserve_verbatim(snippet: &str) -> bool {
-    snippet_contains_comment(snippet)
-        || snippet_has_decorator(snippet)
-        || snippet_needs_asi_preservation(snippet)
+    snippet_contains_comment(snippet) || snippet_has_decorator(snippet) || snippet_needs_asi_preservation(snippet)
 }
 
 fn snippet_has_decorator(snippet: &str) -> bool {
@@ -21,9 +19,7 @@ fn snippet_has_decorator(snippet: &str) -> bool {
     let mut cache = ParseSession::default();
     let output = lexer.lex(&text, &[], &mut cache);
     match output.result {
-        Ok(tokens) => tokens.iter().any(|token| {
-            matches!(token.kind, TypeScriptTokenType::At | TypeScriptTokenType::Decorator)
-        }),
+        Ok(tokens) => tokens.iter().any(|token| matches!(token.kind, TypeScriptTokenType::At | TypeScriptTokenType::Decorator)),
         Err(_) => snippet.trim_start().starts_with('@'),
     }
 }
@@ -35,12 +31,7 @@ fn snippet_contains_comment(snippet: &str) -> bool {
     let mut cache = ParseSession::default();
     let output = lexer.lex(&text, &[], &mut cache);
     match output.result {
-        Ok(tokens) => tokens.iter().any(|token| {
-            matches!(
-                token.kind,
-                TypeScriptTokenType::LineComment | TypeScriptTokenType::BlockComment
-            )
-        }),
+        Ok(tokens) => tokens.iter().any(|token| matches!(token.kind, TypeScriptTokenType::LineComment | TypeScriptTokenType::BlockComment)),
         Err(_) => snippet.contains("//") || snippet.contains("/*"),
     }
 }

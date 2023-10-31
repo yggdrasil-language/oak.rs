@@ -711,9 +711,7 @@ impl<'config> TypeScriptBuilder<'config> {
                                                     for ns_child in clause_node.children() {
                                                         if let RedTree::Node(ns_node) = ns_child {
                                                             if ns_node.green.kind == TypeScriptElementType::IdentifierName {
-                                                                specifiers.push(ImportSpecifier::Namespace(
-                                                                    source.get_text_in(ns_node.span().into()).trim().to_string(),
-                                                                ))
+                                                                specifiers.push(ImportSpecifier::Namespace(source.get_text_in(ns_node.span().into()).trim().to_string()))
                                                             }
                                                         }
                                                     }

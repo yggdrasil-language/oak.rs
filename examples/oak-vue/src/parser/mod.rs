@@ -24,11 +24,7 @@ fn is_html_void_tag(raw: &str) -> bool {
     if raw.chars().next().is_some_and(|c| c.is_ascii_uppercase()) {
         return false;
     }
-    matches!(
-        raw,
-        "area" | "base" | "br" | "col" | "embed" | "hr" | "img" | "input" | "link" | "meta" | "param" | "source"
-            | "track" | "wbr"
-    )
+    matches!(raw, "area" | "base" | "br" | "col" | "embed" | "hr" | "img" | "input" | "link" | "meta" | "param" | "source" | "track" | "wbr")
 }
 
 /// Vue parser.
@@ -283,13 +279,8 @@ impl<'config> VueParser<'config> {
                     String::new()
                 };
                 state.expect(VueTokenType::Gt).ok();
-                if !tag_name.is_empty()
-                    && !close_name.is_empty()
-                    && !tag_name.eq_ignore_ascii_case(&close_name)
-                {
-                    let _ = state.syntax_error(format!(
-                        "mismatched closing tag: expected `</{tag_name}>`, found `</{close_name}>`"
-                    ));
+                if !tag_name.is_empty() && !close_name.is_empty() && !tag_name.eq_ignore_ascii_case(&close_name) {
+                    let _ = state.syntax_error(format!("mismatched closing tag: expected `</{tag_name}>`, found `</{close_name}>`"));
                 }
                 let close_node = state.finish_at(close_cp, crate::parser::element_type::VueElementType::CloseTag);
                 state.sink.restore(close_cp.1);
@@ -336,8 +327,7 @@ impl<'config> VueParser<'config> {
             }
         }
 
-        let adjacent_colon = state.at(VueTokenType::Colon)
-            && name_end == state.current().map(|token| token.span.start);
+        let adjacent_colon = state.at(VueTokenType::Colon) && name_end == state.current().map(|token| token.span.start);
         if !is_directive && adjacent_colon {
             is_directive = true;
             directive_name = attribute_name.unwrap_or_default();
@@ -387,13 +377,7 @@ impl<'config> VueParser<'config> {
             return Some(text);
         }
         // Keywords that appear as HTML / Vue attribute names in the wild.
-        if matches!(
-            state.peek_kind(),
-            Some(
-                For | In | Of | As | If | Else | From | Default | Const | Let | Var | Function | Return | Break
-                    | Continue | Switch | Try | Throw | True | False | Null | Import | Export | While
-            )
-        ) {
+        if matches!(state.peek_kind(), Some(For | In | Of | As | If | Else | From | Default | Const | Let | Var | Function | Return | Break | Continue | Switch | Try | Throw | True | False | Null | Import | Export | While)) {
             let text = state.peek_text().map(|c| c.to_string()).unwrap_or_default();
             state.bump();
             return Some(text);
@@ -428,13 +412,7 @@ impl<'config> VueParser<'config> {
 
     fn bump_attr_name_is_keyword(kind: Option<VueTokenType>) -> bool {
         use VueTokenType::*;
-        matches!(
-            kind,
-            Some(
-                For | In | Of | As | If | Else | From | Default | Const | Let | Var | Function | Return | Break
-                    | Continue | Switch | Try | Throw | True | False | Null | Import | Export | While
-            )
-        )
+        matches!(kind, Some(For | In | Of | As | If | Else | From | Default | Const | Let | Var | Function | Return | Break | Continue | Switch | Try | Throw | True | False | Null | Import | Export | While))
     }
 
     fn parse_directive_value<'a, S: Source + ?Sized>(&self, state: &mut State<'a, S>, directive_name: &str) {
@@ -446,12 +424,7 @@ impl<'config> VueParser<'config> {
                 let inner_owned = text[1..text.len() - 1].to_string();
                 let inner_source = SourceText::new(inner_owned);
                 let mut sub_session = oak_core::parser::ParseSession::default();
-                let _parsed = if directive_name == "v-for" {
-                    self.parse_v_for_only(&inner_source, &mut sub_session)
-                }
-                else {
-                    self.parse_expression_only(&inner_source, &mut sub_session)
-                };
+                let _parsed = if directive_name == "v-for" { self.parse_v_for_only(&inner_source, &mut sub_session) } else { self.parse_expression_only(&inner_source, &mut sub_session) };
             }
         }
         state.bump();

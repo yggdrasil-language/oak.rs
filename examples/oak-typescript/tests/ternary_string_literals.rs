@@ -1,6 +1,8 @@
 use oak_core::{Builder, ParseSession, SourceText};
-use oak_typescript::ast::{ExpressionKind, Statement};
-use oak_typescript::{TypeScriptBuilder, TypeScriptLanguage};
+use oak_typescript::{
+    TypeScriptBuilder, TypeScriptLanguage,
+    ast::{ExpressionKind, Statement},
+};
 
 #[test]
 fn conditional_string_literals_decode_without_trailing_trivia() {

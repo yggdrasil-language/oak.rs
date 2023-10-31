@@ -1,9 +1,6 @@
-use super::view::{XmlDocumentView, XmlElementView};
-use super::view::XmlNodeData;
+use super::view::{XmlDocumentView, XmlElementView, XmlNodeData};
 use oak_core::query::{ElementRef, ElementView, QueryBudget, SelectorOutcome, SelectorResult};
-use oak_xpath::{
-    parse_xpath, Axis, NodeTest, PathExpr, Predicate, Step, XpathExpr, XpathParseError,
-};
+use oak_xpath::{Axis, NodeTest, PathExpr, Predicate, Step, XpathExpr, XpathParseError, parse_xpath};
 
 /// Namespace bindings used to resolve prefixed names during XPath execution.
 #[derive(Debug, Clone, Default)]
@@ -25,21 +22,13 @@ impl XmlNamespaceContext {
 }
 
 /// Executes an XPath subset against an XML document view.
-pub fn select_xpath<'a>(
-    document: &XmlDocumentView<'a>,
-    selector: &str,
-    budget: QueryBudget,
-) -> Result<SelectorResult, XpathParseError> {
+pub fn select_xpath<'a>(document: &XmlDocumentView<'a>, selector: &str, budget: QueryBudget) -> Result<SelectorResult, XpathParseError> {
     let expr = parse_xpath(selector)?;
     Ok(execute_xpath(document, &expr, budget))
 }
 
 /// Executes XPath and maps matches back to source AST elements.
-pub fn select_xpath_elements<'a>(
-    document: &XmlDocumentView<'a>,
-    selector: &str,
-    budget: QueryBudget,
-) -> Result<(SelectorResult, Vec<&'a crate::ast::XmlElement>), XpathParseError> {
+pub fn select_xpath_elements<'a>(document: &XmlDocumentView<'a>, selector: &str, budget: QueryBudget) -> Result<(SelectorResult, Vec<&'a crate::ast::XmlElement>), XpathParseError> {
     let result = select_xpath(document, selector, budget)?;
     let elements = document.source_elements(&result.matches);
     Ok((result, elements))
@@ -55,10 +44,7 @@ fn execute_xpath<'a>(document: &XmlDocumentView<'a>, expr: &XpathExpr, budget: Q
         let path_matches = evaluate_path(document, path, &context, budget, &mut predicates_used);
         for reference in path_matches {
             if matches.len() >= budget.max_matches {
-                return SelectorResult {
-                    outcome: SelectorOutcome::BudgetExceeded,
-                    matches,
-                };
+                return SelectorResult { outcome: SelectorOutcome::BudgetExceeded, matches };
             }
             if !matches.contains(&reference) {
                 matches.push(reference);
@@ -66,27 +52,14 @@ fn execute_xpath<'a>(document: &XmlDocumentView<'a>, expr: &XpathExpr, budget: Q
         }
     }
 
-    SelectorResult {
-        outcome: SelectorOutcome::Matched,
-        matches,
-    }
+    SelectorResult { outcome: SelectorOutcome::Matched, matches }
 }
 
 fn root_elements<'a>(document: &XmlDocumentView<'a>) -> Vec<ElementRef> {
-    document
-        .all_elements()
-        .into_iter()
-        .filter(|reference| document.node(reference.node_id).is_some_and(|node| node.parent.is_none()))
-        .collect()
+    document.all_elements().into_iter().filter(|reference| document.node(reference.node_id).is_some_and(|node| node.parent.is_none())).collect()
 }
 
-fn evaluate_path<'a>(
-    document: &XmlDocumentView<'a>,
-    path: &PathExpr,
-    context: &[ElementRef],
-    budget: QueryBudget,
-    predicates_used: &mut usize,
-) -> Vec<ElementRef> {
+fn evaluate_path<'a>(document: &XmlDocumentView<'a>, path: &PathExpr, context: &[ElementRef], budget: QueryBudget, predicates_used: &mut usize) -> Vec<ElementRef> {
     if path.steps.is_empty() {
         return context.to_vec();
     }
@@ -102,14 +75,7 @@ fn evaluate_path<'a>(
     current
 }
 
-fn evaluate_step<'a>(
-    document: &XmlDocumentView<'a>,
-    step: &Step,
-    context: &[ElementRef],
-    budget: QueryBudget,
-    predicates_used: &mut usize,
-    first_absolute: bool,
-) -> Vec<ElementRef> {
+fn evaluate_step<'a>(document: &XmlDocumentView<'a>, step: &Step, context: &[ElementRef], budget: QueryBudget, predicates_used: &mut usize, first_absolute: bool) -> Vec<ElementRef> {
     if matches!(step.axis, Axis::Attribute) {
         return Vec::new();
     }
@@ -118,32 +84,30 @@ fn evaluate_step<'a>(
     for reference in context {
         let next = if first_absolute {
             vec![*reference]
-        } else {
+        }
+        else {
             match step.axis {
-            Axis::Child => document
-                .element(reference.node_id)
-                .map(|view| view.element_children())
-                .unwrap_or_default(),
-            Axis::Descendant => descendants(document, *reference),
-            Axis::DescendantOrSelf => {
-                let mut nodes = vec![*reference];
-                nodes.extend(descendants(document, *reference));
-                nodes
-            }
-            Axis::Attribute => Vec::new(),
+                Axis::Child => document.element(reference.node_id).map(|view| view.element_children()).unwrap_or_default(),
+                Axis::Descendant => descendants(document, *reference),
+                Axis::DescendantOrSelf => {
+                    let mut nodes = vec![*reference];
+                    nodes.extend(descendants(document, *reference));
+                    nodes
+                }
+                Axis::Attribute => Vec::new(),
             }
         };
 
         for child in next {
-            let Some(node) = document.node(child.node_id) else {
+            let Some(node) = document.node(child.node_id)
+            else {
                 continue;
             };
-            let Some(child_view) = document.element(child.node_id) else {
+            let Some(child_view) = document.element(child.node_id)
+            else {
                 continue;
             };
-            if node_test_matches(node, &step.test)
-                && predicates_match(document, &child_view, &step.predicates, budget, predicates_used)
-            {
+            if node_test_matches(node, &step.test) && predicates_match(document, &child_view, &step.predicates, budget, predicates_used) {
                 candidates.push(child);
             }
         }
@@ -153,15 +117,9 @@ fn evaluate_step<'a>(
 
 fn descendants<'a>(document: &XmlDocumentView<'a>, root: ElementRef) -> Vec<ElementRef> {
     let mut out = Vec::new();
-    let mut stack = document
-        .node(root.node_id)
-        .map(|node| node.children.clone())
-        .unwrap_or_default();
+    let mut stack = document.node(root.node_id).map(|node| node.children.clone()).unwrap_or_default();
     while let Some(node_id) = stack.pop() {
-        let reference = ElementRef {
-            node_id,
-            revision: document.revision(),
-        };
+        let reference = ElementRef { node_id, revision: document.revision() };
         out.push(reference);
         if let Some(node) = document.node(node_id) {
             for child in node.children.iter().rev() {
@@ -180,13 +138,7 @@ fn node_test_matches(node: &XmlNodeData, test: &NodeTest) -> bool {
     }
 }
 
-fn predicates_match<'a>(
-    document: &XmlDocumentView<'a>,
-    view: &XmlElementView<'a>,
-    predicates: &[Predicate],
-    budget: QueryBudget,
-    predicates_used: &mut usize,
-) -> bool {
+fn predicates_match<'a>(document: &XmlDocumentView<'a>, view: &XmlElementView<'a>, predicates: &[Predicate], budget: QueryBudget, predicates_used: &mut usize) -> bool {
     for predicate in predicates {
         *predicates_used += 1;
         if *predicates_used > budget.max_predicates {
@@ -217,22 +169,10 @@ fn predicates_match<'a>(
 }
 
 fn sibling_elements<'a>(document: &XmlDocumentView<'a>, reference: ElementRef) -> Vec<ElementRef> {
-    let parent = document
-        .element(reference.node_id)
-        .and_then(|view| view.parent())
-        .or_else(|| {
-            if document.node(reference.node_id).is_some_and(|node| node.parent.is_none()) {
-                None
-            } else {
-                None
-            }
-        });
+    let parent = document.element(reference.node_id).and_then(|view| view.parent()).or_else(|| if document.node(reference.node_id).is_some_and(|node| node.parent.is_none()) { None } else { None });
 
     match parent {
-        Some(parent_ref) => document
-            .element(parent_ref.node_id)
-            .map(|view| view.element_children())
-            .unwrap_or_default(),
+        Some(parent_ref) => document.element(parent_ref.node_id).map(|view| view.element_children()).unwrap_or_default(),
         None => root_elements(document),
     }
 }

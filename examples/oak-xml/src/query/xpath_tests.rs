@@ -1,7 +1,9 @@
 #[cfg(test)]
 mod tests {
-    use crate::ast::{XmlAttribute, XmlElement, XmlRoot, XmlValue};
-    use crate::query::{select_xpath, select_xpath_elements, XmlDocumentView};
+    use crate::{
+        ast::{XmlAttribute, XmlElement, XmlRoot, XmlValue},
+        query::{XmlDocumentView, select_xpath, select_xpath_elements},
+    };
     use core::range::Range;
     use oak_core::query::QueryBudget;
 
@@ -13,20 +15,11 @@ mod tests {
                 children: vec![
                     XmlValue::Element(XmlElement {
                         name: "w:p".to_string(),
-                        attributes: vec![XmlAttribute {
-                            name: "w14:paraId".to_string(),
-                            value: "abc".to_string(),
-                            span: Range::from(0..0),
-                        }],
+                        attributes: vec![XmlAttribute { name: "w14:paraId".to_string(), value: "abc".to_string(), span: Range::from(0..0) }],
                         children: vec![XmlValue::Text("hello".to_string())],
                         span: Range::from(0..0),
                     }),
-                    XmlValue::Element(XmlElement {
-                        name: "w:p".to_string(),
-                        attributes: Vec::new(),
-                        children: Vec::new(),
-                        span: Range::from(0..0),
-                    }),
+                    XmlValue::Element(XmlElement { name: "w:p".to_string(), attributes: Vec::new(), children: Vec::new(), span: Range::from(0..0) }),
                 ],
                 span: Range::from(0..0),
             }),
@@ -52,8 +45,7 @@ mod tests {
     fn maps_matches_back_to_source_elements() {
         let root = sample_root();
         let view = XmlDocumentView::from_root(&root);
-        let (result, elements) =
-            select_xpath_elements(&view, "/w:body/w:p", QueryBudget::default()).expect("parse");
+        let (result, elements) = select_xpath_elements(&view, "/w:body/w:p", QueryBudget::default()).expect("parse");
         assert_eq!(result.matches.len(), 2);
         assert_eq!(elements.len(), 2);
         assert_eq!(elements[0].name, "w:p");

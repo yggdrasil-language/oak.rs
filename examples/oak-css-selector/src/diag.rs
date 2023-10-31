@@ -13,41 +13,25 @@ pub struct CssSelectorParseError {
 
 impl CssSelectorParseError {
     fn new(code: impl Into<String>, message: impl Into<String>, offset: Option<usize>) -> Self {
-        Self {
-            code: DiagnosticCode::new(code.into()),
-            message: message.into(),
-            offset,
-        }
+        Self { code: DiagnosticCode::new(code.into()), message: message.into(), offset }
     }
 
     /// Unexpected trailing input after a complete selector list.
     #[must_use]
     pub fn unexpected_trailing(remaining: &str, offset: usize) -> Self {
-        Self::new(
-            "oak.css-selector.unexpected-trailing",
-            format!("unexpected trailing input: {remaining}"),
-            Some(offset),
-        )
+        Self::new("oak.css-selector.unexpected-trailing", format!("unexpected trailing input: {remaining}"), Some(offset))
     }
 
     /// Unexpected end of input while parsing a selector fragment.
     #[must_use]
     pub fn unexpected_eof(context: &str, offset: usize) -> Self {
-        Self::new(
-            "oak.css-selector.unexpected-eof",
-            format!("unexpected end of input while parsing {context}"),
-            Some(offset),
-        )
+        Self::new("oak.css-selector.unexpected-eof", format!("unexpected end of input while parsing {context}"), Some(offset))
     }
 
     /// Invalid identifier token.
     #[must_use]
     pub fn invalid_ident(token: &str, offset: usize) -> Self {
-        Self::new(
-            "oak.css-selector.invalid-ident",
-            format!("invalid identifier: {token}"),
-            Some(offset),
-        )
+        Self::new("oak.css-selector.invalid-ident", format!("invalid identifier: {token}"), Some(offset))
     }
 
     /// Returns the unified diagnostic severity for this parse error.

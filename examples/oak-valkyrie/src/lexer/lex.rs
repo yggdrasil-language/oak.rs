@@ -14,8 +14,7 @@ pub(crate) type State<'a, S> = LexerState<'a, S, ValkyrieLanguage>;
 
 static VK_WHITESPACE: LazyLock<WhitespaceConfig> = LazyLock::new(|| WhitespaceConfig { unicode_whitespace: true });
 // Valkyrie：行注释 `#`，块注释 `<# … #>`。不支持 `//` / `///` / `/* */`。
-static VK_COMMENT: LazyLock<CommentConfig> =
-    LazyLock::new(|| CommentConfig { line_marker: "#", block_start: "<#", block_end: "#>", nested_blocks: true });
+static VK_COMMENT: LazyLock<CommentConfig> = LazyLock::new(|| CommentConfig { line_marker: "#", block_start: "<#", block_end: "#>", nested_blocks: true });
 
 impl crate::lexer::ValkyrieLexer<'_> {
     /// Runs the lexer on the given state.

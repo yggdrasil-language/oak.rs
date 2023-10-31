@@ -13,9 +13,7 @@ use std::sync::LazyLock;
 
 type State<'a, S> = LexerState<'a, S, AthenaLanguage>;
 
-static ATHENA_WHITESPACE: LazyLock<WhitespaceConfig> = LazyLock::new(|| WhitespaceConfig {
-    unicode_whitespace: true,
-});
+static ATHENA_WHITESPACE: LazyLock<WhitespaceConfig> = LazyLock::new(|| WhitespaceConfig { unicode_whitespace: true });
 
 /// Lexer for the athena DSL.
 #[derive(Clone, Debug)]
@@ -25,12 +23,7 @@ pub struct AthenaLexer<'config> {
 }
 
 impl<'config> Lexer<AthenaLanguage> for AthenaLexer<'config> {
-    fn lex<'a, S: Source + ?Sized>(
-        &self,
-        source: &S,
-        _edits: &[TextEdit],
-        cache: &'a mut impl LexerCache<AthenaLanguage>,
-    ) -> LexOutput<AthenaLanguage> {
+    fn lex<'a, S: Source + ?Sized>(&self, source: &S, _edits: &[TextEdit], cache: &'a mut impl LexerCache<AthenaLanguage>) -> LexOutput<AthenaLanguage> {
         let mut state = LexerState::new(source);
         let result = self.run(&mut state);
         if result.is_ok() {
@@ -76,7 +69,8 @@ impl<'config> AthenaLexer<'config> {
 
     fn lex_number<S: Source + ?Sized>(&self, state: &mut State<'_, S>) -> bool {
         let start = state.get_position();
-        let Some(first) = state.peek() else {
+        let Some(first) = state.peek()
+        else {
             return false;
         };
         if !first.is_ascii_digit() {
@@ -87,7 +81,8 @@ impl<'config> AthenaLexer<'config> {
         while let Some(c) = state.peek() {
             if c.is_ascii_digit() {
                 state.advance(1);
-            } else {
+            }
+            else {
                 break;
             }
         }
@@ -98,22 +93,15 @@ impl<'config> AthenaLexer<'config> {
                 while let Some(c) = state.peek() {
                     if c.is_ascii_digit() {
                         state.advance(1);
-                    } else {
+                    }
+                    else {
                         break;
                     }
                 }
             }
         }
         let end = state.get_position();
-        state.add_token(
-            if is_real {
-                AthenaTokenType::Real
-            } else {
-                AthenaTokenType::Integer
-            },
-            start,
-            end,
-        );
+        state.add_token(if is_real { AthenaTokenType::Real } else { AthenaTokenType::Integer }, start, end);
         true
     }
 
@@ -143,7 +131,8 @@ impl<'config> AthenaLexer<'config> {
 
     fn lex_ident<S: Source + ?Sized>(&self, state: &mut State<'_, S>) -> bool {
         let start = state.get_position();
-        let Some(first) = state.peek() else {
+        let Some(first) = state.peek()
+        else {
             return false;
         };
         if !(first.is_ascii_alphabetic() || first == '_') {
@@ -153,7 +142,8 @@ impl<'config> AthenaLexer<'config> {
         while let Some(c) = state.peek() {
             if c.is_ascii_alphanumeric() || c == '_' {
                 state.advance(c.len_utf8());
-            } else {
+            }
+            else {
                 break;
             }
         }
@@ -163,7 +153,8 @@ impl<'config> AthenaLexer<'config> {
 
     fn lex_ops_and_delims<S: Source + ?Sized>(&self, state: &mut State<'_, S>) -> bool {
         let start = state.get_position();
-        let Some(c) = state.peek() else {
+        let Some(c) = state.peek()
+        else {
             return false;
         };
         let kind = match c {

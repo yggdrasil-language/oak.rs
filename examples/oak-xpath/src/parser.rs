@@ -1,5 +1,7 @@
-use crate::ast::{Axis, NodeTest, PathExpr, Predicate, QName, Step, XpathExpr};
-use crate::diag::XpathParseError;
+use crate::{
+    ast::{Axis, NodeTest, PathExpr, Predicate, QName, Step, XpathExpr},
+    diag::XpathParseError,
+};
 
 /// Parse an XPath subset selector into an AST.
 pub fn parse_xpath(source: &str) -> Result<XpathExpr, XpathParseError> {
@@ -41,7 +43,8 @@ impl<'a> Parser<'a> {
             self.pos += 2;
             absolute = true;
             leading_descendant = true;
-        } else if self.peek() == Some('/') {
+        }
+        else if self.peek() == Some('/') {
             self.pos += 1;
             absolute = true;
         }
@@ -61,12 +64,15 @@ impl<'a> Parser<'a> {
             let axis = if self.peek_two() == Some("//") {
                 self.pos += 2;
                 Axis::Descendant
-            } else if self.peek() == Some('/') {
+            }
+            else if self.peek() == Some('/') {
                 self.pos += 1;
                 Axis::Child
-            } else if steps.is_empty() {
+            }
+            else if steps.is_empty() {
                 Axis::Child
-            } else {
+            }
+            else {
                 break;
             };
 
@@ -86,7 +92,8 @@ impl<'a> Parser<'a> {
             self.pos += 1;
             let qname = self.parse_qname()?;
             (Axis::Attribute, NodeTest::Name(qname))
-        } else {
+        }
+        else {
             (axis, self.parse_node_test()?)
         };
 
@@ -122,7 +129,8 @@ impl<'a> Parser<'a> {
                 Some(prefix) => Ok(NodeTest::PrefixedWildcard(QName { prefix: Some(prefix), local: "*".to_string() })),
                 None => Ok(NodeTest::AnyElement),
             }
-        } else {
+        }
+        else {
             Ok(NodeTest::Name(qname))
         }
     }
@@ -152,7 +160,8 @@ impl<'a> Parser<'a> {
             if ch.is_ascii_alphanumeric() || ch == '_' || ch == '-' || ch == '.' {
                 out.push(ch);
                 self.pos += 1;
-            } else {
+            }
+            else {
                 break;
             }
         }
@@ -200,13 +209,11 @@ impl<'a> Parser<'a> {
         let mut digits = 0usize;
         while let Some(ch) = self.peek() {
             if let Some(digit) = ch.to_digit(10) {
-                value = value
-                    .checked_mul(10)
-                    .and_then(|next| next.checked_add(digit))
-                    .ok_or_else(|| XpathParseError::unsupported_predicate("numeric overflow", start))?;
+                value = value.checked_mul(10).and_then(|next| next.checked_add(digit)).ok_or_else(|| XpathParseError::unsupported_predicate("numeric overflow", start))?;
                 digits += 1;
                 self.pos += 1;
-            } else {
+            }
+            else {
                 break;
             }
         }
@@ -238,7 +245,8 @@ impl<'a> Parser<'a> {
             self.pos += 1;
             if ch == '[' {
                 depth += 1;
-            } else if ch == closing {
+            }
+            else if ch == closing {
                 depth -= 1;
                 if depth == 0 {
                     return Ok(self.pos - 1);
@@ -252,21 +260,15 @@ impl<'a> Parser<'a> {
         if self.peek() == Some(expected) {
             self.pos += 1;
             Ok(())
-        } else {
-            Err(XpathParseError::unexpected_eof(
-                format!("expected '{expected}'").as_str(),
-                self.pos,
-            ))
+        }
+        else {
+            Err(XpathParseError::unexpected_eof(format!("expected '{expected}'").as_str(), self.pos))
         }
     }
 
     fn expect_end(&mut self) -> Result<(), XpathParseError> {
         self.skip_ws();
-        if self.at_end() {
-            Ok(())
-        } else {
-            Err(XpathParseError::unexpected_trailing(self.remaining(), self.pos))
-        }
+        if self.at_end() { Ok(()) } else { Err(XpathParseError::unexpected_trailing(self.remaining(), self.pos)) }
     }
 
     fn skip_ws(&mut self) -> bool {
@@ -275,7 +277,8 @@ impl<'a> Parser<'a> {
             if ch.is_whitespace() {
                 self.pos += 1;
                 moved = true;
-            } else {
+            }
+            else {
                 break;
             }
         }
@@ -287,11 +290,7 @@ impl<'a> Parser<'a> {
     }
 
     fn peek_two(&self) -> Option<&'a str> {
-        if self.source[self.pos..].starts_with("//") {
-            Some("//")
-        } else {
-            None
-        }
+        if self.source[self.pos..].starts_with("//") { Some("//") } else { None }
     }
 
     fn at_end(&self) -> bool {
@@ -313,11 +312,7 @@ mod tests {
     }
 
     fn child(name: &str) -> Step {
-        Step {
-            axis: Axis::Child,
-            test: NodeTest::Name(crate::ast::QName { prefix: None, local: name.to_string() }),
-            predicates: Vec::new(),
-        }
+        Step { axis: Axis::Child, test: NodeTest::Name(crate::ast::QName { prefix: None, local: name.to_string() }), predicates: Vec::new() }
     }
 
     #[test]
@@ -329,22 +324,8 @@ mod tests {
                 paths: vec![PathExpr {
                     absolute: false,
                     steps: vec![
-                        Step {
-                            axis: Axis::Child,
-                            test: NodeTest::Name(crate::ast::QName {
-                                prefix: Some("w".to_string()),
-                                local: "body".to_string(),
-                            }),
-                            predicates: Vec::new(),
-                        },
-                        Step {
-                            axis: Axis::Child,
-                            test: NodeTest::Name(crate::ast::QName {
-                                prefix: Some("w".to_string()),
-                                local: "p".to_string(),
-                            }),
-                            predicates: Vec::new(),
-                        },
+                        Step { axis: Axis::Child, test: NodeTest::Name(crate::ast::QName { prefix: Some("w".to_string()), local: "body".to_string() }), predicates: Vec::new() },
+                        Step { axis: Axis::Child, test: NodeTest::Name(crate::ast::QName { prefix: Some("w".to_string()), local: "p".to_string() }), predicates: Vec::new() },
                     ],
                 }],
             }
@@ -364,16 +345,7 @@ mod tests {
     fn parses_attribute_predicate() {
         let expr = parse_xpath("w:p[@w14:paraId=\"abc\"]").expect("parse");
         let predicates = &expr.paths[0].steps[0].predicates;
-        assert_eq!(
-            predicates,
-            &[Predicate::AttributeEquals(
-                crate::ast::QName {
-                    prefix: Some("w14".to_string()),
-                    local: "paraId".to_string(),
-                },
-                "abc".to_string(),
-            )]
-        );
+        assert_eq!(predicates, &[Predicate::AttributeEquals(crate::ast::QName { prefix: Some("w14".to_string()), local: "paraId".to_string() }, "abc".to_string(),)]);
     }
 
     #[test]

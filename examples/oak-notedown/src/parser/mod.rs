@@ -45,9 +45,7 @@ impl<'p> Parser<NotedownLanguage> for NoteParser<'p> {
 
 impl<'p> NoteParser<'p> {
     fn parse_block<'a, S: Source + ?Sized>(&self, state: &mut State<'a, S>) {
-        while state.not_at_end()
-            && (state.at(NoteTokenType::Newline) || state.at(NoteTokenType::Whitespace))
-        {
+        while state.not_at_end() && (state.at(NoteTokenType::Newline) || state.at(NoteTokenType::Whitespace)) {
             state.bump();
         }
         if !state.not_at_end() {
@@ -59,9 +57,7 @@ impl<'p> NoteParser<'p> {
             Some(token) if heading_level_from_token(token).is_some() => self.parse_heading(state),
             Some(NoteTokenType::Hash) => self.parse_heading(state),
             Some(NoteTokenType::ListMarker) => self.parse_list_item(state),
-            Some(NoteTokenType::Asterisk) | Some(NoteTokenType::Dash) | Some(NoteTokenType::Plus) => {
-                self.parse_list_item(state)
-            }
+            Some(NoteTokenType::Asterisk) | Some(NoteTokenType::Dash) | Some(NoteTokenType::Plus) => self.parse_list_item(state),
             Some(NoteTokenType::Pipe) => self.parse_table(state),
             Some(NoteTokenType::CodeFence) => self.parse_fenced_code_block(state),
             Some(NoteTokenType::Backtick) => self.parse_code_block(state),
@@ -77,7 +73,8 @@ impl<'p> NoteParser<'p> {
             if let Some(level) = heading_level_from_token(token) {
                 state.bump();
                 level
-            } else {
+            }
+            else {
                 let mut level = 0;
                 while state.at(NoteTokenType::Hash) {
                     state.bump();
@@ -85,7 +82,8 @@ impl<'p> NoteParser<'p> {
                 }
                 level
             }
-        } else {
+        }
+        else {
             0
         };
 
@@ -149,11 +147,7 @@ impl<'p> NoteParser<'p> {
             Some(NoteTokenType::Asterisk) | Some(NoteTokenType::Underscore) => {
                 let marker = kind.unwrap();
                 state.bump();
-                while state.not_at_end()
-                    && !state.at(marker)
-                    && !state.at(NoteTokenType::Newline)
-                    && !state.at(NoteTokenType::Pipe)
-                {
+                while state.not_at_end() && !state.at(marker) && !state.at(NoteTokenType::Newline) && !state.at(NoteTokenType::Pipe) {
                     self.parse_table_cell_inline(state);
                 }
                 if state.at(marker) {
@@ -227,13 +221,11 @@ impl<'p> NoteParser<'p> {
         let checkpoint = state.checkpoint();
         if !state.at(NoteTokenType::Link) && !state.at(NoteTokenType::Image) {
             state.bump(); // legacy `[` token
-        } else {
+        }
+        else {
             state.bump();
         }
-        while state.not_at_end()
-            && !state.at(NoteTokenType::RightBracket)
-            && !state.at(NoteTokenType::Newline)
-        {
+        while state.not_at_end() && !state.at(NoteTokenType::RightBracket) && !state.at(NoteTokenType::Newline) {
             self.parse_inline_content(state);
         }
         if state.at(NoteTokenType::RightBracket) {
@@ -241,21 +233,14 @@ impl<'p> NoteParser<'p> {
         }
         if state.at(NoteTokenType::LeftParen) {
             state.bump();
-            while state.not_at_end()
-                && !state.at(NoteTokenType::RightParen)
-                && !state.at(NoteTokenType::Newline)
-            {
+            while state.not_at_end() && !state.at(NoteTokenType::RightParen) && !state.at(NoteTokenType::Newline) {
                 state.bump();
             }
             if state.at(NoteTokenType::RightParen) {
                 state.bump();
             }
         }
-        let kind = if is_image {
-            NoteElementType::Image
-        } else {
-            NoteElementType::Link
-        };
+        let kind = if is_image { NoteElementType::Image } else { NoteElementType::Link };
         state.finish_at(checkpoint, kind);
     }
 

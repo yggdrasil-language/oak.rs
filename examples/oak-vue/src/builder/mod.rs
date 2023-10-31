@@ -76,17 +76,9 @@ impl VueBuilder {
                             children.push(VueNode::Interpolation(self.build_interpolation(n, current_offset, source)?));
                         }
                         VueElementType::TextNode => {
-                            let content = source.get_text_in(Range {
-                                start: current_offset,
-                                end: current_offset + n.byte_length as usize,
-                            });
+                            let content = source.get_text_in(Range { start: current_offset, end: current_offset + n.byte_length as usize });
                             if !content.trim().is_empty() {
-                                children.push(VueNode::Text(VueText {
-                                    span: Range {
-                                        start: current_offset,
-                                        end: current_offset + n.byte_length as usize,
-                                    },
-                                }));
+                                children.push(VueNode::Text(VueText { span: Range { start: current_offset, end: current_offset + n.byte_length as usize } }));
                             }
                         }
                         _ => {}
@@ -144,21 +136,10 @@ impl VueBuilder {
                                             tag_name = Range { start: sub_offset, end: sub_offset + t.length as usize };
                                         }
                                     }
-                                    GreenTree::Leaf(t)
-                                        if tag_name.is_empty()
-                                            && matches!(
-                                                t.kind,
-                                                VueTokenType::TemplateStart
-                                                    | VueTokenType::ScriptStart
-                                                    | VueTokenType::StyleStart
-                                            ) =>
-                                    {
+                                    GreenTree::Leaf(t) if tag_name.is_empty() && matches!(t.kind, VueTokenType::TemplateStart | VueTokenType::ScriptStart | VueTokenType::StyleStart) => {
                                         // Lexer emits `<template` / `<script` / `<style` as one
                                         // keyword leaf (no separate Identifier). Name span skips `<`.
-                                        tag_name = Range {
-                                            start: sub_offset + 1,
-                                            end: sub_offset + t.length as usize,
-                                        };
+                                        tag_name = Range { start: sub_offset + 1, end: sub_offset + t.length as usize };
                                     }
                                     GreenTree::Node(attr_node) if attr_node.kind == VueElementType::Attribute || attr_node.kind == VueElementType::Directive => {
                                         attributes.push(self.build_attribute(attr_node, sub_offset, source)?);
@@ -175,17 +156,9 @@ impl VueBuilder {
                             children.push(VueNode::Interpolation(self.build_interpolation(n, current_offset, source)?));
                         }
                         VueElementType::TextNode => {
-                            let content = source.get_text_in(Range {
-                                start: current_offset,
-                                end: current_offset + n.byte_length as usize,
-                            });
+                            let content = source.get_text_in(Range { start: current_offset, end: current_offset + n.byte_length as usize });
                             if !content.trim().is_empty() {
-                                children.push(VueNode::Text(VueText {
-                                    span: Range {
-                                        start: current_offset,
-                                        end: current_offset + n.byte_length as usize,
-                                    },
-                                }));
+                                children.push(VueNode::Text(VueText { span: Range { start: current_offset, end: current_offset + n.byte_length as usize } }));
                             }
                         }
                         _ => {}
@@ -245,13 +218,7 @@ impl VueBuilder {
                                 if let GreenTree::Node(argument) = name_child {
                                     if argument.kind == VueElementType::Identifier {
                                         let argument_name = Self::name_range_from_attr_name_node(argument, argument_offset);
-                                        arg = Some(DirectiveArgument {
-                                            span: if argument_name.is_empty() {
-                                                Range { start: argument_offset, end: argument_offset + argument.byte_length as usize }
-                                            } else {
-                                                argument_name
-                                            },
-                                        });
+                                        arg = Some(DirectiveArgument { span: if argument_name.is_empty() { Range { start: argument_offset, end: argument_offset + argument.byte_length as usize } } else { argument_name } });
                                     }
                                 }
                                 argument_offset += name_child.len() as usize;
@@ -321,34 +288,7 @@ impl VueBuilder {
 
     fn is_name_token(kind: VueTokenType) -> bool {
         use VueTokenType::*;
-        matches!(
-            kind,
-            Identifier
-                | For
-                | In
-                | Of
-                | As
-                | If
-                | Else
-                | From
-                | Default
-                | Const
-                | Let
-                | Var
-                | Function
-                | Return
-                | Break
-                | Continue
-                | Switch
-                | Try
-                | Throw
-                | True
-                | False
-                | Null
-                | Import
-                | Export
-                | While
-        )
+        matches!(kind, Identifier | For | In | Of | As | If | Else | From | Default | Const | Let | Var | Function | Return | Break | Continue | Switch | Try | Throw | True | False | Null | Import | Export | While)
     }
 
     fn name_range_from_attr_name_node<'a>(node: &GreenNode<'a, VueLanguage>, offset: usize) -> Range<usize> {

@@ -23,9 +23,7 @@ pub struct TypeScriptRedTreeFormatter {
 
 impl Default for TypeScriptRedTreeFormatter {
     fn default() -> Self {
-        Self {
-            rules: rules::default_rule_set(),
-        }
+        Self { rules: rules::default_rule_set() }
     }
 }
 
@@ -36,12 +34,7 @@ impl TypeScriptRedTreeFormatter {
     }
 
     /// Format one top-level statement node.
-    pub fn format_statement(
-        &self,
-        source: &str,
-        node: &RedNode<TypeScriptLanguage>,
-        options: &CstFormatOptions,
-    ) -> Result<String, String> {
+    pub fn format_statement(&self, source: &str, node: &RedNode<TypeScriptLanguage>, options: &CstFormatOptions) -> Result<String, String> {
         let context = FormatContext::new(options.clone(), options.printer_config());
         let format_children = |child: &RedNode<TypeScriptLanguage>| -> FormatResult<Document<'_>> {
             let span = child.span();
@@ -49,11 +42,7 @@ impl TypeScriptRedTreeFormatter {
             Ok(Document::text(text))
         };
 
-        if let Some(doc) = self
-            .rules
-            .apply_node_rules(node, &context, source, &format_children)
-            .map_err(|err| err.to_string())?
-        {
+        if let Some(doc) = self.rules.apply_node_rules(node, &context, source, &format_children).map_err(|err| err.to_string())? {
             let mut printer_config = options.printer_config();
             printer_config.insert_final_newline = false;
             return Ok(Printer::new(printer_config).print(&doc));
@@ -100,13 +89,8 @@ mod tests {
                 oak_core::RedTree::Leaf(_) => None,
             })
             .expect("statement");
-        assert_eq!(
-            stmt.element_type(),
-            TypeScriptElementType::VariableDeclaration
-        );
-        let out = TypeScriptRedTreeFormatter::new()
-            .format_statement(input, &stmt, &CstFormatOptions::default())
-            .expect("format");
+        assert_eq!(stmt.element_type(), TypeScriptElementType::VariableDeclaration);
+        let out = TypeScriptRedTreeFormatter::new().format_statement(input, &stmt, &CstFormatOptions::default()).expect("format");
         assert_eq!(out, "const x = 1");
     }
 
@@ -126,13 +110,8 @@ mod tests {
                 oak_core::RedTree::Leaf(_) => None,
             })
             .expect("statement");
-        assert_eq!(
-            stmt.element_type(),
-            TypeScriptElementType::ImportDeclaration
-        );
-        let out = TypeScriptRedTreeFormatter::new()
-            .format_statement(input, &stmt, &CstFormatOptions::default())
-            .expect("format");
+        assert_eq!(stmt.element_type(), TypeScriptElementType::ImportDeclaration);
+        let out = TypeScriptRedTreeFormatter::new().format_statement(input, &stmt, &CstFormatOptions::default()).expect("format");
         assert_eq!(out, "import { foo } from 'pkg';");
     }
 }

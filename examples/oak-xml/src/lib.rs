@@ -71,10 +71,7 @@ fn build_output(xml: &str) -> oak_core::builder::BuildOutput<XmlLanguage> {
 /// Parses an XML string into an `XmlValue`.
 pub fn parse(xml: &str) -> Result<XmlValue, String> {
     let output = build_output(xml);
-    output
-        .result
-        .map(|root| root.value)
-        .map_err(|error| format!("Parse failed: {:?}, diagnostics: {:?}", error, output.diagnostics))
+    output.result.map(|root| root.value).map_err(|error| format!("Parse failed: {:?}, diagnostics: {:?}", error, output.diagnostics))
 }
 
 /// Collect unified diagnostics from an XML parse without rendering to stderr.

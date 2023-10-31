@@ -38,17 +38,11 @@ impl FormatRule<TypeScriptLanguage, CstFormatOptions> for VariableDeclarationRul
         if trivia_guard::should_preserve_verbatim(snippet) {
             return Ok(Some(Document::text(snippet)));
         }
-        let formatted = ast_print_source(snippet, &FormatOptions::default())
-            .map_err(oak_core::errors::OakError::format_error)?;
+        let formatted = ast_print_source(snippet, &FormatOptions::default()).map_err(oak_core::errors::OakError::format_error)?;
         Ok(Some(Document::text(formatted)))
     }
 
-    fn apply_token<'a>(
-        &self,
-        _token: &RedLeaf<TypeScriptLanguage>,
-        _context: &FormatContext<TypeScriptLanguage, CstFormatOptions>,
-        _source: &'a str,
-    ) -> FormatResult<Option<Document<'a>>> {
+    fn apply_token<'a>(&self, _token: &RedLeaf<TypeScriptLanguage>, _context: &FormatContext<TypeScriptLanguage, CstFormatOptions>, _source: &'a str) -> FormatResult<Option<Document<'a>>> {
         Ok(None)
     }
 }

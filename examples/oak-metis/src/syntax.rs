@@ -77,12 +77,7 @@ impl Parser {
                         island.items.push(Item::Rewrites(rw));
                     }
                     else {
-                        islands.push(Island {
-                            namespace: current_ns.clone(),
-                            name: "_".into(),
-                            extends: None,
-                            items: vec![Item::Rewrites(rw)],
-                        });
+                        islands.push(Island { namespace: current_ns.clone(), name: "_".into(), extends: None, items: vec![Item::Rewrites(rw)] });
                     }
                 }
                 MetisTokenType::KwConnection => {
@@ -91,12 +86,7 @@ impl Parser {
                         island.items.push(Item::Connection(c));
                     }
                     else {
-                        islands.push(Island {
-                            namespace: current_ns.clone(),
-                            name: "_".into(),
-                            extends: None,
-                            items: vec![Item::Connection(c)],
-                        });
+                        islands.push(Island { namespace: current_ns.clone(), name: "_".into(), extends: None, items: vec![Item::Connection(c)] });
                     }
                 }
                 other => return Err(format!("expected namespace/using/island/action/rewrites/connection, got {other:?}")),

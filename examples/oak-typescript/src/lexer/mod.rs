@@ -288,7 +288,8 @@ impl<'config> TypeScriptLexer<'config> {
             let private = ch == '#';
             if private {
                 state.advance(1);
-                let Some(next) = state.peek() else {
+                let Some(next) = state.peek()
+                else {
                     return false;
                 };
                 if !(next.is_alphabetic() || next == '_' || next == '$') {
@@ -323,12 +324,7 @@ impl<'config> TypeScriptLexer<'config> {
             // Get identifier text and check if it's a keyword (private names stay IdentifierName).
             let end = state.get_position();
             let text = state.get_text_in(oak_core::Range { start, end });
-            let kind = if private {
-                TypeScriptTokenType::IdentifierName
-            }
-            else {
-                self.keyword_or_identifier(&text)
-            };
+            let kind = if private { TypeScriptTokenType::IdentifierName } else { self.keyword_or_identifier(&text) };
 
             state.add_token(kind, start, state.get_position());
             return true;

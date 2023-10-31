@@ -1,8 +1,10 @@
 use std::sync::{Arc, Mutex};
 
 use logger::{EventKind, Filter, Level, LogSink, VecSink, clear_global_sink, reset_dropped_events, set_global_filter, set_global_sink};
-use oak_core::diagnostic::{emit_oak_errors, emit_unified_output};
-use oak_core::errors::{OakDiagnostics, OakError};
+use oak_core::{
+    diagnostic::{emit_oak_errors, emit_unified_output},
+    errors::{OakDiagnostics, OakError},
+};
 use serial_test::serial;
 
 struct SharedSink(Arc<Mutex<VecSink>>);

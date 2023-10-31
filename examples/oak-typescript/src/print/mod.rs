@@ -43,9 +43,7 @@ pub fn format_source(source: &str, _options: &FormatOptions) -> Result<String, S
         if index > 0 {
             out.push('\n');
         }
-        out.push_str(&stmt::print_statement(stmt).ok_or_else(|| {
-            format!("oak print unsupported for statement: {stmt:?}")
-        })?);
+        out.push_str(&stmt::print_statement(stmt).ok_or_else(|| format!("oak print unsupported for statement: {stmt:?}"))?);
     }
 
     if source.ends_with('\n') && !out.ends_with('\n') {

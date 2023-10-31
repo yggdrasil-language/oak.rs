@@ -232,11 +232,7 @@ impl Statement {
     /// `switch` statement parts.
     pub fn as_switch(&self) -> Option<SwitchView<'_>> {
         match self {
-            Self::Switch { discriminant, cases, otherwise, .. } => Some(SwitchView {
-                discriminant,
-                cases: cases.as_slice(),
-                otherwise: otherwise.as_slice(),
-            }),
+            Self::Switch { discriminant, cases, otherwise, .. } => Some(SwitchView { discriminant, cases: cases.as_slice(), otherwise: otherwise.as_slice() }),
             _ => None,
         }
     }

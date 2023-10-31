@@ -46,4 +46,3 @@ fn westwood_preserves_duplicate_keys() {
     let values: Vec<_> = root.sections[0].properties.iter().map(|p| p.value.as_str()).collect();
     assert_eq!(values, ["first", "second"]);
 }
-

@@ -1,8 +1,6 @@
 //! Oak TypeScript expression → canonical text.
 
-use crate::ast::{
-    Expression, ExpressionKind, FunctionParam, ObjectProperty, Statement, TypeAnnotation,
-};
+use crate::ast::{Expression, ExpressionKind, FunctionParam, ObjectProperty, Statement, TypeAnnotation};
 
 /// Print one Oak expression node.
 pub fn print_expression(expr: &Expression) -> Option<String> {
@@ -43,32 +41,19 @@ fn print_expr(expr: &Expression, min_prec: Prec) -> Option<String> {
         ExpressionKind::TemplateString(s) => Some(format!("`{s}`")),
         ExpressionKind::UnaryExpression { operator, argument } => {
             let inner = print_expr(argument, Prec::Unary)?;
-            let text = if operator == "typeof" || operator == "void" || operator == "delete" {
-                format!("{operator} {inner}")
-            } else {
-                format!("{operator}{inner}")
-            };
+            let text = if operator == "typeof" || operator == "void" || operator == "delete" { format!("{operator} {inner}") } else { format!("{operator}{inner}") };
             wrap_prec(text, Prec::Unary, min_prec)
         }
         ExpressionKind::UpdateExpression { operator, argument, prefix } => {
             let inner = print_expr(argument, Prec::Postfix)?;
-            let text =
-                if *prefix { format!("{operator}{inner}") } else { format!("{inner}{operator}") };
+            let text = if *prefix { format!("{operator}{inner}") } else { format!("{inner}{operator}") };
             wrap_prec(text, Prec::Postfix, min_prec)
         }
         ExpressionKind::BinaryExpression { left, operator, right } => {
             let (prec, right_prec) = binary_prec(operator)?;
-            let left_s = if operator == "**" {
-                print_expr(left, Prec::Unary)?
-            } else {
-                print_expr(left, prec)?
-            };
+            let left_s = if operator == "**" { print_expr(left, Prec::Unary)? } else { print_expr(left, prec)? };
             let right_s = print_expr(right, right_prec)?;
-            let spaced = if operator == "," {
-                format!("{left_s},{right_s}")
-            } else {
-                format!("{left_s} {operator} {right_s}")
-            };
+            let spaced = if operator == "," { format!("{left_s},{right_s}") } else { format!("{left_s} {operator} {right_s}") };
             wrap_prec(spaced, prec, min_prec)
         }
         ExpressionKind::ConditionalExpression { test, consequent, alternate } => {
@@ -82,9 +67,11 @@ fn print_expr(expr: &Expression, min_prec: Prec) -> Option<String> {
             let opt = if *optional { "?." } else { "." };
             let prop = if *computed {
                 format!("[{}]", print_expr(property, Prec::Lowest)?)
-            } else if let ExpressionKind::Identifier(name) = property.kind.as_ref() {
+            }
+            else if let ExpressionKind::Identifier(name) = property.kind.as_ref() {
                 name.clone()
-            } else {
+            }
+            else {
                 format!("[{}]", print_expr(property, Prec::Lowest)?)
             };
             wrap_prec(format!("{obj}{opt}{prop}"), Prec::Call, min_prec)
@@ -133,12 +120,8 @@ fn print_expr(expr: &Expression, min_prec: Prec) -> Option<String> {
             }
             wrap_prec(format!("{{ {} }}", parts.join(", ")), Prec::Primary, min_prec)
         }
-        ExpressionKind::SpreadElement(inner) => {
-            wrap_prec(format!("...{}", print_expr(inner, Prec::Unary)?), Prec::Unary, min_prec)
-        }
-        ExpressionKind::AwaitExpression(inner) => {
-            wrap_prec(format!("await {}", print_expr(inner, Prec::Unary)?), Prec::Unary, min_prec)
-        }
+        ExpressionKind::SpreadElement(inner) => wrap_prec(format!("...{}", print_expr(inner, Prec::Unary)?), Prec::Unary, min_prec),
+        ExpressionKind::AwaitExpression(inner) => wrap_prec(format!("await {}", print_expr(inner, Prec::Unary)?), Prec::Unary, min_prec),
         ExpressionKind::YieldExpression(arg) => {
             let text = match arg {
                 Some(inner) => format!("yield {}", print_expr(inner, Prec::Unary)?),
@@ -146,36 +129,23 @@ fn print_expr(expr: &Expression, min_prec: Prec) -> Option<String> {
             };
             wrap_prec(text, Prec::Unary, min_prec)
         }
-        ExpressionKind::ImportExpression { module_specifier } => wrap_prec(
-            format!("import({})", print_expr(module_specifier, Prec::Lowest)?),
-            Prec::Call,
-            min_prec,
-        ),
+        ExpressionKind::ImportExpression { module_specifier } => wrap_prec(format!("import({})", print_expr(module_specifier, Prec::Lowest)?), Prec::Call, min_prec),
         ExpressionKind::ArrowFunction { params, body, async_, .. } => {
             let prefix = if *async_ { "async " } else { "" };
             let params_s = print_params(params)?;
             let body_s = print_arrow_body(body)?;
             wrap_prec(format!("{prefix}{params_s} => {body_s}"), Prec::Assign, min_prec)
         }
-        ExpressionKind::AsExpression { expression, type_annotation }
-        | ExpressionKind::TypeAssertionExpression { expression, type_annotation } => {
+        ExpressionKind::AsExpression { expression, type_annotation } | ExpressionKind::TypeAssertionExpression { expression, type_annotation } => {
             let expr_s = print_expr(expression, Prec::Unary)?;
             let ty = print_type_annotation(type_annotation)?;
             wrap_prec(format!("{expr_s} as {ty}"), Prec::Unary, min_prec)
         }
-        ExpressionKind::NonNullExpression(inner) => {
-            wrap_prec(format!("{}!", print_expr(inner, Prec::Postfix)?), Prec::Postfix, min_prec)
-        }
+        ExpressionKind::NonNullExpression(inner) => wrap_prec(format!("{}!", print_expr(inner, Prec::Postfix)?), Prec::Postfix, min_prec),
         ExpressionKind::FunctionExpression { .. } | ExpressionKind::TaggedTemplateExpression { .. } => None,
-        ExpressionKind::JsxElement(element) => {
-            wrap_prec(super::jsx::print_jsx_element(element)?, Prec::Primary, min_prec)
-        }
-        ExpressionKind::JsxFragment(fragment) => {
-            wrap_prec(super::jsx::print_jsx_fragment(fragment)?, Prec::Primary, min_prec)
-        }
-        ExpressionKind::JsxSelfClosingElement(element) => {
-            wrap_prec(super::jsx::print_jsx_self_closing(element)?, Prec::Primary, min_prec)
-        }
+        ExpressionKind::JsxElement(element) => wrap_prec(super::jsx::print_jsx_element(element)?, Prec::Primary, min_prec),
+        ExpressionKind::JsxFragment(fragment) => wrap_prec(super::jsx::print_jsx_fragment(fragment)?, Prec::Primary, min_prec),
+        ExpressionKind::JsxSelfClosingElement(element) => wrap_prec(super::jsx::print_jsx_self_closing(element)?, Prec::Primary, min_prec),
     }
 }
 
@@ -260,9 +230,11 @@ pub(super) fn print_type_annotation(ty: &TypeAnnotation) -> Option<String> {
 pub(super) fn print_string(s: &str) -> String {
     if !s.contains('\'') {
         format!("'{}'", escape_js(s, '\''))
-    } else if !s.contains('"') {
+    }
+    else if !s.contains('"') {
         format!("\"{}\"", escape_js(s, '"'))
-    } else {
+    }
+    else {
         format!("\"{}\"", escape_js(s, '"'))
     }
 }
@@ -286,19 +258,17 @@ fn escape_js(s: &str, quote: char) -> String {
 }
 
 fn print_number(n: f64) -> String {
-    if n.is_finite() && n.fract() == 0.0 && n.abs() < 1e15 {
-        format!("{}", n as i64)
-    } else {
-        n.to_string()
-    }
+    if n.is_finite() && n.fract() == 0.0 && n.abs() < 1e15 { format!("{}", n as i64) } else { n.to_string() }
 }
 
 #[cfg(test)]
 mod tests {
     use oak_core::{Builder, ParseSession, SourceText};
 
-    use crate::ast::{ExpressionKind, Statement};
-    use crate::{TypeScriptBuilder, TypeScriptLanguage};
+    use crate::{
+        TypeScriptBuilder, TypeScriptLanguage,
+        ast::{ExpressionKind, Statement},
+    };
 
     use super::*;
 
@@ -338,9 +308,6 @@ mod tests {
             }
             other => panic!("root: {other:?}"),
         }
-        assert_eq!(
-            print_expression(&expr).as_deref(),
-            Some("error ? 'true' : 'false'")
-        );
+        assert_eq!(print_expression(&expr).as_deref(), Some("error ? 'true' : 'false'"));
     }
 }

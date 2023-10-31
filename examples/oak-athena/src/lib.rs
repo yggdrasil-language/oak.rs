@@ -9,12 +9,7 @@ pub mod language;
 pub mod lexer;
 pub mod parser;
 
-pub use crate::{
-    builder::AthenaBuilder,
-    language::AthenaLanguage,
-    lexer::AthenaLexer,
-    parser::AthenaParser,
-};
+pub use crate::{builder::AthenaBuilder, language::AthenaLanguage, lexer::AthenaLexer, parser::AthenaParser};
 pub use lexer::token_type::AthenaTokenType;
 pub use oak_core::{ElementType, TokenType};
 pub use parser::element_type::AthenaElementType;

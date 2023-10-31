@@ -17,11 +17,7 @@ pub struct TypeScriptCstFormatter;
 
 impl TypeScriptCstFormatter {
     /// Format one parsed `SourceFile` node using CST span gaps and statement rules.
-    pub fn format_source_file(
-        source: &str,
-        file: &RedNode<'_, TypeScriptLanguage>,
-        options: &CstFormatOptions,
-    ) -> Result<String, String> {
+    pub fn format_source_file(source: &str, file: &RedNode<'_, TypeScriptLanguage>, options: &CstFormatOptions) -> Result<String, String> {
         format_source_file(source, file, options)
     }
 }

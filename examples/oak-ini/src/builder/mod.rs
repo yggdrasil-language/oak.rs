@@ -68,13 +68,7 @@ impl<'config> IniBuilder<'config> {
                 RedTree::Node(n) if n.green.kind == IniElementType::Key && name.is_empty() => {
                     name = source.get_text_in(n.span().into()).trim().to_string();
                 }
-                RedTree::Leaf(t)
-                    if name.is_empty()
-                        && matches!(
-                            t.kind,
-                            IniTokenType::Identifier | IniTokenType::String | IniTokenType::Integer | IniTokenType::Float
-                        ) =>
-                {
+                RedTree::Leaf(t) if name.is_empty() && matches!(t.kind, IniTokenType::Identifier | IniTokenType::String | IniTokenType::Integer | IniTokenType::Float) => {
                     name = source.get_text_in(t.span.clone().into()).trim().to_string();
                 }
                 RedTree::Node(n) if n.green.kind == IniElementType::KeyValue => properties.push(self.build_property(n, source)?),

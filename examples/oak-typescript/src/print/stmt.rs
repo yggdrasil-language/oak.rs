@@ -1,9 +1,6 @@
 //! Oak TypeScript statement → canonical text.
 
-use crate::ast::{
-    BlockStatement, ExportDeclaration, FunctionDeclaration, ImportDeclaration, ImportSpecifier,
-    Statement, VariableDeclaration,
-};
+use crate::ast::{BlockStatement, ExportDeclaration, FunctionDeclaration, ImportDeclaration, ImportSpecifier, Statement, VariableDeclaration};
 
 use super::expr::{print_expression, print_string};
 
@@ -40,9 +37,7 @@ pub fn print_statement(stmt: &Statement) -> Option<String> {
             let body = print_statement(&s.body)?;
             Some(format!("while ({test}) {body}"))
         }
-        Statement::ThrowStatement(s) => {
-            Some(format!("throw {}", print_expression(&s.argument)?))
-        }
+        Statement::ThrowStatement(s) => Some(format!("throw {}", print_expression(&s.argument)?)),
         Statement::BreakStatement(s) => Some(match s.label.as_deref() {
             Some(label) => format!("break {label}"),
             None => "break".into(),

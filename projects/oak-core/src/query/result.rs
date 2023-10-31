@@ -29,10 +29,7 @@ impl SelectorResult {
     /// Creates an empty successful result.
     #[must_use]
     pub fn empty() -> Self {
-        Self {
-            outcome: SelectorOutcome::Matched,
-            matches: Vec::new(),
-        }
+        Self { outcome: SelectorOutcome::Matched, matches: Vec::new() }
     }
 
     /// Returns whether the query completed without structural failure.

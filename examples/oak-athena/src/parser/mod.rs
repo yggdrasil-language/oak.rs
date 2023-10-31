@@ -9,10 +9,7 @@ use crate::{
     parser::element_type::AthenaElementType,
 };
 use oak_core::{
-    parser::{
-        OperatorInfo, ParseCache, ParseOutput, Parser, ParserState, Pratt, PrattParser, binary, parse_with_lexer,
-        unary,
-    },
+    parser::{OperatorInfo, ParseCache, ParseOutput, Parser, ParserState, Pratt, PrattParser, binary, parse_with_lexer, unary},
     source::{Source, TextEdit},
     tree::GreenNode,
 };
@@ -34,12 +31,7 @@ impl<'config> AthenaParser<'config> {
 }
 
 impl<'config> Parser<AthenaLanguage> for AthenaParser<'config> {
-    fn parse<'a, S: Source + ?Sized>(
-        &self,
-        text: &'a S,
-        edits: &[TextEdit],
-        cache: &'a mut impl ParseCache<AthenaLanguage>,
-    ) -> ParseOutput<'a, AthenaLanguage> {
+    fn parse<'a, S: Source + ?Sized>(&self, text: &'a S, edits: &[TextEdit], cache: &'a mut impl ParseCache<AthenaLanguage>) -> ParseOutput<'a, AthenaLanguage> {
         let lexer = AthenaLexer::new(self.config);
         parse_with_lexer(&lexer, text, edits, cache, |state| {
             let checkpoint = state.checkpoint();
@@ -56,11 +48,7 @@ impl<'config> AthenaParser<'config> {
         self.parse_pratt(state, 0);
     }
 
-    fn parse_pratt<'a, S: Source + ?Sized>(
-        &self,
-        state: &mut State<'a, S>,
-        min_precedence: u8,
-    ) -> &'a GreenNode<'a, AthenaLanguage> {
+    fn parse_pratt<'a, S: Source + ?Sized>(&self, state: &mut State<'a, S>, min_precedence: u8) -> &'a GreenNode<'a, AthenaLanguage> {
         PrattParser::new(self.clone()).parse_expr(state, min_precedence)
     }
 
@@ -85,7 +73,8 @@ impl<'config> AthenaParser<'config> {
             self.parse_expression(state);
             if state.at(AthenaTokenType::Comma) {
                 state.bump();
-            } else {
+            }
+            else {
                 break;
             }
         }
@@ -100,7 +89,8 @@ impl<'config> AthenaParser<'config> {
             let entry = state.checkpoint();
             if state.at(AthenaTokenType::Identifier) || state.at(AthenaTokenType::String) {
                 state.bump();
-            } else {
+            }
+            else {
                 break;
             }
             if state.at(AthenaTokenType::Colon) {
@@ -110,7 +100,8 @@ impl<'config> AthenaParser<'config> {
             state.finish_at(entry, AthenaElementType::DictEntry);
             if state.at(AthenaTokenType::Comma) {
                 state.bump();
-            } else {
+            }
+            else {
                 break;
             }
         }
@@ -172,12 +163,7 @@ impl<'config> Pratt<AthenaLanguage> for AthenaParser<'config> {
         self.primary(state)
     }
 
-    fn infix<'a, S: Source + ?Sized>(
-        &self,
-        state: &mut State<'a, S>,
-        left: &'a GreenNode<'a, AthenaLanguage>,
-        min_precedence: u8,
-    ) -> Option<&'a GreenNode<'a, AthenaLanguage>> {
+    fn infix<'a, S: Source + ?Sized>(&self, state: &mut State<'a, S>, left: &'a GreenNode<'a, AthenaLanguage>, min_precedence: u8) -> Option<&'a GreenNode<'a, AthenaLanguage>> {
         let kind = state.peek_kind()?;
         let info = match kind {
             AthenaTokenType::Plus | AthenaTokenType::Minus => Some(OperatorInfo::left(80)),
@@ -188,14 +174,6 @@ impl<'config> Pratt<AthenaLanguage> for AthenaParser<'config> {
         if info.precedence < min_precedence {
             return None;
         }
-        Some(binary(
-            state,
-            left,
-            kind,
-            info.precedence,
-            info.associativity,
-            AthenaElementType::BinaryExpr,
-            |s, p| self.parse_pratt(s, p),
-        ))
+        Some(binary(state, left, kind, info.precedence, info.associativity, AthenaElementType::BinaryExpr, |s, p| self.parse_pratt(s, p)))
     }
 }

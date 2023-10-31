@@ -80,10 +80,7 @@ impl AthenaTokenType {
             Self::Whitespace => UniversalTokenRole::Whitespace,
             Self::Identifier => UniversalTokenRole::Name,
             Self::Integer | Self::Real | Self::String => UniversalTokenRole::Literal,
-            Self::LeftParen | Self::RightParen | Self::Comma
-            | Self::LeftBracket | Self::RightBracket | Self::LeftBrace | Self::RightBrace | Self::Colon => {
-                UniversalTokenRole::Punctuation
-            }
+            Self::LeftParen | Self::RightParen | Self::Comma | Self::LeftBracket | Self::RightBracket | Self::LeftBrace | Self::RightBrace | Self::Colon => UniversalTokenRole::Punctuation,
             Self::Plus | Self::Minus | Self::Times | Self::Divide | Self::Power => UniversalTokenRole::Operator,
             Self::Eof => UniversalTokenRole::Eof,
             Self::Error => UniversalTokenRole::Error,

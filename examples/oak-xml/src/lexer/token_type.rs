@@ -8,13 +8,7 @@ impl TokenType for XmlTokenType {
     const END_OF_STREAM: Self = Self::Error;
 
     fn is_ignored(&self) -> bool {
-        matches!(
-            self,
-            Self::Whitespace
-                | Self::Newline
-                | Self::Comment
-                | Self::ProcessingInstruction
-        )
+        matches!(self, Self::Whitespace | Self::Newline | Self::Comment | Self::ProcessingInstruction)
     }
 
     fn role(&self) -> Self::Role {

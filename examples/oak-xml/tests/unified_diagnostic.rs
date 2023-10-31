@@ -10,11 +10,7 @@ fn valid_xml_exports_empty_unified_set() {
 fn malformed_xml_exports_unified_syntax_diagnostic() {
     let set = diagnostic_set_from_xml("<root><unclosed>");
     assert!(!set.diagnostics().is_empty());
-    assert!(
-        set.diagnostics()
-            .iter()
-            .all(|diagnostic| diagnostic.code().as_str().starts_with("oak.syntax."))
-    );
+    assert!(set.diagnostics().iter().all(|diagnostic| diagnostic.code().as_str().starts_with("oak.syntax.")));
 }
 
 #[test]
