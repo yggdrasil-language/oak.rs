@@ -15,9 +15,12 @@ pub mod lexer;
 
 /// Parser module.
 pub mod parser;
+/// Source formatting (`format_source`, `FormatOptions`).
+pub mod formatter;
 
 pub use ast::*;
 pub use builder::VueBuilder;
+pub use formatter::{FormatError, FormatOptions, format_source};
 pub use language::VueLanguage;
 pub use lexer::{VueLexer, token_type::VueTokenType};
 pub use parser::{VueParser, element_type::VueElementType};
