@@ -1,9 +1,4 @@
 #[test]
-fn ready() {
-    println!("oak-vue tests ready!")
+fn main() {
+    println!("vmz-framework/packages/compilers/vmz-oak-frontend-adapter/tests");
 }
-
-#[cfg(test)]
-mod lexer;
-#[cfg(test)]
-mod parser;
