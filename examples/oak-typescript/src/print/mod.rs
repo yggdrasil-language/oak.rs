@@ -1,8 +1,8 @@
 //! Transitional TypeScript **AST print** (`source` → parse → AST → text).
 //!
 //! This is **not** a CST-faithful formatter and does not use `oak-pretty-print` /
-//! `oak-formatter`. See `tests/format_print_contract.rs` and the VMZ capability matrix.
 //! Returns [`Err`] when parse fails or the AST contains unprintable nodes.
+//! Product contract tests live in downstream `nifty-formatter` / `vmz-formatter`.
 
 mod expr;
 mod jsx;
@@ -53,27 +53,4 @@ pub fn format_source(source: &str, _options: &FormatOptions) -> Result<String, S
     Ok(out)
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
 
-    #[test]
-    fn formats_const_spacing() {
-        let out = format_source("const  x=1", &FormatOptions::default()).expect("format");
-        assert_eq!(out, "const x = 1");
-    }
-
-    #[test]
-    fn format_is_idempotent() {
-        let once = format_source("const x = 1", &FormatOptions::default()).expect("once");
-        let twice = format_source(&once, &FormatOptions::default()).expect("twice");
-        assert_eq!(once, twice);
-    }
-
-    #[test]
-    fn ast_print_drops_leading_line_comment() {
-        let out = format_source("// keep\nconst x = 1", &FormatOptions::default()).expect("format");
-        assert_eq!(out, "const x = 1");
-        assert!(!out.contains("keep"));
-    }
-}

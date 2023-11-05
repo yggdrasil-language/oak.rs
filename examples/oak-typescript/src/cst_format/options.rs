@@ -32,15 +32,3 @@ impl CstFormatOptions {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn maps_indent_and_line_width_to_printer_config() {
-        let options = CstFormatOptions { indent_width: 2, line_width: 100 };
-        let config = options.printer_config();
-        assert_eq!(config.indent_size, 2);
-        assert_eq!(config.max_width, 100);
-    }
-}

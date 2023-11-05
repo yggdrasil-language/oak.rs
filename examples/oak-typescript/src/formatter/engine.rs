@@ -23,15 +23,3 @@ pub fn format_source(source: &str, options: &FormatOptions) -> Result<String, Fo
     }
 }
 
-#[cfg(test)]
-mod smoke {
-    use super::*;
-
-    #[test]
-    fn formats_const_spacing_and_idempotent() {
-        let out = format_source("const  x=1", &FormatOptions::default()).expect("format");
-        assert_eq!(out, "const x = 1");
-        let again = format_source(&out, &FormatOptions::default()).expect("twice");
-        assert_eq!(out, again);
-    }
-}
