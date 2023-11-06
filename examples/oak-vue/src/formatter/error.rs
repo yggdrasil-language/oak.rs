@@ -9,9 +9,7 @@ pub struct FormatError {
 impl FormatError {
     /// Create a formatting error from a message.
     pub fn new(message: impl Into<String>) -> Self {
-        Self {
-            message: message.into(),
-        }
+        Self { message: message.into() }
     }
 
     /// Error message text.

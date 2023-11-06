@@ -22,4 +22,3 @@ pub fn format_source(source: &str, options: &FormatOptions) -> Result<String, Fo
         Err(_) => crate::print::format_source(source, &crate::print::FormatOptions::default()).map_err(FormatError::new),
     }
 }
-

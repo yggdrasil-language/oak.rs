@@ -31,4 +31,3 @@ impl CstFormatOptions {
         Printer::new(config).print(&doc)
     }
 }
-

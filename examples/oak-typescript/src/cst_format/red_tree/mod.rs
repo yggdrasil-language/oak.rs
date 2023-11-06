@@ -60,4 +60,3 @@ fn format_statement_fallback(snippet: &str) -> Result<String, String> {
     }
     ast_print_source(snippet, &FormatOptions::default())
 }
-

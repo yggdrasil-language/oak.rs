@@ -28,5 +28,3 @@ pub fn format_source(source: &str, options: &FormatOptions) -> Result<String, Fo
 
     Ok(options.finalize_output(source, source.to_string()))
 }
-
-

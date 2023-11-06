@@ -110,4 +110,3 @@ fn print_jsx_expression_container(expr: &Option<Expression>) -> Option<String> {
         None => Some("{}".into()),
     }
 }
-

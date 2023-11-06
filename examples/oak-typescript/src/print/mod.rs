@@ -52,5 +52,3 @@ pub fn format_source(source: &str, _options: &FormatOptions) -> Result<String, S
 
     Ok(out)
 }
-
-

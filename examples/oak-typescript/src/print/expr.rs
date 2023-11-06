@@ -260,4 +260,3 @@ fn escape_js(s: &str, quote: char) -> String {
 fn print_number(n: f64) -> String {
     if n.is_finite() && n.fract() == 0.0 && n.abs() < 1e15 { format!("{}", n as i64) } else { n.to_string() }
 }
-

@@ -13,10 +13,10 @@ pub mod language;
 /// Lexer module.
 pub mod lexer;
 
-/// Parser module.
-pub mod parser;
 /// Source formatting (`format_source`, `FormatOptions`).
 pub mod formatter;
+/// Parser module.
+pub mod parser;
 
 pub use ast::*;
 pub use builder::VueBuilder;
