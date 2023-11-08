@@ -6,3 +6,8 @@ UDF lowering, and YY execution lowering remain downstream responsibilities.
 
 This crate deliberately does not route VOS through VOML, VOC, or VON, and it
 does not define a database executor.
+
+This initial structural CST slice is not a complete VOS grammar or Builder AST.
+It must not be treated as a substitute for VOS conformance or used to admit
+unvalidated source to an execution runtime. Existing VOS source parsers are
+still legacy syntax implementations until replaced by CST-based builders.

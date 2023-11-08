@@ -27,6 +27,14 @@ pub enum VosElementType {
     Query,
     /// UDF declaration.
     Udf,
+    /// Session-local micro declaration.
+    Micro,
+    /// Structurally balanced block.
+    Block,
+    /// Structurally balanced parentheses.
+    Parentheses,
+    /// Structurally balanced brackets.
+    Brackets,
     /// Recovered syntax error.
     Error,
 }
@@ -57,6 +65,7 @@ impl From<crate::lexer::VosTokenType> for VosElementType {
             crate::lexer::VosTokenType::Service => Self::Service,
             crate::lexer::VosTokenType::Query => Self::Query,
             crate::lexer::VosTokenType::Udf => Self::Udf,
+            crate::lexer::VosTokenType::Micro => Self::Micro,
             _ => Self::Error,
         }
     }
