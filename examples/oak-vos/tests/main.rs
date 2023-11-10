@@ -63,3 +63,11 @@ fn namespace_does_not_swallow_following_declarations() {
     assert_eq!(root.byte_length as usize, source.text().len());
     assert!(root.children.iter().any(|child| matches!(child, GreenTree::Node(node) if node.kind == VosElementType::Table)));
 }
+
+#[test]
+fn obsolete_table_does_not_become_a_table_declaration() {
+    let root = parse("obsolete table Dealer;").expect("Oak parses obsolete table declarations");
+    assert_eq!(root.declarations.len(), 1);
+    assert_eq!(root.declarations[0].kind, VosDeclarationKind::Obsolete);
+    assert_eq!(root.declarations[0].name.as_deref(), Some("Dealer"));
+}

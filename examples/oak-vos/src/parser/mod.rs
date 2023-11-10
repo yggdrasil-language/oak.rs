@@ -44,6 +44,10 @@ impl VosParser {
         state.incremental_node(element, |state| {
             state.bump();
             self.skip_trivia(state);
+            if element == VosElementType::Obsolete && state.at(VosTokenType::Table) {
+                state.bump();
+                self.skip_trivia(state);
+            }
             if state.at(VosTokenType::Identifier) { state.bump(); }
             self.skip_trivia(state);
             while state.not_at_end() {
