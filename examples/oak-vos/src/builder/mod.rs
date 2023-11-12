@@ -1,5 +1,5 @@
 use crate::{
-    ast::{VosDeclaration, VosDeclarationKind, VosRoot},
+    ast::{VosDeclaration, VosDeclarationKind, VosRoot, VosSyntaxElement, VosSyntaxNode, VosSyntaxToken},
     language::VosLanguage,
     lexer::VosLexer,
     parser::{VosElementType, VosParser},
@@ -53,6 +53,35 @@ impl VosBuilder {
         }
         Ok(VosDeclaration { kind, name, span })
     }
+
+    fn build_syntax<'a>(&self, tree: &GreenTree<'a, VosLanguage>, offset: usize, source: &SourceText) -> VosSyntaxElement {
+        match tree {
+            GreenTree::Node(node) => {
+                let mut children = Vec::new();
+                let mut child_offset = offset;
+                for child in node.children {
+                    children.push(self.build_syntax(child, child_offset, source));
+                    child_offset += match child {
+                        GreenTree::Node(child_node) => child_node.byte_length as usize,
+                        GreenTree::Leaf(leaf) => leaf.length as usize,
+                    };
+                }
+                VosSyntaxElement::Node(VosSyntaxNode {
+                    kind: node.kind,
+                    span: (offset..offset + node.byte_length as usize).into(),
+                    children,
+                })
+            }
+            GreenTree::Leaf(leaf) => {
+                let end = offset + leaf.length as usize;
+                VosSyntaxElement::Token(VosSyntaxToken {
+                    kind: leaf.kind,
+                    span: (offset..end).into(),
+                    text: source.get_text_in((offset..end).into()).into_owned(),
+                })
+            }
+        }
+    }
 }
 
 impl Builder<VosLanguage> for VosBuilder {
@@ -66,6 +95,23 @@ impl Builder<VosLanguage> for VosBuilder {
             Ok(green_tree) => {
                 let text = source.get_text_in((0..source.length()).into()).into_owned();
                 let source_text = SourceText::new(text.clone());
+                let syntax_children = green_tree
+                    .children
+                    .iter()
+                    .scan(0usize, |offset, child| {
+                        let element = self.build_syntax(child, *offset, &source_text);
+                        *offset += match child {
+                            GreenTree::Node(node) => node.byte_length as usize,
+                            GreenTree::Leaf(leaf) => leaf.length as usize,
+                        };
+                        Some(element)
+                    })
+                    .collect();
+                let syntax = VosSyntaxNode {
+                    kind: VosElementType::Root,
+                    span: (0..text.len()).into(),
+                    children: syntax_children,
+                };
                 let mut declarations = Vec::new();
                 let mut offset = 0usize;
                 for child in green_tree.children {
@@ -82,7 +128,7 @@ impl Builder<VosLanguage> for VosBuilder {
                         GreenTree::Leaf(leaf) => offset += leaf.length as usize,
                     }
                 }
-                OakDiagnostics { result: Ok(VosRoot { source: text, declarations }), diagnostics: parse_result.diagnostics }
+                OakDiagnostics { result: Ok(VosRoot { source: text, syntax, declarations }), diagnostics: parse_result.diagnostics }
             }
             Err(error) => OakDiagnostics { result: Err(error), diagnostics: parse_result.diagnostics },
         }
