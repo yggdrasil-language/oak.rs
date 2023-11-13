@@ -10,6 +10,7 @@ fn parses_vos_schema_through_oak() {
     assert!(root.source.contains("table User"));
     assert_eq!(root.declarations.iter().filter(|item| item.kind == VosDeclarationKind::Table).count(), 1);
     assert_eq!(root.declarations.iter().find(|item| item.kind == VosDeclarationKind::Table).and_then(|item| item.name.as_deref()), Some("User"));
+    assert_eq!(root.declarations.iter().find(|item| item.kind == VosDeclarationKind::Namespace).and_then(|item| item.path.as_deref()), Some(["demo".to_owned(), "identity".to_owned()].as_slice()));
 }
 
 #[test]
@@ -86,4 +87,11 @@ fn builder_exposes_lossless_cst_tokens_and_spans() {
         element,
         VosSyntaxElement::Token(token) if token.kind == VosTokenType::Identifier && token.text == "shared"
     )));
+}
+
+#[test]
+fn builder_exposes_using_path_without_reparsing_tokens() {
+    let root = parse("using shared::UserId;").expect("Oak parses using");
+    assert_eq!(root.declarations[0].kind, VosDeclarationKind::Using);
+    assert_eq!(root.declarations[0].path.as_deref(), Some(["shared".to_owned(), "UserId".to_owned()].as_slice()));
 }

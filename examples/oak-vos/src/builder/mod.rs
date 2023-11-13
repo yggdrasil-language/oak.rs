@@ -37,12 +37,17 @@ impl VosBuilder {
         let span = (offset..offset + node.byte_length as usize).into();
         let mut current_offset = offset;
         let mut name = None;
+        let mut path = Vec::new();
         for child in node.children {
             match child {
                 GreenTree::Leaf(leaf) => {
                     if leaf.kind == crate::lexer::VosTokenType::Identifier && name.is_none() {
                         let text = source.get_text_in((current_offset..current_offset + leaf.length as usize).into());
                         name = Some(text.into_owned());
+                    }
+                    if leaf.kind == crate::lexer::VosTokenType::Identifier {
+                        let text = source.get_text_in((current_offset..current_offset + leaf.length as usize).into());
+                        path.push(text.into_owned());
                     }
                     current_offset += leaf.length as usize;
                 }
@@ -51,7 +56,11 @@ impl VosBuilder {
                 }
             }
         }
-        Ok(VosDeclaration { kind, name, span })
+        let path = match kind {
+            VosDeclarationKind::Namespace | VosDeclarationKind::Using => Some(path),
+            _ => None,
+        };
+        Ok(VosDeclaration { kind, name, path, span })
     }
 
     fn build_syntax<'a>(&self, tree: &GreenTree<'a, VosLanguage>, offset: usize, source: &SourceText) -> VosSyntaxElement {
