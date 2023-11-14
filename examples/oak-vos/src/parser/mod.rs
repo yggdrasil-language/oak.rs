@@ -55,7 +55,11 @@ impl VosParser {
                 if kind == VosTokenType::Semicolon { state.bump(); break; }
                 if Self::declaration_kind(kind) != VosElementType::Error { break; }
                 if kind == VosTokenType::LeftBrace {
-                    self.parse_group(state)?;
+                    if matches!(element, VosElementType::Table | VosElementType::Class) {
+                        self.parse_fields(state)?;
+                    } else {
+                        self.parse_group(state)?;
+                    }
                     break;
                 }
                 if matches!(kind, VosTokenType::LeftParen | VosTokenType::LeftBracket) {
@@ -66,6 +70,115 @@ impl VosParser {
             }
             Ok(())
         })
+    }
+
+    fn parse_fields<'a, S: Source + ?Sized>(&self, state: &mut State<'a, S>) -> Result<(), OakError> {
+        let checkpoint = state.checkpoint();
+        state.expect(VosTokenType::LeftBrace)?;
+        loop {
+            self.skip_trivia(state);
+            if state.at(VosTokenType::RightBrace) { break; }
+            let field_checkpoint = state.checkpoint();
+            while state.at(VosTokenType::LeftBracket) {
+                let attribute_checkpoint = state.checkpoint();
+                self.parse_group(state)?;
+                state.finish_at(attribute_checkpoint, VosElementType::FieldAttribute);
+                self.skip_trivia(state);
+            }
+            if state.peek_text().as_deref() == Some("@") {
+                let attribute_checkpoint = state.checkpoint();
+                state.bump();
+                if state.peek_text().as_deref() == Some("@") { state.bump(); }
+                state.finish_at(attribute_checkpoint, VosElementType::FieldAttribute);
+            }
+            state.expect(VosTokenType::Identifier)?;
+            self.skip_trivia(state);
+            state.expect(VosTokenType::Colon)?;
+            self.skip_trivia(state);
+            let type_checkpoint = state.checkpoint();
+            self.parse_type(state, 0)?;
+            state.finish_at(type_checkpoint, VosElementType::TypeSyntax);
+            self.skip_trivia(state);
+            if state.at(VosTokenType::Equal) {
+                state.bump();
+                self.skip_trivia(state);
+                let default_checkpoint = state.checkpoint();
+                self.parse_default(state)?;
+                state.finish_at(default_checkpoint, VosElementType::DefaultValue);
+                self.skip_trivia(state);
+            }
+            state.finish_at(field_checkpoint, VosElementType::Field);
+            if state.at(VosTokenType::Comma) || state.at(VosTokenType::Semicolon) { state.bump(); }
+        }
+        state.expect(VosTokenType::RightBrace)?;
+        state.finish_at(checkpoint, VosElementType::Block);
+        Ok(())
+    }
+
+    fn parse_type<'a, S: Source + ?Sized>(&self, state: &mut State<'a, S>, depth: usize) -> Result<(), OakError> {
+        if depth >= 128 {
+            state.record_unexpected_token("VOS type nesting limit exceeded");
+            return Err(state.errors.last().cloned().expect("Oak records the syntax error"));
+        }
+        if state.peek_text().as_deref() == Some("&") {
+            state.bump();
+            self.skip_trivia(state);
+        }
+        if state.at(VosTokenType::LeftBracket) {
+            state.bump();
+            self.skip_trivia(state);
+            self.parse_type(state, depth + 1)?;
+            self.skip_trivia(state);
+            state.expect(VosTokenType::RightBracket)?;
+        } else {
+            state.expect(VosTokenType::Identifier)?;
+            self.skip_trivia(state);
+            while state.at(VosTokenType::Colon) {
+                state.bump();
+                state.expect(VosTokenType::Colon)?;
+                self.skip_trivia(state);
+                state.expect(VosTokenType::Identifier)?;
+                self.skip_trivia(state);
+            }
+            if state.at(VosTokenType::Less) {
+                state.bump();
+                self.skip_trivia(state);
+                loop {
+                    if state.at(VosTokenType::NumberLiteral) {
+                        state.bump();
+                    } else {
+                        self.parse_type(state, depth + 1)?;
+                    }
+                    self.skip_trivia(state);
+                    if !state.at(VosTokenType::Comma) { break; }
+                    state.bump();
+                    self.skip_trivia(state);
+                }
+                state.expect(VosTokenType::Greater)?;
+            }
+        }
+        self.skip_trivia(state);
+        if state.at(VosTokenType::Question) { state.bump(); }
+        Ok(())
+    }
+
+    fn parse_default<'a, S: Source + ?Sized>(&self, state: &mut State<'a, S>) -> Result<(), OakError> {
+        if matches!(state.peek_text().as_deref(), Some("-" | "+")) {
+            state.bump();
+            self.skip_trivia(state);
+            return state.expect(VosTokenType::NumberLiteral);
+        }
+        match state.peek_kind() {
+            Some(VosTokenType::StringLiteral | VosTokenType::NumberLiteral | VosTokenType::BooleanLiteral | VosTokenType::NullLiteral | VosTokenType::Identifier) => {
+                state.bump();
+                Ok(())
+            }
+            Some(VosTokenType::LeftBracket | VosTokenType::LeftBrace | VosTokenType::LeftParen) => self.parse_group(state),
+            _ => {
+                state.record_unexpected_token("expected VOS default value");
+                Err(state.errors.last().cloned().expect("Oak records the syntax error"))
+            }
+        }
     }
 
     fn consume_token<'a, S: Source + ?Sized>(&self, state: &mut State<'a, S>) -> Result<(), OakError> {
