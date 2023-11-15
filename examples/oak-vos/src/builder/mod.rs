@@ -123,10 +123,7 @@ impl VosBuilder {
     }
 
     fn build_attribute<'a>(&self, node: &GreenNode<'a, VosLanguage>, offset: usize, source: &SourceText) -> VosFieldAttribute {
-        let raw_span = offset..offset + node.byte_length as usize;
-        let raw_text = source.get_text_in(raw_span.clone().into()).into_owned();
-        let text = raw_text.trim_end().to_owned();
-        let span = offset..offset + text.len();
+        let syntax = self.slice(node, offset, source);
         let mut child_offset = offset;
         let mut name = None;
         for child in node.children {
@@ -144,7 +141,7 @@ impl VosBuilder {
                 GreenTree::Leaf(leaf) => leaf.length as usize,
             };
         }
-        VosFieldAttribute { name, text, span: span.into() }
+        VosFieldAttribute { name, text: syntax.text, span: syntax.span }
     }
 
     fn slice<'a>(&self, node: &GreenNode<'a, VosLanguage>, offset: usize, source: &SourceText) -> VosSyntaxSlice {

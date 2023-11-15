@@ -136,6 +136,16 @@ fn builder_preserves_attribute_groups_and_custom_arguments() {
 }
 
 #[test]
+fn attribute_spans_exclude_following_comments() {
+    let source = "table Account { [primary] # key constraint\n id: uuid, @email: utf8 }";
+    let root = parse(source).unwrap();
+    let attribute = &root.declarations[0].fields[0].attributes[0];
+    assert_eq!(attribute.text, "[primary]");
+    assert_eq!(&source[attribute.span.clone()], "[primary]");
+    assert_eq!(root.declarations[0].fields[1].attributes[0].text, "@");
+}
+
+#[test]
 fn class_fields_support_newlines_comments_and_nested_types() {
     let source = "class 数据 {\n [primary] 标识: uuid # trailing type comment\n entries: list<&shared::User?>\n values: [[utf8]?]?\n number: i64 = -42\n active: bool = true\n }";
     let root = parse(source).unwrap();
