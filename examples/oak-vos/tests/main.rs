@@ -1,4 +1,4 @@
-use oak_vos::{VosDeclarationKind, VosSyntaxElement, VosTokenType, parse};
+use oak_vos::{VosDeclarationKind, VosSyntaxElement, VosTokenType, VosTypeArgument, VosTypeSyntax, parse};
 
 #[test]
 fn parses_vos_schema_through_oak() {
@@ -183,4 +183,83 @@ fn typed_fields_do_not_change_lossless_cst() {
     append_text(&root.syntax, &mut restored);
     assert_eq!(restored, source);
     assert_eq!(root.declarations[0].fields.len(), 2);
+}
+
+#[test]
+fn builder_projects_structured_type_syntax_without_resolving_names() {
+    let source = "table User { id: uuid, manager: &shared::User?, tags: [utf8]?, embedding: vector<3>, rows: list<&User>, instant: DateTime<UTC>, }";
+    let root = parse(source).unwrap();
+    let fields = &root.declarations[0].fields;
+    assert!(matches!(&fields[0].type_expr, VosTypeSyntax::Named { path, .. } if path == &["uuid"]));
+    assert!(matches!(&fields[1].type_expr, VosTypeSyntax::Optional { inner, .. } if matches!(inner.as_ref(), VosTypeSyntax::Reference { target, .. } if matches!(target.as_ref(), VosTypeSyntax::Named { path, .. } if path == &["shared", "User"]))));
+    assert!(matches!(&fields[2].type_expr, VosTypeSyntax::Optional { inner, .. } if matches!(inner.as_ref(), VosTypeSyntax::List { element, .. } if matches!(element.as_ref(), VosTypeSyntax::Named { path, .. } if path == &["utf8"]))));
+    assert!(matches!(&fields[3].type_expr, VosTypeSyntax::Generic { path, arguments, .. } if path == &["vector"] && matches!(&arguments[0], VosTypeArgument::Literal(value) if value.text == "3")));
+    assert!(matches!(&fields[4].type_expr, VosTypeSyntax::Generic { path, arguments, .. } if path == &["list"] && matches!(&arguments[0], VosTypeArgument::Type(VosTypeSyntax::Reference { .. }))));
+    assert!(matches!(&fields[5].type_expr, VosTypeSyntax::Generic { path, arguments, .. } if path == &["DateTime"] && matches!(&arguments[0], VosTypeArgument::Type(VosTypeSyntax::Named { path, .. }) if path == &["UTC"])));
+    for field in fields {
+        let span = match &field.type_expr {
+            VosTypeSyntax::Named { span, .. } | VosTypeSyntax::Reference { span, .. } | VosTypeSyntax::Optional { span, .. } | VosTypeSyntax::List { span, .. } | VosTypeSyntax::Generic { span, .. } => span,
+        };
+        assert_eq!(&source[span.clone()], field.type_syntax.text);
+    }
+}
+
+#[test]
+fn structured_type_syntax_rejects_empty_or_malformed_generic_arguments() {
+    for source in ["table T { id: vector<> }", "table T { id: list<utf8 }", "table T { id: [utf8 }", "table T { id: & }", "table T { id: shared:: }"] {
+        assert!(parse(source).is_err(), "accepted malformed type: {source}");
+    }
+}
+
+#[test]
+fn reference_optional_precedence_preserves_trivia_spans() {
+    let source = "class T { owner: &shared::User # reference\n ? }";
+    let root = parse(source).unwrap();
+    let field = &root.declarations[0].fields[0];
+    let VosTypeSyntax::Optional { inner, span } = &field.type_expr else { panic!("expected optional reference") };
+    assert_eq!(&source[span.clone()], "&shared::User # reference\n ?");
+    let VosTypeSyntax::Reference { target, span } = inner.as_ref() else { panic!("expected reference") };
+    assert_eq!(&source[span.clone()], "&shared::User");
+    let VosTypeSyntax::Named { path, span } = target.as_ref() else { panic!("expected named target") };
+    assert_eq!(path, &["shared", "User"]);
+    assert_eq!(&source[span.clone()], "shared::User");
+    assert_eq!(field.type_syntax.text, "&shared::User # reference\n ?");
+}
+
+#[test]
+fn type_depth_has_process_bound() {
+    use std::{process::Command, thread, time::{Duration, Instant}};
+
+    const CHILD_ENV: &str = "OAK_VOS_TYPE_DEPTH_CHILD";
+    if std::env::var_os(CHILD_ENV).is_some() {
+        let source = format!("class T {{ field: {}utf8{} }}", "[".repeat(127), "]".repeat(127));
+        let root = parse(&source).expect("types below the depth limit are valid");
+        assert_eq!(root.declarations[0].fields.len(), 1);
+        for wrapper in ["[", "list<"] {
+            let closing = if wrapper == "[" { "]" } else { ">" };
+            let source = format!("class T {{ field: {}utf8{} }}", wrapper.repeat(4096), closing.repeat(4096));
+            assert!(parse(&source).is_err(), "excessive type nesting must be rejected");
+        }
+        return;
+    }
+    let mut child = Command::new(std::env::current_exe().unwrap())
+        .args(["--exact", "type_depth_has_process_bound", "--nocapture"])
+        .env(CHILD_ENV, "1")
+        .spawn()
+        .expect("spawn bounded parser test");
+    let deadline = Instant::now() + Duration::from_secs(10);
+    loop {
+        match child.try_wait() {
+            Ok(Some(status)) => {
+                assert!(status.success(), "bounded parser child failed: {status}");
+                break;
+            }
+            Ok(None) if Instant::now() < deadline => thread::sleep(Duration::from_millis(10)),
+            result => {
+                child.kill().expect("terminate parser child");
+                child.wait().expect("reap parser child");
+                panic!("bounded parser child timed out or failed to poll: {result:?}");
+            }
+        }
+    }
 }
