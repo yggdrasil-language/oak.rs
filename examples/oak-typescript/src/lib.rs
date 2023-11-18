@@ -30,6 +30,28 @@ pub use crate::{
     parser::{TypeScriptParser, element_type::TypeScriptElementType},
 };
 
+#[cfg(test)]
+mod binding_pattern_unit {
+    use crate::ast::Statement;
+    use oak_core::{Builder, ParseSession, SourceText};
+    use crate::{TypeScriptBuilder, TypeScriptLanguage};
+
+    #[test]
+    fn builds_object_binding_pattern_as_one_declaration() {
+        let source = SourceText::new("const { name } = profile;");
+        let language = TypeScriptLanguage::default();
+        let builder = TypeScriptBuilder::new(&language);
+        let mut session = ParseSession::default();
+        let result = Builder::build(&builder, &source, &[], &mut session);
+        let root = result.result.expect("binding pattern should parse");
+        let Statement::VariableDeclaration(variable) = &root.statements[0] else {
+            panic!("expected variable declaration");
+        };
+        assert_eq!(variable.name, "{ name }");
+        assert!(variable.value.is_some());
+    }
+}
+
 #[cfg(feature = "lsp")]
 pub use crate::lsp::{TypeScriptLanguageService, formatter::TypeScriptFormatter, highlighter::TypeScriptHighlighter};
 
