@@ -12,7 +12,6 @@ use oak_core::{Builder, ParseSession, SourceText};
 
 use crate::{TypeScriptBuilder, TypeScriptLanguage};
 
-use expr::print_expression;
 
 /// Minimal formatter options for the Oak print path.
 #[derive(Debug, Clone, Default)]
@@ -43,7 +42,12 @@ pub fn format_source(source: &str, options: &FormatOptions) -> Result<String, St
     let root = built.result.ok().ok_or_else(|| "oak build returned no root".to_string())?;
     let mut out = String::new();
     for (index, stmt) in root.statements.iter().enumerate() {
-        if index > 0 {
+        if options.type_erasure
+            && matches!(stmt, crate::ast::Statement::ImportDeclaration(import) if import.is_type_only)
+        {
+            continue;
+        }
+        if !out.is_empty() {
             out.push('\n');
         }
         out.push_str(&stmt::print_statement(stmt).ok_or_else(|| format!("oak print unsupported for statement: {stmt:?}"))?);
