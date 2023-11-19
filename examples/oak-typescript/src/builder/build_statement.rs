@@ -23,6 +23,7 @@ impl<'config> TypeScriptBuilder<'config> {
                 let mut value = None;
                 let mut is_declare = false;
                 let mut in_initializer = false;
+                let mut declaration_kind = VariableKind::Const;
                 for child in node.children() {
                     match child {
                         RedTree::Node(child_node) => {
@@ -63,12 +64,15 @@ impl<'config> TypeScriptBuilder<'config> {
                                 }
                             }
                             TypeScriptTokenType::Declare => is_declare = true,
+                            TypeScriptTokenType::Let => declaration_kind = VariableKind::Let,
+                            TypeScriptTokenType::Var => declaration_kind = VariableKind::Var,
+                            TypeScriptTokenType::Const => declaration_kind = VariableKind::Const,
                             TypeScriptTokenType::Equal => in_initializer = true,
                             _ => {}
                         },
                     }
                 }
-                Ok(Some(Statement::VariableDeclaration(VariableDeclaration { decorators: Vec::new(), is_declare, name, ty, value, span: span.into() })))
+                Ok(Some(Statement::VariableDeclaration(VariableDeclaration { decorators: Vec::new(), is_declare, name, kind: declaration_kind, ty, value, span: span.into() })))
             }
             TypeScriptElementType::FunctionDeclaration => {
                 let mut name = String::new();

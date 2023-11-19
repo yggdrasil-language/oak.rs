@@ -16,17 +16,20 @@ use expr::print_expression;
 
 /// Minimal formatter options for the Oak print path.
 #[derive(Debug, Clone, Default)]
-pub struct FormatOptions {}
+pub struct FormatOptions {
+    /// Erase TypeScript-only syntax while printing.
+    pub type_erasure: bool,
+}
 
 /// Format TypeScript/JavaScript source via Oak parse + AST print.
-pub fn format_source(source: &str, _options: &FormatOptions) -> Result<String, String> {
+pub fn format_source(source: &str, options: &FormatOptions) -> Result<String, String> {
     if source.is_empty() {
         return Ok(String::new());
     }
 
     let text = SourceText::new(source);
     let language = TypeScriptLanguage::default();
-    let builder = TypeScriptBuilder::new(&language);
+    let builder = TypeScriptBuilder::new(&language).with_type_erasure(options.type_erasure);
     let mut cache = ParseSession::default();
     let built = Builder::build(&builder, &text, &[], &mut cache);
 

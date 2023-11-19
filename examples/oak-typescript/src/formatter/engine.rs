@@ -15,6 +15,10 @@ pub fn format_source(source: &str, options: &FormatOptions) -> Result<String, Fo
         return Ok(String::new());
     }
 
+    if options.type_erasure {
+        return crate::print::format_source(source, &crate::print::FormatOptions { type_erasure: true }).map_err(FormatError::new);
+    }
+
     let cst = options.cst_options();
     match crate::cst_format::format_source(source, &cst) {
         Ok(out) => Ok(out),
