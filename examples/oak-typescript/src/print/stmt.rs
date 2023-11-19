@@ -1,6 +1,9 @@
 //! Oak TypeScript statement → canonical text.
 
-use crate::ast::{BlockStatement, ClassDeclaration, ClassMember, ExportDeclaration, FunctionDeclaration, ImportDeclaration, ImportSpecifier, Statement, VariableDeclaration};
+use crate::ast::{
+    BlockStatement, ClassDeclaration, ClassMember, DoWhileStatement, ExportDeclaration,
+    FunctionDeclaration, ImportDeclaration, ImportSpecifier, Statement, TryStatement, VariableDeclaration,
+};
 
 use super::expr::{print_expression, print_string};
 
@@ -37,6 +40,8 @@ pub fn print_statement(stmt: &Statement) -> Option<String> {
             let body = print_statement(&s.body)?;
             Some(format!("while ({test}) {body}"))
         }
+        Statement::DoWhileStatement(s) => print_do_while(s),
+        Statement::TryStatement(s) => print_try(s),
         Statement::ThrowStatement(s) => Some(format!("throw {}", print_expression(&s.argument)?)),
         Statement::BreakStatement(s) => Some(match s.label.as_deref() {
             Some(label) => format!("break {label}"),
@@ -50,14 +55,30 @@ pub fn print_statement(stmt: &Statement) -> Option<String> {
         Statement::Interface(_)
         | Statement::TypeAlias(_)
         | Statement::Enum(_)
-        | Statement::DoWhileStatement(_)
         | Statement::ForStatement(_)
         | Statement::ForInStatement(_)
         | Statement::ForOfStatement(_)
         | Statement::SwitchStatement(_)
-        | Statement::TryStatement(_)
         | Statement::Namespace(_) => None,
     }
+}
+
+fn print_do_while(s: &DoWhileStatement) -> Option<String> {
+    let body = print_statement(&s.body)?;
+    let test = print_expression(&s.test)?;
+    Some(format!("do {body} while ({test})"))
+}
+
+fn print_try(s: &TryStatement) -> Option<String> {
+    let mut output = format!("try {}", print_block_body(&s.block)?);
+    if let Some(handler) = &s.handler {
+        let param = handler.param.as_deref().map(|name| format!(" ({name})")).unwrap_or_default();
+        output.push_str(&format!(" catch{param} {}", print_block_body(&handler.body)?));
+    }
+    if let Some(finalizer) = &s.finalizer {
+        output.push_str(&format!(" finally {}", print_block_body(finalizer)?));
+    }
+    Some(output)
 }
 
 fn print_variable(v: &VariableDeclaration) -> Option<String> {
