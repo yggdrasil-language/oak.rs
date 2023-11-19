@@ -52,6 +52,18 @@ mod binding_pattern_unit {
     }
 }
 
+#[cfg(test)]
+mod type_erasure_printer_unit {
+    use crate::{format_source, FormatOptions};
+
+    #[test]
+    fn prints_exported_class_property_without_type_syntax() {
+        let source = "export default class Chart { private width: number = 10; title: string = 'chart'; }";
+        let output = format_source(source, &FormatOptions::default().with_type_erasure(true)).unwrap();
+        assert_eq!(output, "export default class Chart { width = 10; title = 'chart'; }");
+    }
+}
+
 #[cfg(feature = "lsp")]
 pub use crate::lsp::{TypeScriptLanguageService, formatter::TypeScriptFormatter, highlighter::TypeScriptHighlighter};
 
