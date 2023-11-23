@@ -302,6 +302,12 @@ impl<'config> TypeScriptBuilder<'config> {
                                     }
                                 }
                             }
+                            if name.is_empty() {
+                                let raw = source.get_text_in(child_span.into()).trim();
+                                if let Some((key, _)) = raw.split_once(':') {
+                                    name = key.trim().trim_matches(['"', '\'']).to_string();
+                                }
+                            }
                             if let Some(v) = value {
                                 properties.push(ObjectProperty::Property { name, value: v, shorthand: false, span: child_span.into() });
                             }
