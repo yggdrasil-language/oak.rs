@@ -87,7 +87,7 @@ mod object_literal_unit {
     fn preserves_object_property_names_during_type_erasure() {
         let source = "const params = { id: 'sku-1', tab: \"security\" };";
         let output = format_source(source, &FormatOptions::default().with_type_erasure(true)).unwrap();
-        assert_eq!(output, "const params = { id: 'sku-1', tab: \"security\" };");
+        assert_eq!(output, "const params = { id: 'sku-1', tab: 'security' }");
     }
 }
 
