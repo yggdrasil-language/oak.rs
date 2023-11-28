@@ -41,7 +41,7 @@ impl<'config> TypeScriptBuilder<'config> {
                 }
             }
             TypeScriptElementType::StringLiteral => {
-                let content = decode_string_literal_text(&source.get_text_in(span.into()));
+                let content = decode_string_literal_text(&source.get_text_in(span.into()))?;
                 Ok(Some(Expression::new(ExpressionKind::StringLiteral(content), span.into())))
             }
             TypeScriptElementType::BigIntLiteral => {
@@ -311,7 +311,7 @@ impl<'config> TypeScriptBuilder<'config> {
                                                 break;
                                             }
                                             TypeScriptTokenType::StringLiteral => {
-                                                name = decode_string_literal_text(&source.get_text_in(key.span.into()));
+                                                name = decode_string_literal_text(&source.get_text_in(key.span.into()))?;
                                                 break;
                                             }
                                             TypeScriptTokenType::Colon => break,
@@ -541,7 +541,82 @@ impl<'config> TypeScriptBuilder<'config> {
     }
 }
 
-fn decode_string_literal_text(raw: &str) -> String {
+fn decode_string_literal_text(raw: &str) -> Result<String, OakError> {
     let text = raw.trim();
-    if (text.starts_with('"') && text.ends_with('"')) || (text.starts_with('\'') && text.ends_with('\'')) { text[1..text.len() - 1].to_string() } else { text.to_string() }
+    if text.len() < 2 || !matches!(text.as_bytes()[0], b'"' | b'\'') || text.as_bytes().last() != text.as_bytes().first() {
+        return Err(OakError::custom_error("invalid string literal"));
+    }
+    let mut units = Vec::new();
+    let mut chars = text[1..text.len() - 1].chars().peekable();
+    while let Some(character) = chars.next() {
+        let decoded = if character != '\\' {
+            character
+        } else {
+            match chars.next().ok_or_else(|| OakError::custom_error("incomplete string escape"))? {
+                'n' => '\n',
+                'r' => '\r',
+                't' => '\t',
+                'b' => '\u{0008}',
+                'f' => '\u{000c}',
+                'v' => '\u{000b}',
+                '0' if !chars.peek().is_some_and(char::is_ascii_digit) => '\0',
+                '\n' => continue,
+                '\r' => {
+                    if chars.peek() == Some(&'\n') { chars.next(); }
+                    continue;
+                }
+                '\u{2028}' | '\u{2029}' => continue,
+                escape @ ('u' | 'x') => {
+                    let mut hex = String::new();
+                    let braced = escape == 'u' && chars.peek() == Some(&'{');
+                    if braced {
+                        chars.next();
+                        loop {
+                            let digit = chars.next().ok_or_else(|| OakError::custom_error("incomplete Unicode escape"))?;
+                            if digit == '}' { break; }
+                            if !digit.is_ascii_hexdigit() || hex.len() == 6 { return Err(OakError::custom_error("invalid Unicode escape")); }
+                            hex.push(digit);
+                        }
+                    } else {
+                        for _ in 0..if escape == 'u' { 4 } else { 2 } {
+                            let digit = chars.next().ok_or_else(|| OakError::custom_error("incomplete hexadecimal escape"))?;
+                            if !digit.is_ascii_hexdigit() { return Err(OakError::custom_error("invalid hexadecimal escape")); }
+                            hex.push(digit);
+                        }
+                    }
+                    let code = u32::from_str_radix(&hex, 16).map_err(|_| OakError::custom_error("invalid Unicode escape"))?;
+                    if !braced && escape == 'u' {
+                        units.push(code as u16);
+                        continue;
+                    }
+                    char::from_u32(code).ok_or_else(|| OakError::custom_error("invalid Unicode code point"))?
+                }
+                digit if digit.is_ascii_digit() => return Err(OakError::custom_error("legacy octal escape is not supported")),
+                escaped => escaped,
+            }
+        };
+        let mut buffer = [0; 2];
+        units.extend_from_slice(decoded.encode_utf16(&mut buffer));
+    }
+    String::from_utf16(&units).map_err(|_| OakError::custom_error("unpaired Unicode surrogate"))
+}
+
+#[cfg(test)]
+mod string_literal_tests {
+    use super::decode_string_literal_text;
+
+    #[test]
+    fn decodes_javascript_string_escapes() {
+        assert_eq!(decode_string_literal_text(r#"'sku\u002d1'"#).unwrap(), "sku-1");
+        assert_eq!(decode_string_literal_text(r#"'a\'b'"#).unwrap(), "a'b");
+        assert_eq!(decode_string_literal_text(r#"'\x41\u{1f600}\ud83d\ude00'"#).unwrap(), "A😀😀");
+        assert_eq!(decode_string_literal_text("'a\\\r\nb'").unwrap(), "ab");
+    }
+
+    #[test]
+    fn rejects_invalid_string_escapes() {
+        for source in [r#"'\u12'"#, r#"'\xZZ'"#, r#"'\u{110000}'"#, r#"'\ud800'"#] {
+            assert!(decode_string_literal_text(source).is_err(), "{source}");
+        }
+    }
 }
