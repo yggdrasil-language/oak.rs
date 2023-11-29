@@ -60,11 +60,31 @@ impl VosBuilder {
             VosDeclarationKind::Namespace | VosDeclarationKind::Using => Some(path),
             _ => None,
         };
+        let mut signature = None;
+        let mut body = None;
+        let mut child_offset = offset;
+        for child in node.children {
+            if let GreenTree::Node(child_node) = child {
+                match child_node.kind {
+                    VosElementType::Parentheses => {
+                        signature = Some(self.slice(child_node, child_offset, source));
+                    }
+                    VosElementType::Block => {
+                        body = Some(self.slice(child_node, child_offset, source));
+                    }
+                    _ => {}
+                }
+            }
+            child_offset += match child {
+                GreenTree::Node(node) => node.byte_length as usize,
+                GreenTree::Leaf(leaf) => leaf.length as usize,
+            };
+        }
         let mut fields = Vec::new();
         if matches!(kind, VosDeclarationKind::Table | VosDeclarationKind::Class) {
             self.collect_fields(node, offset, source, &mut fields)?;
         }
-        Ok(VosDeclaration { kind, name, path, fields, span })
+        Ok(VosDeclaration { kind, name, path, signature, body, fields, span })
     }
 
     fn collect_fields<'a>(&self, tree: &GreenNode<'a, VosLanguage>, offset: usize, source: &SourceText, fields: &mut Vec<VosField>) -> Result<(), OakError> {

@@ -32,6 +32,10 @@ fn classifies_query_and_udf_declarations() {
     assert_eq!(root.declarations[0].name.as_deref(), Some("active_users"));
     assert_eq!(root.declarations[1].kind, VosDeclarationKind::Udf);
     assert_eq!(root.declarations[1].name.as_deref(), Some("normalize"));
+    assert_eq!(root.declarations[0].signature.as_ref().unwrap().text, "()");
+    assert_eq!(root.declarations[0].body.as_ref().unwrap().text, "{ table User }");
+    assert_eq!(root.declarations[1].signature.as_ref().unwrap().text, "(value: utf8)");
+    assert_eq!(root.declarations[1].body.as_ref().unwrap().text, "{ value }");
 }
 
 #[test]

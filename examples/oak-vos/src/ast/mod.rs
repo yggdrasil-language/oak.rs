@@ -71,6 +71,10 @@ pub struct VosDeclaration {
     pub name: Option<String>,
     /// Qualified path for namespace and using declarations.
     pub path: Option<Vec<String>>,
+    /// Exact parameter or signature syntax when the declaration has one.
+    pub signature: Option<VosSyntaxSlice>,
+    /// Exact body syntax when the declaration has a balanced body block.
+    pub body: Option<VosSyntaxSlice>,
     /// Typed field syntax for table and class declarations.
     pub fields: Vec<VosField>,
     /// Byte span in the original source.
