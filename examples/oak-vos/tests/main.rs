@@ -39,6 +39,28 @@ fn classifies_query_and_udf_declarations() {
 }
 
 #[test]
+fn operation_declaration_slices_keep_exact_source_spans() {
+    let source = "# keep trivia\nquery active_users( status: utf8 ) {\n  User.filter(x => x.status == status)\n}\n\nmicro trim(value: utf8) -> utf8 { value.trim() }";
+    let root = parse(source).expect("Oak parses operation declarations");
+
+    let query = &root.declarations[0];
+    let query_signature = query.signature.as_ref().expect("query signature");
+    let query_body = query.body.as_ref().expect("query body");
+    assert_eq!(&source[query_signature.span.clone()], query_signature.text);
+    assert_eq!(&source[query_body.span.clone()], query_body.text);
+    assert_eq!(query_signature.text, "( status: utf8 )");
+    assert_eq!(query_body.text, "{\n  User.filter(x => x.status == status)\n}");
+
+    let micro = &root.declarations[1];
+    let micro_signature = micro.signature.as_ref().expect("micro signature");
+    let micro_body = micro.body.as_ref().expect("micro body");
+    assert_eq!(&source[micro_signature.span.clone()], micro_signature.text);
+    assert_eq!(&source[micro_body.span.clone()], micro_body.text);
+    assert_eq!(micro_signature.text, "(value: utf8)");
+    assert_eq!(micro_body.text, "{ value.trim() }");
+}
+
+#[test]
 fn rejects_lexical_errors_before_vos_semantic_lowering() {
     let error = parse("table User { name: utf8; \0 }").expect_err("Oak rejects NUL");
     assert!(!error.is_empty());
