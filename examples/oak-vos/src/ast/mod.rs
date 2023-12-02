@@ -73,6 +73,8 @@ pub struct VosDeclaration {
     pub path: Option<Vec<String>>,
     /// Exact parameter or signature syntax when the declaration has one.
     pub signature: Option<VosSyntaxSlice>,
+    /// Structured parameters projected from the declaration signature.
+    pub parameters: Vec<VosParameter>,
     /// Exact body syntax when the declaration has a balanced body block.
     pub body: Option<VosSyntaxSlice>,
     /// Exact return type syntax including the `->` arrow when present.
@@ -82,6 +84,21 @@ pub struct VosDeclaration {
     /// Typed field syntax for table and class declarations.
     pub fields: Vec<VosField>,
     /// Byte span in the original source.
+    pub span: Range<usize>,
+}
+
+/// One Oak-projected operation parameter.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct VosParameter {
+    /// Parameter name as written.
+    pub name: String,
+    /// Source span of the parameter name.
+    pub name_span: Range<usize>,
+    /// Exact parameter type syntax.
+    pub type_syntax: VosSyntaxSlice,
+    /// Structured parameter type syntax.
+    pub type_expr: VosTypeSyntax,
+    /// Span covering the parameter.
     pub span: Range<usize>,
 }
 

@@ -35,6 +35,8 @@ fn classifies_query_and_udf_declarations() {
     assert_eq!(root.declarations[0].signature.as_ref().unwrap().text, "()");
     assert_eq!(root.declarations[0].body.as_ref().unwrap().text, "{ table User }");
     assert_eq!(root.declarations[1].signature.as_ref().unwrap().text, "(value: utf8)");
+    assert_eq!(root.declarations[1].parameters[0].name, "value");
+    assert!(matches!(&root.declarations[1].parameters[0].type_expr, VosTypeSyntax::Named { path, .. } if path == &["utf8".to_owned()]));
     assert_eq!(root.declarations[1].body.as_ref().unwrap().text, "{ value }");
     assert_eq!(root.declarations[1].return_type.as_ref().unwrap().text, "-> utf8");
     assert!(matches!(
