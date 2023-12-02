@@ -75,6 +75,8 @@ pub struct VosDeclaration {
     pub signature: Option<VosSyntaxSlice>,
     /// Exact body syntax when the declaration has a balanced body block.
     pub body: Option<VosSyntaxSlice>,
+    /// Exact return type syntax including the `->` arrow when present.
+    pub return_type: Option<VosSyntaxSlice>,
     /// Typed field syntax for table and class declarations.
     pub fields: Vec<VosField>,
     /// Byte span in the original source.

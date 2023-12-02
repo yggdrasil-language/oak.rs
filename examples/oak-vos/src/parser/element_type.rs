@@ -39,6 +39,8 @@ pub enum VosElementType {
     DefaultValue,
     /// Structurally balanced block.
     Block,
+    /// Operation return type syntax after `->`.
+    ReturnType,
     /// Structurally balanced parentheses.
     Parentheses,
     /// Structurally balanced brackets.

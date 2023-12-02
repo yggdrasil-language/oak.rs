@@ -36,6 +36,7 @@ fn classifies_query_and_udf_declarations() {
     assert_eq!(root.declarations[0].body.as_ref().unwrap().text, "{ table User }");
     assert_eq!(root.declarations[1].signature.as_ref().unwrap().text, "(value: utf8)");
     assert_eq!(root.declarations[1].body.as_ref().unwrap().text, "{ value }");
+    assert_eq!(root.declarations[1].return_type.as_ref().unwrap().text, "-> utf8");
 }
 
 #[test]
@@ -54,9 +55,12 @@ fn operation_declaration_slices_keep_exact_source_spans() {
     let micro = &root.declarations[1];
     let micro_signature = micro.signature.as_ref().expect("micro signature");
     let micro_body = micro.body.as_ref().expect("micro body");
+    let micro_return = micro.return_type.as_ref().expect("micro return type");
     assert_eq!(&source[micro_signature.span.clone()], micro_signature.text);
     assert_eq!(&source[micro_body.span.clone()], micro_body.text);
+    assert_eq!(&source[micro_return.span.clone()], micro_return.text);
     assert_eq!(micro_signature.text, "(value: utf8)");
+    assert_eq!(micro_return.text, "-> utf8");
     assert_eq!(micro_body.text, "{ value.trim() }");
 }
 

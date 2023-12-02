@@ -62,6 +62,7 @@ impl VosBuilder {
         };
         let mut signature = None;
         let mut body = None;
+        let mut return_type = None;
         let mut child_offset = offset;
         for child in node.children {
             if let GreenTree::Node(child_node) = child {
@@ -71,6 +72,9 @@ impl VosBuilder {
                     }
                     VosElementType::Block => {
                         body = Some(self.slice(child_node, child_offset, source));
+                    }
+                    VosElementType::ReturnType => {
+                        return_type = Some(self.slice(child_node, child_offset, source));
                     }
                     _ => {}
                 }
@@ -84,7 +88,7 @@ impl VosBuilder {
         if matches!(kind, VosDeclarationKind::Table | VosDeclarationKind::Class) {
             self.collect_fields(node, offset, source, &mut fields)?;
         }
-        Ok(VosDeclaration { kind, name, path, signature, body, fields, span })
+        Ok(VosDeclaration { kind, name, path, signature, body, return_type, fields, span })
     }
 
     fn collect_fields<'a>(&self, tree: &GreenNode<'a, VosLanguage>, offset: usize, source: &SourceText, fields: &mut Vec<VosField>) -> Result<(), OakError> {

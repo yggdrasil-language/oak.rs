@@ -64,6 +64,20 @@ impl VosParser {
                 }
                 if matches!(kind, VosTokenType::LeftParen | VosTokenType::LeftBracket) {
                     self.parse_group(state)?;
+                } else if matches!(element, VosElementType::Query | VosElementType::Udf | VosElementType::Micro)
+                    && state.peek_text().as_deref() == Some("-")
+                {
+                    let return_checkpoint = state.checkpoint();
+                    state.bump();
+                    self.skip_trivia(state);
+                    if state.peek_text().as_deref() != Some(">") {
+                        state.record_unexpected_token("expected `>` in VOS return type arrow");
+                        return Err(state.errors.last().cloned().expect("Oak records the syntax error"));
+                    }
+                    state.bump();
+                    self.skip_trivia(state);
+                    self.parse_type(state, 0)?;
+                    state.finish_at(return_checkpoint, VosElementType::ReturnType);
                 } else {
                     self.consume_token(state)?;
                 }
