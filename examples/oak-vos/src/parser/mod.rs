@@ -76,7 +76,9 @@ impl VosParser {
                     }
                     state.bump();
                     self.skip_trivia(state);
+                    let type_checkpoint = state.checkpoint();
                     self.parse_type(state, 0)?;
+                    state.finish_at(type_checkpoint, VosElementType::TypeSyntax);
                     state.finish_at(return_checkpoint, VosElementType::ReturnType);
                 } else {
                     self.consume_token(state)?;

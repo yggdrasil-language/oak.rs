@@ -77,6 +77,8 @@ pub struct VosDeclaration {
     pub body: Option<VosSyntaxSlice>,
     /// Exact return type syntax including the `->` arrow when present.
     pub return_type: Option<VosSyntaxSlice>,
+    /// Structured return type syntax projected by Oak without resolving names.
+    pub return_type_expr: Option<VosTypeSyntax>,
     /// Typed field syntax for table and class declarations.
     pub fields: Vec<VosField>,
     /// Byte span in the original source.

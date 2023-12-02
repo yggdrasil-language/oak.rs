@@ -37,6 +37,10 @@ fn classifies_query_and_udf_declarations() {
     assert_eq!(root.declarations[1].signature.as_ref().unwrap().text, "(value: utf8)");
     assert_eq!(root.declarations[1].body.as_ref().unwrap().text, "{ value }");
     assert_eq!(root.declarations[1].return_type.as_ref().unwrap().text, "-> utf8");
+    assert!(matches!(
+        root.declarations[1].return_type_expr.as_ref(),
+        Some(VosTypeSyntax::Named { path, .. }) if path == &["utf8".to_owned()]
+    ));
 }
 
 #[test]
@@ -61,6 +65,10 @@ fn operation_declaration_slices_keep_exact_source_spans() {
     assert_eq!(&source[micro_return.span.clone()], micro_return.text);
     assert_eq!(micro_signature.text, "(value: utf8)");
     assert_eq!(micro_return.text, "-> utf8");
+    assert!(matches!(
+        micro.return_type_expr.as_ref(),
+        Some(VosTypeSyntax::Named { path, .. }) if path == &["utf8".to_owned()]
+    ));
     assert_eq!(micro_body.text, "{ value.trim() }");
 }
 
