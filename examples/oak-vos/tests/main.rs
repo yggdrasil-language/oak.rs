@@ -86,6 +86,17 @@ fn rejects_unterminated_string() {
 }
 
 #[test]
+fn rejects_malformed_operation_parameters() {
+    for source in [
+        "query missing_colon(value utf8) { value }",
+        "query missing_type(value:) { value }",
+        "query missing_comma(first: utf8 second: utf8) { first }",
+    ] {
+        assert!(parse(source).is_err(), "accepted malformed operation: {source}");
+    }
+}
+
+#[test]
 fn rejects_mismatched_and_missing_delimiters() {
     for source in ["table User { name: utf8", "table User { name: [utf8) }", "User.filter(x => x.name]", "}"] {
         assert!(parse(source).is_err(), "accepted malformed source: {source}");

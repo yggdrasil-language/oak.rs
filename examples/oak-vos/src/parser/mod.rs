@@ -62,7 +62,11 @@ impl VosParser {
                     }
                     break;
                 }
-                if matches!(kind, VosTokenType::LeftParen | VosTokenType::LeftBracket) {
+                if kind == VosTokenType::LeftParen
+                    && matches!(element, VosElementType::Query | VosElementType::Udf | VosElementType::Micro)
+                {
+                    self.parse_parameters(state)?;
+                } else if matches!(kind, VosTokenType::LeftParen | VosTokenType::LeftBracket) {
                     self.parse_group(state)?;
                 } else if matches!(element, VosElementType::Query | VosElementType::Udf | VosElementType::Micro)
                     && state.peek_text().as_deref() == Some("-")
@@ -128,6 +132,38 @@ impl VosParser {
         }
         state.expect(VosTokenType::RightBrace)?;
         state.finish_at(checkpoint, VosElementType::Block);
+        Ok(())
+    }
+
+    fn parse_parameters<'a, S: Source + ?Sized>(&self, state: &mut State<'a, S>) -> Result<(), OakError> {
+        let checkpoint = state.checkpoint();
+        state.expect(VosTokenType::LeftParen)?;
+        loop {
+            self.skip_trivia(state);
+            if state.at(VosTokenType::RightParen) {
+                state.bump();
+                break;
+            }
+            let parameter_checkpoint = state.checkpoint();
+            state.expect(VosTokenType::Identifier)?;
+            self.skip_trivia(state);
+            state.expect(VosTokenType::Colon)?;
+            self.skip_trivia(state);
+            let type_checkpoint = state.checkpoint();
+            self.parse_type(state, 0)?;
+            state.finish_at(type_checkpoint, VosElementType::TypeSyntax);
+            self.skip_trivia(state);
+            state.finish_at(parameter_checkpoint, VosElementType::Parameter);
+            if state.at(VosTokenType::Comma) {
+                state.bump();
+                continue;
+            }
+            if !state.at(VosTokenType::RightParen) {
+                state.record_unexpected_token("expected `,` or `)` after VOS operation parameter");
+                return Err(state.errors.last().cloned().expect("Oak records the syntax error"));
+            }
+        }
+        state.finish_at(checkpoint, VosElementType::Parentheses);
         Ok(())
     }
 

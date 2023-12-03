@@ -37,6 +37,8 @@ pub enum VosElementType {
     TypeSyntax,
     /// Field default value syntax.
     DefaultValue,
+    /// Operation parameter declaration.
+    Parameter,
     /// Structurally balanced block.
     Block,
     /// Operation return type syntax after `->`.

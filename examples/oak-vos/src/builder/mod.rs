@@ -4,7 +4,7 @@ use crate::{
     lexer::VosLexer,
     parser::{VosElementType, VosParser},
 };
-use oak_core::{Builder, BuilderCache, GreenNode, GreenTree, Lexer, OakDiagnostics, OakError, Parser, SourceText, TextEdit, TokenType, parser::session::ParseSession, source::Source};
+use oak_core::{Builder, BuilderCache, GreenNode, GreenTree, Lexer, OakDiagnostics, OakError, Parser, SourceText, TextEdit, parser::session::ParseSession, source::Source};
 
 /// Oak Builder for the initial VOS declaration AST.
 #[derive(Clone, Debug, Default)]
@@ -96,53 +96,50 @@ impl VosBuilder {
     }
 
     fn build_parameters(&self, node: &GreenNode<'_, VosLanguage>, offset: usize, source: &SourceText) -> Result<Vec<VosParameter>, OakError> {
-        let mut tokens = Vec::new();
-        self.collect_type_tokens(node, offset, source, &mut tokens);
-        let mut index = 0;
         let mut parameters = Vec::new();
-        while index < tokens.len() {
-            if tokens[index].0 == crate::lexer::VosTokenType::LeftParen {
-                index += 1;
-                continue;
+        let mut child_offset = offset;
+        for child in node.children {
+            if let GreenTree::Node(parameter) = child {
+                if parameter.kind == VosElementType::Parameter {
+                    parameters.push(self.build_parameter(parameter, child_offset, source)?);
+                }
             }
-            if tokens[index].0 == crate::lexer::VosTokenType::RightParen { break; }
-            if !matches!(tokens[index].0, crate::lexer::VosTokenType::Identifier) {
-                index += 1;
-                continue;
-            }
-            let name_span = tokens[index].1.clone();
-            let name = self.token_text(&name_span, source).into_owned();
-            index += 1;
-            while index < tokens.len() && tokens[index].0.is_ignored() { index += 1; }
-            if tokens.get(index).is_none_or(|token| token.0 != crate::lexer::VosTokenType::Colon) { break; }
-            index += 1;
-            while index < tokens.len() && tokens[index].0.is_ignored() { index += 1; }
-            let type_start = tokens.get(index).map(|token| token.1.start).unwrap_or(name_span.end);
-            let type_expr = self.parse_type_tokens(&tokens, &mut index, source)?;
-            let type_end = self.type_span(&type_expr).end;
-            parameters.push(VosParameter {
-                name,
-                name_span: name_span.clone().into(),
-                type_syntax: self.raw_slice(type_start, type_end, source),
-                type_expr,
-                span: (name_span.start..type_end).into(),
-            });
-            while index < tokens.len() && tokens[index].0 != crate::lexer::VosTokenType::Comma && tokens[index].0 != crate::lexer::VosTokenType::RightParen { index += 1; }
-            if tokens.get(index).is_some_and(|token| token.0 == crate::lexer::VosTokenType::Comma) { index += 1; }
+            child_offset += match child {
+                GreenTree::Node(node) => node.byte_length as usize,
+                GreenTree::Leaf(leaf) => leaf.length as usize,
+            };
         }
         Ok(parameters)
     }
 
-    fn collect_type_tokens(&self, node: &GreenNode<'_, VosLanguage>, offset: usize, source: &SourceText, tokens: &mut Vec<(crate::lexer::VosTokenType, core::range::Range<usize>)>) {
+    fn build_parameter(&self, node: &GreenNode<'_, VosLanguage>, offset: usize, source: &SourceText) -> Result<VosParameter, OakError> {
+        let span = (offset..offset + node.byte_length as usize).into();
+        let mut name = None;
+        let mut name_span = None;
+        let mut type_syntax = None;
         let mut child_offset = offset;
         for child in node.children {
             match child {
-                GreenTree::Leaf(leaf) => tokens.push((leaf.kind, (child_offset..child_offset + leaf.length as usize).into())),
-                GreenTree::Node(inner) => self.collect_type_tokens(inner, child_offset, source, tokens),
+                GreenTree::Leaf(leaf) if leaf.kind == crate::lexer::VosTokenType::Identifier && name.is_none() => {
+                    let leaf_span = (child_offset..child_offset + leaf.length as usize).into();
+                    name = Some(self.token_text(&leaf_span, source).into_owned());
+                    name_span = Some(leaf_span);
+                }
+                GreenTree::Node(type_node) if type_node.kind == VosElementType::TypeSyntax => {
+                    type_syntax = Some(self.slice(type_node, child_offset, source));
+                }
+                _ => {}
             }
-            child_offset += match child { GreenTree::Node(inner) => inner.byte_length as usize, GreenTree::Leaf(leaf) => leaf.length as usize };
+            child_offset += match child {
+                GreenTree::Node(node) => node.byte_length as usize,
+                GreenTree::Leaf(leaf) => leaf.length as usize,
+            };
         }
-        let _ = source;
+        let name = name.ok_or_else(|| OakError::expected_token("VOS parameter name", offset, None))?;
+        let name_span = name_span.expect("parameter name has a span");
+        let type_syntax = type_syntax.ok_or_else(|| OakError::expected_token("VOS parameter type", offset, None))?;
+        let type_expr = self.build_type_expr(node, offset, source)?;
+        Ok(VosParameter { name, name_span, type_syntax, type_expr, span })
     }
 
     fn collect_fields<'a>(&self, tree: &GreenNode<'a, VosLanguage>, offset: usize, source: &SourceText, fields: &mut Vec<VosField>) -> Result<(), OakError> {
