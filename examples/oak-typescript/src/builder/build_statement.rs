@@ -289,6 +289,9 @@ impl<'config> TypeScriptBuilder<'config> {
                             if leaf.kind == TypeScriptTokenType::Declare {
                                 is_declare = true
                             }
+                            else if leaf.kind == TypeScriptTokenType::IdentifierName && name.is_empty() {
+                                name = source.get_text_in(leaf.span.into()).to_string();
+                            }
                         }
                     }
                 }
@@ -334,6 +337,9 @@ impl<'config> TypeScriptBuilder<'config> {
                         RedTree::Leaf(leaf) => {
                             if leaf.kind == TypeScriptTokenType::Declare {
                                 is_declare = true
+                            }
+                            else if leaf.kind == TypeScriptTokenType::IdentifierName && name.is_empty() {
+                                name = source.get_text_in(leaf.span.into()).to_string();
                             }
                         }
                     }

@@ -28,16 +28,17 @@ impl<'config> TypeScriptBuilder<'config> {
                                 }
                             }
                         }
+                        if name.is_empty() {
+                            name = source.get_text_in(child_node.span().into()).to_string();
+                        }
                         return Ok(Some(TypeAnnotation::Reference { name, args }));
                     }
                     TypeScriptElementType::UnionType => {
                         let mut types = Vec::new();
-                        for sub_child in child_node.children() {
-                            if let RedTree::Node(sub_node) = sub_child {
-                                if let Some(t) = self.build_type_annotation(&sub_node, source)? {
-                                    types.push(t);
-                                }
-                            }
+                        let text = source.get_text_in(child_node.span().into()).to_string();
+                        for part in text.split('|').map(str::trim).filter(|part| !part.is_empty()) {
+                            let predefined = matches!(part, "any" | "boolean" | "never" | "number" | "object" | "string" | "symbol" | "undefined" | "unknown" | "void");
+                            types.push(if predefined { TypeAnnotation::Predefined(part.to_string()) } else { TypeAnnotation::Reference { name: part.to_string(), args: Vec::new() } });
                         }
                         return Ok(Some(TypeAnnotation::Union(types)));
                     }
@@ -71,6 +72,57 @@ impl<'config> TypeScriptBuilder<'config> {
                             }
                         }
                         return Ok(Some(TypeAnnotation::Tuple(types)));
+                    }
+                    TypeScriptElementType::FunctionType => {
+                        let mut args = Vec::new();
+                        let mut return_type = None;
+                        for sub_child in child_node.children() {
+                            if let RedTree::Node(sub_node) = sub_child {
+                                match sub_node.green.kind {
+                                    TypeScriptElementType::Parameter => {
+                                        if let Some(param) = self.build_parameter(&sub_node, source)? {
+                                            args.push(param);
+                                        }
+                                    }
+                                    TypeScriptElementType::TypeAnnotation => {
+                                        return_type = self.build_type_annotation(&sub_node, source)?;
+                                    }
+                                    _ => {}
+                                }
+                            }
+                        }
+                        return Ok(Some(TypeAnnotation::Function { type_params: Vec::new(), args, return_type: Box::new(return_type.unwrap_or(TypeAnnotation::Predefined("void".to_string()))) }));
+                    }
+                    TypeScriptElementType::TypeLiteral => {
+                        let mut members = Vec::new();
+                        for sub_child in child_node.children() {
+                            let RedTree::Node(sub_node) = sub_child
+                            else {
+                                continue;
+                            };
+                            if sub_node.green.kind != TypeScriptElementType::PropertySignature {
+                                continue;
+                            }
+                            let text = source.get_text_in(sub_node.span().into()).to_string();
+                            let name = text.split_once(':').map(|(name, _)| name.trim().trim_end_matches('?').trim().to_string()).unwrap_or_else(|| text.trim().to_string());
+                            let ty = sub_node.children().find_map(|child| match child {
+                                RedTree::Node(node) if node.green.kind == TypeScriptElementType::TypeAnnotation => self.build_type_annotation(&node, source).ok().flatten(),
+                                _ => None,
+                            });
+                            members.push(ClassMember::Property {
+                                decorators: Vec::new(),
+                                name,
+                                ty,
+                                initializer: None,
+                                visibility: None,
+                                is_static: false,
+                                is_readonly: false,
+                                is_abstract: false,
+                                is_optional: text.contains('?'),
+                                span: sub_node.span().into(),
+                            });
+                        }
+                        return Ok(Some(TypeAnnotation::Object(members)));
                     }
                     TypeScriptElementType::LiteralType => {
                         for sub_child in child_node.children() {

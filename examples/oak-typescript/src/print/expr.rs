@@ -223,6 +223,42 @@ pub(super) fn print_type_annotation(ty: &TypeAnnotation) -> Option<String> {
             crate::ast::LiteralType::Boolean(b) => Some(if *b { "true" } else { "false" }.into()),
             crate::ast::LiteralType::BigInt(s) => Some(format!("{s}n")),
         },
+        TypeAnnotation::Reference { name, args } => {
+            if args.is_empty() {
+                Some(name.clone())
+            }
+            else {
+                Some(format!("{}<{}>", name, args.iter().map(print_type_annotation).collect::<Option<Vec<_>>>()?.join(", ")))
+            }
+        }
+        TypeAnnotation::Array(inner) => Some(format!("{}[]", print_type_annotation(inner)?)),
+        TypeAnnotation::Tuple(items) => Some(format!("[{}]", items.iter().map(print_type_annotation).collect::<Option<Vec<_>>>()?.join(", "))),
+        TypeAnnotation::Union(items) => Some(items.iter().map(print_type_annotation).collect::<Option<Vec<_>>>()?.join(" | ")),
+        TypeAnnotation::Intersection(items) => Some(items.iter().map(print_type_annotation).collect::<Option<Vec<_>>>()?.join(" & ")),
+        TypeAnnotation::Function { args, return_type, .. } => {
+            let params = args
+                .iter()
+                .map(|arg| {
+                    let ty = arg.ty.as_ref().and_then(print_type_annotation).map(|ty| format!(": {ty}")).unwrap_or_default();
+                    Some(format!("{}{}{}", arg.name, if arg.optional { "?" } else { "" }, ty))
+                })
+                .collect::<Option<Vec<_>>>()?
+                .join(", ");
+            Some(format!("({params}) => {}", print_type_annotation(return_type)?))
+        }
+        TypeAnnotation::Object(members) => {
+            let properties = members
+                .iter()
+                .map(|member| match member {
+                    crate::ast::ClassMember::Property { name, ty, is_optional, .. } => {
+                        let ty = print_type_annotation(ty.as_ref()?)?;
+                        Some(format!("{}{}: {}", name, if *is_optional { "?" } else { "" }, ty))
+                    }
+                    _ => None,
+                })
+                .collect::<Option<Vec<_>>>()?;
+            Some(format!("{{ {} }}", properties.join("; ")))
+        }
         _ => None,
     }
 }

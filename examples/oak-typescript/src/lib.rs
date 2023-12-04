@@ -91,6 +91,20 @@ mod object_literal_unit {
     }
 }
 
+#[cfg(test)]
+mod function_type_unit {
+    use crate::{format_source, FormatOptions};
+
+    #[test]
+    fn formats_function_types_inside_object_aliases() {
+        let source = r#"type Api = { "parse-subject": (subject: string) => ParsedSubject; "section-for-gitmoji": (gitmoji: string | undefined) => ReleaseSection; };"#;
+        let output = format_source(source, &FormatOptions::default()).unwrap();
+        assert!(output.contains("type Api = {"));
+        assert!(output.contains("\"parse-subject\": (subject: string) => ParsedSubject"));
+        assert!(output.contains("\"section-for-gitmoji\": (gitmoji: string | undefined) => ReleaseSection"));
+    }
+}
+
 #[cfg(feature = "lsp")]
 pub use crate::lsp::{TypeScriptLanguageService, formatter::TypeScriptFormatter, highlighter::TypeScriptHighlighter};
 

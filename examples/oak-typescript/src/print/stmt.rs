@@ -2,7 +2,7 @@
 
 use crate::ast::{
     BlockStatement, ClassDeclaration, ClassMember, DoWhileStatement, ExportDeclaration,
-    FunctionDeclaration, ImportDeclaration, ImportSpecifier, Statement, TryStatement, VariableDeclaration,
+    FunctionDeclaration, ImportDeclaration, ImportSpecifier, Statement, TryStatement, TypeAliasDeclaration, VariableDeclaration,
 };
 
 use super::expr::{print_expression, print_string};
@@ -25,6 +25,7 @@ pub fn print_statement(stmt: &Statement) -> Option<String> {
         Statement::ImportDeclaration(d) => print_import(d),
         Statement::ExportDeclaration(d) => print_export(d),
         Statement::FunctionDeclaration(d) => print_function(d),
+        Statement::TypeAlias(d) => print_type_alias(d),
         Statement::BlockStatement(b) => print_block(b),
         Statement::IfStatement(s) => {
             let test = print_expression(&s.test)?;
@@ -53,7 +54,6 @@ pub fn print_statement(stmt: &Statement) -> Option<String> {
         }),
         Statement::ClassDeclaration(d) => print_class(d),
         Statement::Interface(_)
-        | Statement::TypeAlias(_)
         | Statement::Enum(_)
         | Statement::ForStatement(_)
         | Statement::ForInStatement(_)
@@ -61,6 +61,11 @@ pub fn print_statement(stmt: &Statement) -> Option<String> {
         | Statement::SwitchStatement(_)
         | Statement::Namespace(_) => None,
     }
+}
+
+fn print_type_alias(d: &TypeAliasDeclaration) -> Option<String> {
+    let ty = super::expr::print_type_annotation(&d.ty)?;
+    Some(format!("type {} = {};", d.name, ty))
 }
 
 fn print_do_while(s: &DoWhileStatement) -> Option<String> {

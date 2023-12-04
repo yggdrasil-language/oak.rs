@@ -156,7 +156,8 @@ impl<'config> TypeScriptParser<'config> {
         while state.at(IdentifierName.into()) || state.at(LeftBrace.into()) || state.at(LeftBracket.into()) {
             if state.at(IdentifierName.into()) {
                 self.expect(state, IdentifierName).ok();
-            } else {
+            }
+            else {
                 self.parse_binding_pattern(state);
             }
             if self.eat(state, Equal) {
@@ -174,17 +175,14 @@ impl<'config> TypeScriptParser<'config> {
     fn parse_binding_pattern<'a, S: Source + ?Sized>(&self, state: &mut State<'a, S>) {
         use TypeScriptTokenType::*;
         let checkpoint = state.checkpoint();
-        let (open, close) = if state.at(LeftBrace.into()) {
-            (LeftBrace, RightBrace)
-        } else {
-            (LeftBracket, RightBracket)
-        };
+        let (open, close) = if state.at(LeftBrace.into()) { (LeftBrace, RightBrace) } else { (LeftBracket, RightBracket) };
         state.bump();
         let mut depth = 1usize;
         while state.not_at_end() && depth > 0 {
             if state.at(open.into()) {
                 depth += 1;
-            } else if state.at(close.into()) {
+            }
+            else if state.at(close.into()) {
                 depth -= 1;
             }
             state.bump();
@@ -265,6 +263,7 @@ impl<'config> TypeScriptParser<'config> {
         state.bump(); // type
         self.expect(state, IdentifierName).ok();
         self.expect(state, Equal).ok();
+        self.parse_type_annotation(state)?;
         while state.not_at_end() && !self.at(state, Semicolon) {
             self.skip_trivia(state);
             if state.not_at_end() && !self.at(state, Semicolon) { state.bump() } else { break }
