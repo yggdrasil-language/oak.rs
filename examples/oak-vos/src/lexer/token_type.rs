@@ -34,6 +34,8 @@ pub enum VosTokenType {
     Service,
     /// `micro` keyword.
     Micro,
+    /// `macro` keyword.
+    Macro,
     /// `query` keyword.
     Query,
     /// `udf` keyword.

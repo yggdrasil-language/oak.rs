@@ -22,6 +22,15 @@ fn preserves_current_vos_micro_authoring_surface() {
 }
 
 #[test]
+fn preserves_vos_macro_authoring_surface() {
+    let root = parse("macro public_name(value: utf8) -> utf8 { value.trim() }").expect("Oak parses macro declarations");
+    assert_eq!(root.declarations[0].kind, VosDeclarationKind::Macro);
+    assert_eq!(root.declarations[0].name.as_deref(), Some("public_name"));
+    assert_eq!(root.declarations[0].parameters[0].name, "value");
+    assert_eq!(root.declarations[0].return_type.as_ref().unwrap().text, "-> utf8");
+}
+
+#[test]
 fn classifies_query_and_udf_declarations() {
     let root = parse(
         "query active_users() { table User } udf normalize(value: utf8) -> utf8 { value }",

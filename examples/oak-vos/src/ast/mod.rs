@@ -60,6 +60,8 @@ pub enum VosDeclarationKind {
     Udf,
     /// Session-local micro declaration.
     Micro,
+    /// Durable macro declaration.
+    Macro,
 }
 
 /// A source-spanned top-level VOS declaration.

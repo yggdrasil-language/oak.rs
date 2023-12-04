@@ -28,6 +28,7 @@ impl VosBuilder {
             VosElementType::Query => VosDeclarationKind::Query,
             VosElementType::Udf => VosDeclarationKind::Udf,
             VosElementType::Micro => VosDeclarationKind::Micro,
+            VosElementType::Macro => VosDeclarationKind::Macro,
             _ => return None,
         })
     }

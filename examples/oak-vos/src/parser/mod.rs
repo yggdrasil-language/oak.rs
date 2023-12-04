@@ -29,6 +29,7 @@ impl VosParser {
             VosTokenType::Flags => VosElementType::Flags,
             VosTokenType::Service => VosElementType::Service,
             VosTokenType::Micro => VosElementType::Micro,
+            VosTokenType::Macro => VosElementType::Macro,
             VosTokenType::Udf => VosElementType::Udf,
             VosTokenType::Query => VosElementType::Query,
             VosTokenType::Using => VosElementType::Using,
@@ -63,12 +64,12 @@ impl VosParser {
                     break;
                 }
                 if kind == VosTokenType::LeftParen
-                    && matches!(element, VosElementType::Query | VosElementType::Udf | VosElementType::Micro)
+                    && matches!(element, VosElementType::Query | VosElementType::Udf | VosElementType::Micro | VosElementType::Macro)
                 {
                     self.parse_parameters(state)?;
                 } else if matches!(kind, VosTokenType::LeftParen | VosTokenType::LeftBracket) {
                     self.parse_group(state)?;
-                } else if matches!(element, VosElementType::Query | VosElementType::Udf | VosElementType::Micro)
+                } else if matches!(element, VosElementType::Query | VosElementType::Udf | VosElementType::Micro | VosElementType::Macro)
                     && state.peek_text().as_deref() == Some("-")
                 {
                     let return_checkpoint = state.checkpoint();

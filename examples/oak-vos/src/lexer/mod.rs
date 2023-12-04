@@ -33,6 +33,7 @@ impl VosLexer {
             "const" => VosTokenType::Const,
             "service" => VosTokenType::Service,
             "micro" => VosTokenType::Micro,
+            "macro" => VosTokenType::Macro,
             "query" => VosTokenType::Query,
             "udf" => VosTokenType::Udf,
             "let" => VosTokenType::Let,

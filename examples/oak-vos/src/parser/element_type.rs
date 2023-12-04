@@ -29,6 +29,8 @@ pub enum VosElementType {
     Udf,
     /// Session-local micro declaration.
     Micro,
+    /// Durable macro declaration.
+    Macro,
     /// Table or class field declaration.
     Field,
     /// Field attribute syntax.
@@ -78,6 +80,7 @@ impl From<crate::lexer::VosTokenType> for VosElementType {
             crate::lexer::VosTokenType::Query => Self::Query,
             crate::lexer::VosTokenType::Udf => Self::Udf,
             crate::lexer::VosTokenType::Micro => Self::Micro,
+            crate::lexer::VosTokenType::Macro => Self::Macro,
             _ => Self::Error,
         }
     }
