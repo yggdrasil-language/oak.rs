@@ -103,6 +103,28 @@ mod function_type_unit {
         assert!(output.contains("\"parse-subject\": (subject: string) => ParsedSubject"));
         assert!(output.contains("\"section-for-gitmoji\": (gitmoji: string | undefined) => ReleaseSection"));
     }
+
+    #[test]
+    fn formats_nifty_native_contract_shape() {
+        let source = r#"import type { ParsedSubject, ReleaseSection } from "./types.js";
+export type GitmojiExports = {
+    "known-gitmojis": () => string[];
+    "validate-subject": (subject: string) => boolean;
+    "leading-gitmoji": (subject: string) => string | undefined;
+    "section-for-gitmoji": (gitmoji: string | undefined) => ReleaseSection;
+    "author-mention": (email: string, authorName: string, authorMapJson: string) => string;
+};
+export type GitExports = {
+    "resolve-range": (
+        repoRoot: string,
+        version: string | undefined,
+        fromRef: string | undefined,
+        toRef: string | undefined,
+    ) => { version: string; "from-ref"?: string; "to-ref": string };
+    "list-tag-infos": (repoRoot: string) => Array<{ name: string; "short-hash": string }>;
+};"#;
+        format_source(source, &FormatOptions::default()).expect("Nifty native type contract should format");
+    }
 }
 
 #[cfg(feature = "lsp")]

@@ -399,8 +399,9 @@ impl<'config> TypeScriptParser<'config> {
         self.skip_trivia(state);
         // `export type …`
         if self.at(state, Type) {
-            state.bump();
-            self.skip_trivia(state);
+            self.parse_type_alias_declaration(state)?;
+            state.finish_at(cp, TypeScriptElementType::ExportDeclaration);
+            return Ok(());
         }
 
         if self.eat(state, Default) {
