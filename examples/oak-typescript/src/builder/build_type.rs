@@ -3,6 +3,7 @@ use oak_core::{OakError, RedNode, RedTree, Source, SourceText};
 
 impl<'config> TypeScriptBuilder<'config> {
     pub(crate) fn build_type_annotation(&self, node: &RedNode<TypeScriptLanguage>, source: &SourceText) -> Result<Option<TypeAnnotation>, OakError> {
+        let raw = source.get_text_in(node.span().into()).trim().to_string();
         for child in node.children() {
             if let RedTree::Node(child_node) = child {
                 let kind = child_node.green.kind;
@@ -151,7 +152,7 @@ impl<'config> TypeScriptBuilder<'config> {
                 }
             }
         }
-        Ok(None)
+        if raw.is_empty() { Ok(None) } else { Ok(Some(TypeAnnotation::Identifier(raw))) }
     }
 
     pub(crate) fn build_type_parameter(&self, node: &RedNode<TypeScriptLanguage>, source: &SourceText) -> Result<Option<TypeParameter>, OakError> {

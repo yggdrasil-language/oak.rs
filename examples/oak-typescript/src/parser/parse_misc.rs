@@ -61,100 +61,39 @@ impl<'config> TypeScriptParser<'config> {
     }
 
     pub(crate) fn parse_type_annotation<'a, S: Source + ?Sized>(&self, state: &mut State<'a, S>) -> Result<(), OakError> {
-        use crate::{lexer::token_type::TypeScriptTokenType::*, parser::element_type::TypeScriptElementType};
+        use crate::lexer::token_type::TypeScriptTokenType::*;
+        use crate::parser::element_type::TypeScriptElementType;
 
         let cp = state.checkpoint();
-        match self.peek_kind(state) {
-            Some(LeftParen) => {
-                state.bump();
-                while state.not_at_end() && !self.at(state, RightParen) {
-                    let parameter_cp = state.checkpoint();
-                    self.skip_trivia(state);
-                    if self.at(state, DotDotDot) {
-                        state.bump();
-                    }
-                    if self.at(state, IdentifierName) || self.at(state, StringLiteral) {
-                        state.bump();
-                    }
-                    self.eat(state, Question);
-                    if self.eat(state, Colon) {
-                        self.parse_type_annotation(state)?;
-                    }
-                    state.finish_at(parameter_cp, TypeScriptElementType::Parameter);
-                    self.eat(state, Comma);
-                    if state.checkpoint().0 == parameter_cp.0 && state.not_at_end() {
-                        state.bump();
-                    }
-                }
-                self.expect(state, RightParen).ok();
-                if self.eat(state, Arrow) {
-                    self.parse_type_annotation(state)?;
-                    state.finish_at(cp, TypeScriptElementType::FunctionType);
-                }
-                else {
-                    state.finish_at(cp, TypeScriptElementType::TupleType);
-                }
+        let mut parens = 0usize;
+        let mut brackets = 0usize;
+        let mut braces = 0usize;
+        let mut angles = 0usize;
+        let mut consumed = false;
+
+        while state.not_at_end() {
+            let Some(kind) = self.peek_kind(state) else { break };
+            if consumed && parens == 0 && brackets == 0 && braces == 0 && angles == 0 && matches!(kind, Comma | Semicolon | RightParen | RightBrace | Equal) {
+                break;
             }
-            Some(LeftBrace) => {
-                state.bump();
-                while state.not_at_end() && !self.at(state, RightBrace) {
-                    let member_cp = state.checkpoint();
-                    self.skip_trivia(state);
-                    if self.at(state, IdentifierName) || self.at(state, StringLiteral) || self.at(state, NumericLiteral) {
-                        state.bump();
-                        self.eat(state, Question);
-                        if self.eat(state, Colon) {
-                            self.parse_type_annotation(state)?;
-                        }
-                        self.eat(state, Comma);
-                        self.eat(state, Semicolon);
-                        state.finish_at(member_cp, TypeScriptElementType::PropertySignature);
-                    }
-                    else if state.not_at_end() {
-                        state.bump();
-                    }
-                }
-                self.expect(state, RightBrace).ok();
-                state.finish_at(cp, TypeScriptElementType::TypeLiteral);
+            match kind {
+                LeftParen => parens += 1,
+                RightParen if parens > 0 => parens -= 1,
+                LeftBracket => brackets += 1,
+                RightBracket if brackets > 0 => brackets -= 1,
+                LeftBrace => braces += 1,
+                RightBrace if braces > 0 => braces -= 1,
+                Less => angles += 1,
+                Greater if angles > 0 => angles -= 1,
+                _ => {}
             }
-            Some(PredefinedType | Any | Boolean | Never | Number | Object | String | Symbol | Undefined | Unknown | Void) => {
-                state.bump();
-                state.finish_at(cp, TypeScriptElementType::PredefinedType);
-                if self.eat(state, Pipe) {
-                    while state.not_at_end() {
-                        self.parse_type_annotation(state)?;
-                        if !self.eat(state, Pipe) {
-                            break;
-                        }
-                    }
-                    state.finish_at(cp, TypeScriptElementType::UnionType);
-                }
-            }
-            Some(StringLiteral | NumericLiteral | True | False) => {
-                state.bump();
-                state.finish_at(cp, TypeScriptElementType::LiteralType);
-            }
-            Some(IdentifierName | Typeof | Keyof) => {
-                state.bump();
-                state.finish_at(cp, TypeScriptElementType::TypeReference);
-                if self.eat(state, Pipe) {
-                    while state.not_at_end() {
-                        self.parse_type_annotation(state)?;
-                        if !self.eat(state, Pipe) {
-                            break;
-                        }
-                    }
-                    state.finish_at(cp, TypeScriptElementType::UnionType);
-                }
-            }
-            _ => {
-                if state.not_at_end() {
-                    state.bump();
-                    state.finish_at(cp, TypeScriptElementType::TypeReference);
-                }
-            }
+            state.bump();
+            consumed = true;
         }
-        state.finish_at(cp, TypeScriptElementType::TypeAnnotation);
+
+        if consumed {
+            state.finish_at(cp, TypeScriptElementType::TypeAnnotation);
+        }
         Ok(())
     }
 
