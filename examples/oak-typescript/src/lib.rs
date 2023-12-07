@@ -128,16 +128,31 @@ export type GitExports = {
 
     #[test]
     fn formats_nifty_native_function_tail() {
-        let source = r#"export function loadNiftyNative(): NativeApi {
+        let source = r#"const cached: NiftyNative | undefined;
+export function loadNiftyNative(): NiftyNative {
+    if (cached) {
+        return cached;
+    }
+    const key = `${process.platform}-${process.arch}`;
+    const pkg = PLATFORM_PACKAGES[key];
+    if (!pkg) {
+        throw new Error(`Unsupported platform for Nifty native bindings: ${key}`);
+    }
+    const require = createRequire(import.meta.url);
     const binding = require(pkg).default as NativeBinding;
     cached = wrapBinding(binding);
     return cached;
 }
 
 export function mapTagInfo(raw: { name: string; "short-hash": string }): TagInfo {
-    return { name: raw.name, "short-hash": raw["short-hash"] };
+    return { name: raw.name, shortHash: raw["short-hash"] };
 }"#;
         format_source(source, &FormatOptions::default()).expect("Nifty native function tail should format");
+    }
+
+    #[test]
+    fn formats_import_meta_expression() {
+        format_source("const require = createRequire(import.meta.url);", &FormatOptions::default()).expect("import.meta should format");
     }
 }
 

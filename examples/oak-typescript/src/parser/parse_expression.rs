@@ -16,8 +16,23 @@ impl<'config> TypeScriptParser<'config> {
                 self.parse_function_declaration_content(state).ok();
                 state.finish_at(cp, crate::parser::element_type::TypeScriptElementType::FunctionExpression)
             }
+            Some(Import) => {
+                state.bump();
+                if self.eat(state, Dot) {
+                    self.expect(state, IdentifierName).ok();
+                    state.finish_at(cp, crate::parser::element_type::TypeScriptElementType::MemberExpression)
+                }
+                else {
+                    state.finish_at(cp, crate::parser::element_type::TypeScriptElementType::IdentifierName)
+                }
+            }
             Some(IdentifierName) => {
-                self.expect(state, IdentifierName).ok();
+                if self.at(state, IdentifierName) {
+                    state.bump();
+                }
+                else {
+                    state.bump();
+                }
                 state.finish_at(cp, crate::parser::element_type::TypeScriptElementType::IdentifierName)
             }
             // Keywords that are valid primary expressions (not Error leaves).
@@ -222,7 +237,17 @@ impl<'config> TypeScriptParser<'config> {
                 while state.not_at_end() && !self.at(state, RightParen) {
                     self.skip_trivia(state);
                     let acp = state.checkpoint();
-                    PrattParser::parse(state, 0, self);
+                    if self.at(state, Import) {
+                        state.bump();
+                        self.eat(state, Dot);
+                        self.expect(state, IdentifierName).ok();
+                        if self.eat(state, Dot) {
+                            self.expect(state, IdentifierName).ok();
+                        }
+                    }
+                    else {
+                        PrattParser::parse(state, 0, self);
+                    }
                     state.finish_at(acp, crate::parser::element_type::TypeScriptElementType::CallArgument);
                     if state.checkpoint().0 == acp.0 {
                         state.bump();
