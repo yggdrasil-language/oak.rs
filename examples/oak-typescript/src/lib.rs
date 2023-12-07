@@ -125,6 +125,20 @@ export type GitExports = {
 };"#;
         format_source(source, &FormatOptions::default()).expect("Nifty native type contract should format");
     }
+
+    #[test]
+    fn formats_nifty_native_function_tail() {
+        let source = r#"export function loadNiftyNative(): NativeApi {
+    const binding = require(pkg).default as NativeBinding;
+    cached = wrapBinding(binding);
+    return cached;
+}
+
+export function mapTagInfo(raw: { name: string; "short-hash": string }): TagInfo {
+    return { name: raw.name, "short-hash": raw["short-hash"] };
+}"#;
+        format_source(source, &FormatOptions::default()).expect("Nifty native function tail should format");
+    }
 }
 
 #[cfg(feature = "lsp")]

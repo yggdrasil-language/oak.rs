@@ -4,6 +4,7 @@ use oak_core::{
     parser::pratt::{Associativity, PrattParser, binary},
     source::Source,
 };
+use crate::lexer::token_type::TypeScriptTokenType;
 
 impl<'config> TypeScriptParser<'config> {
     pub(crate) fn primary<'a, S: Source + ?Sized>(&self, state: &mut State<'a, S>) -> &'a GreenNode<'a, crate::language::TypeScriptLanguage> {
@@ -236,7 +237,12 @@ impl<'config> TypeScriptParser<'config> {
                 let cp = state.checkpoint_before(left);
                 let op = if kind == Dot { Dot } else { QuestionDot };
                 self.expect(state, op).ok();
-                self.expect(state, IdentifierName).ok();
+                if self.at(state, IdentifierName) || state.peek_text().is_some_and(|text| TypeScriptTokenType::from_keyword(&text).is_some()) {
+                    state.bump();
+                }
+                else {
+                    self.expect(state, IdentifierName).ok();
+                }
                 Some(state.finish_at(cp, crate::parser::element_type::TypeScriptElementType::MemberExpression.into()))
             }
             LeftBracket => {
