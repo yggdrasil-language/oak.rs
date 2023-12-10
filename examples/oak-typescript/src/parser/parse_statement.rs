@@ -205,12 +205,8 @@ impl<'config> TypeScriptParser<'config> {
             self.expect(state, IdentifierName).ok();
         }
         self.parse_parameters(state)?;
-        // Skip return type annotation
         if self.eat(state, Colon) {
-            while state.not_at_end() && !self.at(state, LeftBrace) && !self.at(state, Semicolon) {
-                self.skip_trivia(state);
-                if state.not_at_end() && !self.at(state, LeftBrace) && !self.at(state, Semicolon) { state.bump() } else { break }
-            }
+            self.parse_type_annotation(state)?;
         }
         if self.at(state, LeftBrace) {
             self.parse_block(state)?

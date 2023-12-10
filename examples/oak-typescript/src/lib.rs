@@ -151,6 +151,14 @@ export function mapTagInfo(raw: { name: string; "short-hash": string }): TagInfo
     }
 
     #[test]
+    fn formats_optional_properties_in_function_return_types() {
+        let source = r#"export function authPayload(options: AuthCliOptions): { otp?: string; totpSecret?: string; token?: string; npm: string } {
+    return { npm: options.npm };
+}"#;
+        format_source(source, &FormatOptions::default()).expect("optional return properties should format");
+    }
+
+    #[test]
     fn formats_import_meta_expression() {
         format_source("const require = createRequire(import.meta.url);", &FormatOptions::default()).expect("import.meta should format");
     }
