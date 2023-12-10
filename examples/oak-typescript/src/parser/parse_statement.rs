@@ -357,6 +357,10 @@ impl<'config> TypeScriptParser<'config> {
         self.expect(state, LeftBrace).ok();
         while state.not_at_end() && !self.at(state, RightBrace) {
             self.skip_trivia(state);
+            if self.at(state, Type) {
+                state.bump();
+                self.skip_trivia(state);
+            }
             if self.at(state, IdentifierName) {
                 let spec_cp = state.checkpoint();
                 self.parse_import_identifier(state);
