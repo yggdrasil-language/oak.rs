@@ -165,6 +165,12 @@ export function mapTagInfo(raw: { name: string; "short-hash": string }): TagInfo
     }
 
     #[test]
+    fn formats_async_function_exports() {
+        let source = r#"export async function loadValue(): Promise<string> { return "ok"; }"#;
+        format_source(source, &FormatOptions::default()).expect("async exports should format");
+    }
+
+    #[test]
     fn formats_import_meta_expression() {
         format_source("const require = createRequire(import.meta.url);", &FormatOptions::default()).expect("import.meta should format");
     }

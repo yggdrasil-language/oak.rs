@@ -65,7 +65,7 @@ impl<'config> TypeScriptParser<'config> {
                 Some(Var) | Some(Let) | Some(Const) => {
                     self.parse_variable_declaration(state)?;
                 }
-                Some(Function) => {
+                Some(Function) | Some(Async) => {
                     self.parse_function_declaration(state)?;
                 }
                 Some(Class) | Some(Abstract) => {
@@ -199,7 +199,10 @@ impl<'config> TypeScriptParser<'config> {
 
     pub(crate) fn parse_function_declaration_content<'a, S: Source + ?Sized>(&self, state: &mut State<'a, S>) -> Result<(), OakError> {
         use crate::lexer::token_type::TypeScriptTokenType::*;
-        state.bump(); // function
+        if self.eat(state, Async) {
+            self.skip_trivia(state);
+        }
+        self.expect(state, Function).ok();
         self.skip_trivia(state);
         if self.at(state, IdentifierName) {
             self.expect(state, IdentifierName).ok();
