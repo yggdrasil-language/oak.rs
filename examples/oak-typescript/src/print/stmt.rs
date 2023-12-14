@@ -120,7 +120,22 @@ fn print_import(d: &ImportDeclaration) -> Option<String> {
 }
 
 fn print_export(d: &ExportDeclaration) -> Option<String> {
-    if !d.specifiers.is_empty() || d.source.is_some() || d.is_type_only {
+    if !d.specifiers.is_empty() {
+        let mut parts = Vec::with_capacity(d.specifiers.len());
+        for specifier in &d.specifiers {
+            let type_kw = if specifier.is_type_only { "type " } else { "" };
+            let name = if specifier.local == specifier.exported {
+                specifier.local.clone()
+            }
+            else {
+                format!("{} as {}", specifier.local, specifier.exported)
+            };
+            parts.push(format!("{type_kw}{name}"));
+        }
+        let source = d.source.as_ref().map(|value| format!(" from {}", print_string(value))).unwrap_or_default();
+        return Some(format!("export {{ {} }}{source};", parts.join(", ")));
+    }
+    if d.source.is_some() || d.is_type_only {
         return None;
     }
     let default_kw = if d.is_default { "default " } else { "" };

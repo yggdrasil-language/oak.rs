@@ -171,6 +171,12 @@ export function mapTagInfo(raw: { name: string; "short-hash": string }): TagInfo
     }
 
     #[test]
+    fn formats_inline_type_export_specifiers() {
+        let source = r#"export { value, type Value } from "./value.js";"#;
+        format_source(source, &FormatOptions::default()).expect("inline type exports should format");
+    }
+
+    #[test]
     fn formats_import_meta_expression() {
         format_source("const require = createRequire(import.meta.url);", &FormatOptions::default()).expect("import.meta should format");
     }

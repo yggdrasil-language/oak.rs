@@ -798,6 +798,7 @@ impl<'config> TypeScriptBuilder<'config> {
                                             if named_node.green.kind == TypeScriptElementType::ExportSpecifier {
                                                 let mut local = String::new();
                                                 let mut exported = String::new();
+                                                let mut is_type_only = false;
                                                 for spec_child in named_node.children() {
                                                     if let RedTree::Node(spec_node) = spec_child {
                                                         if spec_node.green.kind == TypeScriptElementType::IdentifierName {
@@ -805,11 +806,16 @@ impl<'config> TypeScriptBuilder<'config> {
                                                             if local.is_empty() { local = name } else { exported = name }
                                                         }
                                                     }
+                                                    else if let RedTree::Leaf(leaf) = spec_child {
+                                                        if leaf.kind == TypeScriptTokenType::Type {
+                                                            is_type_only = true;
+                                                        }
+                                                    }
                                                 }
                                                 if exported.is_empty() {
                                                     exported = local.clone()
                                                 }
-                                                specifiers.push(ExportSpecifier { local, exported })
+                                                specifiers.push(ExportSpecifier { local, exported, is_type_only })
                                             }
                                         }
                                     }

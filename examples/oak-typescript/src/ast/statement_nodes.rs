@@ -447,6 +447,8 @@ pub struct ExportSpecifier {
     pub local: String,
     /// Exported name.
     pub exported: String,
+    /// Whether this specifier is type-only.
+    pub is_type_only: bool,
 }
 
 /// Represents an import declaration.
