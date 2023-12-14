@@ -177,6 +177,23 @@ export function mapTagInfo(raw: { name: string; "short-hash": string }): TagInfo
     }
 
     #[test]
+    fn formats_nifty_cli_index_exports() {
+        let source = r#"export { runCli } from "./main.js";
+export { bumpSemver, bumpWorkspace, runBump, type BumpKind, type BumpOptions, type BumpReport } from "./bump.js";
+export { runPublish, type PublishOptions, type PublishReport } from "./publish.js";
+export { runTrust, type TrustReport } from "./trust.js";
+export { runUpdate } from "./update.js";
+export { runLint } from "./lint.js";
+export { runUpload } from "./upload.js";
+export { installNativeFromOptions, type InstallNativeOptions } from "./install-native.js";
+export { findWorkspaceRoot, listWorkspacePackages, type WorkspacePackage } from "./workspace.js";"#;
+        let output = format_source(source, &FormatOptions::default()).expect("nifty cli exports should format");
+        println!("OUTPUT={output}");
+        assert!(output.contains("type BumpKind"));
+        assert!(output.contains("type WorkspacePackage"));
+    }
+
+    #[test]
     fn formats_import_meta_expression() {
         format_source("const require = createRequire(import.meta.url);", &FormatOptions::default()).expect("import.meta should format");
     }
@@ -187,3 +204,6 @@ pub use crate::lsp::{TypeScriptLanguageService, formatter::TypeScriptFormatter, 
 
 #[cfg(feature = "mcp")]
 pub use crate::mcp::serve_typescript_mcp;
+
+
+

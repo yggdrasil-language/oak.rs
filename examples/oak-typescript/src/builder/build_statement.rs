@@ -793,12 +793,16 @@ impl<'config> TypeScriptBuilder<'config> {
                             let child_kind = child_node.green.kind;
                             match child_kind {
                                 TypeScriptElementType::NamedExports => {
+                                    let mut pending_type_only = false;
                                     for named_child in child_node.children() {
                                         if let RedTree::Node(named_node) = named_child {
                                             if named_node.green.kind == TypeScriptElementType::ExportSpecifier {
                                                 let mut local = String::new();
                                                 let mut exported = String::new();
-                                                let mut is_type_only = false;
+                                                let span = named_node.span();
+                                                let prefix_start = span.start.saturating_sub(5);
+                                                let prefix = source.get_text_in((prefix_start..span.start).into()).trim().to_string();
+                                                let mut is_type_only = pending_type_only || prefix == "type" || source.get_text_in(span.into()).trim_start().starts_with("type ");
                                                 for spec_child in named_node.children() {
                                                     if let RedTree::Node(spec_node) = spec_child {
                                                         if spec_node.green.kind == TypeScriptElementType::IdentifierName {
@@ -817,6 +821,9 @@ impl<'config> TypeScriptBuilder<'config> {
                                                 }
                                                 specifiers.push(ExportSpecifier { local, exported, is_type_only })
                                             }
+                                        }
+                                        else if let RedTree::Leaf(leaf) = named_child {
+                                            pending_type_only = leaf.kind == TypeScriptTokenType::Type;
                                         }
                                     }
                                 }
@@ -849,3 +856,4 @@ impl<'config> TypeScriptBuilder<'config> {
         }
     }
 }
+
