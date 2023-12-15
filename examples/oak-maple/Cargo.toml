@@ -1,0 +1,20 @@
+[package]
+name = "oak-maple"
+version.workspace = true
+authors.workspace = true
+description = "Maple expression language parser for Oak."
+edition.workspace = true
+license.workspace = true
+homepage.workspace = true
+repository = "https://github.com/yggdrasil-language/oak.rs/tree/master/examples/oak-maple"
+documentation = "https://docs.rs/oak-maple"
+categories = ["parsing"]
+keywords = ["parser", "maple", "symbolic", "oak"]
+
+[dependencies]
+oak-core = { workspace = true }
+serde = { workspace = true, optional = true }
+
+[features]
+default = ["serde"]
+serde = ["dep:serde", "oak-core/serde"]
