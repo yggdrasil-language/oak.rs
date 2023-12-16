@@ -193,6 +193,45 @@ export { findWorkspaceRoot, listWorkspacePackages, type WorkspacePackage } from 
     }
 
     #[test]
+    fn formats_const_asserted_array_literals() {
+        format_source("const values = [\"a\"] as const;", &FormatOptions::default())
+            .expect("const assertions should format");
+    }
+
+    #[test]
+    fn formats_readonly_array_type_members() {
+        format_source(
+            "type Config = { values: readonly string[] | undefined };",
+            &FormatOptions::default(),
+        )
+        .expect("readonly array type members should format");
+    }
+
+    #[test]
+    fn formats_readonly_array_record_types() {
+        format_source(
+            "type Presets = Record<NiftyFormatPreset, readonly string[] | undefined>;",
+            &FormatOptions::default(),
+        )
+        .expect("readonly array record types should format");
+    }
+
+    #[test]
+    fn formats_nifty_format_presets_source() {
+        let source = include_str!("E:/vmz 全栈开发/npm-tools/projects/packages/nifty/src/config/formatPresets.ts");
+        format_source(source, &FormatOptions::default()).expect("Nifty format presets should format");
+    }
+
+    #[test]
+    fn formats_preset_record_declaration() {
+        format_source(
+            "const PRESET_INCLUDES: Record<NiftyFormatPreset, readonly string[] | undefined> = { default: undefined };",
+            &FormatOptions::default(),
+        )
+        .expect("preset record declaration should format");
+    }
+
+    #[test]
     fn formats_import_meta_expression() {
         format_source("const require = createRequire(import.meta.url);", &FormatOptions::default()).expect("import.meta should format");
     }

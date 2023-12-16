@@ -160,6 +160,9 @@ impl<'config> TypeScriptParser<'config> {
             else {
                 self.parse_binding_pattern(state);
             }
+            if self.eat(state, Colon) {
+                self.parse_type_annotation(state)?;
+            }
             if self.eat(state, Equal) {
                 PrattParser::parse(state, 0, self);
             }
