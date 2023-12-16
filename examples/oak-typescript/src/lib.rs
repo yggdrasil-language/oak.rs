@@ -188,7 +188,6 @@ export { runUpload } from "./upload.js";
 export { installNativeFromOptions, type InstallNativeOptions } from "./install-native.js";
 export { findWorkspaceRoot, listWorkspacePackages, type WorkspacePackage } from "./workspace.js";"#;
         let output = format_source(source, &FormatOptions::default()).expect("nifty cli exports should format");
-        println!("OUTPUT={output}");
         assert!(output.contains("type BumpKind"));
         assert!(output.contains("type WorkspacePackage"));
     }

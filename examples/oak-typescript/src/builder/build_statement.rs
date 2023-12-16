@@ -799,10 +799,7 @@ impl<'config> TypeScriptBuilder<'config> {
                                             if named_node.green.kind == TypeScriptElementType::ExportSpecifier {
                                                 let mut local = String::new();
                                                 let mut exported = String::new();
-                                                let span = named_node.span();
-                                                let prefix_start = span.start.saturating_sub(5);
-                                                let prefix = source.get_text_in((prefix_start..span.start).into()).trim().to_string();
-                                                let mut is_type_only = pending_type_only || prefix == "type" || source.get_text_in(span.into()).trim_start().starts_with("type ");
+                                                let mut is_type_only = pending_type_only;
                                                 for spec_child in named_node.children() {
                                                     if let RedTree::Node(spec_node) = spec_child {
                                                         if spec_node.green.kind == TypeScriptElementType::IdentifierName {
