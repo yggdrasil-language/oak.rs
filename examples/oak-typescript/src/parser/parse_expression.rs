@@ -64,6 +64,9 @@ impl<'config> TypeScriptParser<'config> {
                 while state.not_at_end() && !self.at(state, RightParen) {
                     let acp = state.checkpoint();
                     PrattParser::parse(state, 0, self);
+                    if self.eat(state, Colon) {
+                        self.parse_type_annotation(state).ok();
+                    }
                     state.finish_at(acp, crate::parser::element_type::TypeScriptElementType::Parameter);
                     if state.checkpoint().0 == acp.0 {
                         state.bump();
@@ -74,6 +77,9 @@ impl<'config> TypeScriptParser<'config> {
                     }
                 }
                 self.expect(state, RightParen).ok();
+                if self.eat(state, Colon) {
+                    self.parse_return_type_annotation(state).ok();
+                }
                 state.finish_at(cp, crate::parser::element_type::TypeScriptElementType::ArrowFunction)
             }
             Some(Less) if self.config.jsx => self.parse_jsx_element(state),

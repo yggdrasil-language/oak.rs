@@ -232,6 +232,16 @@ export { findWorkspaceRoot, listWorkspacePackages, type WorkspacePackage } from 
     }
 
     #[test]
+    fn formats_typed_arrow_return_config_source() {
+        let source = r#"const DEFAULT_ENV = (cwd: string): NiftyConfigEnv => ({
+    mode: process.env.NODE_ENV ?? "development",
+    command: "serve",
+    layout: detectProjectLayout(cwd),
+});"#;
+        format_source(source, &FormatOptions::default()).expect("typed arrow return should format");
+    }
+
+    #[test]
     fn formats_import_meta_expression() {
         format_source("const require = createRequire(import.meta.url);", &FormatOptions::default()).expect("import.meta should format");
     }

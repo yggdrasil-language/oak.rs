@@ -61,6 +61,14 @@ impl<'config> TypeScriptParser<'config> {
     }
 
     pub(crate) fn parse_type_annotation<'a, S: Source + ?Sized>(&self, state: &mut State<'a, S>) -> Result<(), OakError> {
+        self.parse_type_annotation_with_arrow(state, false)
+    }
+
+    pub(crate) fn parse_return_type_annotation<'a, S: Source + ?Sized>(&self, state: &mut State<'a, S>) -> Result<(), OakError> {
+        self.parse_type_annotation_with_arrow(state, true)
+    }
+
+    fn parse_type_annotation_with_arrow<'a, S: Source + ?Sized>(&self, state: &mut State<'a, S>, stop_at_arrow: bool) -> Result<(), OakError> {
         use crate::lexer::token_type::TypeScriptTokenType::*;
         use crate::parser::element_type::TypeScriptElementType;
 
@@ -73,7 +81,7 @@ impl<'config> TypeScriptParser<'config> {
 
         while state.not_at_end() {
             let Some(kind) = self.peek_kind(state) else { break };
-            if consumed && parens == 0 && brackets == 0 && braces == 0 && angles == 0 && matches!(kind, Comma | Semicolon | RightParen | RightBrace | Equal) {
+            if consumed && parens == 0 && brackets == 0 && braces == 0 && angles == 0 && (matches!(kind, Comma | Semicolon | RightParen | RightBrace | Equal) || (stop_at_arrow && matches!(kind, Arrow))) {
                 break;
             }
             match kind {

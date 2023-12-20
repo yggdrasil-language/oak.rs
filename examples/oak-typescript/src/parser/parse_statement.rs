@@ -212,7 +212,7 @@ impl<'config> TypeScriptParser<'config> {
         }
         self.parse_parameters(state)?;
         if self.eat(state, Colon) {
-            self.parse_type_annotation(state)?;
+            self.parse_return_type_annotation(state)?;
         }
         if self.at(state, LeftBrace) {
             self.parse_block(state)?
