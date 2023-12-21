@@ -503,6 +503,13 @@ impl<'config> TypeScriptParser<'config> {
             let cp = state.checkpoint();
             self.parse_variable_declaration_content(state)?;
             state.finish_at(cp, crate::parser::element_type::TypeScriptElementType::VariableDeclaration);
+            if self.eat(state, Of) {
+                PrattParser::parse(state, 0, self);
+                self.expect(state, RightParen).ok();
+                self.parse_statement(state)?;
+                state.finish_at(cp, crate::parser::element_type::TypeScriptElementType::ForOfStatement);
+                return Ok(());
+            }
         }
         else {
             if !self.at(state, Semicolon) {

@@ -242,6 +242,15 @@ export { findWorkspaceRoot, listWorkspacePackages, type WorkspacePackage } from 
     }
 
     #[test]
+    fn formats_for_of_config_source() {
+        format_source(
+            "for (const name of CONFIG_FILE_NAMES) { const candidate = join(here, name); }",
+            &FormatOptions::default(),
+        )
+        .expect("for-of should format");
+    }
+
+    #[test]
     fn formats_import_meta_expression() {
         format_source("const require = createRequire(import.meta.url);", &FormatOptions::default()).expect("import.meta should format");
     }
