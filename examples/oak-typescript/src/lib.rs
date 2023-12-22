@@ -251,6 +251,15 @@ export { findWorkspaceRoot, listWorkspacePackages, type WorkspacePackage } from 
     }
 
     #[test]
+    fn formats_multiline_type_exports() {
+        format_source(
+            "export type {\n    CommitRecord,\n    GithubAuthor,\n} from \"./types.js\";",
+            &FormatOptions::default(),
+        )
+        .expect("multiline type exports should format");
+    }
+
+    #[test]
     fn formats_import_meta_expression() {
         format_source("const require = createRequire(import.meta.url);", &FormatOptions::default()).expect("import.meta should format");
     }

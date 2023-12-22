@@ -405,7 +405,17 @@ impl<'config> TypeScriptParser<'config> {
         self.skip_trivia(state);
         // `export type …`
         if self.at(state, Type) {
-            self.parse_type_alias_declaration(state)?;
+            let type_cp = state.checkpoint();
+            state.bump();
+            self.skip_trivia(state);
+            if self.at(state, LeftBrace) {
+                self.parse_named_exports(state);
+                self.eat(state, Semicolon);
+            }
+            else {
+                state.restore(type_cp);
+                self.parse_type_alias_declaration(state)?;
+            }
             state.finish_at(cp, TypeScriptElementType::ExportDeclaration);
             return Ok(());
         }
