@@ -410,6 +410,9 @@ impl<'config> TypeScriptParser<'config> {
             self.skip_trivia(state);
             if self.at(state, LeftBrace) {
                 self.parse_named_exports(state);
+                if self.eat(state, From) {
+                    self.parse_import_string_literal(state);
+                }
                 self.eat(state, Semicolon);
             }
             else {
@@ -510,9 +513,9 @@ impl<'config> TypeScriptParser<'config> {
         // Init
         self.skip_trivia(state);
         if self.at(state, Var) || self.at(state, Let) || self.at(state, Const) {
-            let cp = state.checkpoint();
+            let declaration_cp = state.checkpoint();
             self.parse_variable_declaration_content(state)?;
-            state.finish_at(cp, crate::parser::element_type::TypeScriptElementType::VariableDeclaration);
+            state.finish_at(declaration_cp, crate::parser::element_type::TypeScriptElementType::VariableDeclaration);
             if self.eat(state, Of) {
                 PrattParser::parse(state, 0, self);
                 self.expect(state, RightParen).ok();
