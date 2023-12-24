@@ -2,7 +2,6 @@
 #![feature(new_range_api)]
 #![warn(missing_docs)]
 
-mod cst_format;
 mod print;
 
 /// AST module for TypeScript.

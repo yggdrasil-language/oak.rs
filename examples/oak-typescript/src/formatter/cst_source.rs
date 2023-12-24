@@ -12,17 +12,10 @@ use crate::{
     parser::{TypeScriptParser, element_type::TypeScriptElementType},
 };
 
-mod formatter_bridge;
-mod options;
-mod red_tree;
-mod trivia_guard;
-
-use red_tree::TypeScriptRedTreeFormatter;
-
-pub use options::CstFormatOptions;
+use super::{cst_options::CstFormatOptions, red_tree::TypeScriptRedTreeFormatter};
 
 /// Format a parsed `SourceFile` red node with companion source text.
-pub fn format_source_file(source: &str, file: &RedNode<'_, TypeScriptLanguage>, options: &CstFormatOptions) -> Result<String, String> {
+pub(crate) fn format_source_file(source: &str, file: &RedNode<'_, TypeScriptLanguage>, options: &CstFormatOptions) -> Result<String, String> {
     if file.element_type() != TypeScriptElementType::SourceFile {
         return Err(format!("expected SourceFile root, got {:?}", file.element_type()));
     }
@@ -66,7 +59,7 @@ pub fn format_source_file(source: &str, file: &RedNode<'_, TypeScriptLanguage>, 
 }
 
 /// Format TypeScript/JavaScript source with trivia between top-level statements preserved.
-pub fn format_source(source: &str, options: &CstFormatOptions) -> Result<String, String> {
+pub(crate) fn format_source(source: &str, options: &CstFormatOptions) -> Result<String, String> {
     if source.is_empty() {
         return Ok(String::new());
     }

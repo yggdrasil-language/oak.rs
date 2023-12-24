@@ -1,21 +1,21 @@
-//! `VariableDeclaration` RedTree formatting rule (first `FormatRule` scaffold).
+//! `ImportDeclaration` RedTree formatting rule.
 
 use oak_core::tree::{RedLeaf, RedNode};
 use oak_pretty_print::{Document, FormatContext, FormatResult, FormatRule};
 
 use crate::{
-    cst_format::{CstFormatOptions, trivia_guard},
+    formatter::{CstFormatOptions, trivia_guard},
     language::TypeScriptLanguage,
     parser::element_type::TypeScriptElementType,
     print::{FormatOptions, format_source as ast_print_source},
 };
 
-/// Formats `const`/`let`/`var` declarations via AST print when trivia guards pass.
-pub struct VariableDeclarationRule;
+/// Formats `import` declarations via AST print when trivia guards pass.
+pub struct ImportDeclarationRule;
 
-impl FormatRule<TypeScriptLanguage, CstFormatOptions> for VariableDeclarationRule {
+impl FormatRule<TypeScriptLanguage, CstFormatOptions> for ImportDeclarationRule {
     fn name(&self) -> &str {
-        "typescript.variable_declaration"
+        "typescript.import_declaration"
     }
 
     fn priority(&self) -> u8 {
@@ -23,7 +23,7 @@ impl FormatRule<TypeScriptLanguage, CstFormatOptions> for VariableDeclarationRul
     }
 
     fn applies_to_node(&self, node: &RedNode<TypeScriptLanguage>) -> bool {
-        node.element_type() == TypeScriptElementType::VariableDeclaration
+        node.element_type() == TypeScriptElementType::ImportDeclaration
     }
 
     fn apply_node<'a>(

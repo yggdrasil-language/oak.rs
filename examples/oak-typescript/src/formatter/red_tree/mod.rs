@@ -12,7 +12,7 @@ use crate::{
     print::{FormatOptions, format_source as ast_print_source},
 };
 
-use super::{CstFormatOptions, trivia_guard};
+use super::{cst_options::CstFormatOptions, trivia_guard};
 
 mod rules;
 

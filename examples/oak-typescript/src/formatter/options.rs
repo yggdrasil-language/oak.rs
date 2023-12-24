@@ -1,4 +1,4 @@
-use crate::cst_format::CstFormatOptions;
+use super::cst_options::CstFormatOptions;
 
 /// Product-facing options for [`super::format_source`].
 #[derive(Debug, Clone, PartialEq, Eq)]

@@ -1,4 +1,4 @@
-//! Bridge from `cst_format` toward `oak-formatter` on `RedTree`.
+//! Bridge from formatter CST toward `oak-formatter` on `RedTree`.
 //!
 //! RedTree formatting rules live in [`super::red_tree::TypeScriptRedTreeFormatter`].
 //! Product callers use [`crate::formatter::format_source`].
@@ -6,7 +6,7 @@ use oak_core::RedNode;
 
 use crate::language::TypeScriptLanguage;
 
-use super::{CstFormatOptions, format_source_file};
+use super::{cst_options::CstFormatOptions, cst_source::format_source_file};
 
 /// TypeScript CST formatter adapter for RedTree + source pairs.
 ///

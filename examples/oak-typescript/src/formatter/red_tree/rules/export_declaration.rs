@@ -6,7 +6,7 @@ use oak_core::{
 };
 use oak_pretty_print::{Document, FormatContext, FormatResult, FormatRule};
 
-use crate::{cst_format::CstFormatOptions, language::TypeScriptLanguage, lexer::token_type::TypeScriptTokenType, parser::element_type::TypeScriptElementType};
+use crate::{formatter::CstFormatOptions, language::TypeScriptLanguage, lexer::token_type::TypeScriptTokenType, parser::element_type::TypeScriptElementType};
 
 /// Format exported class boundaries without regenerating their member bodies.
 pub struct ExportDeclarationRule;

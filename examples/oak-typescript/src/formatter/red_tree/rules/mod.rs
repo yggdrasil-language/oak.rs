@@ -6,7 +6,7 @@ mod variable_declaration;
 
 use oak_pretty_print::RuleSet;
 
-use crate::{cst_format::CstFormatOptions, language::TypeScriptLanguage};
+use crate::{formatter::CstFormatOptions, language::TypeScriptLanguage};
 
 pub use import_declaration::ImportDeclarationRule;
 pub use export_declaration::ExportDeclarationRule;
