@@ -7,7 +7,7 @@ const ROOT_DIR = path.join(__dirname, '..');
 const EXAMPLES_DIR = path.join(ROOT_DIR, 'examples');
 const LOG_FILE = path.join(ROOT_DIR, 'check-structures.log');
 const MAX_LINES = 1000;
-const ALLOWED_SRC_DIRS = ['ast', 'builder', 'parser', 'lexer', 'language', 'formatter', 'print', 'lsp', 'mcp'];
+const ALLOWED_SRC_DIRS = ['ast', 'builder', 'parser', 'lexer', 'language', 'formatter', 'printer', 'lsp', 'mcp'];
 const ALLOWED_SRC_FILES = ['lib.rs', 'main.rs', 'mod.rs'];
 
 // Violation object structure:
