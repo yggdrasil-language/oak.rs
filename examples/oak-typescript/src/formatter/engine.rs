@@ -19,8 +19,7 @@ pub fn format_source(source: &str, options: &FormatOptions) -> Result<String, Fo
         return crate::print::format_source(source, &crate::print::FormatOptions { type_erasure: true }).map_err(FormatError::new);
     }
 
-    let cst = options.cst_options();
-    match super::cst_source::format_source(source, &cst) {
+    match super::source::format_source(source, options) {
         Ok(out) => Ok(out),
         Err(err) if is_hard_format_error(&err) => Err(FormatError::new(err)),
         Err(_) => crate::print::format_source(source, &crate::print::FormatOptions::default()).map_err(FormatError::new),

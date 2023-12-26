@@ -4,16 +4,16 @@ use oak_core::tree::{RedLeaf, RedNode};
 use oak_pretty_print::{Document, FormatContext, FormatResult, FormatRule};
 
 use crate::{
-    formatter::{CstFormatOptions, trivia_guard},
+    formatter::{options::FormatOptions, trivia_guard},
     language::TypeScriptLanguage,
     parser::element_type::TypeScriptElementType,
-    print::{FormatOptions, format_source as ast_print_source},
+    print::{FormatOptions as PrintOptions, format_source as ast_print_source},
 };
 
 /// Formats `import` declarations via AST print when trivia guards pass.
 pub struct ImportDeclarationRule;
 
-impl FormatRule<TypeScriptLanguage, CstFormatOptions> for ImportDeclarationRule {
+impl FormatRule<TypeScriptLanguage, FormatOptions> for ImportDeclarationRule {
     fn name(&self) -> &str {
         "typescript.import_declaration"
     }
@@ -29,7 +29,7 @@ impl FormatRule<TypeScriptLanguage, CstFormatOptions> for ImportDeclarationRule 
     fn apply_node<'a>(
         &self,
         node: &RedNode<TypeScriptLanguage>,
-        _context: &FormatContext<TypeScriptLanguage, CstFormatOptions>,
+        _context: &FormatContext<TypeScriptLanguage, FormatOptions>,
         source: &'a str,
         _format_children: &dyn Fn(&RedNode<TypeScriptLanguage>) -> FormatResult<Document<'a>>,
     ) -> FormatResult<Option<Document<'a>>> {
@@ -38,11 +38,11 @@ impl FormatRule<TypeScriptLanguage, CstFormatOptions> for ImportDeclarationRule 
         if trivia_guard::should_preserve_verbatim(snippet) {
             return Ok(Some(Document::text(snippet)));
         }
-        let formatted = ast_print_source(snippet, &FormatOptions::default()).map_err(oak_core::errors::OakError::format_error)?;
+        let formatted = ast_print_source(snippet, &PrintOptions::default()).map_err(oak_core::errors::OakError::format_error)?;
         Ok(Some(Document::text(formatted)))
     }
 
-    fn apply_token<'a>(&self, _token: &RedLeaf<TypeScriptLanguage>, _context: &FormatContext<TypeScriptLanguage, CstFormatOptions>, _source: &'a str) -> FormatResult<Option<Document<'a>>> {
+    fn apply_token<'a>(&self, _token: &RedLeaf<TypeScriptLanguage>, _context: &FormatContext<TypeScriptLanguage, FormatOptions>, _source: &'a str) -> FormatResult<Option<Document<'a>>> {
         Ok(None)
     }
 }

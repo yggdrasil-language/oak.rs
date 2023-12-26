@@ -9,16 +9,16 @@ use oak_pretty_print::{Document, FormatContext, FormatResult, Printer, RuleSet};
 
 use crate::{
     language::TypeScriptLanguage,
-    print::{FormatOptions, format_source as ast_print_source},
+    print::{FormatOptions as PrintOptions, format_source as ast_print_source},
 };
 
-use super::{cst_options::CstFormatOptions, trivia_guard};
+use super::{options::FormatOptions, trivia_guard};
 
 mod rules;
 
 /// TypeScript CST formatter driven by RedTree formatting rules.
 pub struct TypeScriptRedTreeFormatter {
-    rules: RuleSet<TypeScriptLanguage, CstFormatOptions>,
+    rules: RuleSet<TypeScriptLanguage, FormatOptions>,
 }
 
 impl Default for TypeScriptRedTreeFormatter {
@@ -34,7 +34,7 @@ impl TypeScriptRedTreeFormatter {
     }
 
     /// Format one top-level statement node.
-    pub fn format_statement(&self, source: &str, node: &RedNode<TypeScriptLanguage>, options: &CstFormatOptions) -> Result<String, String> {
+    pub fn format_statement(&self, source: &str, node: &RedNode<TypeScriptLanguage>, options: &FormatOptions) -> Result<String, String> {
         let context = FormatContext::new(options.clone(), options.printer_config());
         let format_children = |child: &RedNode<TypeScriptLanguage>| -> FormatResult<Document<'_>> {
             let span = child.span();
@@ -58,5 +58,5 @@ fn format_statement_fallback(snippet: &str) -> Result<String, String> {
     if trivia_guard::should_preserve_verbatim(snippet) {
         return Ok(snippet.to_string());
     }
-    ast_print_source(snippet, &FormatOptions::default())
+    ast_print_source(snippet, &PrintOptions::default())
 }

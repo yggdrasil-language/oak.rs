@@ -6,7 +6,7 @@ use oak_core::RedNode;
 
 use crate::language::TypeScriptLanguage;
 
-use super::{cst_options::CstFormatOptions, cst_source::format_source_file};
+use super::{options::FormatOptions, source::format_source_file};
 
 /// TypeScript CST formatter adapter for RedTree + source pairs.
 ///
@@ -17,7 +17,7 @@ pub struct TypeScriptCstFormatter;
 
 impl TypeScriptCstFormatter {
     /// Format one parsed `SourceFile` node using CST span gaps and statement rules.
-    pub fn format_source_file(source: &str, file: &RedNode<'_, TypeScriptLanguage>, options: &CstFormatOptions) -> Result<String, String> {
+    pub fn format_source_file(source: &str, file: &RedNode<'_, TypeScriptLanguage>, options: &FormatOptions) -> Result<String, String> {
         format_source_file(source, file, options)
     }
 }

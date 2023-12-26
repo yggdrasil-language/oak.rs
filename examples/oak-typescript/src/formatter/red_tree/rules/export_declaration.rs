@@ -6,7 +6,7 @@ use oak_core::{
 };
 use oak_pretty_print::{Document, FormatContext, FormatResult, FormatRule};
 
-use crate::{formatter::CstFormatOptions, language::TypeScriptLanguage, lexer::token_type::TypeScriptTokenType, parser::element_type::TypeScriptElementType};
+use crate::{formatter::FormatOptions, language::TypeScriptLanguage, lexer::token_type::TypeScriptTokenType, parser::element_type::TypeScriptElementType};
 
 /// Format exported class boundaries without regenerating their member bodies.
 pub struct ExportDeclarationRule;
@@ -25,7 +25,7 @@ fn class_body<'tree>(node: &RedNode<'tree, TypeScriptLanguage>) -> Option<RedNod
     None
 }
 
-impl FormatRule<TypeScriptLanguage, CstFormatOptions> for ExportDeclarationRule {
+impl FormatRule<TypeScriptLanguage, FormatOptions> for ExportDeclarationRule {
     fn name(&self) -> &str {
         "typescript.export_declaration"
     }
@@ -41,7 +41,7 @@ impl FormatRule<TypeScriptLanguage, CstFormatOptions> for ExportDeclarationRule 
     fn apply_node<'a>(
         &self,
         node: &RedNode<TypeScriptLanguage>,
-        context: &FormatContext<TypeScriptLanguage, CstFormatOptions>,
+        context: &FormatContext<TypeScriptLanguage, FormatOptions>,
         source: &'a str,
         _format_children: &dyn Fn(&RedNode<TypeScriptLanguage>) -> FormatResult<Document<'a>>,
     ) -> FormatResult<Option<Document<'a>>> {
@@ -110,7 +110,7 @@ impl FormatRule<TypeScriptLanguage, CstFormatOptions> for ExportDeclarationRule 
         Ok(Some(Document::text(output)))
     }
 
-    fn apply_token<'a>(&self, _token: &RedLeaf<TypeScriptLanguage>, _context: &FormatContext<TypeScriptLanguage, CstFormatOptions>, _source: &'a str) -> FormatResult<Option<Document<'a>>> {
+    fn apply_token<'a>(&self, _token: &RedLeaf<TypeScriptLanguage>, _context: &FormatContext<TypeScriptLanguage, FormatOptions>, _source: &'a str) -> FormatResult<Option<Document<'a>>> {
         Ok(None)
     }
 }

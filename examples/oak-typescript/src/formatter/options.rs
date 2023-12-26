@@ -1,5 +1,3 @@
-use super::cst_options::CstFormatOptions;
-
 /// Product-facing options for [`super::format_source`].
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
@@ -26,7 +24,18 @@ impl FormatOptions {
         self
     }
 
-    pub(crate) fn cst_options(&self) -> CstFormatOptions {
-        CstFormatOptions { indent_width: self.indent_width, line_width: self.line_width }
+
+    pub(crate) fn printer_config(&self) -> oak_pretty_print::PrinterConfig {
+        oak_pretty_print::PrinterConfig::new()
+            .with_indent_style(oak_pretty_print::IndentStyle::Spaces(self.indent_width))
+            .with_max_width(self.line_width)
     }
+
+    pub(crate) fn finalize_output(&self, source: &str, body: String) -> String {
+        let mut config = self.printer_config();
+        config.insert_final_newline = source.ends_with('\n');
+        let doc = oak_pretty_print::document::Document::text(body);
+        oak_pretty_print::Printer::new(config).print(&doc)
+    }
+
 }

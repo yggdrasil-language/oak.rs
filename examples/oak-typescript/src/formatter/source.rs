@@ -1,9 +1,7 @@
 //! CST-oriented `source` formatter (green-tree spans + trivia gaps).
 //!
 //! Uses `TypeScriptParser` for the concrete tree, preserves verbatim text between
-//! top-level statement spans, and formats supported statements via transitional AST print.
-//! This is the path toward real `oak-formatter` / `oak-pretty-print` integration — not a
-//! finished CST formatter yet.
+//! top-level statement spans, and formats supported statements via formatter rules.
 
 use oak_core::{ParseSession, Parser, RedNode, RedTree, SourceText};
 
@@ -12,10 +10,10 @@ use crate::{
     parser::{TypeScriptParser, element_type::TypeScriptElementType},
 };
 
-use super::{cst_options::CstFormatOptions, red_tree::TypeScriptRedTreeFormatter};
+use super::{options::FormatOptions, red_tree::TypeScriptRedTreeFormatter};
 
 /// Format a parsed `SourceFile` red node with companion source text.
-pub(crate) fn format_source_file(source: &str, file: &RedNode<'_, TypeScriptLanguage>, options: &CstFormatOptions) -> Result<String, String> {
+pub(crate) fn format_source_file(source: &str, file: &RedNode<'_, TypeScriptLanguage>, options: &FormatOptions) -> Result<String, String> {
     if file.element_type() != TypeScriptElementType::SourceFile {
         return Err(format!("expected SourceFile root, got {:?}", file.element_type()));
     }
@@ -59,7 +57,7 @@ pub(crate) fn format_source_file(source: &str, file: &RedNode<'_, TypeScriptLang
 }
 
 /// Format TypeScript/JavaScript source with trivia between top-level statements preserved.
-pub(crate) fn format_source(source: &str, options: &CstFormatOptions) -> Result<String, String> {
+pub(crate) fn format_source(source: &str, options: &FormatOptions) -> Result<String, String> {
     if source.is_empty() {
         return Ok(String::new());
     }
