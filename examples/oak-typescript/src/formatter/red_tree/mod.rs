@@ -9,7 +9,7 @@ use oak_pretty_print::{Document, FormatContext, FormatResult, Printer, RuleSet};
 
 use crate::{
     language::TypeScriptLanguage,
-    print::{FormatOptions as PrintOptions, format_source as ast_print_source},
+    printer::{FormatOptions as PrintOptions, format_source as ast_print_source},
 };
 
 use super::{options::FormatOptions, trivia_guard};

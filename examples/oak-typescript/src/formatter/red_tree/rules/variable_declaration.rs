@@ -7,7 +7,7 @@ use crate::{
     formatter::{options::FormatOptions, trivia_guard},
     language::TypeScriptLanguage,
     parser::element_type::TypeScriptElementType,
-    print::{FormatOptions as PrintOptions, format_source as ast_print_source},
+    printer::{FormatOptions as PrintOptions, format_source as ast_print_source},
 };
 
 /// Formats `const`/`let`/`var` declarations via AST print when trivia guards pass.
