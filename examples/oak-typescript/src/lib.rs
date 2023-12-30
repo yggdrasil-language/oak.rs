@@ -56,10 +56,10 @@ mod type_erasure_printer_unit {
     use crate::{format_source, FormatOptions};
 
     #[test]
-    fn prints_exported_class_property_without_type_syntax() {
+    fn rejects_type_erasure_on_cst_formatter_contract() {
         let source = "export default class Chart { private width: number = 10; title: string = 'chart'; }";
-        let output = format_source(source, &FormatOptions::default().with_type_erasure(true)).unwrap();
-        assert_eq!(output, "export default class Chart { width = 10; title = 'chart'; }");
+        let err = format_source(source, &FormatOptions::default().with_type_erasure(true)).unwrap_err();
+        assert!(err.message().contains("type erasure"));
     }
 }
 
@@ -68,13 +68,10 @@ mod control_flow_printer_unit {
     use crate::{format_source, FormatOptions};
 
     #[test]
-    fn prints_minimal_control_flow_statements() {
+    fn rejects_unsupported_control_flow_until_cst_rules_exist() {
         let source = "do { tick(); } while (ready); try { run(); } catch { recover(); } finally { cleanup(); }";
-        let output = format_source(source, &FormatOptions::default()).unwrap();
-        assert_eq!(
-            output,
-            "do { tick() } while (ready)\ntry { run() } catch { recover() } finally { cleanup() }"
-        );
+        let err = format_source(source, &FormatOptions::default()).unwrap_err();
+        assert!(err.message().contains("unsupported top-level CST node"));
     }
 }
 
@@ -83,10 +80,10 @@ mod object_literal_unit {
     use crate::{format_source, FormatOptions};
 
     #[test]
-    fn preserves_object_property_names_during_type_erasure() {
+    fn rejects_type_erasure_for_object_literals() {
         let source = "const params = { id: 'sku-1', tab: \"security\" };";
-        let output = format_source(source, &FormatOptions::default().with_type_erasure(true)).unwrap();
-        assert_eq!(output, "const params = { id: 'sku-1', tab: 'security' }");
+        let err = format_source(source, &FormatOptions::default().with_type_erasure(true)).unwrap_err();
+        assert!(err.message().contains("type erasure"));
     }
 }
 
@@ -95,12 +92,10 @@ mod function_type_unit {
     use crate::{format_source, FormatOptions};
 
     #[test]
-    fn formats_function_types_inside_object_aliases() {
+    fn rejects_type_alias_until_cst_rules_exist() {
         let source = r#"type Api = { "parse-subject": (subject: string) => ParsedSubject; "section-for-gitmoji": (gitmoji: string | undefined) => ReleaseSection; };"#;
-        let output = format_source(source, &FormatOptions::default()).unwrap();
-        assert!(output.contains("type Api = {"));
-        assert!(output.contains("\"parse-subject\": (subject: string) => ParsedSubject"));
-        assert!(output.contains("\"section-for-gitmoji\": (gitmoji: string | undefined) => ReleaseSection"));
+        let err = format_source(source, &FormatOptions::default()).unwrap_err();
+        assert!(err.message().contains("unsupported top-level CST node"));
     }
 
     #[test]
@@ -198,21 +193,23 @@ export { findWorkspaceRoot, listWorkspacePackages, type WorkspacePackage } from 
     }
 
     #[test]
-    fn formats_readonly_array_type_members() {
-        format_source(
+    fn rejects_readonly_array_type_members_until_cst_rules_exist() {
+        let err = format_source(
             "type Config = { values: readonly string[] | undefined };",
             &FormatOptions::default(),
         )
-        .expect("readonly array type members should format");
+        .unwrap_err();
+        assert!(err.message().contains("unsupported top-level CST node"));
     }
 
     #[test]
-    fn formats_readonly_array_record_types() {
-        format_source(
+    fn rejects_readonly_array_record_types_until_cst_rules_exist() {
+        let err = format_source(
             "type Presets = Record<NiftyFormatPreset, readonly string[] | undefined>;",
             &FormatOptions::default(),
         )
-        .expect("readonly array record types should format");
+        .unwrap_err();
+        assert!(err.message().contains("unsupported top-level CST node"));
     }
 
     #[test]
@@ -241,12 +238,13 @@ export { findWorkspaceRoot, listWorkspacePackages, type WorkspacePackage } from 
     }
 
     #[test]
-    fn formats_for_of_config_source() {
-        format_source(
+    fn rejects_for_of_until_cst_rules_exist() {
+        let err = format_source(
             "for (const name of CONFIG_FILE_NAMES) { const candidate = join(here, name); }",
             &FormatOptions::default(),
         )
-        .expect("for-of should format");
+        .unwrap_err();
+        assert!(err.message().contains("unsupported top-level CST node"));
     }
 
     #[test]
