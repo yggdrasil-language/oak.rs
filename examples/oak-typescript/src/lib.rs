@@ -2,7 +2,7 @@
 #![feature(new_range_api)]
 #![warn(missing_docs)]
 
-mod print;
+mod printer;
 
 /// AST module for TypeScript.
 pub mod ast;
