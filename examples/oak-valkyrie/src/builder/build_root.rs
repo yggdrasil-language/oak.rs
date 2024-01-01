@@ -12,6 +12,7 @@ impl<'config> ValkyrieBuilder<'config> {
     pub fn build_root<S: Source + ?Sized>(&self, green_tree: &GreenNode<ValkyrieLanguage>, source: &S) -> Result<ValkyrieRoot, OakError> {
         let red_root = RedNode::<ValkyrieLanguage>::new(green_tree, 0);
         let mut items = Vec::new();
+        let mut pending_annotations = Vec::new();
         for child in red_root.children() {
             match child {
                 RedTree::Node(n) => {
@@ -19,8 +20,16 @@ impl<'config> ValkyrieBuilder<'config> {
                     if n.green.kind == ValkyrieElementType::ExprStatement && is_eof_only_expr_stmt(&n) {
                         continue;
                     }
+                    if n.green.kind == ValkyrieElementType::Attribute {
+                        pending_annotations.push(self.build_attribute(n, source)?);
+                        continue;
+                    }
                     match self.build_item(n, source) {
-                        Ok(item) => items.push(item),
+                        Ok(mut item) => {
+                            let annotations = std::mem::take(&mut pending_annotations);
+                            Self::take_annotations_for_item(&mut item, annotations);
+                            items.push(item);
+                        }
                         Err(err) => {
                             return Err(err);
                         }
@@ -34,6 +43,9 @@ impl<'config> ValkyrieBuilder<'config> {
                     }
                 },
             }
+        }
+        if !pending_annotations.is_empty() {
+            return Err(source.syntax_error("Attribute is not attached to an item".to_string(), red_root.span().end));
         }
         Ok(ValkyrieRoot { items })
     }
@@ -104,6 +116,10 @@ impl<'config> ValkyrieBuilder<'config> {
                 structure.annotations = annotations;
                 Vec::new()
             }
+            StatementNode::System(system) => {
+                system.annotations = annotations;
+                Vec::new()
+            }
             _ => annotations,
         }
     }
@@ -121,6 +137,10 @@ impl<'config> ValkyrieBuilder<'config> {
             ValkyrieElementType::Struct => {
                 let structure = self.build_struct(n, source)?;
                 Ok(StatementNode::Structure(Box::new(structure)))
+            }
+            ValkyrieElementType::System => {
+                let system = self.build_system(n, source)?;
+                Ok(StatementNode::System(Box::new(system)))
             }
             ValkyrieElementType::Flags => {
                 let flags = self.build_flags(n, source)?;

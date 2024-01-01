@@ -8,6 +8,36 @@ use crate::{
 use oak_core::{OakError, RedNode, RedTree, Source};
 
 impl<'config> ValkyrieBuilder<'config> {
+    pub(crate) fn build_system<S: Source + ?Sized>(&self, node: RedNode<ValkyrieLanguage>, source: &S) -> Result<SystemDeclaration, OakError> {
+        let span = node.span();
+        let mut name = Identifier { name: String::new(), span: Default::default() };
+        let mut annotations = Vec::new();
+        let mut methods = Vec::new();
+
+        for child in node.children() {
+            match child {
+                RedTree::Leaf(t) => match t.kind {
+                    ValkyrieTokenType::Whitespace | ValkyrieTokenType::Newline | ValkyrieTokenType::LineComment | ValkyrieTokenType::BlockComment => continue,
+                    ValkyrieTokenType::Identifier if name.name.is_empty() => {
+                        name = Identifier { name: text(source, t.span), span: t.span };
+                    }
+                    _ => {}
+                },
+                RedTree::Node(n) => match n.green.kind {
+                    ValkyrieElementType::Attribute => annotations.push(self.build_attribute(n, source)?),
+                    ValkyrieElementType::Micro | ValkyrieElementType::Method => {
+                        let mut method = self.build_function(n, source)?;
+                        method.annotations.splice(0..0, std::mem::take(&mut annotations));
+                        methods.push(method);
+                    }
+                    _ => {}
+                },
+            }
+        }
+
+        Ok(SystemDeclaration { annotations, name, methods, span })
+    }
+
     pub(crate) fn build_let<S: Source + ?Sized>(&self, node: RedNode<ValkyrieLanguage>, source: &S) -> Result<Let, OakError> {
         let span = node.span();
         let mut is_mutable = false;

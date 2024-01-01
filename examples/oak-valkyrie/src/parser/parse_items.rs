@@ -498,7 +498,10 @@ pub(crate) fn parse_attribute<S: oak_core::Source + ?Sized>(state: &mut State<'_
     if state.at(ValkyrieTokenType::LeftParen) {
         state.bump();
         while state.not_at_end() && !state.at(ValkyrieTokenType::RightParen) {
-            state.bump();
+            parse_expression(state)?;
+            if state.at(ValkyrieTokenType::Comma) {
+                state.bump();
+            }
         }
         if state.at(ValkyrieTokenType::RightParen) {
             state.bump();

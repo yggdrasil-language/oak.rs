@@ -96,3 +96,36 @@ fn test_valkyrie_builder_namespace() {
 
     assert!(true, "Namespace builder test placeholder")
 }
+
+#[test]
+fn test_system_builder_and_attributes() {
+    use oak_core::{Builder, SourceText};
+    use oak_valkyrie::ast::{StatementNode, TermExpression};
+
+    let language = ValkyrieLanguage::ecs_language();
+    let builder = ValkyrieBuilder::new(&language);
+    let source = SourceText::new(
+        r#"@phase("Update")
+        system MovementSystem {
+            @reads(Position, enabled)
+            micro execute(world: World) { return 1 }
+        }"#,
+    );
+    let mut cache = oak_core::parser::ParseSession::<ValkyrieLanguage>::default();
+    let diagnostics = builder.build(&source, &[], &mut cache);
+    let root = diagnostics.result.expect("system builder should succeed");
+
+    let StatementNode::System(system) = &root.items[0]
+    else {
+        panic!("expected a system item");
+    };
+    assert_eq!(system.name.name, "MovementSystem");
+    assert_eq!(system.annotations.len(), 1);
+    assert_eq!(system.annotations[0].name.name, "phase");
+    assert_eq!(system.annotations[0].args.len(), 1);
+    assert!(matches!(system.annotations[0].args[0], TermExpression::StringLiteral(_)));
+    assert_eq!(system.methods.len(), 1);
+    assert_eq!(system.methods[0].name.name, "execute");
+    assert_eq!(system.methods[0].annotations.len(), 1);
+    assert_eq!(system.methods[0].annotations[0].args.len(), 2);
+}

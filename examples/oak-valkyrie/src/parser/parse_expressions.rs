@@ -185,7 +185,7 @@ pub(crate) fn parse_primary_expression<S: oak_core::Source + ?Sized>(state: &mut
                 state.sink.finish_node(cp, ValkyrieElementType::LiteralExpression);
                 Ok(())
             }
-            ValkyrieTokenType::Keyword(ValkyrieKeywords::True) | ValkyrieTokenType::Keyword(ValkyrieKeywords::False) => {
+            ValkyrieTokenType::BoolLiteral | ValkyrieTokenType::Keyword(ValkyrieKeywords::True) | ValkyrieTokenType::Keyword(ValkyrieKeywords::False) => {
                 let cp = state.sink.checkpoint();
                 state.bump();
                 state.sink.finish_node(cp, ValkyrieElementType::BooleanLiteral);
