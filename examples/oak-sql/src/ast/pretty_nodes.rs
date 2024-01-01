@@ -21,6 +21,19 @@ impl AsDocument for SqlStatement {
             SqlStatement::Create(it) => it.as_document(&()),
             SqlStatement::Drop(it) => it.as_document(&()),
             SqlStatement::Alter(it) => it.as_document(&()),
+            SqlStatement::Transaction(it) => Document::text(match it.action {
+                crate::ast::TransactionAction::Begin => "BEGIN",
+                crate::ast::TransactionAction::Commit => "COMMIT",
+                crate::ast::TransactionAction::Rollback => "ROLLBACK",
+            }),
+            SqlStatement::SetNames(it) => {
+                if let Some(collation) = &it.collation {
+                    doc!("SET NAMES ", it.character_set.as_ref(), " COLLATE ", collation.as_ref())
+                }
+                else {
+                    doc!("SET NAMES ", it.character_set.as_ref())
+                }
+            }
             SqlStatement::Error { .. } => nil,
             SqlStatement::Unknown { .. } => nil,
         }

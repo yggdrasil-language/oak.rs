@@ -2,6 +2,7 @@ use crate::ast::statements::{
     ddl::{AlterStatement, CreateStatement, DropStatement},
     dml::{DeleteStatement, InsertStatement, UpdateStatement},
     query::SelectStatement,
+    session::{SetNamesStatement, TransactionStatement},
 };
 use core::range::Range;
 use oak_core::source::{SourceBuffer, ToSource};
@@ -50,6 +51,10 @@ pub enum SqlStatement {
     Drop(DropStatement),
     /// An ALTER statement.
     Alter(AlterStatement),
+    /// A transaction boundary.
+    Transaction(TransactionStatement),
+    /// A character-set session setting.
+    SetNames(SetNamesStatement),
     /// An error occurred during parsing or building.
     Error {
         /// The error message.
@@ -76,6 +81,8 @@ impl ToSource for SqlStatement {
             SqlStatement::Create(s) => s.to_source(buffer),
             SqlStatement::Drop(s) => s.to_source(buffer),
             SqlStatement::Alter(s) => s.to_source(buffer),
+            SqlStatement::Transaction(s) => s.to_source(buffer),
+            SqlStatement::SetNames(s) => s.to_source(buffer),
             SqlStatement::Error { message, .. } => {
                 buffer.push("/* ERROR: ");
                 buffer.push(message);

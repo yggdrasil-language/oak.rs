@@ -132,6 +132,17 @@ impl<'config> SqlParser<'config> {
         use crate::lexer::SqlTokenType::*;
         let cp = state.checkpoint();
         state.expect(Set).ok();
+        if state.peek_kind() == Some(Identifier_) && state.peek_text().is_some_and(|text| text.eq_ignore_ascii_case("NAMES")) {
+            state.bump();
+            state.expect(Identifier_).ok();
+            if state.peek_kind() == Some(Identifier_) && state.peek_text().is_some_and(|text| text.eq_ignore_ascii_case("COLLATE")) {
+                state.bump();
+                state.expect(Identifier_).ok();
+            }
+            state.eat(Semicolon);
+            state.finish_at(cp, SqlElementType::SetNamesStatement);
+            return Ok(());
+        }
         state.expect(Identifier_).ok();
         state.expect(Equal).ok();
         PrattParser::parse(state, 0, self);

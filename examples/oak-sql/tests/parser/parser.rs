@@ -26,6 +26,33 @@ fn test_sql_builder_select() {
 }
 
 #[test]
+fn test_sql_builder_session_statements() {
+    let config = SqlLanguage::default();
+    let builder = SqlBuilder::new(&config);
+
+    for (source, expected) in [("BEGIN", TransactionAction::Begin), ("COMMIT TRANSACTION", TransactionAction::Commit), ("ROLLBACK", TransactionAction::Rollback)] {
+        let mut session = ParseSession::<SqlLanguage>::default();
+        let result = builder.build(&SourceText::new(source), &[], &mut session);
+        let root = result.result.unwrap_or_else(|error| panic!("{source}: {error:?} {:?}", result.diagnostics));
+        let SqlStatement::Transaction(statement) = &root.statements[0]
+        else {
+            panic!("Expected transaction statement for {source}");
+        };
+        assert_eq!(statement.action, expected);
+    }
+
+    let mut session = ParseSession::<SqlLanguage>::default();
+    let result = builder.build(&SourceText::new("SET NAMES utf8mb4 COLLATE utf8mb4_bin"), &[], &mut session);
+    let root = result.result.unwrap_or_else(|error| panic!("SET NAMES: {error:?} {:?}", result.diagnostics));
+    let SqlStatement::SetNames(statement) = &root.statements[0]
+    else {
+        panic!("Expected SET NAMES statement, got {:?}", root.statements);
+    };
+    assert_eq!(statement.character_set.as_ref(), "utf8mb4");
+    assert_eq!(statement.collation.as_deref(), Some("utf8mb4_bin"));
+}
+
+#[test]
 fn test_sql_builder_insert() {
     let config = SqlLanguage::default();
     let builder = SqlBuilder::new(&config);

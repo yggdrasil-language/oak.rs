@@ -103,6 +103,8 @@ impl<'config> SqlBuilder<'config> {
                     SqlElementType::CreateStatement => self.build_create_statement(n, source).map(SqlStatement::Create),
                     SqlElementType::DropStatement => self.build_drop_statement(n, source).map(SqlStatement::Drop),
                     SqlElementType::AlterStatement => self.build_alter_statement(n, source).map(SqlStatement::Alter),
+                    SqlElementType::TransactionStatement => self.build_transaction_statement(n).map(SqlStatement::Transaction),
+                    SqlElementType::SetNamesStatement => self.build_set_names_statement(n, source).map(SqlStatement::SetNames),
                     _ => continue,
                 };
 
@@ -607,6 +609,41 @@ impl<'config> SqlBuilder<'config> {
         Ok(TableName { name: name.ok_or_else(|| OakError::custom_error("Missing table name"))?, span: node.span() })
     }
 
+    fn build_transaction_statement<'a>(&self, node: RedNode<'a, SqlLanguage>) -> Result<TransactionStatement, OakError> {
+        let action = node
+            .children()
+            .find_map(|child| match child {
+                RedTree::Leaf(token) => match token.kind {
+                    SqlTokenType::Begin => Some(TransactionAction::Begin),
+                    SqlTokenType::Commit => Some(TransactionAction::Commit),
+                    SqlTokenType::Rollback => Some(TransactionAction::Rollback),
+                    _ => None,
+                },
+                _ => None,
+            })
+            .ok_or_else(|| OakError::custom_error("Missing transaction action"))?;
+        Ok(TransactionStatement { action, span: node.span() })
+    }
+
+    fn build_set_names_statement<'a>(&self, node: RedNode<'a, SqlLanguage>, source: &SourceText) -> Result<SetNamesStatement, OakError> {
+        let tokens = node
+            .children()
+            .filter_map(|child| match child {
+                RedTree::Leaf(token) if token.kind == SqlTokenType::Identifier_ => Some(self.get_text(token.span.clone(), source)),
+                _ => None,
+            })
+            .collect::<Vec<_>>();
+        if tokens.first().is_none_or(|token| !token.eq_ignore_ascii_case("NAMES")) {
+            return Err(OakError::custom_error("SET NAMES requires a character set and optional collation"));
+        }
+        let (character_set, collation) = match tokens.as_slice() {
+            [_, character_set] => (character_set.clone(), None),
+            [_, character_set, collate, collation] if collate.eq_ignore_ascii_case("COLLATE") => (character_set.clone(), Some(collation.clone())),
+            _ => return Err(OakError::custom_error("SET NAMES requires a character set and optional collation")),
+        };
+        Ok(SetNamesStatement { character_set, collation, span: node.span() })
+    }
+
     fn build_identifier<'a>(&self, node: RedNode<'a, SqlLanguage>, source: &SourceText) -> Result<Identifier, OakError> {
         Ok(Identifier { name: self.get_text(node.span(), source), span: node.span() })
     }
@@ -771,6 +808,8 @@ impl<'config> SqlBuilder<'config> {
             SqlElementType::CreateStatement => Ok(SqlStatement::Create(self.build_create_statement(node, source)?)),
             SqlElementType::DropStatement => Ok(SqlStatement::Drop(self.build_drop_statement(node, source)?)),
             SqlElementType::AlterStatement => Ok(SqlStatement::Alter(self.build_alter_statement(node, source)?)),
+            SqlElementType::TransactionStatement => Ok(SqlStatement::Transaction(self.build_transaction_statement(node)?)),
+            SqlElementType::SetNamesStatement => Ok(SqlStatement::SetNames(self.build_set_names_statement(node, source)?)),
             _ => Err(OakError::custom_error("Unknown statement type")),
         }
     }
