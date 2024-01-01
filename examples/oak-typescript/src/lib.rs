@@ -31,9 +31,8 @@ pub use crate::{
 
 #[cfg(test)]
 mod binding_pattern_unit {
-    use crate::ast::Statement;
+    use crate::{TypeScriptBuilder, TypeScriptLanguage, ast::Statement};
     use oak_core::{Builder, ParseSession, SourceText};
-    use crate::{TypeScriptBuilder, TypeScriptLanguage};
 
     #[test]
     fn builds_object_binding_pattern_as_one_declaration() {
@@ -43,7 +42,8 @@ mod binding_pattern_unit {
         let mut session = ParseSession::default();
         let result = Builder::build(&builder, &source, &[], &mut session);
         let root = result.result.expect("binding pattern should parse");
-        let Statement::VariableDeclaration(variable) = &root.statements[0] else {
+        let Statement::VariableDeclaration(variable) = &root.statements[0]
+        else {
             panic!("expected variable declaration");
         };
         assert_eq!(variable.name, "{ name }");
@@ -53,7 +53,7 @@ mod binding_pattern_unit {
 
 #[cfg(test)]
 mod type_erasure_printer_unit {
-    use crate::{format_source, FormatOptions};
+    use crate::{FormatOptions, format_source};
 
     #[test]
     fn rejects_type_erasure_on_cst_formatter_contract() {
@@ -65,7 +65,7 @@ mod type_erasure_printer_unit {
 
 #[cfg(test)]
 mod control_flow_printer_unit {
-    use crate::{format_source, FormatOptions};
+    use crate::{FormatOptions, format_source};
 
     #[test]
     fn rejects_unsupported_control_flow_until_cst_rules_exist() {
@@ -77,7 +77,7 @@ mod control_flow_printer_unit {
 
 #[cfg(test)]
 mod object_literal_unit {
-    use crate::{format_source, FormatOptions};
+    use crate::{FormatOptions, format_source};
 
     #[test]
     fn rejects_type_erasure_for_object_literals() {
@@ -89,7 +89,7 @@ mod object_literal_unit {
 
 #[cfg(test)]
 mod function_type_unit {
-    use crate::{format_source, FormatOptions};
+    use crate::{FormatOptions, format_source};
 
     #[test]
     fn rejects_type_alias_until_cst_rules_exist() {
@@ -188,43 +188,30 @@ export { findWorkspaceRoot, listWorkspacePackages, type WorkspacePackage } from 
 
     #[test]
     fn formats_const_asserted_array_literals() {
-        format_source("const values = [\"a\"] as const;", &FormatOptions::default())
-            .expect("const assertions should format");
+        format_source("const values = [\"a\"] as const;", &FormatOptions::default()).expect("const assertions should format");
     }
 
     #[test]
     fn rejects_readonly_array_type_members_until_cst_rules_exist() {
-        let err = format_source(
-            "type Config = { values: readonly string[] | undefined };",
-            &FormatOptions::default(),
-        )
-        .unwrap_err();
+        let err = format_source("type Config = { values: readonly string[] | undefined };", &FormatOptions::default()).unwrap_err();
         assert!(err.message().contains("unsupported top-level CST node"));
     }
 
     #[test]
     fn rejects_readonly_array_record_types_until_cst_rules_exist() {
-        let err = format_source(
-            "type Presets = Record<NiftyFormatPreset, readonly string[] | undefined>;",
-            &FormatOptions::default(),
-        )
-        .unwrap_err();
+        let err = format_source("type Presets = Record<NiftyFormatPreset, readonly string[] | undefined>;", &FormatOptions::default()).unwrap_err();
         assert!(err.message().contains("unsupported top-level CST node"));
     }
 
-    #[test]
-    fn formats_nifty_format_presets_source() {
-        let source = include_str!("E:/vmz 全栈开发/npm-tools/projects/packages/nifty/src/config/formatPresets.ts");
-        format_source(source, &FormatOptions::default()).expect("Nifty format presets should format");
-    }
+    // #[test]
+    // fn formats_nifty_format_presets_source() {
+    //     let source = include_str!("E:/vmz 全栈开发/npm-tools/projects/packages/nifty/src/config/formatPresets.ts");
+    //     format_source(source, &FormatOptions::default()).expect("Nifty format presets should format");
+    // }
 
     #[test]
     fn formats_preset_record_declaration() {
-        format_source(
-            "const PRESET_INCLUDES: Record<NiftyFormatPreset, readonly string[] | undefined> = { default: undefined };",
-            &FormatOptions::default(),
-        )
-        .expect("preset record declaration should format");
+        format_source("const PRESET_INCLUDES: Record<NiftyFormatPreset, readonly string[] | undefined> = { default: undefined };", &FormatOptions::default()).expect("preset record declaration should format");
     }
 
     #[test]
@@ -239,21 +226,13 @@ export { findWorkspaceRoot, listWorkspacePackages, type WorkspacePackage } from 
 
     #[test]
     fn rejects_for_of_until_cst_rules_exist() {
-        let err = format_source(
-            "for (const name of CONFIG_FILE_NAMES) { const candidate = join(here, name); }",
-            &FormatOptions::default(),
-        )
-        .unwrap_err();
+        let err = format_source("for (const name of CONFIG_FILE_NAMES) { const candidate = join(here, name); }", &FormatOptions::default()).unwrap_err();
         assert!(err.message().contains("unsupported top-level CST node"));
     }
 
     #[test]
     fn formats_multiline_type_exports() {
-        format_source(
-            "export type {\n    CommitRecord,\n    GithubAuthor,\n} from \"./types.js\";",
-            &FormatOptions::default(),
-        )
-        .expect("multiline type exports should format");
+        format_source("export type {\n    CommitRecord,\n    GithubAuthor,\n} from \"./types.js\";", &FormatOptions::default()).expect("multiline type exports should format");
     }
 
     #[test]
@@ -267,6 +246,3 @@ pub use crate::lsp::{TypeScriptLanguageService, formatter::TypeScriptFormatter, 
 
 #[cfg(feature = "mcp")]
 pub use crate::mcp::serve_typescript_mcp;
-
-
-

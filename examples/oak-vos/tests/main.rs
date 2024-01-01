@@ -2,10 +2,7 @@ use oak_vos::{VosDeclarationKind, VosSyntaxElement, VosTokenType, VosTypeArgumen
 
 #[test]
 fn parses_vos_schema_through_oak() {
-    let root = parse(
-        "namespace demo::identity\n table User { @@id: uuid, embedding: vec<3>, asset: file, }",
-    )
-    .expect("Oak parses the VOS surface");
+    let root = parse("namespace demo::identity\n table User { @@id: uuid, embedding: vec<3>, asset: file, }").expect("Oak parses the VOS surface");
 
     assert!(root.source.contains("table User"));
     assert_eq!(root.declarations.iter().filter(|item| item.kind == VosDeclarationKind::Table).count(), 1);
@@ -32,10 +29,7 @@ fn preserves_vos_macro_authoring_surface() {
 
 #[test]
 fn classifies_query_and_udf_declarations() {
-    let root = parse(
-        "query active_users() { table User } udf normalize(value: utf8) -> utf8 { value }",
-    )
-    .expect("Oak recognizes VOS query and udf declarations");
+    let root = parse("query active_users() { table User } udf normalize(value: utf8) -> utf8 { value }").expect("Oak recognizes VOS query and udf declarations");
 
     assert_eq!(root.declarations[0].kind, VosDeclarationKind::Query);
     assert_eq!(root.declarations[0].name.as_deref(), Some("active_users"));
@@ -96,11 +90,7 @@ fn rejects_unterminated_string() {
 
 #[test]
 fn rejects_malformed_operation_parameters() {
-    for source in [
-        "query missing_colon(value utf8) { value }",
-        "query missing_type(value:) { value }",
-        "query missing_comma(first: utf8 second: utf8) { first }",
-    ] {
+    for source in ["query missing_colon(value utf8) { value }", "query missing_type(value:) { value }", "query missing_comma(first: utf8 second: utf8) { first }"] {
         assert!(parse(source).is_err(), "accepted malformed operation: {source}");
     }
 }
@@ -114,8 +104,8 @@ fn rejects_mismatched_and_missing_delimiters() {
 
 #[test]
 fn namespace_does_not_swallow_following_declarations() {
-    use oak_core::{Parser, SourceText, ParseSession, GreenTree};
-    use oak_vos::{VosLanguage, VosParser, VosElementType};
+    use oak_core::{GreenTree, ParseSession, Parser, SourceText};
+    use oak_vos::{VosElementType, VosLanguage, VosParser};
     let language = VosLanguage;
     let source = SourceText::new("namespace demo::identity\n table User { @@id: uuid, }");
     let mut cache = ParseSession::<VosLanguage>::default();
@@ -138,10 +128,15 @@ fn builder_exposes_lossless_cst_tokens_and_spans() {
     let source = "using shared::UserId;\ntable User { @@id: uuid, }";
     let root = parse(source).expect("Oak parses the VOS surface");
     assert_eq!(root.syntax.span, (0..source.len()).into());
-    let using = root.syntax.children.iter().find_map(|element| match element {
-        VosSyntaxElement::Node(node) if node.kind == oak_vos::VosElementType::Using => Some(node),
-        _ => None,
-    }).expect("using CST node");
+    let using = root
+        .syntax
+        .children
+        .iter()
+        .find_map(|element| match element {
+            VosSyntaxElement::Node(node) if node.kind == oak_vos::VosElementType::Using => Some(node),
+            _ => None,
+        })
+        .expect("using CST node");
     assert_eq!(&source[using.span.clone()], "using shared::UserId;\n");
     assert!(using.children.iter().any(|element| matches!(
         element,
@@ -276,11 +271,20 @@ fn reference_optional_precedence_preserves_trivia_spans() {
     let source = "class T { owner: &shared::User # reference\n ? }";
     let root = parse(source).unwrap();
     let field = &root.declarations[0].fields[0];
-    let VosTypeSyntax::Optional { inner, span } = &field.type_expr else { panic!("expected optional reference") };
+    let VosTypeSyntax::Optional { inner, span } = &field.type_expr
+    else {
+        panic!("expected optional reference")
+    };
     assert_eq!(&source[span.clone()], "&shared::User # reference\n ?");
-    let VosTypeSyntax::Reference { target, span } = inner.as_ref() else { panic!("expected reference") };
+    let VosTypeSyntax::Reference { target, span } = inner.as_ref()
+    else {
+        panic!("expected reference")
+    };
     assert_eq!(&source[span.clone()], "&shared::User");
-    let VosTypeSyntax::Named { path, span } = target.as_ref() else { panic!("expected named target") };
+    let VosTypeSyntax::Named { path, span } = target.as_ref()
+    else {
+        panic!("expected named target")
+    };
     assert_eq!(path, &["shared", "User"]);
     assert_eq!(&source[span.clone()], "shared::User");
     assert_eq!(field.type_syntax.text, "&shared::User # reference\n ?");
@@ -288,7 +292,11 @@ fn reference_optional_precedence_preserves_trivia_spans() {
 
 #[test]
 fn type_depth_has_process_bound() {
-    use std::{process::Command, thread, time::{Duration, Instant}};
+    use std::{
+        process::Command,
+        thread,
+        time::{Duration, Instant},
+    };
 
     const CHILD_ENV: &str = "OAK_VOS_TYPE_DEPTH_CHILD";
     if std::env::var_os(CHILD_ENV).is_some() {
@@ -302,11 +310,7 @@ fn type_depth_has_process_bound() {
         }
         return;
     }
-    let mut child = Command::new(std::env::current_exe().unwrap())
-        .args(["--exact", "type_depth_has_process_bound", "--nocapture"])
-        .env(CHILD_ENV, "1")
-        .spawn()
-        .expect("spawn bounded parser test");
+    let mut child = Command::new(std::env::current_exe().unwrap()).args(["--exact", "type_depth_has_process_bound", "--nocapture"]).env(CHILD_ENV, "1").spawn().expect("spawn bounded parser test");
     let deadline = Instant::now() + Duration::from_secs(10);
     loop {
         match child.try_wait() {

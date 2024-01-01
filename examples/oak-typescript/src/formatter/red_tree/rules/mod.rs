@@ -1,15 +1,15 @@
 //! TypeScript RedTree `FormatRule` registry.
 
-mod import_declaration;
 mod export_declaration;
+mod import_declaration;
 mod variable_declaration;
 
 use oak_pretty_print::RuleSet;
 
 use crate::{formatter::FormatOptions, language::TypeScriptLanguage};
 
-pub use import_declaration::ImportDeclarationRule;
 pub use export_declaration::ExportDeclarationRule;
+pub use import_declaration::ImportDeclarationRule;
 pub use variable_declaration::VariableDeclarationRule;
 
 /// Build the default TypeScript RedTree rule set.

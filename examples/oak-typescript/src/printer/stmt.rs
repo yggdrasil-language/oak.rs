@@ -1,9 +1,6 @@
 //! Oak TypeScript statement → canonical text.
 
-use crate::ast::{
-    BlockStatement, ClassDeclaration, ClassMember, DoWhileStatement, ExportDeclaration,
-    FunctionDeclaration, ImportDeclaration, ImportSpecifier, Statement, TryStatement, TypeAliasDeclaration, VariableDeclaration,
-};
+use crate::ast::{BlockStatement, ClassDeclaration, ClassMember, DoWhileStatement, ExportDeclaration, FunctionDeclaration, ImportDeclaration, ImportSpecifier, Statement, TryStatement, TypeAliasDeclaration, VariableDeclaration};
 
 use super::expr::{print_expression, print_string};
 
@@ -53,13 +50,7 @@ pub fn print_statement(stmt: &Statement) -> Option<String> {
             None => "continue".into(),
         }),
         Statement::ClassDeclaration(d) => print_class(d),
-        Statement::Interface(_)
-        | Statement::Enum(_)
-        | Statement::ForStatement(_)
-        | Statement::ForInStatement(_)
-        | Statement::ForOfStatement(_)
-        | Statement::SwitchStatement(_)
-        | Statement::Namespace(_) => None,
+        Statement::Interface(_) | Statement::Enum(_) | Statement::ForStatement(_) | Statement::ForInStatement(_) | Statement::ForOfStatement(_) | Statement::SwitchStatement(_) | Statement::Namespace(_) => None,
     }
 }
 
@@ -124,12 +115,7 @@ fn print_export(d: &ExportDeclaration) -> Option<String> {
         let mut parts = Vec::with_capacity(d.specifiers.len());
         for specifier in &d.specifiers {
             let type_kw = if specifier.is_type_only { "type " } else { "" };
-            let name = if specifier.local == specifier.exported {
-                specifier.local.clone()
-            }
-            else {
-                format!("{} as {}", specifier.local, specifier.exported)
-            };
+            let name = if specifier.local == specifier.exported { specifier.local.clone() } else { format!("{} as {}", specifier.local, specifier.exported) };
             parts.push(format!("{type_kw}{name}"));
         }
         let source = d.source.as_ref().map(|value| format!(" from {}", print_string(value))).unwrap_or_default();
@@ -176,7 +162,6 @@ fn print_function_params(params: &[crate::ast::FunctionParam]) -> Option<String>
     Some(format!("({})", parts.join(", ")))
 }
 
-
 fn print_class(d: &ClassDeclaration) -> Option<String> {
     if !d.decorators.is_empty() || d.is_declare || d.is_abstract || !d.type_params.is_empty() || !d.implements.is_empty() {
         return None;
@@ -212,7 +197,15 @@ fn print_class_member(member: &ClassMember) -> Option<String> {
             }
             let static_kw = if *is_static { "static " } else { "" };
             let async_kw = if *is_async { "async " } else { "" };
-            let accessor = if *is_getter { "get " } else if *is_setter { "set " } else { "" };
+            let accessor = if *is_getter {
+                "get "
+            }
+            else if *is_setter {
+                "set "
+            }
+            else {
+                ""
+            };
             let params = print_function_params(params)?;
             let body = print_block_body(body)?;
             Some(format!("{static_kw}{async_kw}{accessor}{name}{params} {body}"))

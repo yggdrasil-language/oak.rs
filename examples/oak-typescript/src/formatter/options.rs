@@ -24,11 +24,8 @@ impl FormatOptions {
         self
     }
 
-
     pub(crate) fn printer_config(&self) -> oak_pretty_print::PrinterConfig {
-        oak_pretty_print::PrinterConfig::new()
-            .with_indent_style(oak_pretty_print::IndentStyle::Spaces(self.indent_width))
-            .with_max_width(self.line_width)
+        oak_pretty_print::PrinterConfig::new().with_indent_style(oak_pretty_print::IndentStyle::Spaces(self.indent_width)).with_max_width(self.line_width)
     }
 
     pub(crate) fn finalize_output(&self, source: &str, body: String) -> String {
@@ -37,5 +34,4 @@ impl FormatOptions {
         let doc = oak_pretty_print::document::Document::text(body);
         oak_pretty_print::Printer::new(config).print(&doc)
     }
-
 }

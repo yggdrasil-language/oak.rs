@@ -1,6 +1,9 @@
-use oak_core::{OakError, Parser, ParseCache, Source, TextEdit, TokenType, parser::parse_with_lexer};
+use oak_core::{OakError, ParseCache, Parser, Source, TextEdit, TokenType, parser::parse_with_lexer};
 
-use crate::{language::VosLanguage, lexer::{VosLexer, VosTokenType}};
+use crate::{
+    language::VosLanguage,
+    lexer::{VosLexer, VosTokenType},
+};
 
 /// CST element kinds.
 pub mod element_type;
@@ -14,10 +17,14 @@ pub struct VosParser;
 
 impl VosParser {
     /// Creates a parser using the VOS language configuration.
-    pub fn new(_config: &VosLanguage) -> Self { Self }
+    pub fn new(_config: &VosLanguage) -> Self {
+        Self
+    }
 
     fn skip_trivia<'a, S: Source + ?Sized>(&self, state: &mut State<'a, S>) {
-        while state.current().map(|token| token.kind.is_ignored()).unwrap_or(false) { state.bump(); }
+        while state.current().map(|token| token.kind.is_ignored()).unwrap_or(false) {
+            state.bump();
+        }
     }
 
     fn declaration_kind(kind: VosTokenType) -> VosElementType {
@@ -40,7 +47,10 @@ impl VosParser {
     }
 
     fn parse_declaration<'a, S: Source + ?Sized>(&self, state: &mut State<'a, S>) -> Result<(), OakError> {
-        let Some(token) = state.current() else { return Ok(()) };
+        let Some(token) = state.current()
+        else {
+            return Ok(());
+        };
         let element = Self::declaration_kind(token.kind);
         state.incremental_node(element, |state| {
             state.bump();
@@ -49,29 +59,38 @@ impl VosParser {
                 state.bump();
                 self.skip_trivia(state);
             }
-            if state.at(VosTokenType::Identifier) { state.bump(); }
+            if state.at(VosTokenType::Identifier) {
+                state.bump();
+            }
             self.skip_trivia(state);
             while state.not_at_end() {
-                let Some(kind) = state.current().map(|token| token.kind) else { break };
-                if kind == VosTokenType::Semicolon { state.bump(); break; }
-                if Self::declaration_kind(kind) != VosElementType::Error { break; }
+                let Some(kind) = state.current().map(|token| token.kind)
+                else {
+                    break;
+                };
+                if kind == VosTokenType::Semicolon {
+                    state.bump();
+                    break;
+                }
+                if Self::declaration_kind(kind) != VosElementType::Error {
+                    break;
+                }
                 if kind == VosTokenType::LeftBrace {
                     if matches!(element, VosElementType::Table | VosElementType::Class) {
                         self.parse_fields(state)?;
-                    } else {
+                    }
+                    else {
                         self.parse_group(state)?;
                     }
                     break;
                 }
-                if kind == VosTokenType::LeftParen
-                    && matches!(element, VosElementType::Query | VosElementType::Udf | VosElementType::Micro | VosElementType::Macro)
-                {
+                if kind == VosTokenType::LeftParen && matches!(element, VosElementType::Query | VosElementType::Udf | VosElementType::Micro | VosElementType::Macro) {
                     self.parse_parameters(state)?;
-                } else if matches!(kind, VosTokenType::LeftParen | VosTokenType::LeftBracket) {
+                }
+                else if matches!(kind, VosTokenType::LeftParen | VosTokenType::LeftBracket) {
                     self.parse_group(state)?;
-                } else if matches!(element, VosElementType::Query | VosElementType::Udf | VosElementType::Micro | VosElementType::Macro)
-                    && state.peek_text().as_deref() == Some("-")
-                {
+                }
+                else if matches!(element, VosElementType::Query | VosElementType::Udf | VosElementType::Micro | VosElementType::Macro) && state.peek_text().as_deref() == Some("-") {
                     let return_checkpoint = state.checkpoint();
                     state.bump();
                     self.skip_trivia(state);
@@ -85,7 +104,8 @@ impl VosParser {
                     self.parse_type(state, 0)?;
                     state.finish_at(type_checkpoint, VosElementType::TypeSyntax);
                     state.finish_at(return_checkpoint, VosElementType::ReturnType);
-                } else {
+                }
+                else {
                     self.consume_token(state)?;
                 }
             }
@@ -98,7 +118,9 @@ impl VosParser {
         state.expect(VosTokenType::LeftBrace)?;
         loop {
             self.skip_trivia(state);
-            if state.at(VosTokenType::RightBrace) { break; }
+            if state.at(VosTokenType::RightBrace) {
+                break;
+            }
             let field_checkpoint = state.checkpoint();
             while state.at(VosTokenType::LeftBracket) {
                 let attribute_checkpoint = state.checkpoint();
@@ -109,7 +131,9 @@ impl VosParser {
             if state.peek_text().as_deref() == Some("@") {
                 let attribute_checkpoint = state.checkpoint();
                 state.bump();
-                if state.peek_text().as_deref() == Some("@") { state.bump(); }
+                if state.peek_text().as_deref() == Some("@") {
+                    state.bump();
+                }
                 state.finish_at(attribute_checkpoint, VosElementType::FieldAttribute);
             }
             state.expect(VosTokenType::Identifier)?;
@@ -129,7 +153,9 @@ impl VosParser {
                 self.skip_trivia(state);
             }
             state.finish_at(field_checkpoint, VosElementType::Field);
-            if state.at(VosTokenType::Comma) || state.at(VosTokenType::Semicolon) { state.bump(); }
+            if state.at(VosTokenType::Comma) || state.at(VosTokenType::Semicolon) {
+                state.bump();
+            }
         }
         state.expect(VosTokenType::RightBrace)?;
         state.finish_at(checkpoint, VosElementType::Block);
@@ -183,7 +209,8 @@ impl VosParser {
             self.parse_type(state, depth + 1)?;
             self.skip_trivia(state);
             state.expect(VosTokenType::RightBracket)?;
-        } else {
+        }
+        else {
             state.expect(VosTokenType::Identifier)?;
             self.skip_trivia(state);
             while state.at(VosTokenType::Colon) {
@@ -199,11 +226,14 @@ impl VosParser {
                 loop {
                     if state.at(VosTokenType::NumberLiteral) {
                         state.bump();
-                    } else {
+                    }
+                    else {
                         self.parse_type(state, depth + 1)?;
                     }
                     self.skip_trivia(state);
-                    if !state.at(VosTokenType::Comma) { break; }
+                    if !state.at(VosTokenType::Comma) {
+                        break;
+                    }
                     state.bump();
                     self.skip_trivia(state);
                 }
@@ -211,7 +241,9 @@ impl VosParser {
             }
         }
         self.skip_trivia(state);
-        if state.at(VosTokenType::Question) { state.bump(); }
+        if state.at(VosTokenType::Question) {
+            state.bump();
+        }
         Ok(())
     }
 
@@ -248,15 +280,22 @@ impl VosParser {
         let mut closings = Vec::new();
         let mut element = VosElementType::Block;
         loop {
-            let Some(kind) = state.current().map(|token| token.kind) else { return Err(state.unexpected_eof()) };
+            let Some(kind) = state.current().map(|token| token.kind)
+            else {
+                return Err(state.unexpected_eof());
+            };
             match kind {
                 VosTokenType::LeftBrace => closings.push(VosTokenType::RightBrace),
                 VosTokenType::LeftParen => {
-                    if closings.is_empty() { element = VosElementType::Parentheses; }
+                    if closings.is_empty() {
+                        element = VosElementType::Parentheses;
+                    }
                     closings.push(VosTokenType::RightParen);
                 }
                 VosTokenType::LeftBracket => {
-                    if closings.is_empty() { element = VosElementType::Brackets; }
+                    if closings.is_empty() {
+                        element = VosElementType::Brackets;
+                    }
                     closings.push(VosTokenType::RightBracket);
                 }
                 VosTokenType::RightBrace | VosTokenType::RightParen | VosTokenType::RightBracket => {
@@ -273,7 +312,9 @@ impl VosParser {
                 _ => {}
             }
             state.bump();
-            if closings.is_empty() { break; }
+            if closings.is_empty() {
+                break;
+            }
         }
         state.finish_at(checkpoint, element);
         Ok(())
@@ -287,16 +328,20 @@ impl Parser<VosLanguage> for VosParser {
             let checkpoint = state.checkpoint();
             while state.not_at_end() {
                 self.skip_trivia(state);
-                if state.at(VosTokenType::Eof) { break; }
+                if state.at(VosTokenType::Eof) {
+                    break;
+                }
                 if state.at(VosTokenType::Error) {
                     state.record_unexpected_token("invalid VOS token");
                     return Err(state.errors.last().cloned().expect("Oak records the lexical error"));
                 }
                 if state.current().map(|token| Self::declaration_kind(token.kind) != VosElementType::Error).unwrap_or(false) {
                     self.parse_declaration(state)?;
-                } else if matches!(state.current().map(|token| token.kind), Some(VosTokenType::LeftBrace | VosTokenType::LeftParen | VosTokenType::LeftBracket)) {
+                }
+                else if matches!(state.current().map(|token| token.kind), Some(VosTokenType::LeftBrace | VosTokenType::LeftParen | VosTokenType::LeftBracket)) {
                     self.parse_group(state)?;
-                } else {
+                }
+                else {
                     self.consume_token(state)?;
                 }
             }

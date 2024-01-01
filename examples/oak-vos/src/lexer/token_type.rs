@@ -90,11 +90,17 @@ impl TokenType for VosTokenType {
     type Role = UniversalTokenRole;
     const END_OF_STREAM: Self = Self::Eof;
 
-    fn is_ignored(&self) -> bool { matches!(self, Self::Whitespace | Self::Comment) }
+    fn is_ignored(&self) -> bool {
+        matches!(self, Self::Whitespace | Self::Comment)
+    }
 
-    fn is_comment(&self) -> bool { matches!(self, Self::Comment) }
+    fn is_comment(&self) -> bool {
+        matches!(self, Self::Comment)
+    }
 
-    fn is_whitespace(&self) -> bool { matches!(self, Self::Whitespace) }
+    fn is_whitespace(&self) -> bool {
+        matches!(self, Self::Whitespace)
+    }
 
     fn role(&self) -> Self::Role {
         match self {
@@ -105,7 +111,9 @@ impl TokenType for VosTokenType {
             Self::Identifier => UniversalTokenRole::Name,
             Self::Operator => UniversalTokenRole::Operator,
             Self::StringLiteral | Self::NumberLiteral | Self::BooleanLiteral | Self::NullLiteral => UniversalTokenRole::Literal,
-            Self::LeftBrace | Self::RightBrace | Self::LeftParen | Self::RightParen | Self::LeftBracket | Self::RightBracket | Self::Colon | Self::Semicolon | Self::Comma | Self::Equal | Self::Question | Self::Less | Self::Greater | Self::Dot => UniversalTokenRole::Punctuation,
+            Self::LeftBrace | Self::RightBrace | Self::LeftParen | Self::RightParen | Self::LeftBracket | Self::RightBracket | Self::Colon | Self::Semicolon | Self::Comma | Self::Equal | Self::Question | Self::Less | Self::Greater | Self::Dot => {
+                UniversalTokenRole::Punctuation
+            }
             _ => UniversalTokenRole::Keyword,
         }
     }

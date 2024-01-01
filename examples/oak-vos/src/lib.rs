@@ -4,12 +4,12 @@
 #![doc(html_logo_url = "https://raw.githubusercontent.com/yggdrasil-language/oaks/refs/heads/dev/documents/logo.svg")]
 #![doc(html_favicon_url = "https://raw.githubusercontent.com/yggdrasil-language/oaks/refs/heads/dev/documents/logo.svg")]
 
-/// The Oak language configuration for VOS.
-pub mod language;
 /// The initial declaration AST emitted by Oak Builder.
 pub mod ast;
 /// The Oak Builder for VOS declarations.
 pub mod builder;
+/// The Oak language configuration for VOS.
+pub mod language;
 /// The Oak lexer for VOS.
 pub mod lexer;
 /// The Oak parser for VOS.

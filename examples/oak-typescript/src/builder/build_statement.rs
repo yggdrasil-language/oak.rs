@@ -853,4 +853,3 @@ impl<'config> TypeScriptBuilder<'config> {
         }
     }
 }
-

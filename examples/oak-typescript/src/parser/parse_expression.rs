@@ -1,10 +1,12 @@
-use crate::parser::{State, TypeScriptParser};
+use crate::{
+    lexer::token_type::TypeScriptTokenType,
+    parser::{State, TypeScriptParser},
+};
 use oak_core::{
     GreenNode,
     parser::pratt::{Associativity, PrattParser, binary},
     source::Source,
 };
-use crate::lexer::token_type::TypeScriptTokenType;
 
 impl<'config> TypeScriptParser<'config> {
     pub(crate) fn primary<'a, S: Source + ?Sized>(&self, state: &mut State<'a, S>) -> &'a GreenNode<'a, crate::language::TypeScriptLanguage> {

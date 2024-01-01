@@ -551,7 +551,8 @@ fn decode_string_literal_text(raw: &str) -> Result<String, OakError> {
     while let Some(character) = chars.next() {
         let decoded = if character != '\\' {
             character
-        } else {
+        }
+        else {
             match chars.next().ok_or_else(|| OakError::custom_error("incomplete string escape"))? {
                 'n' => '\n',
                 'r' => '\r',
@@ -562,7 +563,9 @@ fn decode_string_literal_text(raw: &str) -> Result<String, OakError> {
                 '0' if !chars.peek().is_some_and(char::is_ascii_digit) => '\0',
                 '\n' => continue,
                 '\r' => {
-                    if chars.peek() == Some(&'\n') { chars.next(); }
+                    if chars.peek() == Some(&'\n') {
+                        chars.next();
+                    }
                     continue;
                 }
                 '\u{2028}' | '\u{2029}' => continue,
@@ -573,14 +576,21 @@ fn decode_string_literal_text(raw: &str) -> Result<String, OakError> {
                         chars.next();
                         loop {
                             let digit = chars.next().ok_or_else(|| OakError::custom_error("incomplete Unicode escape"))?;
-                            if digit == '}' { break; }
-                            if !digit.is_ascii_hexdigit() || hex.len() == 6 { return Err(OakError::custom_error("invalid Unicode escape")); }
+                            if digit == '}' {
+                                break;
+                            }
+                            if !digit.is_ascii_hexdigit() || hex.len() == 6 {
+                                return Err(OakError::custom_error("invalid Unicode escape"));
+                            }
                             hex.push(digit);
                         }
-                    } else {
+                    }
+                    else {
                         for _ in 0..if escape == 'u' { 4 } else { 2 } {
                             let digit = chars.next().ok_or_else(|| OakError::custom_error("incomplete hexadecimal escape"))?;
-                            if !digit.is_ascii_hexdigit() { return Err(OakError::custom_error("invalid hexadecimal escape")); }
+                            if !digit.is_ascii_hexdigit() {
+                                return Err(OakError::custom_error("invalid hexadecimal escape"));
+                            }
                             hex.push(digit);
                         }
                     }

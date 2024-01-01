@@ -12,7 +12,9 @@ pub struct VosBuilder;
 
 impl VosBuilder {
     /// Creates a VOS Builder.
-    pub fn new(_config: &VosLanguage) -> Self { Self }
+    pub fn new(_config: &VosLanguage) -> Self {
+        Self
+    }
 
     fn kind(element: VosElementType) -> Option<VosDeclarationKind> {
         Some(match element {
@@ -178,14 +180,12 @@ impl VosBuilder {
                         name_span = Some(token_span.into());
                     }
                 }
-                GreenTree::Node(child_node) => {
-                    match child_node.kind {
-                        VosElementType::FieldAttribute => attributes.push(self.build_attribute(child_node, child_offset, source)),
-                        VosElementType::TypeSyntax => type_syntax = Some(self.slice(child_node, child_offset, source)),
-                        VosElementType::DefaultValue => default_value = Some(self.slice(child_node, child_offset, source)),
-                        _ => {}
-                    }
-                }
+                GreenTree::Node(child_node) => match child_node.kind {
+                    VosElementType::FieldAttribute => attributes.push(self.build_attribute(child_node, child_offset, source)),
+                    VosElementType::TypeSyntax => type_syntax = Some(self.slice(child_node, child_offset, source)),
+                    VosElementType::DefaultValue => default_value = Some(self.slice(child_node, child_offset, source)),
+                    _ => {}
+                },
             }
             child_offset += match child {
                 GreenTree::Node(node) => node.byte_length as usize,
@@ -234,7 +234,8 @@ impl VosBuilder {
     }
 
     fn parse_type_tokens(&self, tokens: &[(crate::lexer::VosTokenType, core::range::Range<usize>)], index: &mut usize, source: &SourceText) -> Result<VosTypeSyntax, OakError> {
-        let Some((kind, span)) = tokens.get(*index) else {
+        let Some((kind, span)) = tokens.get(*index)
+        else {
             return Err(OakError::expected_token("VOS type syntax", 0, None));
         };
         let start = span.start;
@@ -247,12 +248,9 @@ impl VosBuilder {
             };
             let end = self.type_span(&target).end;
             let reference = VosTypeSyntax::Reference { target: Box::new(target), span: (start..end).into() };
-            if let Some(optional_end) = target_optional {
-                VosTypeSyntax::Optional { inner: Box::new(reference), span: (start..optional_end).into() }
-            } else {
-                reference
-            }
-        } else if *kind == crate::lexer::VosTokenType::LeftBracket {
+            if let Some(optional_end) = target_optional { VosTypeSyntax::Optional { inner: Box::new(reference), span: (start..optional_end).into() } } else { reference }
+        }
+        else if *kind == crate::lexer::VosTokenType::LeftBracket {
             *index += 1;
             let element = self.parse_type_tokens(tokens, index, source)?;
             let close = tokens.get(*index).ok_or_else(|| OakError::unexpected_eof(start, None))?;
@@ -261,7 +259,8 @@ impl VosBuilder {
             }
             *index += 1;
             VosTypeSyntax::List { element: Box::new(element), span: (start..close.1.end).into() }
-        } else if *kind == crate::lexer::VosTokenType::Identifier {
+        }
+        else if *kind == crate::lexer::VosTokenType::Identifier {
             let mut path = vec![self.token_text(span, source).into_owned()];
             let mut end = span.end;
             *index += 1;
@@ -286,7 +285,8 @@ impl VosBuilder {
                     let parsed = if matches!(argument.0, crate::lexer::VosTokenType::NumberLiteral | crate::lexer::VosTokenType::StringLiteral | crate::lexer::VosTokenType::BooleanLiteral | crate::lexer::VosTokenType::NullLiteral) {
                         *index += 1;
                         VosTypeArgument::Literal(self.raw_slice(argument.1.start, argument.1.end, source))
-                    } else {
+                    }
+                    else {
                         VosTypeArgument::Type(self.parse_type_tokens(tokens, index, source)?)
                     };
                     end = match &parsed {
@@ -306,10 +306,12 @@ impl VosBuilder {
                     *index += 1;
                 }
                 VosTypeSyntax::Generic { path, arguments, span: (start..end).into() }
-            } else {
+            }
+            else {
                 VosTypeSyntax::Named { path, span: (start..end).into() }
             }
-        } else {
+        }
+        else {
             return Err(OakError::expected_token("VOS type syntax", span.start, None));
         };
         if tokens.get(*index).is_some_and(|token| token.0 == crate::lexer::VosTokenType::Question) {
@@ -343,7 +345,9 @@ impl VosBuilder {
         for child in node.children {
             if let GreenTree::Node(inner) = child {
                 let inner_attribute = self.build_attribute(inner, child_offset, source);
-                if name.is_none() { name = inner_attribute.name; }
+                if name.is_none() {
+                    name = inner_attribute.name;
+                }
             }
             if let GreenTree::Leaf(leaf) = child {
                 if leaf.kind == crate::lexer::VosTokenType::Identifier && name.is_none() {
@@ -397,19 +401,11 @@ impl VosBuilder {
                         GreenTree::Leaf(leaf) => leaf.length as usize,
                     };
                 }
-                VosSyntaxElement::Node(VosSyntaxNode {
-                    kind: node.kind,
-                    span: (offset..offset + node.byte_length as usize).into(),
-                    children,
-                })
+                VosSyntaxElement::Node(VosSyntaxNode { kind: node.kind, span: (offset..offset + node.byte_length as usize).into(), children })
             }
             GreenTree::Leaf(leaf) => {
                 let end = offset + leaf.length as usize;
-                VosSyntaxElement::Token(VosSyntaxToken {
-                    kind: leaf.kind,
-                    span: (offset..end).into(),
-                    text: source.get_text_in((offset..end).into()).into_owned(),
-                })
+                VosSyntaxElement::Token(VosSyntaxToken { kind: leaf.kind, span: (offset..end).into(), text: source.get_text_in((offset..end).into()).into_owned() })
             }
         }
     }
@@ -438,11 +434,7 @@ impl Builder<VosLanguage> for VosBuilder {
                         Some(element)
                     })
                     .collect();
-                let syntax = VosSyntaxNode {
-                    kind: VosElementType::Root,
-                    span: (0..text.len()).into(),
-                    children: syntax_children,
-                };
+                let syntax = VosSyntaxNode { kind: VosElementType::Root, span: (0..text.len()).into(), children: syntax_children };
                 let mut declarations = Vec::new();
                 let mut offset = 0usize;
                 for child in green_tree.children {
