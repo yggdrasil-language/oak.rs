@@ -67,6 +67,10 @@ impl<'config> TypeScriptLexer<'config> {
                 continue;
             }
 
+            if self.lex_regex_literal(state) {
+                continue;
+            }
+
             if self.lex_operator_or_punctuation(state) {
                 continue;
             }
@@ -337,6 +341,50 @@ impl<'config> TypeScriptLexer<'config> {
         TypeScriptTokenType::from_keyword(text).unwrap_or(TypeScriptTokenType::IdentifierName)
     }
 
+    fn lex_regex_literal<'a, S: Source + ?Sized>(&self, state: &mut State<'a, S>) -> bool {
+        if state.peek() != Some('/') || !regex_can_start_after(state.get_tokens()) {
+            return false;
+        }
+        let start = state.get_position();
+        state.advance(1);
+        let mut in_class = false;
+        let mut closed = false;
+        while let Some(ch) = state.peek() {
+            if ch == '\\' {
+                state.advance(1);
+                if state.peek().is_some() {
+                    state.advance(1);
+                }
+                continue;
+            }
+            if ch == '[' {
+                in_class = true;
+            } else if ch == ']' {
+                in_class = false;
+            } else if ch == '/' && !in_class {
+                state.advance(1);
+                closed = true;
+                break;
+            } else if ch == '\n' || ch == '\r' {
+                break;
+            }
+            state.advance(ch.len_utf8());
+        }
+        if !closed {
+            state.set_position(start);
+            return false;
+        }
+        while let Some(ch) = state.peek() {
+            if ch.is_alphabetic() {
+                state.advance(ch.len_utf8());
+            } else {
+                break;
+            }
+        }
+        state.add_token(TypeScriptTokenType::RegexLiteral, start, state.get_position());
+        true
+    }
+
     fn lex_operator_or_punctuation<'a, S: Source + ?Sized>(&self, state: &mut State<'a, S>) -> bool {
         let start = state.get_position();
         let rest = state.rest();
@@ -421,4 +469,37 @@ impl<'config> TypeScriptLexer<'config> {
 
         false
     }
+}
+
+fn regex_can_start_after(tokens: &[oak_core::Token<TypeScriptTokenType>]) -> bool {
+    let previous = tokens.iter().rev().find(|token| {
+        !matches!(token.kind, TypeScriptTokenType::Whitespace | TypeScriptTokenType::Newline | TypeScriptTokenType::LineComment | TypeScriptTokenType::BlockComment)
+    });
+    let Some(previous) = previous else {
+        return true;
+    };
+    matches!(
+        previous.kind,
+        TypeScriptTokenType::Equal
+            | TypeScriptTokenType::LeftParen
+            | TypeScriptTokenType::LeftBracket
+            | TypeScriptTokenType::LeftBrace
+            | TypeScriptTokenType::Comma
+            | TypeScriptTokenType::Colon
+            | TypeScriptTokenType::Semicolon
+            | TypeScriptTokenType::Question
+            | TypeScriptTokenType::Exclamation
+            | TypeScriptTokenType::Arrow
+            | TypeScriptTokenType::Return
+            | TypeScriptTokenType::Throw
+            | TypeScriptTokenType::Case
+            | TypeScriptTokenType::Delete
+            | TypeScriptTokenType::Void
+            | TypeScriptTokenType::Typeof
+            | TypeScriptTokenType::New
+            | TypeScriptTokenType::In
+            | TypeScriptTokenType::Of
+            | TypeScriptTokenType::Else
+            | TypeScriptTokenType::Do
+    )
 }
