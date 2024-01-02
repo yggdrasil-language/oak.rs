@@ -12,7 +12,6 @@ keywords = ["parser", "vue", "sfc", "incremental"]
 
 [dependencies]
 oak-core = { workspace = true }
-oak-pretty-print = { workspace = true }
 serde = { workspace = true, optional = true }
 oak-lsp = { workspace = true, optional = true }
 oak-hover = { workspace = true, optional = true }
