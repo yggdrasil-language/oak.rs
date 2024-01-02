@@ -1,53 +1,94 @@
-use alloc::string::String;
-use oak_core::{language::Language, tree::RedTree};
+use core::range::Range;
 
-/// Generic formatter trait for language-specific formatters
-///
-/// This trait defines the interface that language-specific formatters must implement.
-pub trait Formatter<L: Language> {
-    /// The state type used by this formatter
-    type State;
+use crate::{config::GapConstraint, errors::FormatResult};
 
-    /// The output type produced by this formatter
-    type Output;
-
-    /// Formats a red-green tree
-    ///
-    /// # Parameters
-    /// - `tree`: The red-green tree to format
-    /// - `state`: The current formatter state
-    ///
-    /// # Returns
-    /// The formatted output
-    fn format<'a>(&self, tree: &RedTree<'a, L>, state: &mut Self::State) -> Self::Output;
+/// A source edit produced by a formatter gap decision.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TextEdit {
+    /// The source gap replaced by this edit.
+    pub span: Range<usize>,
+    /// Replacement whitespace or trivia layout.
+    pub text: String,
 }
 
-/// A generic formatter that can be used for any language
-///
-/// This struct provides a common interface for formatting code in any language.
-pub struct GenericFormatter<L: Language, F: Formatter<L>> {
-    /// The language-specific formatter implementation
-    formatter: F,
-    _marker: core::marker::PhantomData<L>,
+/// A token boundary and its source gap.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TokenGap<'a> {
+    /// The preceding token text.
+    pub left: &'a str,
+    /// The source bytes between the two tokens.
+    pub source: &'a str,
+    /// The following token text.
+    pub right: &'a str,
+    /// The source range of the gap.
+    pub span: Range<usize>,
 }
 
-impl<L: Language, F: Formatter<L>> GenericFormatter<L, F> {
-    /// Creates a new GenericFormatter
-    ///
-    /// # Parameters
-    /// - `formatter`: The language-specific formatter implementation
-    pub fn new(formatter: F) -> Self {
-        Self { formatter, _marker: core::marker::PhantomData }
+/// Convert non-overlapping gap decisions into source edits.
+pub fn edits_for_gaps<'a, I>(gaps: I) -> FormatResult<Vec<TextEdit>>
+where
+    I: IntoIterator<Item = (TokenGap<'a>, GapConstraint)>,
+{
+    let mut edits = Vec::new();
+    let mut previous_end = 0;
+    for (gap, constraint) in gaps {
+        if gap.span.start < previous_end || gap.span.end < gap.span.start {
+            return Err(oak_core::OakError::format_error("formatter produced overlapping token gaps"));
+        }
+        let text = match constraint {
+            GapConstraint::NoSpace => String::new(),
+            GapConstraint::RequiredSpace | GapConstraint::OptionalSpace => " ".to_owned(),
+            GapConstraint::Preserve => gap.source.to_owned(),
+            GapConstraint::HardLine => "\n".to_owned(),
+        };
+        if text != gap.source {
+            edits.push(TextEdit { span: gap.span.clone(), text });
+        }
+        previous_end = gap.span.end;
     }
+    Ok(edits)
+}
 
-    /// Formats the given source code
-    ///
-    /// # Parameters
-    /// - `source`: The source code to format
-    ///
-    /// # Returns
-    /// The formatted source code
-    pub fn format_source(&self, source: &str) -> String {
-        source.to_string()
+/// Apply validated, source-relative edits from right to left.
+pub fn apply_edits(source: &str, edits: &[TextEdit]) -> FormatResult<String> {
+    let mut ordered = edits.to_vec();
+    ordered.sort_by_key(|edit| (edit.span.start, edit.span.end));
+    let mut previous_end = 0;
+    for edit in &ordered {
+        if edit.span.start < previous_end || edit.span.end > source.len() {
+            return Err(oak_core::OakError::format_error("formatter edit range is invalid or overlapping"));
+        }
+        previous_end = edit.span.end;
     }
+    let mut output = source.to_owned();
+    for edit in ordered.into_iter().rev() {
+        output.replace_range(edit.span.start..edit.span.end, &edit.text);
+    }
+    Ok(output)
+}
+
+/// Choose a conservative whitespace constraint for two lexical tokens.
+pub fn conservative_constraint(left: &str, gap: &str, right: &str) -> GapConstraint {
+    if left.starts_with("//") || left.starts_with("/*") || right.starts_with("//") || right.starts_with("/*") || gap.contains("//") || gap.contains("/*") || gap.contains('\n') {
+        return GapConstraint::Preserve;
+    }
+    if needs_space(left, right) { GapConstraint::RequiredSpace } else { GapConstraint::NoSpace }
+}
+
+fn needs_space(left: &str, right: &str) -> bool {
+    if (left == "<" && right == "/") || (left == "/" && right == ">") {
+        return false;
+    }
+    if left == "/" && right.chars().next().is_some_and(|ch| ch.is_ascii_alphabetic()) {
+        return false;
+    }
+    let left_word = left.chars().last().is_some_and(|ch| ch.is_ascii_alphanumeric() || ch == '_' || ch == '$');
+    let right_word = right.chars().next().is_some_and(|ch| ch.is_ascii_alphanumeric() || ch == '_' || ch == '$');
+    let left_quote = left.ends_with(['\'', '"', '`']);
+    let right_quote = right.starts_with(['\'', '"', '`']);
+    let left_operator = left.ends_with(['=', '+', '-', '*', '/', '%', '?', ':', '&', '|']);
+    let right_operator = right.starts_with(['=', '+', '-', '*', '/', '%', '?', ':', '&', '|']);
+    let brace_boundary = left.ends_with('{') || right.starts_with('}') || (left_word && right.starts_with('{')) || (left.ends_with('}') && right_word);
+
+    (left_word && (right_word || right_quote)) || (left_quote && right_word) || left.ends_with(',') || left.ends_with(';') || left.ends_with(':') || left_operator || right_operator || brace_boundary
 }

@@ -1,70 +1,29 @@
-use alloc::borrow::Cow;
+//! Configuration primitives owned by the formatter algorithm.
 
-/// Indent style
+/// The layout decision for one source gap.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(feature = "serde", serde(tag = "type", content = "value"))]
-pub enum IndentStyle {
-    /// Use spaces
-    Spaces(u8),
-    /// Use tabs
-    Tabs,
+pub enum GapConstraint {
+    /// Do not emit a byte in the gap.
+    NoSpace,
+    /// Emit one space unless a preserved line break owns the gap.
+    OptionalSpace,
+    /// Emit one space.
+    RequiredSpace,
+    /// Keep the source gap unchanged.
+    Preserve,
+    /// A language rule requires a line break.
+    HardLine,
 }
 
-impl Default for IndentStyle {
-    fn default() -> Self {
-        IndentStyle::Spaces(4)
-    }
-}
-
-/// Line ending
+/// Local options for applying token-gap edits.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
-pub enum LineEnding {
-    /// Unix style (\n)
-    Unix,
-    /// Windows style (\r\n)
-    Windows,
-    /// Auto detect
-    Auto,
+pub struct GapFormatOptions {
+    /// Whether final newline policy is controlled by the caller.
+    pub preserve_final_newline: bool,
 }
 
-impl Default for LineEnding {
+impl Default for GapFormatOptions {
     fn default() -> Self {
-        LineEnding::Auto
-    }
-}
-
-/// Common formatting configuration that can be shared across languages
-///
-/// This struct provides common formatting options that are applicable to most
-/// programming languages. Language-specific formatters can use this as a base
-/// and add their own specific options.
-#[derive(Debug, Clone)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
-#[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
-pub struct CommonFormatterConfig {
-    /// Indent style
-    pub indent_style: IndentStyle,
-    /// Indent text (cached single-level indent string)
-    pub indent_text: Cow<'static, str>,
-    /// Line ending
-    pub line_ending: LineEnding,
-    /// Maximum line length
-    pub max_width: usize,
-    /// Whether to insert a final newline at the end of the file
-    pub insert_final_newline: bool,
-    /// Whether to trim trailing whitespace
-    pub trim_trailing_whitespace: bool,
-    /// Whether to preserve blank lines
-    pub preserve_blank_lines: bool,
-    /// Maximum consecutive blank lines
-    pub max_blank_lines: usize,
-}
-
-impl Default for CommonFormatterConfig {
-    fn default() -> Self {
-        Self { indent_style: IndentStyle::default(), indent_text: Cow::Borrowed("    "), line_ending: LineEnding::default(), max_width: 80, insert_final_newline: true, trim_trailing_whitespace: true, preserve_blank_lines: true, max_blank_lines: 2 }
+        Self { preserve_final_newline: true }
     }
 }

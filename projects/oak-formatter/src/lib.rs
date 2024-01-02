@@ -1,30 +1,21 @@
 #![doc(html_logo_url = "https://raw.githubusercontent.com/ygg-lang/oaks/refs/heads/dev/documents/logo.svg")]
 #![doc(html_favicon_url = "https://raw.githubusercontent.com/ygg-lang/oaks/refs/heads/dev/documents/logo.svg")]
 #![warn(missing_docs)]
-//! High-level formatting library for the Oak language framework.
-//!
-//! This crate provides high-level formatting logic, including configuration management,
-//! annotation processing, and language-specific formatting rules.
+//! CST token-gap formatting primitives for Oak language adapters.
 
 pub extern crate alloc;
 extern crate self as oak_formatter;
 
 // Public modules
-/// Annotation handling and processing
-pub mod annotation;
-/// Formatting configuration
+/// Formatting configuration and gap constraints.
 pub mod config;
-/// Error types for formatting
+/// Shared Oak formatter errors.
 pub mod errors;
-/// Language-specific formatters
+/// Source edit and token-gap operations.
 pub mod formatters;
 
-// Re-export commonly used types
 pub use crate::{
-    annotation::{AnnotationParam, AnnotationParser, AnnotationProcessor, AnnotationValue, FormatAnnotation},
-    config::{CommonFormatterConfig, IndentStyle, LineEnding},
-    errors::FormatResult,
+    config::{GapConstraint, GapFormatOptions},
+    errors::{FormatResult, OakDiagnostics, OakError, OakErrorKind},
+    formatters::{TextEdit, TokenGap, apply_edits, conservative_constraint, edits_for_gaps},
 };
-
-pub use crate::formatters::{Formatter, GenericFormatter};
-pub use oak_core::language::Language;

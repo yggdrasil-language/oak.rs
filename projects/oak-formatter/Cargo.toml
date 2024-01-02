@@ -16,9 +16,7 @@ path = "src/lib.rs"
 oak-core = { workspace = true }
 serde = { workspace = true, optional = true, features = ["derive"] }
 serde_json = { workspace = true, optional = true }
-regex = { workspace = true, optional = true }
 
 [features]
-default = ["serde"]
+default = []
 serde = ["dep:serde", "dep:serde_json"]
-regex = ["dep:regex"]

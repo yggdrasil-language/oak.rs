@@ -1,6 +1,6 @@
-use oak_core::errors::OakError;
+//! Formatter errors use Oak's shared diagnostic type.
 
-/// Format result type
-///
-/// This type represents the result of a formatting operation.
+pub use oak_core::errors::{OakDiagnostics, OakError, OakErrorKind};
+
+/// Result returned by the CST formatter algorithm.
 pub type FormatResult<T> = Result<T, OakError>;

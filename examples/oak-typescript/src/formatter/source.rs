@@ -1,89 +1,73 @@
-//! CST-oriented `source` formatter (green-tree spans + trivia gaps).
-//!
-//! Uses `TypeScriptParser` for the concrete tree, preserves verbatim text between
-//! top-level statement spans, and formats supported statements via formatter rules.
+//! TypeScript CST token-gap adapter.
 
-use oak_core::{ParseSession, Parser, RedNode, RedTree, SourceText};
+use core::range::Range;
+use oak_core::{Lexer, ParseSession, SourceText};
+use oak_formatter::{TokenGap, apply_edits, conservative_constraint, edits_for_gaps};
 
+use super::FormatOptions;
 use crate::{
     language::TypeScriptLanguage,
-    parser::{TypeScriptParser, element_type::TypeScriptElementType},
+    lexer::{TypeScriptLexer, token_type::TypeScriptTokenType},
 };
 
-use super::{options::FormatOptions, red_tree::TypeScriptRedTreeFormatter};
-
-/// Format a parsed `SourceFile` red node with companion source text.
-pub(crate) fn format_source_file(source: &str, file: &RedNode<'_, TypeScriptLanguage>, options: &FormatOptions) -> Result<String, String> {
-    if file.element_type() != TypeScriptElementType::SourceFile {
-        return Err(format!("expected SourceFile root, got {:?}", file.element_type()));
-    }
-
-    let file_span = file.span();
-    let mut out = String::new();
-    let mut cursor = file_span.start;
-
-    for child in file.children() {
-        let child_span = child.span();
-        if child_span.start < cursor {
-            return Err("overlapping CST spans".into());
-        }
-        if child_span.start > cursor {
-            out.push_str(slice_source(source, cursor, child_span.start));
-        }
-
-        match child {
-            RedTree::Leaf(_) => {
-                out.push_str(slice_source(source, child_span.start, child_span.end));
-            }
-            RedTree::Node(stmt) => {
-                let kind = stmt.element_type();
-                if !is_supported_top_level(kind) {
-                    return Err(format!("unsupported top-level CST node: {kind:?}"));
-                }
-                out.push_str(&TypeScriptRedTreeFormatter::new().format_statement(source, &stmt, options)?);
-            }
-        }
-        cursor = child_span.end;
-    }
-
-    if cursor < file_span.end {
-        out.push_str(slice_source(source, cursor, file_span.end));
-    }
-    else if cursor < source.len() {
-        out.push_str(slice_source(source, cursor, source.len()));
-    }
-
-    Ok(options.finalize_output(source, out))
-}
-
-/// Format TypeScript/JavaScript source with trivia between top-level statements preserved.
-pub(crate) fn format_source(source: &str, options: &FormatOptions) -> Result<String, String> {
+pub(crate) fn format_source(source: &str, options: &FormatOptions) -> Result<String, oak_core::OakError> {
     if source.is_empty() {
         return Ok(String::new());
     }
 
     let text = SourceText::new(source);
     let language = TypeScriptLanguage::default();
-    let parser = TypeScriptParser::new(&language);
+    let lexer = TypeScriptLexer::new(&language);
     let mut session = ParseSession::default();
-    let parsed = parser.parse(&text, &[], &mut session);
-
-    if let Err(err) = &parsed.result {
-        return Err(format!("oak parse failed: {err:?}"));
+    let output = lexer.lex(&text, &[], &mut session);
+    let tokens = match output.result {
+        Ok(tokens) => tokens,
+        Err(error) => return Err(error),
+    };
+    if let Some(error) = output.diagnostics.into_iter().next() {
+        return Err(error);
     }
-    if !parsed.diagnostics.is_empty() {
-        return Err(format!("oak diagnostics: {:?}", parsed.diagnostics));
+    let significant: Vec<_> = tokens.iter().filter(|token| !is_layout(token.kind)).collect();
+    validate_delimiters(source, &significant)?;
+    let mut gaps = Vec::new();
+    for pair in significant.windows(2) {
+        let left = &pair[0];
+        let right = &pair[1];
+        let span = Range { start: left.span.end, end: right.span.start };
+        let gap = source.get(span.clone()).ok_or_else(|| oak_core::OakError::format_error("lexer token span is outside source"))?;
+        let left_text = source.get(left.span.clone()).ok_or_else(|| oak_core::OakError::format_error("left token span is outside source"))?;
+        let right_text = source.get(right.span.clone()).ok_or_else(|| oak_core::OakError::format_error("right token span is outside source"))?;
+        gaps.push((TokenGap { left: left_text, source: gap, right: right_text, span }, conservative_constraint(left_text, gap, right_text)));
     }
-
-    let root_green = parsed.result.ok().ok_or_else(|| "oak parse returned no root".to_string())?;
-    let file = RedNode::new(root_green, 0);
-    format_source_file(source, &file, options)
+    let edits = edits_for_gaps(gaps)?;
+    let formatted = apply_edits(source, &edits)?;
+    let _ = options;
+    Ok(formatted)
 }
 
-fn slice_source(source: &str, start: usize, end: usize) -> &str {
-    source.get(start..end).unwrap_or("")
+fn is_layout(kind: TypeScriptTokenType) -> bool {
+    matches!(kind, TypeScriptTokenType::Whitespace | TypeScriptTokenType::Newline)
 }
 
-fn is_supported_top_level(kind: TypeScriptElementType) -> bool {
-    matches!(kind, TypeScriptElementType::VariableDeclaration | TypeScriptElementType::ImportDeclaration | TypeScriptElementType::ExportDeclaration | TypeScriptElementType::ExpressionStatement)
+fn validate_delimiters(source: &str, tokens: &[&oak_core::Token<TypeScriptTokenType>]) -> Result<(), oak_core::OakError> {
+    let mut stack = Vec::new();
+    for token in tokens {
+        let text = source.get(token.span.clone()).ok_or_else(|| oak_core::OakError::format_error("lexer token span is outside source"))?;
+        match text {
+            "{" | "(" | "[" => stack.push(text),
+            "}" | ")" | "]" => {
+                let expected = match text {
+                    "}" => "{",
+                    ")" => "(",
+                    "]" => "[",
+                    _ => unreachable!(),
+                };
+                if stack.pop() != Some(expected) {
+                    return Err(oak_core::OakError::format_error("formatter input has unbalanced delimiters"));
+                }
+            }
+            _ => {}
+        }
+    }
+    if stack.is_empty() { Ok(()) } else { Err(oak_core::OakError::format_error("formatter input has unbalanced delimiters")) }
 }
