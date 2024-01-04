@@ -79,16 +79,56 @@ fn needs_space(left: &str, right: &str) -> bool {
     if (left == "<" && right == "/") || (left == "/" && right == ">") {
         return false;
     }
-    if left == "/" && right.chars().next().is_some_and(|ch| ch.is_ascii_alphabetic()) {
+    // Delimiters and member access bind directly to their neighbours.
+    if matches!(right, ")" | "]" | "}" | "," | ";" | "." | "?.") || matches!(left, "(" | "[" | "." | "?.") || (left == "?" && right == ":") || (left == "!" && right != "=") || left == "~" || matches!(left, "++" | "--") || matches!(right, "++" | "--") {
         return false;
+    }
+    // Optional properties and parameters use `name?: Type`.
+    if right == "?" || left == "?" {
+        return false;
+    }
+    // Control-flow keywords conventionally separate from their condition.
+    if matches!(left, "if" | "for" | "while" | "switch" | "catch" | "with") && right == "(" {
+        return true;
     }
     let left_word = left.chars().last().is_some_and(|ch| ch.is_ascii_alphanumeric() || ch == '_' || ch == '$');
     let right_word = right.chars().next().is_some_and(|ch| ch.is_ascii_alphanumeric() || ch == '_' || ch == '$');
     let left_quote = left.ends_with(['\'', '"', '`']);
     let right_quote = right.starts_with(['\'', '"', '`']);
-    let left_operator = left.ends_with(['=', '+', '-', '*', '/', '%', '?', ':', '&', '|']);
-    let right_operator = right.starts_with(['=', '+', '-', '*', '/', '%', '?', ':', '&', '|']);
+    let left_operator = left.ends_with(['=', '+', '-', '*', '/', '%', ':', '&', '|']);
+    let right_operator = right.starts_with(['=', '+', '-', '*', '/', '%', ':', '&', '|']);
     let brace_boundary = left.ends_with('{') || right.starts_with('}') || (left_word && right.starts_with('{')) || (left.ends_with('}') && right_word);
 
     (left_word && (right_word || right_quote)) || (left_quote && right_word) || left.ends_with(',') || left.ends_with(';') || left.ends_with(':') || left_operator || right_operator || brace_boundary
+}
+
+#[cfg(test)]
+mod tests {
+    use super::conservative_constraint;
+    use crate::GapConstraint;
+
+    fn space(left: &str, right: &str) -> bool {
+        matches!(conservative_constraint(left, "", right), GapConstraint::RequiredSpace)
+    }
+
+    #[test]
+    fn keeps_typescript_optional_markers_tight() {
+        assert!(!space("name", "?"));
+        assert!(!space("?", ":"));
+        assert!(space(":", "string"));
+    }
+
+    #[test]
+    fn keeps_unary_and_update_operators_tight() {
+        assert!(!space("!", "ready"));
+        assert!(!space("++", "index"));
+        assert!(!space("index", "++"));
+    }
+
+    #[test]
+    fn separates_control_flow_conditions() {
+        assert!(space("if", "("));
+        assert!(space("for", "("));
+        assert!(!space("call", "("));
+    }
 }
