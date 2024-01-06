@@ -80,12 +80,23 @@ fn needs_space(left: &str, right: &str) -> bool {
         return false;
     }
     // Delimiters and member access bind directly to their neighbours.
-    if matches!(right, ")" | "]" | "}" | "," | ";" | "." | "?.") || matches!(left, "(" | "[" | "." | "?.") || (left == "?" && right == ":") || (left == "!" && right != "=") || left == "~" || matches!(left, "++" | "--") || matches!(right, "++" | "--") {
+    if matches!(right, ")" | "]" | "," | ";" | "." | "?.")
+        || matches!(left, "(" | "[" | "." | "?.")
+        || (left == "?" && right == ":")
+        || (left == "/" && right.chars().next().is_some_and(|ch| ch.is_ascii_alphabetic()))
+        || (left == "!" && right != "=")
+        || left == "~"
+        || matches!(left, "++" | "--")
+        || matches!(right, "++" | "--")
+    {
         return false;
     }
     // Optional properties and parameters use `name?: Type`.
-    if right == "?" || left == "?" {
+    if left == "?" && right == ":" {
         return false;
+    }
+    if left == "?" {
+        return true;
     }
     // Control-flow keywords conventionally separate from their condition.
     if matches!(left, "if" | "for" | "while" | "switch" | "catch" | "with") && right == "(" {

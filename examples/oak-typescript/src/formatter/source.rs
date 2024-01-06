@@ -30,14 +30,22 @@ pub(crate) fn format_source(source: &str, options: &FormatOptions) -> Result<Str
     let significant: Vec<_> = tokens.iter().filter(|token| !is_layout(token.kind)).collect();
     validate_delimiters(source, &significant)?;
     let mut gaps = Vec::new();
-    for pair in significant.windows(2) {
+    for (index, pair) in significant.windows(2).enumerate() {
         let left = &pair[0];
         let right = &pair[1];
         let span = Range { start: left.span.end, end: right.span.start };
         let gap = source.get(span.clone()).ok_or_else(|| oak_core::OakError::format_error("lexer token span is outside source"))?;
         let left_text = source.get(left.span.clone()).ok_or_else(|| oak_core::OakError::format_error("left token span is outside source"))?;
         let right_text = source.get(right.span.clone()).ok_or_else(|| oak_core::OakError::format_error("right token span is outside source"))?;
-        gaps.push((TokenGap { left: left_text, source: gap, right: right_text, span }, conservative_constraint(left_text, gap, right_text)));
+        let mut constraint = conservative_constraint(left_text, gap, right_text);
+        // `?` is ambiguous in a token pair. In `name?: Type` it binds to the
+        // property name, while in `condition ? value : fallback` it is a
+        // ternary operator. Use the next CST token to disambiguate it.
+        if right_text == "?" {
+            let next = significant.get(index + 2).and_then(|token| source.get(token.span.clone()));
+            constraint = if next == Some(":") { oak_formatter::GapConstraint::NoSpace } else { oak_formatter::GapConstraint::RequiredSpace };
+        }
+        gaps.push((TokenGap { left: left_text, source: gap, right: right_text, span }, constraint));
     }
     let edits = edits_for_gaps(gaps)?;
     let formatted = apply_edits(source, &edits)?;
