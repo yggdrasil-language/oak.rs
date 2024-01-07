@@ -98,6 +98,9 @@ fn needs_space(left: &str, right: &str) -> bool {
     if left == "?" {
         return true;
     }
+    if right == ":" {
+        return false;
+    }
     // Control-flow keywords conventionally separate from their condition.
     if matches!(left, "if" | "for" | "while" | "switch" | "catch" | "with") && right == "(" {
         return true;
@@ -110,7 +113,15 @@ fn needs_space(left: &str, right: &str) -> bool {
     let right_operator = right.starts_with(['=', '+', '-', '*', '/', '%', ':', '&', '|']);
     let brace_boundary = left.ends_with('{') || right.starts_with('}') || (left_word && right.starts_with('{')) || (left.ends_with('}') && right_word);
 
-    (left_word && (right_word || right_quote)) || (left_quote && right_word) || left.ends_with(',') || left.ends_with(';') || left.ends_with(':') || left_operator || right_operator || brace_boundary
+    (left_word && (right_word || right_quote))
+        || (left_quote && right_word)
+        || left.ends_with(',')
+        || left.ends_with(';')
+        || left.ends_with(':')
+        || left_operator
+        || right_operator
+        || (left_word && right == "<")
+        || brace_boundary
 }
 
 #[cfg(test)]
@@ -141,5 +152,12 @@ mod tests {
         assert!(space("if", "("));
         assert!(space("for", "("));
         assert!(!space("call", "("));
+    }
+
+    #[test]
+    fn separates_comparison_operators_without_touching_jsx_openers() {
+        assert!(space("left", "<"));
+        assert!(space(">", "right"));
+        assert!(!space("<", "div"));
     }
 }

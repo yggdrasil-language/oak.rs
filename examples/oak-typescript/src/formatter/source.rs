@@ -45,6 +45,16 @@ pub(crate) fn format_source(source: &str, options: &FormatOptions) -> Result<Str
             let next = significant.get(index + 2).and_then(|token| source.get(token.span.clone()));
             constraint = if next == Some(":") { oak_formatter::GapConstraint::NoSpace } else { oak_formatter::GapConstraint::RequiredSpace };
         }
+        if right_text == ":" {
+            let ternary = significant[..index].iter().rev().take(32).any(|token| source.get(token.span.clone()) == Some("?"));
+            constraint = if ternary { oak_formatter::GapConstraint::RequiredSpace } else { oak_formatter::GapConstraint::NoSpace };
+        }
+        if right_text == "<" {
+            let next = significant.get(index + 2).and_then(|token| source.get(token.span.clone()));
+            if next == Some("/") {
+                constraint = oak_formatter::GapConstraint::NoSpace;
+            }
+        }
         gaps.push((TokenGap { left: left_text, source: gap, right: right_text, span }, constraint));
     }
     let edits = edits_for_gaps(gaps)?;
