@@ -113,15 +113,7 @@ fn needs_space(left: &str, right: &str) -> bool {
     let right_operator = right.starts_with(['=', '+', '-', '*', '/', '%', ':', '&', '|']);
     let brace_boundary = left.ends_with('{') || right.starts_with('}') || (left_word && right.starts_with('{')) || (left.ends_with('}') && right_word);
 
-    (left_word && (right_word || right_quote))
-        || (left_quote && right_word)
-        || left.ends_with(',')
-        || left.ends_with(';')
-        || left.ends_with(':')
-        || left_operator
-        || right_operator
-        || (left_word && right == "<")
-        || brace_boundary
+    (left_word && (right_word || right_quote)) || (left_quote && right_word) || left.ends_with(',') || left.ends_with(';') || left.ends_with(':') || left_operator || right_operator || (left_word && right == "<") || brace_boundary
 }
 
 #[cfg(test)]
