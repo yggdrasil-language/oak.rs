@@ -46,19 +46,37 @@ pub(crate) fn format_source(source: &str, options: &FormatOptions) -> Result<Str
             constraint = if next == Some(":") { oak_formatter::GapConstraint::NoSpace } else { oak_formatter::GapConstraint::RequiredSpace };
         }
         if right_text == ":" {
-            let prefix = &source[..right.span.start];
-            let last_question = prefix.rfind('?');
-            let last_statement = prefix.rfind(';').unwrap_or(0);
-            let ternary = left_text != "?" && last_question.is_some_and(|position| position > last_statement);
+            let mut ternary = false;
+            if left_text != "?" {
+                for token in significant[..index].iter().rev().take(64) {
+                    match source.get(token.span.clone()) {
+                        Some("?") => {
+                            ternary = true;
+                            break;
+                        }
+                        Some(";" | "{" | "}") => break,
+                        _ => {}
+                    }
+                }
+            }
             constraint = if ternary { oak_formatter::GapConstraint::RequiredSpace } else { oak_formatter::GapConstraint::NoSpace };
         }
-        if right_text == "<" {
+        if right_text == "<" || right_text == ">" {
             let next = significant.get(index + 2).and_then(|token| source.get(token.span.clone()));
-            if next == Some("/") {
+            if right_text == "<" && next == Some("/") {
                 constraint = oak_formatter::GapConstraint::NoSpace;
+            } else if right_text == ">"
+                && significant
+                    .get(index.wrapping_sub(1))
+                    .and_then(|token| source.get(token.span.clone()))
+                    .is_some_and(|text| text == "<" || text == "/")
+            {
+                constraint = oak_formatter::GapConstraint::NoSpace;
+            } else if left_text.chars().last().is_some_and(|ch| ch.is_ascii_alphanumeric() || matches!(ch, '_' | '$' | ')' | ']')) {
+                constraint = oak_formatter::GapConstraint::RequiredSpace;
             }
         }
-        if left_text == "<" {
+        if left_text == "<" || left_text == ">" {
             let comparison = significant
                 .get(index.wrapping_sub(1))
                 .and_then(|token| source.get(token.span.clone()))

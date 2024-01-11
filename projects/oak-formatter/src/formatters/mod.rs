@@ -76,6 +76,9 @@ pub fn conservative_constraint(left: &str, gap: &str, right: &str) -> GapConstra
 }
 
 fn needs_space(left: &str, right: &str) -> bool {
+    if right.is_empty() {
+        return false;
+    }
     if (left == "<" && right == "/") || (left == "/" && right == ">") {
         return false;
     }
