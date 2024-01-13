@@ -54,7 +54,7 @@ pub(crate) fn format_source(source: &str, options: &FormatOptions) -> Result<Str
                             ternary = true;
                             break;
                         }
-                        Some(";" | "{" | "}") => break,
+                        Some(";" | "{" | "}" | ",") => break,
                         _ => {}
                     }
                 }
