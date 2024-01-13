@@ -50,7 +50,7 @@ pub(crate) fn format_source(source: &str, options: &FormatOptions) -> Result<Str
             if left_text != "?" {
                 for token in significant[..index].iter().rev().take(64) {
                     match source.get(token.span.clone()) {
-                        Some("?") => {
+                        Some("?") if token.kind == TypeScriptTokenType::Question => {
                             ternary = true;
                             break;
                         }
