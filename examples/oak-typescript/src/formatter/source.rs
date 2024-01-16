@@ -48,13 +48,20 @@ pub(crate) fn format_source(source: &str, options: &FormatOptions) -> Result<Str
         if right_text == ":" {
             let mut ternary = false;
             if left_text != "?" {
+                let mut nesting = match left_text {
+                    ")" | "]" | "}" => 1,
+                    _ => 0,
+                };
                 for token in significant[..index].iter().rev().take(64) {
                     match source.get(token.span.clone()) {
                         Some("?") if token.kind == TypeScriptTokenType::Question => {
                             ternary = true;
                             break;
                         }
-                        Some(";" | "{" | "}") => break,
+                        Some(")" | "]" | "}") => nesting += 1,
+                        Some("(" | "[" | "{") if nesting > 0 => nesting -= 1,
+                        Some("(" | "[" | "{") => break,
+                        Some(";" | "," | "}") if nesting == 0 => break,
                         _ => {}
                     }
                 }
