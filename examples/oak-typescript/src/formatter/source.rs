@@ -58,10 +58,11 @@ pub(crate) fn format_source(source: &str, options: &FormatOptions) -> Result<Str
                             ternary = true;
                             break;
                         }
-                        Some(")" | "]" | "}") => nesting += 1,
+                        Some("}") => break,
+                        Some(")" | "]") => nesting += 1,
                         Some("(" | "[" | "{") if nesting > 0 => nesting -= 1,
                         Some("(" | "[" | "{") => break,
-                        Some(";" | "," | "}") if nesting == 0 => break,
+                        Some(";" | ",") if nesting == 0 => break,
                         _ => {}
                     }
                 }
