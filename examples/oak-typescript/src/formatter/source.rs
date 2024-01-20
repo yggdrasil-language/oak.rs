@@ -73,22 +73,19 @@ pub(crate) fn format_source(source: &str, options: &FormatOptions) -> Result<Str
             let next = significant.get(index + 2).and_then(|token| source.get(token.span.clone()));
             if right_text == "<" && next == Some("/") {
                 constraint = oak_formatter::GapConstraint::NoSpace;
-            } else if right_text == ">"
-                && significant
-                    .get(index.wrapping_sub(1))
-                    .and_then(|token| source.get(token.span.clone()))
-                    .is_some_and(|text| text == "<" || text == "/")
-            {
+            }
+            else if right_text == "<" && looks_like_type_arguments(&significant, index, source) {
                 constraint = oak_formatter::GapConstraint::NoSpace;
-            } else if left_text.chars().last().is_some_and(|ch| ch.is_ascii_alphanumeric() || matches!(ch, '_' | '$' | ')' | ']')) {
+            }
+            else if right_text == ">" && significant.get(index.wrapping_sub(1)).and_then(|token| source.get(token.span.clone())).is_some_and(|text| text == "<" || text == "/") {
+                constraint = oak_formatter::GapConstraint::NoSpace;
+            }
+            else if left_text.chars().last().is_some_and(|ch| ch.is_ascii_alphanumeric() || matches!(ch, '_' | '$' | ')' | ']')) {
                 constraint = oak_formatter::GapConstraint::RequiredSpace;
             }
         }
         if left_text == "<" || left_text == ">" {
-            let comparison = significant
-                .get(index.wrapping_sub(1))
-                .and_then(|token| source.get(token.span.clone()))
-                .is_some_and(|text| text.chars().last().is_some_and(|ch| ch.is_ascii_alphanumeric() || matches!(ch, '_' | '$' | ')' | ']')));
+            let comparison = significant.get(index.wrapping_sub(1)).and_then(|token| source.get(token.span.clone())).is_some_and(|text| text.chars().last().is_some_and(|ch| ch.is_ascii_alphanumeric() || matches!(ch, '_' | '$' | ')' | ']')));
             if !right_text.is_empty() && comparison && right_text != "/" {
                 constraint = oak_formatter::GapConstraint::RequiredSpace;
             }
@@ -99,6 +96,27 @@ pub(crate) fn format_source(source: &str, options: &FormatOptions) -> Result<Str
     let formatted = apply_edits(source, &edits)?;
     let _ = options;
     Ok(formatted)
+}
+
+fn looks_like_type_arguments(significant: &[&oak_core::Token<TypeScriptTokenType>], index: usize, source: &str) -> bool {
+    let mut depth = 0usize;
+    for token in significant.iter().skip(index + 1) {
+        let text = match source.get(token.span.clone()) {
+            Some(text) => text,
+            None => return false,
+        };
+        match text {
+            "<" => depth += 1,
+            ">" if depth == 0 => {
+                let after = significant.iter().skip_while(|candidate| candidate.span.start <= token.span.start).find_map(|candidate| source.get(candidate.span.clone()));
+                return after.is_none_or(|next| matches!(next, "=" | "," | ";" | ")" | "]" | "}" | "." | "(" | "=>" | "?" | ":"));
+            }
+            ">" => depth -= 1,
+            ";" | "=" | "?" | ":" if depth == 0 => return false,
+            _ => {}
+        }
+    }
+    false
 }
 
 fn is_layout(kind: TypeScriptTokenType) -> bool {
