@@ -85,6 +85,7 @@ fn needs_space(left: &str, right: &str) -> bool {
     // Delimiters and member access bind directly to their neighbours.
     if matches!(right, ")" | "]" | "," | ";" | "." | "?.")
         || matches!(left, "(" | "[" | "." | "?.")
+        || (left == "{" && right == "}")
         || (left == "?" && right == ":")
         || (left == "/" && right.chars().next().is_some_and(|ch| ch.is_ascii_alphabetic()))
         || (left == "!" && right != "=")
@@ -106,6 +107,14 @@ fn needs_space(left: &str, right: &str) -> bool {
     }
     // Control-flow keywords conventionally separate from their condition.
     if matches!(left, "if" | "for" | "while" | "switch" | "catch" | "with") && right == "(" {
+        return true;
+    }
+    if matches!(right, "as" | "instanceof" | "in") || matches!(left, "as" | "instanceof" | "in") {
+        return true;
+    }
+    if matches!(left, "return" | "throw" | "new" | "typeof" | "void" | "delete" | "await" | "yield")
+        && matches!(right, "[" | "{" | "(")
+    {
         return true;
     }
     let left_word = left.chars().last().is_some_and(|ch| ch.is_ascii_alphanumeric() || ch == '_' || ch == '$');
@@ -154,5 +163,13 @@ mod tests {
         assert!(space("left", "<"));
         assert!(space(">", "right"));
         assert!(!space("<", "div"));
+    }
+
+    #[test]
+    fn separates_type_assertions_and_keyword_expressions() {
+        assert!(space(")", "as"));
+        assert!(space("as", "string"));
+        assert!(space("return", "["));
+        assert!(!space("{", "}"));
     }
 }
