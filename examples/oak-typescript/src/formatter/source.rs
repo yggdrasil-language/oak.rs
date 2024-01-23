@@ -74,7 +74,7 @@ pub(crate) fn format_source(source: &str, options: &FormatOptions) -> Result<Str
             if right_text == "<" && next == Some("/") {
                 constraint = oak_formatter::GapConstraint::NoSpace;
             }
-            else if right_text == "<" && looks_like_type_arguments(&significant, index, source) {
+            else if right_text == "<" && (looks_like_type_arguments(&significant, index, source) || significant.get(index + 3).and_then(|token| source.get(token.span.clone())) == Some(">")) {
                 constraint = oak_formatter::GapConstraint::NoSpace;
             }
             else if right_text == ">" && significant.get(index.wrapping_sub(1)).and_then(|token| source.get(token.span.clone())).is_some_and(|text| text == "<" || text == "/") {
@@ -85,7 +85,7 @@ pub(crate) fn format_source(source: &str, options: &FormatOptions) -> Result<Str
             }
         }
         if left_text == "<" || left_text == ">" {
-            let generic_angle = left_text == "<" && index > 0 && looks_like_type_arguments(&significant, index - 1, source);
+            let generic_angle = left_text == "<" && index > 0 && (looks_like_type_arguments(&significant, index - 1, source) || significant.get(index + 2).and_then(|token| source.get(token.span.clone())) == Some(">"));
             let comparison = !generic_angle && significant.get(index.wrapping_sub(1)).and_then(|token| source.get(token.span.clone())).is_some_and(|text| text.chars().last().is_some_and(|ch| ch.is_ascii_alphanumeric() || matches!(ch, '_' | '$' | ')' | ']')));
             if !right_text.is_empty() && comparison && right_text != "/" {
                 constraint = oak_formatter::GapConstraint::RequiredSpace;
