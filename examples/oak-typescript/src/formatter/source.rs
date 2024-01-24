@@ -38,6 +38,9 @@ pub(crate) fn format_source(source: &str, options: &FormatOptions) -> Result<Str
         let left_text = source.get(left.span.clone()).ok_or_else(|| oak_core::OakError::format_error("left token span is outside source"))?;
         let right_text = source.get(right.span.clone()).ok_or_else(|| oak_core::OakError::format_error("right token span is outside source"))?;
         let mut constraint = conservative_constraint(left_text, gap, right_text);
+        if right_text == "=" && is_jsx_attribute_gap(&significant, index, source) {
+            constraint = oak_formatter::GapConstraint::NoSpace;
+        }
         // `?` is ambiguous in a token pair. In `name?: Type` it binds to the
         // property name, while in `condition ? value : fallback` it is a
         // ternary operator. Use the next CST token to disambiguate it.
@@ -97,6 +100,24 @@ pub(crate) fn format_source(source: &str, options: &FormatOptions) -> Result<Str
     let formatted = apply_edits(source, &edits)?;
     let _ = options;
     Ok(formatted)
+}
+
+fn is_jsx_attribute_gap(significant: &[&oak_core::Token<TypeScriptTokenType>], index: usize, source: &str) -> bool {
+    let mut nesting = 0usize;
+    for token in significant[..=index].iter().rev() {
+        let text = match source.get(token.span.clone()) {
+            Some(text) => text,
+            None => return false,
+        };
+        match text {
+            ">" => nesting += 1,
+            "<" if nesting == 0 => return true,
+            "<" => nesting -= 1,
+            ";" | "{" | "}" if nesting == 0 => return false,
+            _ => {}
+        }
+    }
+    false
 }
 
 fn looks_like_type_arguments(significant: &[&oak_core::Token<TypeScriptTokenType>], index: usize, source: &str) -> bool {
