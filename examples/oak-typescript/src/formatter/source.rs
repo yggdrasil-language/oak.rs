@@ -44,6 +44,9 @@ pub(crate) fn format_source(source: &str, options: &FormatOptions) -> Result<Str
         if left_text == "=" && is_jsx_attribute_gap(&significant, index, source) {
             constraint = oak_formatter::GapConstraint::NoSpace;
         }
+        if right_text.starts_with(['\'', '"', '`']) && significant.get(index.wrapping_sub(1)).and_then(|token| source.get(token.span.clone())) == Some("=") && is_jsx_attribute_gap(&significant, index, source) {
+            constraint = oak_formatter::GapConstraint::NoSpace;
+        }
         // `?` is ambiguous in a token pair. In `name?: Type` it binds to the
         // property name, while in `condition ? value : fallback` it is a
         // ternary operator. Use the next CST token to disambiguate it.
