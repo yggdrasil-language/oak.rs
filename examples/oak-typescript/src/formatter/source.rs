@@ -116,7 +116,7 @@ fn is_jsx_attribute_gap(significant: &[&oak_core::Token<TypeScriptTokenType>], i
             ">" => nesting += 1,
             "<" if nesting == 0 => return true,
             "<" => nesting -= 1,
-            ";" | "{" | "}" if nesting == 0 => return false,
+            ";" | "{" | "}" | "=" if nesting == 0 => return false,
             _ => {}
         }
     }
