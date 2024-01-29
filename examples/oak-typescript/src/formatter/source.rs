@@ -38,6 +38,9 @@ pub(crate) fn format_source(source: &str, options: &FormatOptions) -> Result<Str
         let left_text = source.get(left.span.clone()).ok_or_else(|| oak_core::OakError::format_error("left token span is outside source"))?;
         let right_text = source.get(right.span.clone()).ok_or_else(|| oak_core::OakError::format_error("right token span is outside source"))?;
         let mut constraint = conservative_constraint(left_text, gap, right_text);
+        if left_text == ">" && is_jsx_attribute_gap(&significant, index, source) {
+            constraint = oak_formatter::GapConstraint::NoSpace;
+        }
         if right_text.starts_with(['\'', '"', '`']) && left_text == "=" && is_jsx_attribute_gap(&significant, index, source) {
             constraint = oak_formatter::GapConstraint::NoSpace;
         }
@@ -121,7 +124,12 @@ fn is_jsx_attribute_gap(significant: &[&oak_core::Token<TypeScriptTokenType>], i
         match text {
             ">" => nesting += 1,
             "<" if nesting == 0 => return true,
-            "<" => nesting -= 1,
+            "<" if nesting > 0 => {
+                nesting -= 1;
+                if nesting == 0 {
+                    return true;
+                }
+            }
             ";" | "{" | "}" if nesting == 0 => return false,
             _ => {}
         }
