@@ -69,7 +69,7 @@ pub(crate) fn format_source(source: &str, options: &FormatOptions) -> Result<Str
                 };
                 for token in significant[..index].iter().rev().take(64) {
                     match source.get(token.span.clone()) {
-                        Some("?") if token.kind == TypeScriptTokenType::Question => {
+                        Some("?") if token.kind == TypeScriptTokenType::Question && nesting == 0 => {
                             ternary = true;
                             break;
                         }
@@ -89,7 +89,10 @@ pub(crate) fn format_source(source: &str, options: &FormatOptions) -> Result<Str
             if right_text == "<" && next == Some("/") {
                 constraint = oak_formatter::GapConstraint::NoSpace;
             }
-            else if right_text == "<" && (looks_like_type_arguments(&significant, index, source) || significant.get(index + 3).and_then(|token| source.get(token.span.clone())) == Some(">")) {
+            else if right_text == "<" && looks_like_type_arguments(&significant, index + 1, source) {
+                constraint = oak_formatter::GapConstraint::NoSpace;
+            }
+            else if right_text == ">" && is_type_argument_close(&significant, index + 1, source) {
                 constraint = oak_formatter::GapConstraint::NoSpace;
             }
             else if right_text == ">" && significant.get(index.wrapping_sub(1)).and_then(|token| source.get(token.span.clone())).is_some_and(|text| text == "<" || text == "/") {
@@ -100,7 +103,8 @@ pub(crate) fn format_source(source: &str, options: &FormatOptions) -> Result<Str
             }
         }
         if left_text == "<" || left_text == ">" {
-            let generic_angle = left_text == "<" && index > 0 && (looks_like_type_arguments(&significant, index - 1, source) || significant.get(index + 2).and_then(|token| source.get(token.span.clone())) == Some(">"));
+            let generic_angle = (left_text == "<" && looks_like_type_arguments(&significant, index, source))
+                || (left_text == ">" && is_type_argument_close(&significant, index, source));
             let comparison = !generic_angle && significant.get(index.wrapping_sub(1)).and_then(|token| source.get(token.span.clone())).is_some_and(|text| text.chars().last().is_some_and(|ch| ch.is_ascii_alphanumeric() || matches!(ch, '_' | '$' | ')' | ']')));
             if !right_text.is_empty() && comparison && right_text != "/" {
                 constraint = oak_formatter::GapConstraint::RequiredSpace;
@@ -127,7 +131,7 @@ fn is_jsx_attribute_gap(significant: &[&oak_core::Token<TypeScriptTokenType>], i
             "<" if nesting > 0 => {
                 nesting -= 1;
                 if nesting == 0 {
-                    return true;
+                    return false;
                 }
             }
             ";" | "{" | "}" if nesting == 0 => return false,
@@ -148,9 +152,32 @@ fn looks_like_type_arguments(significant: &[&oak_core::Token<TypeScriptTokenType
             "<" => depth += 1,
             ">" if depth == 0 => {
                 let after = significant.iter().skip_while(|candidate| candidate.span.start <= token.span.start).find_map(|candidate| source.get(candidate.span.clone()));
-                return after.is_none_or(|next| matches!(next, "=" | "," | ";" | ")" | "]" | "}" | "." | "(" | "=>" | "?" | ":"));
+                return after.is_none_or(|next| matches!(next, "=" | "," | ";" | ")" | "]" | "}" | "." | "(" | "{" | ">" | "|" | "&" | "=>" | "?" | ":"));
             }
             ">" => depth -= 1,
+            ">>" if depth <= 2 => {
+                let after = significant.iter().skip_while(|candidate| candidate.span.start <= token.span.start).find_map(|candidate| source.get(candidate.span.clone()));
+                return after.is_none_or(|next| matches!(next, "=" | "," | ";" | ")" | "]" | "}" | "." | "(" | "{" | "|" | "&" | "=>" | "?" | ":"));
+            }
+            ">>" => depth -= 2,
+            ";" | "=" | "?" | ":" if depth == 0 => return false,
+            _ => {}
+        }
+    }
+    false
+}
+
+fn is_type_argument_close(significant: &[&oak_core::Token<TypeScriptTokenType>], close_index: usize, source: &str) -> bool {
+    let mut depth = 0usize;
+    for index in (0..close_index).rev() {
+        let text = match source.get(significant[index].span.clone()) {
+            Some(text) => text,
+            None => return false,
+        };
+        match text {
+            ">" => depth += 1,
+            "<" if depth == 0 => return looks_like_type_arguments(significant, index, source),
+            "<" => depth -= 1,
             ";" | "=" | "?" | ":" if depth == 0 => return false,
             _ => {}
         }
@@ -183,4 +210,22 @@ fn validate_delimiters(source: &str, tokens: &[&oak_core::Token<TypeScriptTokenT
         }
     }
     if stack.is_empty() { Ok(()) } else { Err(oak_core::OakError::format_error("formatter input has unbalanced delimiters")) }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::format_source;
+    use crate::formatter::FormatOptions;
+
+    #[test]
+    fn keeps_generic_types_tight_through_nested_closers() {
+        let source = "async function load(value: Record<string, unknown>): Promise<Array<number>> { return new Set<string>(); } const defaults: Record<string, string> = {};";
+        assert_eq!(format_source(source, &FormatOptions::default()).unwrap(), source);
+    }
+
+    #[test]
+    fn keeps_function_return_annotation_tight_after_optional_parameters() {
+        let source = "function parse(fallback?: string): Record<string, unknown> { return {}; }";
+        assert_eq!(format_source(source, &FormatOptions::default()).unwrap(), source);
+    }
 }
