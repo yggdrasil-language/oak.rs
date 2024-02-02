@@ -120,7 +120,7 @@ pub(crate) fn format_source(source: &str, options: &FormatOptions) -> Result<Str
 
 fn is_jsx_attribute_gap(significant: &[&oak_core::Token<TypeScriptTokenType>], index: usize, source: &str) -> bool {
     let mut nesting = 0usize;
-    for token in significant[..=index].iter().rev() {
+    for (token_index, token) in significant[..=index].iter().enumerate().rev() {
         let text = match source.get(token.span.clone()) {
             Some(text) => text,
             None => return false,
@@ -131,7 +131,8 @@ fn is_jsx_attribute_gap(significant: &[&oak_core::Token<TypeScriptTokenType>], i
             "<" if nesting > 0 => {
                 nesting -= 1;
                 if nesting == 0 {
-                    return false;
+                    let previous = token_index.checked_sub(1).and_then(|previous| significant.get(previous)).and_then(|token| source.get(token.span.clone()));
+                    return matches!(previous, Some("=" | "return" | "=>" | "(" | "["));
                 }
             }
             ";" | "{" | "}" if nesting == 0 => return false,
@@ -160,7 +161,7 @@ fn looks_like_type_arguments(significant: &[&oak_core::Token<TypeScriptTokenType
                 return after.is_none_or(|next| matches!(next, "=" | "," | ";" | ")" | "]" | "}" | "." | "(" | "{" | "|" | "&" | "=>" | "?" | ":"));
             }
             ">>" => depth -= 2,
-            ";" | "=" | "?" | ":" if depth == 0 => return false,
+            ";" if depth == 0 => return false,
             _ => {}
         }
     }
