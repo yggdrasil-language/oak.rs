@@ -144,24 +144,27 @@ fn is_jsx_attribute_gap(significant: &[&oak_core::Token<TypeScriptTokenType>], i
 
 fn looks_like_type_arguments(significant: &[&oak_core::Token<TypeScriptTokenType>], index: usize, source: &str) -> bool {
     let mut depth = 0usize;
+    let mut delimiters = 0usize;
     for token in significant.iter().skip(index + 1) {
         let text = match source.get(token.span.clone()) {
             Some(text) => text,
             None => return false,
         };
         match text {
+            "{" | "(" | "[" => delimiters += 1,
+            "}" | ")" | "]" if delimiters > 0 => delimiters -= 1,
             "<" => depth += 1,
-            ">" if depth == 0 => {
+            ">" if depth == 0 && delimiters == 0 => {
                 let after = significant.iter().skip_while(|candidate| candidate.span.start <= token.span.start).find_map(|candidate| source.get(candidate.span.clone()));
                 return after.is_none_or(|next| matches!(next, "=" | "," | ";" | ")" | "]" | "}" | "." | "(" | "{" | ">" | "|" | "&" | "=>" | "?" | ":"));
             }
             ">" => depth -= 1,
-            ">>" if depth <= 2 => {
+            ">>" if depth <= 2 && delimiters == 0 => {
                 let after = significant.iter().skip_while(|candidate| candidate.span.start <= token.span.start).find_map(|candidate| source.get(candidate.span.clone()));
                 return after.is_none_or(|next| matches!(next, "=" | "," | ";" | ")" | "]" | "}" | "." | "(" | "{" | "|" | "&" | "=>" | "?" | ":"));
             }
             ">>" => depth -= 2,
-            ";" if depth == 0 => return false,
+            ";" | "=" | "?" | ":" if depth == 0 && delimiters == 0 => return false,
             _ => {}
         }
     }
