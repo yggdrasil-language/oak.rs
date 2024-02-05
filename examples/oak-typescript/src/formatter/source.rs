@@ -109,6 +109,18 @@ pub(crate) fn format_source(source: &str, options: &FormatOptions) -> Result<Str
             if !right_text.is_empty() && comparison && right_text != "/" {
                 constraint = oak_formatter::GapConstraint::RequiredSpace;
             }
+            if generic_angle && (left_text == "<" || matches!(right_text, "{" | "(" | ")" | "," | ";" | ">" | ">>")) {
+                constraint = oak_formatter::GapConstraint::NoSpace;
+            }
+        }
+        if (left_text == "async" && right_text == "(")
+            || (matches!(left_text, "const" | "let" | "var") && right_text == "[")
+            || (left_text == "]" && right_text == "of") {
+            constraint = oak_formatter::GapConstraint::RequiredSpace;
+        }
+        if gap.contains('\n') || left_text.starts_with("//") || left_text.starts_with("/*") || right_text.starts_with("//") || right_text.starts_with("/*")
+            || (source.starts_with("#!") && left.span.start < source.find('\n').unwrap_or(source.len())) {
+            constraint = oak_formatter::GapConstraint::Preserve;
         }
         gaps.push((TokenGap { left: left_text, source: gap, right: right_text, span }, constraint));
     }
@@ -231,5 +243,12 @@ mod tests {
     fn keeps_function_return_annotation_tight_after_optional_parameters() {
         let source = "function parse(fallback?: string): Record<string, unknown> { return {}; }";
         assert_eq!(format_source(source, &FormatOptions::default()).unwrap(), source);
+    }
+
+    #[test]
+    fn preserves_authoring_boundaries() {
+        for source in ["#!/usr/bin/env node\nconst value = 1;", "const task = async (value) => value;", "for (const [key, value] of entries) { consume(key, value); }", "type Rows = Array<{ id: string }>;", "const value = ready\n    ? load()\n    : fallback;"] {
+            assert_eq!(format_source(source, &FormatOptions::default()).unwrap(), source);
+        }
     }
 }
