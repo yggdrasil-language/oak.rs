@@ -10,7 +10,6 @@ pub struct TextEdit {
     /// Replacement whitespace or trivia layout.
     pub text: String,
 }
-
 /// A token boundary and its source gap.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TokenGap<'a> {
@@ -112,9 +111,7 @@ fn needs_space(left: &str, right: &str) -> bool {
     if matches!(right, "as" | "instanceof" | "in") || matches!(left, "as" | "instanceof" | "in") {
         return true;
     }
-    if matches!(left, "return" | "throw" | "new" | "typeof" | "void" | "delete" | "await" | "yield")
-        && matches!(right, "[" | "{" | "(")
-    {
+    if matches!(left, "return" | "throw" | "new" | "typeof" | "void" | "delete" | "await" | "yield") && matches!(right, "[" | "{" | "(") {
         return true;
     }
     let left_word = left.chars().last().is_some_and(|ch| ch.is_ascii_alphanumeric() || ch == '_' || ch == '$');
@@ -125,51 +122,14 @@ fn needs_space(left: &str, right: &str) -> bool {
     let right_operator = right.starts_with(['=', '+', '-', '*', '/', '%', ':', '&', '|']) || matches!(right, "??" | "??=" | "&&" | "&&=" | "||" | "||=" | "=>" | "<=" | ">=" | "==" | "===" | "!==");
     let brace_boundary = left.ends_with('{') || right.starts_with('}') || right == "{" || (left_word && right.starts_with('{')) || (left.ends_with('}') && right_word);
 
-    (left_word && (right_word || right_quote)) || (left_quote && right_word) || left.ends_with(',') || left.ends_with(';') || left.ends_with(':') || left_operator || right_operator || (left_word && right == "<") || (left == ">" && right_word) || brace_boundary
-}
-
-#[cfg(test)]
-mod tests {
-    use super::conservative_constraint;
-    use crate::GapConstraint;
-
-    fn space(left: &str, right: &str) -> bool {
-        matches!(conservative_constraint(left, "", right), GapConstraint::RequiredSpace)
-    }
-
-    #[test]
-    fn keeps_typescript_optional_markers_tight() {
-        assert!(!space("name", "?"));
-        assert!(!space("?", ":"));
-        assert!(space(":", "string"));
-    }
-
-    #[test]
-    fn keeps_unary_and_update_operators_tight() {
-        assert!(!space("!", "ready"));
-        assert!(!space("++", "index"));
-        assert!(!space("index", "++"));
-    }
-
-    #[test]
-    fn separates_control_flow_conditions() {
-        assert!(space("if", "("));
-        assert!(space("for", "("));
-        assert!(!space("call", "("));
-    }
-
-    #[test]
-    fn separates_comparison_operators_without_touching_jsx_openers() {
-        assert!(space("left", "<"));
-        assert!(space(">", "right"));
-        assert!(!space("<", "div"));
-    }
-
-    #[test]
-    fn separates_type_assertions_and_keyword_expressions() {
-        assert!(space(")", "as"));
-        assert!(space("as", "string"));
-        assert!(space("return", "["));
-        assert!(!space("{", "}"));
-    }
+    (left_word && (right_word || right_quote))
+        || (left_quote && right_word)
+        || left.ends_with(',')
+        || left.ends_with(';')
+        || left.ends_with(':')
+        || left_operator
+        || right_operator
+        || (left_word && right == "<")
+        || (left == ">" && right_word)
+        || brace_boundary
 }

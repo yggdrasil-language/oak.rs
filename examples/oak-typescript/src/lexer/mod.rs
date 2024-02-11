@@ -359,13 +359,16 @@ impl<'config> TypeScriptLexer<'config> {
             }
             if ch == '[' {
                 in_class = true;
-            } else if ch == ']' {
+            }
+            else if ch == ']' {
                 in_class = false;
-            } else if ch == '/' && !in_class {
+            }
+            else if ch == '/' && !in_class {
                 state.advance(1);
                 closed = true;
                 break;
-            } else if ch == '\n' || ch == '\r' {
+            }
+            else if ch == '\n' || ch == '\r' {
                 break;
             }
             state.advance(ch.len_utf8());
@@ -377,7 +380,8 @@ impl<'config> TypeScriptLexer<'config> {
         while let Some(ch) = state.peek() {
             if ch.is_alphabetic() {
                 state.advance(ch.len_utf8());
-            } else {
+            }
+            else {
                 break;
             }
         }
@@ -472,10 +476,9 @@ impl<'config> TypeScriptLexer<'config> {
 }
 
 fn regex_can_start_after(tokens: &[oak_core::Token<TypeScriptTokenType>]) -> bool {
-    let previous = tokens.iter().rev().find(|token| {
-        !matches!(token.kind, TypeScriptTokenType::Whitespace | TypeScriptTokenType::Newline | TypeScriptTokenType::LineComment | TypeScriptTokenType::BlockComment)
-    });
-    let Some(previous) = previous else {
+    let previous = tokens.iter().rev().find(|token| !matches!(token.kind, TypeScriptTokenType::Whitespace | TypeScriptTokenType::Newline | TypeScriptTokenType::LineComment | TypeScriptTokenType::BlockComment));
+    let Some(previous) = previous
+    else {
         return true;
     };
     matches!(

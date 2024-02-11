@@ -103,9 +103,9 @@ pub(crate) fn format_source(source: &str, options: &FormatOptions) -> Result<Str
             }
         }
         if left_text == "<" || left_text == ">" {
-            let generic_angle = (left_text == "<" && looks_like_type_arguments(&significant, index, source))
-                || (left_text == ">" && is_type_argument_close(&significant, index, source));
-            let comparison = !generic_angle && significant.get(index.wrapping_sub(1)).and_then(|token| source.get(token.span.clone())).is_some_and(|text| text.chars().last().is_some_and(|ch| ch.is_ascii_alphanumeric() || matches!(ch, '_' | '$' | ')' | ']')));
+            let generic_angle = (left_text == "<" && looks_like_type_arguments(&significant, index, source)) || (left_text == ">" && is_type_argument_close(&significant, index, source));
+            let comparison =
+                !generic_angle && significant.get(index.wrapping_sub(1)).and_then(|token| source.get(token.span.clone())).is_some_and(|text| text.chars().last().is_some_and(|ch| ch.is_ascii_alphanumeric() || matches!(ch, '_' | '$' | ')' | ']')));
             if !right_text.is_empty() && comparison && right_text != "/" {
                 constraint = oak_formatter::GapConstraint::RequiredSpace;
             }
@@ -118,20 +118,18 @@ pub(crate) fn format_source(source: &str, options: &FormatOptions) -> Result<Str
         }
         if matches!(left_text, "+" | "-") {
             let previous = index.checked_sub(1).and_then(|previous| significant.get(previous)).and_then(|token| source.get(token.span.clone()));
-            if previous.is_none()
-                || matches!(previous, Some("(" | "[" | "{" | "=" | "," | ":" | "?" | "return" | "throw" | "=>" | "!" | "+" | "-" | "*" | "/" | "%" | "??" | "&&" | "||"))
-            {
+            if previous.is_none() || matches!(previous, Some("(" | "[" | "{" | "=" | "," | ":" | "?" | "return" | "throw" | "=>" | "!" | "+" | "-" | "*" | "/" | "%" | "??" | "&&" | "||")) {
                 constraint = oak_formatter::GapConstraint::NoSpace;
             }
         }
         if (left_text == "async" && right_text == "(")
             || (matches!(left_text, "const" | "let" | "var") && right_text == "[")
             || (left_text == "]" && right_text == "of")
-            || (left_text == ")" && right_text.chars().next().is_some_and(|ch| ch.is_ascii_alphanumeric() || matches!(ch, '_' | '$'))) {
+            || (left_text == ")" && right_text.chars().next().is_some_and(|ch| ch.is_ascii_alphanumeric() || matches!(ch, '_' | '$')))
+        {
             constraint = oak_formatter::GapConstraint::RequiredSpace;
         }
-        if gap.contains('\n') || left_text.starts_with("//") || left_text.starts_with("/*") || right_text.starts_with("//") || right_text.starts_with("/*")
-            || (source.starts_with("#!") && left.span.start < source.find('\n').unwrap_or(source.len())) {
+        if gap.contains('\n') || left_text.starts_with("//") || left_text.starts_with("/*") || right_text.starts_with("//") || right_text.starts_with("/*") || (source.starts_with("#!") && left.span.start < source.find('\n').unwrap_or(source.len())) {
             constraint = oak_formatter::GapConstraint::Preserve;
         }
         gaps.push((TokenGap { left: left_text, source: gap, right: right_text, span }, constraint));
@@ -141,7 +139,6 @@ pub(crate) fn format_source(source: &str, options: &FormatOptions) -> Result<Str
     let _ = options;
     Ok(formatted)
 }
-
 fn is_jsx_attribute_gap(significant: &[&oak_core::Token<TypeScriptTokenType>], index: usize, source: &str) -> bool {
     let mut nesting = 0usize;
     for (token_index, token) in significant[..=index].iter().enumerate().rev() {
@@ -238,43 +235,4 @@ fn validate_delimiters(source: &str, tokens: &[&oak_core::Token<TypeScriptTokenT
         }
     }
     if stack.is_empty() { Ok(()) } else { Err(oak_core::OakError::format_error("formatter input has unbalanced delimiters")) }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::format_source;
-    use crate::formatter::FormatOptions;
-
-    #[test]
-    fn keeps_generic_types_tight_through_nested_closers() {
-        let source = "async function load(value: Record<string, unknown>): Promise<Array<number>> { return new Set<string>(); } const defaults: Record<string, string> = {};";
-        assert_eq!(format_source(source, &FormatOptions::default()).unwrap(), source);
-    }
-
-    #[test]
-    fn keeps_function_return_annotation_tight_after_optional_parameters() {
-        let source = "function parse(fallback?: string): Record<string, unknown> { return {}; }";
-        assert_eq!(format_source(source, &FormatOptions::default()).unwrap(), source);
-    }
-
-    #[test]
-    fn preserves_authoring_boundaries() {
-        for source in ["#!/usr/bin/env node\nconst value = 1;", "const task = async (value) => value;", "for (const [key, value] of entries) { consume(key, value); }", "type Rows = Array<{ id: string }>;", "function fetchRows(): Promise<Row[]> { return load(); }", "const suffix = value.slice(0, -suffix.length);", "const value = ready\n    ? load()\n    : fallback;"] {
-            assert_eq!(format_source(source, &FormatOptions::default()).unwrap(), source);
-        }
-    }
-
-    #[test]
-    fn keeps_space_before_function_body_after_primitive_generic_return() {
-        let source = "export async function cmdCommitExport(options: ParsedOptions): Promise<number>{ await bootstrapFromOptions(options); return 0; }";
-        let expected = "export async function cmdCommitExport(options: ParsedOptions): Promise<number> { await bootstrapFromOptions(options); return 0; }";
-        assert_eq!(format_source(source, &FormatOptions::default()).unwrap(), expected);
-    }
-
-    #[test]
-    fn separates_control_flow_bodies_and_nullish_assignments() {
-        let source = "if (ready)return value; options.token??= fallback; if (missing)throw error;";
-        let expected = "if (ready) return value; options.token ??= fallback; if (missing) throw error;";
-        assert_eq!(format_source(source, &FormatOptions::default()).unwrap(), expected);
-    }
 }

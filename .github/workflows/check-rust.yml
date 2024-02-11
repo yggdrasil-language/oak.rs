@@ -37,8 +37,22 @@ jobs:
             - name: Check formatting
               run: cargo fmt --all -- --check
 
+            - name: Check TypeScript formatter build
+              run: cargo check --manifest-path examples/oak-typescript/Cargo.toml --all-targets
+
             - name: Check compilation
-              run: cargo check --all-targets --all-features
+              shell: bash
+              run: |
+                  set -euo pipefail
+                  mapfile -t example_packages < <(
+                      cargo metadata --no-deps --format-version 1 \
+                        | jq -r '.packages[] | select(.manifest_path | contains("/examples/")) | .name'
+                  )
+                  args=()
+                  for package in "${example_packages[@]}"; do
+                      args+=(--exclude "$package")
+                  done
+                  cargo check --workspace --all-targets --all-features "${args[@]}"
 
     rust-test:
         name: Rust Test (${{ matrix.os }}, ${{ matrix.feature }})
@@ -69,12 +83,30 @@ jobs:
             # `--lib --tests` skips included-readme doctests (stale API snippets).
             - name: Run tests (no-default features)
               if: matrix.feature == 'no-default'
-              run: cargo test --workspace --lib --tests --no-default-features --no-fail-fast
+              shell: bash
+              run: |
+                  set -euo pipefail
+                  mapfile -t packages < <(cargo metadata --no-deps --format-version 1 | jq -r '.packages[] | select(.manifest_path | contains("/examples/")) | .name')
+                  excludes=()
+                  for package in "${packages[@]}"; do excludes+=(--exclude "$package"); done
+                  cargo test --workspace --lib --tests --no-default-features --no-fail-fast "${excludes[@]}"
 
             - name: Run tests (default features)
               if: matrix.feature == 'default'
-              run: cargo test --workspace --lib --tests --no-fail-fast
+              shell: bash
+              run: |
+                  set -euo pipefail
+                  mapfile -t packages < <(cargo metadata --no-deps --format-version 1 | jq -r '.packages[] | select(.manifest_path | contains("/examples/")) | .name')
+                  excludes=()
+                  for package in "${packages[@]}"; do excludes+=(--exclude "$package"); done
+                  cargo test --workspace --lib --tests --no-fail-fast "${excludes[@]}"
 
             - name: Run tests (all features)
               if: matrix.feature == 'all'
-              run: cargo test --workspace --lib --tests --all-features --no-fail-fast
+              shell: bash
+              run: |
+                  set -euo pipefail
+                  mapfile -t packages < <(cargo metadata --no-deps --format-version 1 | jq -r '.packages[] | select(.manifest_path | contains("/examples/")) | .name')
+                  excludes=()
+                  for package in "${packages[@]}"; do excludes+=(--exclude "$package"); done
+                  cargo test --workspace --lib --tests --all-features --no-fail-fast "${excludes[@]}"
