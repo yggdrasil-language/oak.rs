@@ -126,7 +126,8 @@ pub(crate) fn format_source(source: &str, options: &FormatOptions) -> Result<Str
         }
         if (left_text == "async" && right_text == "(")
             || (matches!(left_text, "const" | "let" | "var") && right_text == "[")
-            || (left_text == "]" && right_text == "of") {
+            || (left_text == "]" && right_text == "of")
+            || (left_text == ")" && right_text.chars().next().is_some_and(|ch| ch.is_ascii_alphanumeric() || matches!(ch, '_' | '$'))) {
             constraint = oak_formatter::GapConstraint::RequiredSpace;
         }
         if gap.contains('\n') || left_text.starts_with("//") || left_text.starts_with("/*") || right_text.starts_with("//") || right_text.starts_with("/*")
@@ -267,6 +268,13 @@ mod tests {
     fn keeps_space_before_function_body_after_primitive_generic_return() {
         let source = "export async function cmdCommitExport(options: ParsedOptions): Promise<number>{ await bootstrapFromOptions(options); return 0; }";
         let expected = "export async function cmdCommitExport(options: ParsedOptions): Promise<number> { await bootstrapFromOptions(options); return 0; }";
+        assert_eq!(format_source(source, &FormatOptions::default()).unwrap(), expected);
+    }
+
+    #[test]
+    fn separates_control_flow_bodies_and_nullish_assignments() {
+        let source = "if (ready)return value; options.token??= fallback; if (missing)throw error;";
+        let expected = "if (ready) return value; options.token ??= fallback; if (missing) throw error;";
         assert_eq!(format_source(source, &FormatOptions::default()).unwrap(), expected);
     }
 }
