@@ -44,7 +44,10 @@ jobs:
               shell: bash
               run: |
                   set -euo pipefail
-                  mapfile -t example_packages < <(
+                  example_packages=()
+                  while IFS= read -r package; do
+                      example_packages+=("$package")
+                  done < <(
                       cargo metadata --no-deps --format-version 1 \
                         | jq -r '.packages[] | select(.manifest_path | contains("/examples/")) | .name'
                   )
@@ -86,7 +89,8 @@ jobs:
               shell: bash
               run: |
                   set -euo pipefail
-                  mapfile -t packages < <(cargo metadata --no-deps --format-version 1 | jq -r '.packages[] | select(.manifest_path | contains("/examples/")) | .name')
+                  packages=()
+                  while IFS= read -r package; do packages+=("$package"); done < <(cargo metadata --no-deps --format-version 1 | jq -r '.packages[] | select(.manifest_path | contains("/examples/")) | .name')
                   excludes=()
                   for package in "${packages[@]}"; do excludes+=(--exclude "$package"); done
                   cargo test --workspace --lib --tests --no-default-features --no-fail-fast "${excludes[@]}"
@@ -96,7 +100,8 @@ jobs:
               shell: bash
               run: |
                   set -euo pipefail
-                  mapfile -t packages < <(cargo metadata --no-deps --format-version 1 | jq -r '.packages[] | select(.manifest_path | contains("/examples/")) | .name')
+                  packages=()
+                  while IFS= read -r package; do packages+=("$package"); done < <(cargo metadata --no-deps --format-version 1 | jq -r '.packages[] | select(.manifest_path | contains("/examples/")) | .name')
                   excludes=()
                   for package in "${packages[@]}"; do excludes+=(--exclude "$package"); done
                   cargo test --workspace --lib --tests --no-fail-fast "${excludes[@]}"
@@ -106,7 +111,8 @@ jobs:
               shell: bash
               run: |
                   set -euo pipefail
-                  mapfile -t packages < <(cargo metadata --no-deps --format-version 1 | jq -r '.packages[] | select(.manifest_path | contains("/examples/")) | .name')
+                  packages=()
+                  while IFS= read -r package; do packages+=("$package"); done < <(cargo metadata --no-deps --format-version 1 | jq -r '.packages[] | select(.manifest_path | contains("/examples/")) | .name')
                   excludes=()
                   for package in "${packages[@]}"; do excludes+=(--exclude "$package"); done
                   cargo test --workspace --lib --tests --all-features --no-fail-fast "${excludes[@]}"
