@@ -518,10 +518,33 @@ impl<'config> Pratt<VueLanguage> for VueParser<'config> {
         self.skip_whitespace(state);
         let node = if state.at(LeftParen) {
             state.expect(LeftParen).ok();
-            let inner = PrattParser::parse(state, 0, self);
-            state.push_child(inner);
+            if !state.at(RightParen) {
+                let inner = PrattParser::parse(state, 0, self);
+                state.push_child(inner);
+            }
             state.expect(RightParen).ok();
             state.finish_at(cp, crate::parser::element_type::VueElementType::Expression)
+        }
+        else if state.at(LeftBrace) {
+            state.expect(LeftBrace).ok();
+            while state.not_at_end() && !state.at(RightBrace) {
+                let property_cp = state.checkpoint();
+                if state.at(Identifier) || matches!(state.peek_kind(), Some(True | False | Null)) {
+                    state.bump();
+                    if state.at(Colon) {
+                        state.bump();
+                        let value = PrattParser::parse(state, 0, self);
+                        state.push_child(value);
+                    }
+                    state.finish_at(property_cp, crate::parser::element_type::VueElementType::ObjectProperty);
+                }
+                else {
+                    state.bump();
+                }
+                if state.at(Comma) { state.bump(); }
+            }
+            state.expect(RightBrace).ok();
+            state.finish_at(cp, crate::parser::element_type::VueElementType::ObjectExpr)
         }
         else if state.at(Identifier) {
             state.expect(Identifier).ok();
@@ -598,6 +621,7 @@ impl<'config> Pratt<VueLanguage> for VueParser<'config> {
             Or => (30, Associativity::Left),
             // Ternary `cond ? then : else` — between logical OR and assignment.
             Question => (20, Associativity::Right),
+            Arrow => (5, Associativity::Right),
             Eq => (10, Associativity::Right),
             _ => {
                 state.restore(start_cp);
@@ -621,6 +645,13 @@ impl<'config> Pratt<VueLanguage> for VueParser<'config> {
         self.skip_whitespace(state);
 
         let node = match kind {
+            Arrow => {
+                state.expect(Arrow).ok();
+                self.skip_whitespace(state);
+                let body = PrattParser::parse(state, 0, self);
+                state.push_child(body);
+                state.finish_at(op_cp, crate::parser::element_type::VueElementType::ArrowFunction)
+            }
             Dot => {
                 state.expect(Dot).ok();
                 self.skip_whitespace(state);
@@ -649,7 +680,7 @@ impl<'config> Pratt<VueLanguage> for VueParser<'config> {
                             break;
                         }
                         self.skip_whitespace(state);
-                        if state.expect(Comma).is_ok() {
+                        if state.eat(Comma) {
                             self.skip_whitespace(state);
                         }
                         else {
