@@ -63,20 +63,9 @@ impl<'config> TypeScriptParser<'config> {
             }
             Some(LeftParen) => {
                 state.bump();
-                while state.not_at_end() && !self.at(state, RightParen) {
-                    let acp = state.checkpoint();
-                    PrattParser::parse(state, 0, self);
-                    if self.eat(state, Colon) {
-                        self.parse_type_annotation(state).ok();
-                    }
-                    state.finish_at(acp, crate::parser::element_type::TypeScriptElementType::Parameter);
-                    if state.checkpoint().0 == acp.0 {
-                        state.bump();
-                        break;
-                    }
-                    if !self.eat(state, Comma) {
-                        break;
-                    }
+                if !self.at(state, RightParen) {
+                    let inner = PrattParser::parse(state, 0, self);
+                    state.push_child(inner);
                 }
                 self.expect(state, RightParen).ok();
                 if self.eat(state, Colon) {
@@ -211,6 +200,7 @@ impl<'config> TypeScriptParser<'config> {
             | QuestionQuestionEqual => (1, Associativity::Right),
             Question => (2, Associativity::Right),
             PipePipe => (3, Associativity::Left),
+            QuestionQuestion => (3, Associativity::Left),
             AmpersandAmpersand => (4, Associativity::Left),
             Pipe => (5, Associativity::Left),
             Caret => (6, Associativity::Left),
@@ -270,6 +260,17 @@ impl<'config> TypeScriptParser<'config> {
                 let cp = state.checkpoint_before(left);
                 let op = if kind == Dot { Dot } else { QuestionDot };
                 self.expect(state, op).ok();
+                if kind == QuestionDot && self.at(state, LeftParen) {
+                    self.expect(state, LeftParen).ok();
+                    while state.not_at_end() && !self.at(state, RightParen) {
+                        let acp = state.checkpoint();
+                        PrattParser::parse(state, 0, self);
+                        state.finish_at(acp, crate::parser::element_type::TypeScriptElementType::CallArgument);
+                        if !self.eat(state, Comma) { break; }
+                    }
+                    self.expect(state, RightParen).ok();
+                    return Some(state.finish_at(cp, crate::parser::element_type::TypeScriptElementType::CallExpression.into()));
+                }
                 if self.at(state, IdentifierName) || state.peek_text().is_some_and(|text| TypeScriptTokenType::from_keyword(&text).is_some()) {
                     state.bump();
                 }
