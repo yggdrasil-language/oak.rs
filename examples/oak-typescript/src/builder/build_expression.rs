@@ -312,7 +312,8 @@ impl<'config> TypeScriptBuilder<'config> {
                                                 break;
                                             }
                                             TypeScriptTokenType::StringLiteral => {
-                                                name = decode_string_literal_text(&source.get_text_in(key.span.into()))?;
+                                                let raw = source.get_text_in(key.span.into());
+                                                name = decode_string_literal_text(&raw).unwrap_or_else(|_| raw.trim_matches(['"', '\'']).to_string());
                                                 break;
                                             }
                                             TypeScriptTokenType::Colon => break,
