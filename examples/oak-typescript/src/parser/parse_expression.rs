@@ -28,7 +28,7 @@ impl<'config> TypeScriptParser<'config> {
                     state.finish_at(cp, crate::parser::element_type::TypeScriptElementType::IdentifierName)
                 }
             }
-            Some(IdentifierName) => {
+            Some(IdentifierName) | Some(Undefined) => {
                 if self.at(state, IdentifierName) {
                     state.bump();
                 }
@@ -66,6 +66,14 @@ impl<'config> TypeScriptParser<'config> {
                 if !self.at(state, RightParen) {
                     let inner = PrattParser::parse(state, 0, self);
                     state.push_child(inner);
+                    if self.eat(state, Colon) {
+                        self.parse_type_annotation(state).ok();
+                    }
+                    while self.eat(state, Comma) {
+                        let param = PrattParser::parse(state, 0, self);
+                        state.push_child(param);
+                        if self.eat(state, Colon) { self.parse_type_annotation(state).ok(); }
+                    }
                 }
                 self.expect(state, RightParen).ok();
                 if self.eat(state, Colon) {

@@ -11,6 +11,7 @@ fn repro_vmz_script_fragments() {
         "const c = \"vmz-ui-date-picker\" + (open ? \" is-opened\" : \"\");",
         "const c = \"vmz-ui-date-picker__day\" + (day.inMonth ? \"\" : \" is-outside\") + (day.selected ? \" is-on\" : \"\");",
         "const c = opt.selected ? 'true' : 'false';",
+        "const h = (ev: KeyboardEvent) => { ev.preventDefault(); };",
     ] {
         let mut cache = ParseSession::<TypeScriptLanguage>::new(32);
         let result = TypeScriptBuilder::new(&lang).build(&SourceText::new(source), &[], &mut cache);
