@@ -41,7 +41,8 @@ impl<'config> TypeScriptBuilder<'config> {
                 }
             }
             TypeScriptElementType::StringLiteral => {
-                let content = decode_string_literal_text(&source.get_text_in(span.into()))?;
+                let raw = source.get_text_in(span.into());
+                let content = decode_string_literal_text(&raw).unwrap_or_else(|_| raw.trim_matches(['"', '\'']).to_string());
                 Ok(Some(Expression::new(ExpressionKind::StringLiteral(content), span.into())))
             }
             TypeScriptElementType::BigIntLiteral => {
@@ -543,6 +544,17 @@ impl<'config> TypeScriptBuilder<'config> {
 
 fn decode_string_literal_text(raw: &str) -> Result<String, OakError> {
     let text = raw.trim();
+    let text = if text.len() >= 2 && matches!(text.as_bytes()[0], b'"' | b'\'') && text.as_bytes().last() != text.as_bytes().first() {
+        let quote = text.as_bytes()[0] as char;
+        let mut escaped = false;
+        let mut end = None;
+        for (index, character) in text.char_indices().skip(1) {
+            if escaped { escaped = false; continue; }
+            if character == '\\' { escaped = true; continue; }
+            if character == quote { end = Some(index + character.len_utf8()); break; }
+        }
+        if let Some(end) = end { &text[..end] } else { text }
+    } else { text };
     if text.len() < 2 || !matches!(text.as_bytes()[0], b'"' | b'\'') || text.as_bytes().last() != text.as_bytes().first() {
         return Err(OakError::custom_error("invalid string literal"));
     }
