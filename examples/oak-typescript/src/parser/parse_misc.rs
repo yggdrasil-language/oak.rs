@@ -31,6 +31,25 @@ impl<'config> TypeScriptParser<'config> {
         state.at(kind.into())
     }
 
+    pub(crate) fn is_binding_identifier<'a, S: Source + ?Sized>(&self, state: &mut State<'a, S>) -> bool {
+        self.skip_trivia(state);
+        let kind = state.peek_kind().and_then(|k| k.try_into().ok());
+        let keyword_name = state.peek_text().is_some_and(|text| TypeScriptTokenType::from_keyword(&text).is_some());
+        kind == Some(TypeScriptTokenType::IdentifierName) || keyword_name
+    }
+
+    pub(crate) fn parse_binding_identifier<'a, S: Source + ?Sized>(&self, state: &mut State<'a, S>) {
+        use crate::parser::element_type::TypeScriptElementType;
+        let cp = state.checkpoint();
+        if self.is_binding_identifier(state) {
+            state.bump();
+            state.finish_at(cp, TypeScriptElementType::IdentifierName);
+        }
+        else {
+            self.expect(state, TypeScriptTokenType::IdentifierName).ok();
+        }
+    }
+
     pub(crate) fn parse_parameters<'a, S: Source + ?Sized>(&self, state: &mut State<'a, S>) -> Result<(), OakError> {
         use crate::lexer::token_type::TypeScriptTokenType::*;
         self.expect(state, LeftParen).ok();

@@ -76,10 +76,26 @@ impl<'config> TypeScriptParser<'config> {
                     }
                 }
                 self.expect(state, RightParen).ok();
-                if self.eat(state, Colon) {
-                    self.parse_return_type_annotation(state).ok();
+                if self.eat(state, Arrow) {
+                    self.parse_statement(state).ok();
+                    state.finish_at(cp, crate::parser::element_type::TypeScriptElementType::ArrowFunction)
                 }
-                state.finish_at(cp, crate::parser::element_type::TypeScriptElementType::ArrowFunction)
+                else if self.at(state, Colon) {
+                    let colon_cp = state.checkpoint();
+                    state.bump();
+                    self.parse_return_type_annotation(state).ok();
+                    if self.eat(state, Arrow) {
+                        self.parse_statement(state).ok();
+                        state.finish_at(cp, crate::parser::element_type::TypeScriptElementType::ArrowFunction)
+                    }
+                    else {
+                        state.restore(colon_cp);
+                        state.finish_at(cp, crate::parser::element_type::TypeScriptElementType::OpenParen)
+                    }
+                }
+                else {
+                    state.finish_at(cp, crate::parser::element_type::TypeScriptElementType::OpenParen)
+                }
             }
             Some(Less) if self.config.jsx => self.parse_jsx_element(state),
             Some(LeftBracket) => {

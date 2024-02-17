@@ -12,11 +12,23 @@ fn repro_vmz_script_fragments() {
         "const c = \"vmz-ui-date-picker__day\" + (day.inMonth ? \"\" : \" is-outside\") + (day.selected ? \" is-on\" : \"\");",
         "const c = opt.selected ? 'true' : 'false';",
         "const h = (ev: KeyboardEvent) => { ev.preventDefault(); };",
+        r#"const el = ev?.target
+ ? (t.closest("[data-vmz-date-iso]") as HTMLElement | null)
+                : ((ev?.currentTarget as HTMLElement | null) ?? null);"#,
+        r#"const el =
+            (t && typeof (t as HTMLElement).closest === "function"
+                ? ((t as HTMLElement).closest("[data-vmz-option]") as HTMLElement | null)
+                : null) || (ev?.currentTarget as HTMLElement | null);"#,
+        r#"const id =
+            el && typeof el.getAttribute === "function" ? el.getAttribute("data-vmz-option") : null;"#,
+        r#"const type = String(file.type || "").toLowerCase();"#,
     ] {
         let mut cache = ParseSession::<TypeScriptLanguage>::new(32);
         let result = TypeScriptBuilder::new(&lang).build(&SourceText::new(source), &[], &mut cache);
         println!("{source}: {} diagnostics", result.diagnostics.len());
-        if !result.diagnostics.is_empty() { println!("DIAGS={:?}", result.diagnostics); }
+        if !result.diagnostics.is_empty() {
+            println!("DIAGS={:?}", result.diagnostics);
+        }
         assert!(result.result.is_ok());
         assert!(result.diagnostics.is_empty(), "{source}: {:#?}", result.diagnostics);
     }

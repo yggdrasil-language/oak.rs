@@ -153,12 +153,12 @@ impl<'config> TypeScriptParser<'config> {
         use TypeScriptTokenType::*;
         state.bump(); // var, let, or const
         self.skip_trivia(state);
-        while state.at(IdentifierName.into()) || state.at(LeftBrace.into()) || state.at(LeftBracket.into()) {
-            if state.at(IdentifierName.into()) {
-                self.expect(state, IdentifierName).ok();
+        while self.is_binding_identifier(state) || self.at(state, LeftBrace) || self.at(state, LeftBracket) {
+            if self.at(state, LeftBrace) || self.at(state, LeftBracket) {
+                self.parse_binding_pattern(state);
             }
             else {
-                self.parse_binding_pattern(state);
+                self.parse_binding_identifier(state);
             }
             if self.eat(state, Colon) {
                 self.parse_type_annotation(state)?;
