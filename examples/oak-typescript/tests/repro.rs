@@ -1,5 +1,7 @@
 use oak_core::{Builder, parser::ParseSession, SourceText};
-use oak_typescript::{TypeScriptBuilder, TypeScriptLanguage};
+use oak_typescript::{
+    TypeScriptBuilder, TypeScriptLanguage, formatter::{FormatOptions, format_source},
+};
 
 #[test]
 fn repro_vmz_script_fragments() {
@@ -31,5 +33,19 @@ fn repro_vmz_script_fragments() {
         }
         assert!(result.result.is_ok());
         assert!(result.diagnostics.is_empty(), "{source}: {:#?}", result.diagnostics);
+    }
+}
+
+#[test]
+fn repro_vmz_formatter_fragments() {
+    let options = FormatOptions::default();
+    for source in [
+        "export type ParsedOptions = Record<string, string | boolean | string[]> & { _: string[] };",
+        "const FROM_SPEC_RE = /\\b(?:import|export)\\s+[^'\"\\n]*?\\s+from\\s+(['\"])([^'\"]+)\\1/g;",
+        "if (/\\[[^\\]]+\\]/.test(href) || /\\/:[^/]+/.test(href)) return full;",
+        "return /\\.(c?js|mjs|ts)$/i.test(token);",
+    ] {
+        let output = format_source(source, &options).expect("format");
+        assert_eq!(format_source(&output, &options).expect("idempotent"), output, "source={source:?}");
     }
 }

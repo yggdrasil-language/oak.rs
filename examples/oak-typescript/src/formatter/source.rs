@@ -218,17 +218,32 @@ fn is_layout(kind: TypeScriptTokenType) -> bool {
 fn validate_delimiters(source: &str, tokens: &[&oak_core::Token<TypeScriptTokenType>]) -> Result<(), oak_core::OakError> {
     let mut stack = Vec::new();
     for token in tokens {
-        let text = source.get(token.span.clone()).ok_or_else(|| oak_core::OakError::format_error("lexer token span is outside source"))?;
-        match text {
-            "{" | "(" | "[" => stack.push(text),
-            "}" | ")" | "]" => {
-                let expected = match text {
-                    "}" => "{",
-                    ")" => "(",
-                    "]" => "[",
-                    _ => unreachable!(),
-                };
-                if stack.pop() != Some(expected) {
+        if matches!(
+            token.kind,
+            TypeScriptTokenType::StringLiteral
+                | TypeScriptTokenType::TemplateString
+                | TypeScriptTokenType::RegexLiteral
+                | TypeScriptTokenType::LineComment
+                | TypeScriptTokenType::BlockComment
+        ) {
+            continue;
+        }
+        match token.kind {
+            TypeScriptTokenType::LeftBrace => stack.push('{'),
+            TypeScriptTokenType::LeftParen => stack.push('('),
+            TypeScriptTokenType::LeftBracket => stack.push('['),
+            TypeScriptTokenType::RightBrace => {
+                if stack.pop() != Some('{') {
+                    return Err(oak_core::OakError::format_error("formatter input has unbalanced delimiters"));
+                }
+            }
+            TypeScriptTokenType::RightParen => {
+                if stack.pop() != Some('(') {
+                    return Err(oak_core::OakError::format_error("formatter input has unbalanced delimiters"));
+                }
+            }
+            TypeScriptTokenType::RightBracket => {
+                if stack.pop() != Some('[') {
                     return Err(oak_core::OakError::format_error("formatter input has unbalanced delimiters"));
                 }
             }
