@@ -57,6 +57,18 @@ pub enum TermExpression {
     /// let message = "Hello, world!"
     /// ```
     StringLiteral(StringLiteral),
+    /// An integer literal preserving its lexical text and source span.
+    IntegerLiteral {
+        value: String,
+        #[cfg_attr(feature = "serde", serde(with = "oak_core::serde_range"))]
+        span: Span,
+    },
+    /// A floating-point literal preserving its lexical text and source span.
+    FloatLiteral {
+        value: String,
+        #[cfg_attr(feature = "serde", serde(with = "oak_core::serde_range"))]
+        span: Span,
+    },
     /// A boolean literal expression.
     ///
     /// # V Language Example
@@ -626,6 +638,8 @@ impl TermExpression {
         match self {
             TermExpression::NamePath(path) => path.span,
             TermExpression::StringLiteral(string) => string.span,
+            TermExpression::IntegerLiteral { span, .. } => *span,
+            TermExpression::FloatLiteral { span, .. } => *span,
             TermExpression::Bool { span, .. } => *span,
             TermExpression::Binary(node) => node.span,
             TermExpression::Unary(node) => node.span,

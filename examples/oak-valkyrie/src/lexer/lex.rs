@@ -151,11 +151,16 @@ impl crate::lexer::ValkyrieLexer<'_> {
             if ch.is_ascii_digit() {
                 state.advance(ch.len_utf8());
 
+                let mut has_fraction = false;
                 while let Some(ch) = state.current() {
+                    if ch == '.' {
+                        has_fraction = true;
+                    }
                     if ch.is_ascii_digit() || ch == '.' || ch == '_' { state.advance(ch.len_utf8()) } else { break }
                 }
 
-                state.add_token(ValkyrieTokenType::IntegerLiteral, start, state.get_position());
+                let kind = if has_fraction { ValkyrieTokenType::FloatLiteral } else { ValkyrieTokenType::IntegerLiteral };
+                state.add_token(kind, start, state.get_position());
                 return true;
             }
         }

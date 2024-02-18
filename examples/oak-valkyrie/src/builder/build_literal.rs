@@ -50,9 +50,11 @@ impl<'config> ValkyrieBuilder<'config> {
                         string_value = Some(text(source, t.span));
                         string_span = Some(t.span);
                     }
-                    ValkyrieTokenType::IntegerLiteral | ValkyrieTokenType::FloatLiteral => {
-                        let value = text(source, t.span);
-                        return Ok(TermExpression::StringLiteral(StringLiteral { prefix: None, quote_count: 0, segments: vec![StringSegment::Text(Box::new(TextSegment { content: value, span: t.span }))], span }));
+                    ValkyrieTokenType::IntegerLiteral => {
+                        return Ok(TermExpression::IntegerLiteral { value: text(source, t.span), span });
+                    }
+                    ValkyrieTokenType::FloatLiteral => {
+                        return Ok(TermExpression::FloatLiteral { value: text(source, t.span), span });
                     }
                     _ => {}
                 }
