@@ -24,6 +24,8 @@ pub enum ValkyrieElementType {
     // Nodes
     /// Attribute node.
     Attribute,
+    /// Attribute argument node.
+    AttributeArgument,
     /// Name path node.
     NamePath,
     /// Type node.
@@ -76,6 +78,8 @@ pub enum ValkyrieElementType {
     OffsetExpression,
     /// Field expression node.
     FieldExpression,
+    /// Term 层显式泛型应用：`expr::<T>`。
+    TurbofishExpression,
     /// If expression node.
     IfExpression,
     /// Match expression node.
@@ -122,6 +126,8 @@ pub enum ValkyrieElementType {
     AssociatedType,
     /// Impl definition node.
     Impl,
+    /// Imply definition node.
+    Imply,
     /// Field definition node.
     Field,
     /// Method definition node.

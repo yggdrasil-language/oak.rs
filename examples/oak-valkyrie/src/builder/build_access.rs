@@ -3,8 +3,9 @@ use crate::{
     ast::*,
     builder::{ValkyrieBuilder, utils},
     lexer::token_type::ValkyrieTokenType,
+    parser::element_type::ValkyrieElementType,
 };
-use oak_core::{OakError, RedNode, Source};
+use oak_core::{OakError, RedNode, RedTree, Source};
 
 impl<'config> ValkyrieBuilder<'config> {
     pub(crate) fn build_field_expr<S: Source + ?Sized>(&self, node: RedNode<ValkyrieLanguage>, source: &S) -> Result<TermExpression, OakError> {
@@ -30,6 +31,40 @@ impl<'config> ValkyrieBuilder<'config> {
         let (receiver, offset) = utils::build_index_expr(&node, source, |n, s| self.build_expr(*n, s), "Missing offset")?;
 
         Ok(TermExpression::Offset { receiver, offset, span })
+    }
+
+    pub(crate) fn build_turbofish<S: Source + ?Sized>(&self, node: RedNode<ValkyrieLanguage>, source: &S) -> Result<TermExpression, OakError> {
+        let span = node.span();
+        let mut expr = None;
+        let mut arguments = Vec::new();
+        for child in node.children() {
+            if utils::should_skip_node(&child) {
+                continue;
+            }
+            if let RedTree::Node(n) = child {
+                match n.green.kind {
+                    ValkyrieElementType::GenericArgumentList => {
+                        for arg_child in n.children() {
+                            if utils::should_skip_node(&arg_child) {
+                                continue;
+                            }
+                            if let RedTree::Node(type_node) = arg_child {
+                                if type_node.green.kind == ValkyrieElementType::Type {
+                                    arguments.push(self.build_type(type_node, source)?);
+                                }
+                            }
+                        }
+                    }
+                    _ => {
+                        if expr.is_none() {
+                            expr = Some(Box::new(self.build_expr(n, source)?));
+                        }
+                    }
+                }
+            }
+        }
+        let expr = expr.ok_or_else(|| source.syntax_error("Missing turbofish expression".to_string(), span.start))?;
+        Ok(TermExpression::Turbofish { expr, arguments, span })
     }
 
     pub(crate) fn build_paren<S: Source + ?Sized>(&self, node: RedNode<ValkyrieLanguage>, source: &S) -> Result<TermExpression, OakError> {

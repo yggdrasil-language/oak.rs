@@ -10,6 +10,14 @@ type State<'a, S> = ParserState<'a, ValkyrieLanguage, S>;
 /// 解析顶层项
 pub(crate) fn parse_item<S: oak_core::Source + ?Sized>(state: &mut State<'_, S>) -> Result<(), oak_core::OakError> {
     state.skip_trivia();
+    while state.at(ValkyrieTokenType::LeftBracket) {
+        parse_bracket_attribute_list(state)?;
+        state.skip_trivia();
+    }
+    while state.at(ValkyrieTokenType::At) {
+        parse_attribute(state)?;
+        state.skip_trivia();
+    }
     if let Some(token) = state.current() {
         match &token.kind {
             ValkyrieTokenType::Keyword(ValkyrieKeywords::Micro) => parse_micro(state),
@@ -17,10 +25,11 @@ pub(crate) fn parse_item<S: oak_core::Source + ?Sized>(state: &mut State<'_, S>)
             ValkyrieTokenType::Keyword(ValkyrieKeywords::Namespace) => parse_namespace(state),
             ValkyrieTokenType::Keyword(ValkyrieKeywords::Class) => parse_class(state),
             ValkyrieTokenType::Keyword(ValkyrieKeywords::Struct) | ValkyrieTokenType::Keyword(ValkyrieKeywords::Structure) => parse_struct(state),
-            ValkyrieTokenType::Keyword(ValkyrieKeywords::Enums) => parse_enums(state),
+            ValkyrieTokenType::Keyword(ValkyrieKeywords::Enums) | ValkyrieTokenType::Keyword(ValkyrieKeywords::Unity) => parse_enums(state),
             ValkyrieTokenType::Keyword(ValkyrieKeywords::Enum) => parse_enum(state),
             ValkyrieTokenType::Keyword(ValkyrieKeywords::Flags) => parse_flags(state),
             ValkyrieTokenType::Keyword(ValkyrieKeywords::Trait) => parse_trait(state),
+            ValkyrieTokenType::Keyword(ValkyrieKeywords::Imply) => parse_imply(state),
             ValkyrieTokenType::Keyword(ValkyrieKeywords::Using) => parse_using(state),
             ValkyrieTokenType::Keyword(ValkyrieKeywords::Let) => {
                 let cp = state.sink.checkpoint();
@@ -54,9 +63,7 @@ pub(crate) fn parse_micro<S: oak_core::Source + ?Sized>(state: &mut State<'_, S>
     if state.at(ValkyrieTokenType::Identifier) {
         state.bump();
     }
-    if state.at(ValkyrieTokenType::LeftBracket) {
-        parse_generic_parameter_list(state)?;
-    }
+    parse_micro_generic_parameter_clause(state)?;
     if state.at(ValkyrieTokenType::LeftParen) {
         parse_parameter_list(state)?;
     }
@@ -78,9 +85,7 @@ pub(crate) fn parse_mezzo<S: oak_core::Source + ?Sized>(state: &mut State<'_, S>
     if state.at(ValkyrieTokenType::Identifier) {
         state.bump();
     }
-    if state.at(ValkyrieTokenType::LeftBracket) {
-        parse_generic_parameter_list(state)?;
-    }
+    parse_micro_generic_parameter_clause(state)?;
     if state.at(ValkyrieTokenType::LeftParen) {
         parse_parameter_list(state)?;
     }
@@ -120,7 +125,7 @@ pub(crate) fn parse_class<S: oak_core::Source + ?Sized>(state: &mut State<'_, S>
     if state.at(ValkyrieTokenType::Identifier) {
         state.bump();
     }
-    if state.at(ValkyrieTokenType::LeftBracket) {
+    if state.at(ValkyrieTokenType::LessThan) {
         parse_generic_parameter_list(state)?;
     }
     if state.at(ValkyrieTokenType::Colon) {
@@ -197,7 +202,7 @@ pub(crate) fn parse_struct<S: oak_core::Source + ?Sized>(state: &mut State<'_, S
     if state.at(ValkyrieTokenType::Identifier) {
         state.bump();
     }
-    if state.at(ValkyrieTokenType::LeftBracket) {
+    if state.at(ValkyrieTokenType::LessThan) {
         parse_generic_parameter_list(state)?;
     }
     if state.at(ValkyrieTokenType::LeftBrace) {
@@ -241,7 +246,7 @@ pub(crate) fn parse_enums<S: oak_core::Source + ?Sized>(state: &mut State<'_, S>
     if state.at(ValkyrieTokenType::Identifier) {
         state.bump();
     }
-    if state.at(ValkyrieTokenType::LeftBracket) {
+    if state.at(ValkyrieTokenType::LessThan) {
         parse_generic_parameter_list(state)?;
     }
     if state.at(ValkyrieTokenType::Colon) {
@@ -370,6 +375,59 @@ pub(crate) fn parse_flags<S: oak_core::Source + ?Sized>(state: &mut State<'_, S>
     Ok(())
 }
 
+/// 解析 `imply` 实现块。
+pub(crate) fn parse_imply<S: oak_core::Source + ?Sized>(state: &mut State<'_, S>) -> Result<(), oak_core::OakError> {
+    let cp = state.sink.checkpoint();
+    state.bump();
+    if state.at(ValkyrieTokenType::LessThan) {
+        parse_generic_parameter_list(state)?;
+    }
+    parse_type(state)?;
+    if state.at(ValkyrieTokenType::Colon) {
+        state.bump();
+        parse_type(state)?;
+    }
+    if state.at(ValkyrieTokenType::LeftBrace) {
+        state.bump();
+        while state.not_at_end() && !state.at(ValkyrieTokenType::RightBrace) {
+            while state.at(ValkyrieTokenType::At) {
+                parse_attribute(state)?;
+            }
+            if state.at(ValkyrieTokenType::Keyword(ValkyrieKeywords::Micro)) {
+                parse_micro(state)?;
+            }
+            else if state.at(ValkyrieTokenType::Keyword(ValkyrieKeywords::Type)) {
+                let acp = state.sink.checkpoint();
+                state.bump();
+                if state.at(ValkyrieTokenType::Identifier) {
+                    state.bump();
+                }
+                state.sink.finish_node(acp, ValkyrieElementType::AssociatedType);
+            }
+            else if state.at(ValkyrieTokenType::Identifier) {
+                let mcp = state.sink.checkpoint();
+                state.bump();
+                if state.at(ValkyrieTokenType::LeftParen) {
+                    parse_parameter_list(state)?;
+                }
+                if state.at(ValkyrieTokenType::Colon) {
+                    state.bump();
+                    parse_type(state)?;
+                }
+                state.sink.finish_node(mcp, ValkyrieElementType::Method);
+            }
+            else {
+                state.bump();
+            }
+        }
+        if state.at(ValkyrieTokenType::RightBrace) {
+            state.bump();
+        }
+    }
+    state.sink.finish_node(cp, ValkyrieElementType::Imply);
+    Ok(())
+}
+
 /// 解析 trait 定义
 pub(crate) fn parse_trait<S: oak_core::Source + ?Sized>(state: &mut State<'_, S>) -> Result<(), oak_core::OakError> {
     let cp = state.sink.checkpoint();
@@ -377,7 +435,7 @@ pub(crate) fn parse_trait<S: oak_core::Source + ?Sized>(state: &mut State<'_, S>
     if state.at(ValkyrieTokenType::Identifier) {
         state.bump();
     }
-    if state.at(ValkyrieTokenType::LeftBracket) {
+    if state.at(ValkyrieTokenType::LessThan) {
         parse_generic_parameter_list(state)?;
     }
     if state.at(ValkyrieTokenType::LeftBrace) {
@@ -488,6 +546,67 @@ pub(crate) fn parse_attribute_item<S: oak_core::Source + ?Sized>(state: &mut Sta
     parse_item(state)
 }
 
+/// 解析 `[export(name: "answer"), main]` 形式的方括号属性列表。
+pub(crate) fn parse_bracket_attribute_list<S: oak_core::Source + ?Sized>(state: &mut State<'_, S>) -> Result<(), oak_core::OakError> {
+    state.bump();
+    state.skip_trivia();
+    while state.not_at_end() && !state.at(ValkyrieTokenType::RightBracket) {
+        let before = state.checkpoint().0;
+        parse_bracket_attribute(state)?;
+        if state.checkpoint().0 == before {
+            break;
+        }
+        state.skip_trivia();
+        if state.at(ValkyrieTokenType::Comma) {
+            state.bump();
+            state.skip_trivia();
+        }
+    }
+    if state.at(ValkyrieTokenType::RightBracket) {
+        state.bump();
+    }
+    Ok(())
+}
+
+/// 解析方括号属性列表中的一个属性项。
+pub(crate) fn parse_bracket_attribute<S: oak_core::Source + ?Sized>(state: &mut State<'_, S>) -> Result<(), oak_core::OakError> {
+    let cp = state.sink.checkpoint();
+    parse_name_path(state)?;
+    if state.at(ValkyrieTokenType::LeftParen) {
+        state.bump();
+        while state.not_at_end() && !state.at(ValkyrieTokenType::RightParen) {
+            parse_attribute_argument(state)?;
+            if state.at(ValkyrieTokenType::Comma) {
+                state.bump();
+            }
+        }
+        if state.at(ValkyrieTokenType::RightParen) {
+            state.bump();
+        }
+    }
+    state.sink.finish_node(cp, ValkyrieElementType::Attribute);
+    Ok(())
+}
+
+/// 解析属性参数：`name: "answer"` 或位置参数。
+pub(crate) fn parse_attribute_argument<S: oak_core::Source + ?Sized>(state: &mut State<'_, S>) -> Result<(), oak_core::OakError> {
+    let cp = state.sink.checkpoint();
+    if state.at(ValkyrieTokenType::Identifier) {
+        let next = state.peek_non_trivia_kind_at(1);
+        if next == Some(ValkyrieTokenType::Colon) || next == Some(ValkyrieTokenType::Eq) {
+            state.bump();
+            state.bump();
+            parse_expression(state)?;
+        } else {
+            parse_expression(state)?;
+        }
+    } else {
+        parse_expression(state)?;
+    }
+    state.sink.finish_node(cp, ValkyrieElementType::AttributeArgument);
+    Ok(())
+}
+
 /// 解析属性
 pub(crate) fn parse_attribute<S: oak_core::Source + ?Sized>(state: &mut State<'_, S>) -> Result<(), oak_core::OakError> {
     let cp = state.sink.checkpoint();
@@ -498,7 +617,7 @@ pub(crate) fn parse_attribute<S: oak_core::Source + ?Sized>(state: &mut State<'_
     if state.at(ValkyrieTokenType::LeftParen) {
         state.bump();
         while state.not_at_end() && !state.at(ValkyrieTokenType::RightParen) {
-            parse_expression(state)?;
+            parse_attribute_argument(state)?;
             if state.at(ValkyrieTokenType::Comma) {
                 state.bump();
             }
@@ -528,6 +647,14 @@ pub(crate) fn parse_name_path<S: oak_core::Source + ?Sized>(state: &mut State<'_
 }
 
 // 以下函数在其他模块中定义
+pub(crate) fn parse_micro_generic_parameter_clause<S: oak_core::Source + ?Sized>(state: &mut State<'_, S>) -> Result<(), oak_core::OakError> {
+    crate::parser::parse_types::parse_micro_generic_parameter_clause(state)
+}
+
+pub(crate) fn parse_term_generic_parameter_clause<S: oak_core::Source + ?Sized>(state: &mut State<'_, S>) -> Result<(), oak_core::OakError> {
+    crate::parser::parse_types::parse_term_generic_parameter_clause(state)
+}
+
 pub(crate) fn parse_generic_parameter_list<S: oak_core::Source + ?Sized>(state: &mut State<'_, S>) -> Result<(), oak_core::OakError> {
     crate::parser::parse_types::parse_generic_parameter_list(state)
 }

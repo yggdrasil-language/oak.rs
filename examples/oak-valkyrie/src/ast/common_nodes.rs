@@ -1,5 +1,18 @@
 use super::{Block, FieldDeclaration, GenericParam, Identifier, Param, Pattern, Span, TermExpression, TypeExpression};
 
+/// One attribute argument, optionally keyed (`name: "answer"`).
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct AttributeArgument {
+    /// Optional named-argument key.
+    pub key: Option<Identifier>,
+    /// Structured argument expression.
+    pub value: TermExpression,
+    /// The source code span.
+    #[cfg_attr(feature = "serde", serde(with = "oak_core::serde_range"))]
+    pub span: Span,
+}
+
 /// An attribute
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
@@ -7,7 +20,7 @@ pub struct Attribute {
     /// The attribute name.
     pub name: Identifier,
     /// The attribute arguments.
-    pub args: Vec<TermExpression>,
+    pub args: Vec<AttributeArgument>,
     /// The source code span.
     #[cfg_attr(feature = "serde", serde(with = "oak_core::serde_range"))]
     pub span: Span,

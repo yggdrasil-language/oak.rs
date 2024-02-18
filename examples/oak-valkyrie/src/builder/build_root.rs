@@ -37,6 +37,7 @@ impl<'config> ValkyrieBuilder<'config> {
                 }
                 RedTree::Leaf(t) => match t.kind {
                     ValkyrieTokenType::Whitespace | ValkyrieTokenType::Newline | ValkyrieTokenType::LineComment | ValkyrieTokenType::BlockComment => continue,
+                    ValkyrieTokenType::LeftBracket | ValkyrieTokenType::RightBracket | ValkyrieTokenType::Comma => continue,
                     ValkyrieTokenType::Eof => continue,
                     _ => {
                         return Err(source.syntax_error(format!("Unexpected token in root: {:?}", t.kind), t.span.start));
@@ -153,6 +154,10 @@ impl<'config> ValkyrieBuilder<'config> {
             ValkyrieElementType::Trait => {
                 let trait_node = self.build_trait(n, source)?;
                 Ok(StatementNode::Trait(Box::new(trait_node)))
+            }
+            ValkyrieElementType::Imply => {
+                let imply = self.build_imply(n, source)?;
+                Ok(StatementNode::Imply(Box::new(imply)))
             }
             ValkyrieElementType::Widget => {
                 let widget = self.build_widget(n, source)?;

@@ -31,9 +31,9 @@ pub mod type_nodes;
 pub mod widget_nodes;
 
 pub use self::{
-    common_nodes::{Attribute, EnumVariant, InterpolationSegment, StringLiteral, StringSegment, TextSegment, VariantCase},
+    common_nodes::{Attribute, AttributeArgument, EnumVariant, InterpolationSegment, StringLiteral, StringSegment, TextSegment, VariantCase},
     ecs_nodes::{ComponentDeclaration, EventDeclaration, SystemDeclaration},
-    items_nodes::{AssociatedType, Effect, Enums, Flags, MicroDeclaration, Parent, Property, PropertyKind, StatementNode, Trait, TypeFunction, Variant, WidgetDeclaration},
+    items_nodes::{AssociatedType, Effect, Enums, Flags, ImplyDeclaration, MicroDeclaration, Parent, Property, PropertyKind, StatementNode, Trait, TypeFunction, Variant, WidgetDeclaration},
     namespace_nodes::{NamespaceDeclaration, UsingDeclaration},
     pattern_nodes::{ClassPattern, LiteralPattern, MatchArm, Pattern, TypePattern, VariablePattern, WildcardPattern},
     root_nodes::{EnumsKind, Identifier, LoopKind, NamePath, Span, ValkyrieRoot},

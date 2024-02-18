@@ -27,6 +27,8 @@ pub enum StatementNode {
     Trait(Box<Trait>),
     /// A widget declaration.
     Widget(Box<WidgetDeclaration>),
+    /// An `imply` implementation block.
+    Imply(Box<ImplyDeclaration>),
     /// A micro (small function) declaration.
     Micro(Box<MicroDeclaration>),
     /// A type function declaration.
@@ -147,6 +149,25 @@ pub struct WidgetDeclaration {
     pub items: Vec<StatementNode>,
     /// Annotations applied to the widget.
     pub annotations: Vec<Attribute>,
+    /// The source code span.
+    #[cfg_attr(feature = "serde", serde(with = "oak_core::serde_range"))]
+    pub span: Span,
+}
+
+/// An `imply` block attaching methods to a type or trait witness.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct ImplyDeclaration {
+    /// Annotations applied to the imply block.
+    pub annotations: Vec<Attribute>,
+    /// Generic parameters declared on the imply header.
+    pub generics: Vec<GenericParam>,
+    /// Target type being extended or implemented.
+    pub target_type: TypeExpression,
+    /// Optional trait or protocol being implemented.
+    pub trait_type: Option<TypeExpression>,
+    /// Methods defined in the imply block.
+    pub methods: Vec<MethodDeclaration>,
     /// The source code span.
     #[cfg_attr(feature = "serde", serde(with = "oak_core::serde_range"))]
     pub span: Span,

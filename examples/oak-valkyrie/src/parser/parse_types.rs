@@ -7,6 +7,17 @@ use oak_core::parser::ParserState;
 
 type State<'a, S> = ParserState<'a, ValkyrieLanguage, S>;
 
+#[inline]
+fn token_index<S: oak_core::Source + ?Sized>(state: &State<'_, S>) -> usize {
+    state.checkpoint().0
+}
+
+/// 容错循环若未消耗 token 则必须退出，否则 green tree 会指数膨胀并撑爆内存。
+#[inline]
+fn stalled<S: oak_core::Source + ?Sized>(state: &State<'_, S>, before: usize) -> bool {
+    token_index(state) == before
+}
+
 /// 解析类型
 pub(crate) fn parse_type<S: oak_core::Source + ?Sized>(state: &mut State<'_, S>) -> Result<(), oak_core::OakError> {
     let cp = state.sink.checkpoint();
@@ -16,13 +27,17 @@ pub(crate) fn parse_type<S: oak_core::Source + ?Sized>(state: &mut State<'_, S>)
     if state.at(ValkyrieTokenType::Identifier) {
         state.bump();
     }
-    if state.at(ValkyrieTokenType::LeftBracket) {
+    if state.at(ValkyrieTokenType::LessThan) {
         parse_generic_argument_list(state)?;
     }
     if state.at(ValkyrieTokenType::LeftParen) {
         state.bump();
         while state.not_at_end() && !state.at(ValkyrieTokenType::RightParen) {
+            let before = token_index(state);
             parse_type(state)?;
+            if stalled(state, before) {
+                break;
+            }
             if state.at(ValkyrieTokenType::Comma) {
                 state.bump();
             }
@@ -39,11 +54,30 @@ pub(crate) fn parse_type<S: oak_core::Source + ?Sized>(state: &mut State<'_, S>)
     Ok(())
 }
 
-/// 解析泛型参数列表
+/// 解析 micro/mezzo 形参泛型：首选 `micro wrap<T>(...)`，亦接受 `micro wrap::<T>(...)`。
+///
+/// 与类型应用 `Envelope<T>`、调用点 turbofish `foo::<T>()` 分属不同语法位置。
+pub(crate) fn parse_micro_generic_parameter_clause<S: oak_core::Source + ?Sized>(state: &mut State<'_, S>) -> Result<(), oak_core::OakError> {
+    if state.at(ValkyrieTokenType::ColonColon) && state.peek_non_trivia_kind_at(1) == Some(ValkyrieTokenType::LessThan) {
+        state.bump();
+    }
+    if state.at(ValkyrieTokenType::LessThan) {
+        parse_generic_parameter_list(state)?;
+    }
+    Ok(())
+}
+
+/// 兼容旧名。
+pub(crate) fn parse_term_generic_parameter_clause<S: oak_core::Source + ?Sized>(state: &mut State<'_, S>) -> Result<(), oak_core::OakError> {
+    parse_micro_generic_parameter_clause(state)
+}
+
+/// 解析 type / unite / trait 等类型层泛型形参列表：`<T, U>`。
 pub(crate) fn parse_generic_parameter_list<S: oak_core::Source + ?Sized>(state: &mut State<'_, S>) -> Result<(), oak_core::OakError> {
     let cp = state.sink.checkpoint();
     state.bump();
-    while state.not_at_end() && !state.at(ValkyrieTokenType::RightBracket) {
+    while state.not_at_end() && !state.at(ValkyrieTokenType::GreaterThan) {
+        let before = token_index(state);
         let gcp = state.sink.checkpoint();
         if state.at(ValkyrieTokenType::Keyword(ValkyrieKeywords::Type)) {
             state.bump();
@@ -59,12 +93,15 @@ pub(crate) fn parse_generic_parameter_list<S: oak_core::Source + ?Sized>(state: 
             state.bump();
             parse_type(state)?;
         }
+        if stalled(state, before) {
+            break;
+        }
         state.sink.finish_node(gcp, ValkyrieElementType::GenericParameter);
         if state.at(ValkyrieTokenType::Comma) {
             state.bump();
         }
     }
-    if state.at(ValkyrieTokenType::RightBracket) {
+    if state.at(ValkyrieTokenType::GreaterThan) {
         state.bump();
     }
     state.sink.finish_node(cp, ValkyrieElementType::GenericParameterList);
@@ -75,13 +112,17 @@ pub(crate) fn parse_generic_parameter_list<S: oak_core::Source + ?Sized>(state: 
 pub(crate) fn parse_generic_argument_list<S: oak_core::Source + ?Sized>(state: &mut State<'_, S>) -> Result<(), oak_core::OakError> {
     let cp = state.sink.checkpoint();
     state.bump();
-    while state.not_at_end() && !state.at(ValkyrieTokenType::RightBracket) {
+    while state.not_at_end() && !state.at(ValkyrieTokenType::GreaterThan) {
+        let before = token_index(state);
         parse_type(state)?;
+        if stalled(state, before) {
+            break;
+        }
         if state.at(ValkyrieTokenType::Comma) {
             state.bump();
         }
     }
-    if state.at(ValkyrieTokenType::RightBracket) {
+    if state.at(ValkyrieTokenType::GreaterThan) {
         state.bump();
     }
     state.sink.finish_node(cp, ValkyrieElementType::GenericArgumentList);
@@ -94,6 +135,10 @@ pub(crate) fn parse_parameter_list<S: oak_core::Source + ?Sized>(state: &mut Sta
     state.bump();
     while state.not_at_end() && !state.at(ValkyrieTokenType::RightParen) {
         let pcp = state.sink.checkpoint();
+        let progressed = state.at(ValkyrieTokenType::Keyword(ValkyrieKeywords::Mut))
+            || state.at(ValkyrieTokenType::Identifier)
+            || state.at(ValkyrieTokenType::Colon)
+            || state.at(ValkyrieTokenType::Eq);
         if state.at(ValkyrieTokenType::Keyword(ValkyrieKeywords::Mut)) {
             state.bump();
         }
@@ -107,6 +152,9 @@ pub(crate) fn parse_parameter_list<S: oak_core::Source + ?Sized>(state: &mut Sta
         if state.at(ValkyrieTokenType::Eq) {
             state.bump();
             parse_expression(state)?;
+        }
+        if !progressed {
+            break;
         }
         state.sink.finish_node(pcp, ValkyrieElementType::Parameter);
         if state.at(ValkyrieTokenType::Comma) {

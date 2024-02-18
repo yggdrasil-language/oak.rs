@@ -83,6 +83,16 @@ pub enum TermExpression {
         #[cfg_attr(feature = "serde", serde(with = "oak_core::serde_range"))]
         span: Span,
     },
+    /// Term 层显式泛型应用（turbofish），如 `identity::<i32>` 或 `T::<i64>()`。
+    Turbofish {
+        /// 被应用泛型的表达式。
+        expr: Box<TermExpression>,
+        /// 类型实参。
+        arguments: Vec<TypeExpression>,
+        /// 源码区间。
+        #[cfg_attr(feature = "serde", serde(with = "oak_core::serde_range"))]
+        span: Span,
+    },
     /// A function call expression.
     ///
     /// # V Language Example
@@ -643,6 +653,7 @@ impl TermExpression {
             TermExpression::Bool { span, .. } => *span,
             TermExpression::Binary(node) => node.span,
             TermExpression::Unary(node) => node.span,
+            TermExpression::Turbofish { span, .. } => *span,
             TermExpression::ApplyCall { span, .. } => *span,
             TermExpression::DotCall { span, .. } => *span,
             TermExpression::Index { span, .. } => *span,

@@ -274,11 +274,44 @@ impl<'config> ValkyrieBuilder<'config> {
                             name.span = path.span;
                         }
                     }
-                    _ => args.push(self.build_expr(n, source)?),
+                    ValkyrieElementType::AttributeArgument => {
+                        let argument = self.build_attribute_argument(n, source)?;
+                        args.push(argument);
+                    }
+                    _ => {
+                        let value = self.build_expr(n, source)?;
+                        args.push(AttributeArgument { key: None, value, span: n.span() });
+                    }
                 },
             }
         }
 
         Ok(Attribute { name, args, span })
+    }
+
+    pub(crate) fn build_attribute_argument<S: Source + ?Sized>(&self, node: RedNode<ValkyrieLanguage>, source: &S) -> Result<AttributeArgument, OakError> {
+        let span = node.span();
+        let mut key = None;
+        let mut value = None;
+
+        for child in node.children() {
+            match child {
+                RedTree::Leaf(t) => match t.kind {
+                    ValkyrieTokenType::Whitespace | ValkyrieTokenType::Newline | ValkyrieTokenType::LineComment | ValkyrieTokenType::BlockComment => continue,
+                    ValkyrieTokenType::Identifier if key.is_none() && value.is_none() => {
+                        key = Some(Identifier { name: text(source, t.span), span: t.span });
+                    }
+                    _ => {}
+                },
+                RedTree::Node(n) => {
+                    if value.is_none() {
+                        value = Some(self.build_expr(n, source)?);
+                    }
+                }
+            }
+        }
+
+        let value = value.ok_or_else(|| source.syntax_error("Missing attribute argument value".to_string(), span.start))?;
+        Ok(AttributeArgument { key, value, span })
     }
 }

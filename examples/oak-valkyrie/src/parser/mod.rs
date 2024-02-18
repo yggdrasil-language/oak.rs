@@ -21,7 +21,12 @@ impl<'config> Parser<ValkyrieLanguage> for ValkyrieParser<'config> {
                 if state.at(crate::ValkyrieTokenType::Eof) {
                     break;
                 }
+                let before = state.checkpoint().0;
                 parse_item(state)?;
+                // 容错解析若未前进必须停止，否则会无限生成 ExprStatement 节点并撑爆内存。
+                if state.checkpoint().0 == before {
+                    break;
+                }
                 state.skip_trivia();
             }
             let root = state.sink.finish_node(cp, ValkyrieElementType::Root);

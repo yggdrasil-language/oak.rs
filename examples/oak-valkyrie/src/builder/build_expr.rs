@@ -11,6 +11,7 @@ impl<'config> ValkyrieBuilder<'config> {
             crate::parser::element_type::ValkyrieElementType::UnaryExpression => self.build_unary(node, source),
             crate::parser::element_type::ValkyrieElementType::CallExpression => self.build_call(node, source),
             crate::parser::element_type::ValkyrieElementType::FieldExpression => self.build_field_expr(node, source),
+            crate::parser::element_type::ValkyrieElementType::TurbofishExpression => self.build_turbofish(node, source),
             crate::parser::element_type::ValkyrieElementType::IndexExpression => self.build_index(node, source),
             crate::parser::element_type::ValkyrieElementType::OffsetExpression => self.build_offset(node, source),
             crate::parser::element_type::ValkyrieElementType::ParenthesizedExpression => self.build_paren(node, source),

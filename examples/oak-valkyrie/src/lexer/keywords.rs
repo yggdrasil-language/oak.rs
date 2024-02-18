@@ -73,6 +73,12 @@ pub enum ValkyrieKeywords {
     /// trait Show { micro show(self) }
     /// ```
     Trait,
+    /// Declare an inherent or trait implementation block.
+    ///
+    /// ```v
+    /// imply Owner { micro answer(self) -> i32 { return 1 } }
+    /// ```
+    Imply,
     /// Declare flags.
     ///
     /// ```v

@@ -1,6 +1,9 @@
 use crate::{
     ValkyrieLanguage,
-    ast::{ClassDeclaration, EnumVariant, Enums, EnumsKind, FieldDeclaration, Flags, Identifier, Parent, SingletonDeclaration, StatementNode, StructureDeclaration, Trait, Variant, VariantCase, WidgetDeclaration},
+    ast::{
+        ClassDeclaration, EnumVariant, Enums, EnumsKind, FieldDeclaration, Flags, Identifier, ImplyDeclaration, Parent, SingletonDeclaration, StatementNode,
+        StructureDeclaration, Trait, TypeExpression, Variant, VariantCase, WidgetDeclaration,
+    },
     builder::{ValkyrieBuilder, text},
     lexer::{ValkyrieKeywords, token_type::ValkyrieTokenType},
     parser::element_type::ValkyrieElementType,
@@ -320,6 +323,66 @@ impl<'config> ValkyrieBuilder<'config> {
         let pattern = pattern.ok_or_else(|| source.syntax_error("Missing pattern in variant case".to_string(), span.start))?;
         let body = body.ok_or_else(|| source.syntax_error("Missing body in variant case".to_string(), span.start))?;
         Ok(VariantCase { pattern, body, span })
+    }
+
+    pub(crate) fn build_imply<S: Source + ?Sized>(&self, node: RedNode<ValkyrieLanguage>, source: &S) -> Result<ImplyDeclaration, OakError> {
+        let span = node.span();
+        let mut annotations = Vec::new();
+        let mut generics = Vec::new();
+        let mut target_type = TypeExpression::Namepath(Box::new(crate::ast::NamePath { parts: Vec::new(), span: Default::default() }));
+        let mut trait_type = None;
+        let mut methods = Vec::new();
+        let mut saw_target = false;
+
+        for child in node.children() {
+            match child {
+                RedTree::Leaf(t) => match t.kind {
+                    ValkyrieTokenType::Whitespace | ValkyrieTokenType::Newline | ValkyrieTokenType::LineComment | ValkyrieTokenType::BlockComment => continue,
+                    _ => {}
+                },
+                RedTree::Node(n) => match n.green.kind {
+                    ValkyrieElementType::Attribute => annotations.push(self.build_attribute(n, source)?),
+                    ValkyrieElementType::GenericParameterList => generics = self.build_generic_params(n, source)?,
+                    ValkyrieElementType::Type => {
+                        let ty = self.build_type(n, source)?;
+                        if !saw_target {
+                            target_type = ty;
+                            saw_target = true;
+                        }
+                        else {
+                            trait_type = Some(ty);
+                        }
+                    }
+                    ValkyrieElementType::Micro => {
+                        if let Ok(func) = self.build_function(n, source) {
+                            methods.push(func);
+                        }
+                    }
+                    ValkyrieElementType::Method => {
+                        if let Ok(func) = self.build_function(n, source) {
+                            methods.push(func);
+                        }
+                    }
+                    ValkyrieElementType::BlockExpression => {
+                        for inner_child in n.children() {
+                            if let RedTree::Node(inner_n) = inner_child {
+                                match inner_n.green.kind {
+                                    ValkyrieElementType::Micro | ValkyrieElementType::Method => {
+                                        if let Ok(func) = self.build_function(inner_n, source) {
+                                            methods.push(func);
+                                        }
+                                    }
+                                    _ => {}
+                                }
+                            }
+                        }
+                    }
+                    _ => {}
+                },
+            }
+        }
+
+        Ok(ImplyDeclaration { annotations, generics, target_type, trait_type, methods, span })
     }
 
     pub(crate) fn build_trait<S: Source + ?Sized>(&self, node: RedNode<ValkyrieLanguage>, source: &S) -> Result<Trait, OakError> {

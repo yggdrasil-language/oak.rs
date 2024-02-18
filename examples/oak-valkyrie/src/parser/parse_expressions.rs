@@ -117,10 +117,21 @@ pub(crate) fn parse_postfix_expression<S: oak_core::Source + ?Sized>(state: &mut
             }
             state.sink.finish_node(cp, ValkyrieElementType::IndexExpression);
         }
+        else if state.at(ValkyrieTokenType::ColonColon) && state.peek_non_trivia_kind_at(1) == Some(ValkyrieTokenType::LessThan) {
+            let cp = state.sink.checkpoint() - 1;
+            state.bump();
+            crate::parser::parse_types::parse_generic_argument_list(state)?;
+            state.sink.finish_node(cp, ValkyrieElementType::TurbofishExpression);
+        }
         else if state.at(ValkyrieTokenType::LeftParen) {
             let cp = state.sink.checkpoint() - 1;
             parse_argument_list(state)?;
             state.sink.finish_node(cp, ValkyrieElementType::CallExpression);
+        }
+        else if state.at(ValkyrieTokenType::LeftBrace) {
+            let cp = state.sink.checkpoint() - 1;
+            crate::parser::parse_blocks::parse_object_initializer(state)?;
+            state.sink.finish_node(cp, ValkyrieElementType::ObjectExpression);
         }
         else {
             break;
@@ -134,7 +145,11 @@ pub(crate) fn parse_argument_list<S: oak_core::Source + ?Sized>(state: &mut Stat
     let cp = state.sink.checkpoint();
     state.bump();
     while state.not_at_end() && !state.at(ValkyrieTokenType::RightParen) {
+        let before = state.checkpoint().0;
         parse_expression(state)?;
+        if state.checkpoint().0 == before {
+            break;
+        }
         if state.at(ValkyrieTokenType::Comma) {
             state.bump();
         }
