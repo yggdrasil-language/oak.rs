@@ -14,6 +14,7 @@ keywords = ["parser", "valkyrie", "experimental"]
 [dependencies]
 oak-core = { workspace = true }
 oak-dejavu = { workspace = true }
+oak-formatter = { workspace = true }
 serde = { workspace = true, optional = true, features = ["unstable"]}
 unicode-ident = "1.0.12"
 
@@ -34,4 +35,9 @@ required-features = ["serde"]
 [[test]]
 name = "lexer"
 path = "tests/lexer/mod.rs"
+required-features = ["serde"]
+
+[[test]]
+name = "formatter"
+path = "tests/formatter/mod.rs"
 required-features = ["serde"]

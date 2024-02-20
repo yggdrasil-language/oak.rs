@@ -17,6 +17,9 @@ pub mod lexer;
 /// Parser module.
 pub mod parser;
 
+/// CST token-gap source formatter.
+pub mod formatter;
+
 pub use crate::{
     ast::ValkyrieRoot,
     builder::ValkyrieBuilder,
