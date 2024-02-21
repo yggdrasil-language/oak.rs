@@ -13,6 +13,7 @@ keywords = ["parser", "valkyrie", "language"]
 
 [dependencies]
 oak-core = { workspace = true }
+oak-formatter = { workspace = true }
 serde = { workspace = true, optional = true }
 
 [dev-dependencies]
@@ -27,4 +28,9 @@ all-features = true
 
 [[test]]
 name = "main"
+required-features = ["serde"]
+
+[[test]]
+name = "formatter"
+path = "tests/formatter/mod.rs"
 required-features = ["serde"]
