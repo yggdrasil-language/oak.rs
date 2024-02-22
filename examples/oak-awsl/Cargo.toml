@@ -1,0 +1,22 @@
+[package]
+name = "oak-awsl"
+version.workspace = true
+authors.workspace = true
+description = "Asgard AWSL template formatter for the oak ecosystem."
+edition.workspace = true
+license.workspace = true
+homepage.workspace = true
+repository = "https://github.com/yggdrasil-language/oak.rs/tree/master/examples/oak-awsl"
+categories = ["parsing"]
+keywords = ["parser", "awsl", "asgard", "template"]
+
+[dependencies]
+oak-core = { workspace = true }
+oak-formatter = { workspace = true }
+
+[dev-dependencies]
+oak-testing = { workspace = true }
+
+[[test]]
+name = "formatter"
+path = "tests/formatter/mod.rs"

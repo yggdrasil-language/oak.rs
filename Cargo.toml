@@ -86,6 +86,7 @@ oak-actionscript = { path = "examples/oak-actionscript", version = "0.0.12" }
 oak-ada = { path = "examples/oak-ada", version = "0.0.12" }
 oak-apl = { path = "examples/oak-apl", version = "0.0.12" }
 oak-ascii-doc = { path = "examples/oak-ascii-doc", version = "0.0.12" }
+oak-awsl = { path = "examples/oak-awsl", version = "0.0.12" }
 oak-bash = { path = "examples/oak-bash", version = "0.0.12" }
 oak-bat = { path = "examples/oak-bat", version = "0.0.12" }
 oak-c = { path = "examples/oak-c", version = "0.0.12" }
