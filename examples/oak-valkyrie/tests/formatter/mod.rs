@@ -21,3 +21,19 @@ fn idempotent_minimal_micro() {
     let twice = format_source(&once, &FormatOptions::default()).expect("format twice");
     assert_eq!(once, twice);
 }
+
+#[test]
+fn idempotent_vx_namespace() {
+    let source = "namespace demo;";
+    let once = format_source(source, &FormatOptions::default()).expect("format once");
+    let twice = format_source(&once, &FormatOptions::default()).expect("format twice");
+    assert_eq!(once, twice);
+}
+
+#[test]
+fn idempotent_vx_widget_markup() {
+    let source = "widget Demo { micro view() { <div class=\"box\">{title}</div> } }";
+    let once = format_source(source, &FormatOptions::default()).expect("format once");
+    let twice = format_source(&once, &FormatOptions::default()).expect("format twice");
+    assert_eq!(once, twice);
+}
