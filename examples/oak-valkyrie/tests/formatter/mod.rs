@@ -37,3 +37,19 @@ fn idempotent_vx_widget_markup() {
     let twice = format_source(&once, &FormatOptions::default()).expect("format twice");
     assert_eq!(once, twice);
 }
+
+#[test]
+fn formats_vx_markup_attribute_spacing() {
+    let source = "widget W { micro view() { <div class=\"box\">{title}</div> } }";
+    let out = format_source(source, &FormatOptions::default()).expect("format");
+    assert!(out.contains("<div class=\"box\">"));
+    assert_eq!(format_source(&out, &FormatOptions::default()).expect("idempotent"), out);
+}
+
+#[test]
+fn preserves_generic_angle_brackets() {
+    let source = "micro main() { let xs: Vec<i32> = [] }";
+    let out = format_source(source, &FormatOptions::default()).expect("format");
+    assert!(out.contains("Vec<i32>"));
+    assert_eq!(format_source(&out, &FormatOptions::default()).expect("idempotent"), out);
+}

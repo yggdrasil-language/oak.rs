@@ -139,14 +139,37 @@ fn valkyrie_gap_constraint(
         constraint = GapConstraint::RequiredSpace;
     }
 
-    if right == "<" && looks_like_generic_open(significant, index + 1, source) {
-        constraint = GapConstraint::NoSpace;
+    if right == "<" {
+        if looks_like_markup_open(significant, index + 1, source) || looks_like_generic_open(significant, index + 1, source) {
+            constraint = GapConstraint::NoSpace;
+        }
     }
     if left == ">" && is_generic_close(significant, index, source) {
         if right == "{" {
             constraint = GapConstraint::RequiredSpace;
         }
         else if matches!(right, "(" | ")" | "," | ";" | ">" | "|" | "&" | "?" | ":") {
+            constraint = GapConstraint::NoSpace;
+        }
+    }
+
+    if in_markup_angle_gap(significant, index, source) {
+        if left == "=" || right == "=" {
+            constraint = GapConstraint::NoSpace;
+        }
+        if left == "<" || right == ">" {
+            constraint = GapConstraint::NoSpace;
+        }
+        if left == "/" && right == ">" {
+            constraint = GapConstraint::NoSpace;
+        }
+        if left == ">" && right == "<" {
+            constraint = GapConstraint::Preserve;
+        }
+        else if left == ">" && right != "{" && right != "/" && !right.starts_with('<') {
+            constraint = GapConstraint::RequiredSpace;
+        }
+        if left == "{" || right == "}" {
             constraint = GapConstraint::NoSpace;
         }
     }
@@ -160,7 +183,76 @@ fn valkyrie_gap_constraint(
     constraint
 }
 
+fn token_text<'a>(
+    significant: &[&oak_core::Token<ValkyrieTokenType>],
+    index: usize,
+    source: &'a str,
+) -> Option<&'a str> {
+    significant.get(index).and_then(|token| source.get(token.span.clone()))
+}
+
+fn is_markup_name(text: &str) -> bool {
+    !text.is_empty()
+        && text.chars().all(|ch| ch.is_ascii_alphanumeric() || matches!(ch, '_' | '-' | '.'))
+}
+
+fn find_closing_angle(significant: &[&oak_core::Token<ValkyrieTokenType>], open_index: usize, source: &str) -> Option<usize> {
+    let mut depth = 0usize;
+    for i in (open_index + 1)..significant.len() {
+        match token_text(significant, i, source)? {
+            "<" => depth += 1,
+            ">" if depth == 0 => return Some(i),
+            ">" => depth -= 1,
+            _ => {}
+        }
+    }
+    None
+}
+
+fn looks_like_markup_open(significant: &[&oak_core::Token<ValkyrieTokenType>], open_index: usize, source: &str) -> bool {
+    if token_text(significant, open_index + 1, source) == Some("/") {
+        return true;
+    }
+    let close = match find_closing_angle(significant, open_index, source) {
+        Some(close) => close,
+        None => return false,
+    };
+    for i in (open_index + 1)..close {
+        let text = match token_text(significant, i, source) {
+            Some(text) => text,
+            None => continue,
+        };
+        if text == "=" || text.starts_with('@') {
+            return true;
+        }
+    }
+    if token_text(significant, open_index + 1, source).is_some_and(is_markup_name) {
+        match token_text(significant, open_index + 2, source) {
+            Some(">") | Some("/") => return true,
+            Some(next) if is_markup_name(next) => return true,
+            _ => {}
+        }
+    }
+    false
+}
+
+fn in_markup_angle_gap(significant: &[&oak_core::Token<ValkyrieTokenType>], gap_left_index: usize, source: &str) -> bool {
+    let mut open = 0usize;
+    for i in 0..=gap_left_index {
+        if token_text(significant, i, source) == Some("<") && looks_like_markup_open(significant, i, source) {
+            open += 1;
+        }
+        else if token_text(significant, i, source) == Some(">") && open > 0 {
+            open -= 1;
+        }
+    }
+    open > 0
+}
+
 fn looks_like_generic_open(significant: &[&oak_core::Token<ValkyrieTokenType>], open_index: usize, source: &str) -> bool {
+    if looks_like_markup_open(significant, open_index, source) {
+        return false;
+    }
     let mut depth = 0usize;
     for token in significant.iter().skip(open_index + 1) {
         let text = match source.get(token.span.clone()) {
