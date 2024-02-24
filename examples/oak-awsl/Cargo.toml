@@ -2,7 +2,7 @@
 name = "oak-awsl"
 version.workspace = true
 authors.workspace = true
-description = "Asgard AWSL template formatter for the oak ecosystem."
+description = "Asgard AWSL template parser and formatter for the oak ecosystem."
 edition.workspace = true
 license.workspace = true
 homepage.workspace = true
@@ -13,6 +13,10 @@ keywords = ["parser", "awsl", "asgard", "template"]
 [dependencies]
 oak-core = { workspace = true }
 oak-formatter = { workspace = true }
+oak-valkyrie = { workspace = true }
+
+[features]
+default = []
 
 [dev-dependencies]
 oak-testing = { workspace = true }
