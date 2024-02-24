@@ -1,3 +1,4 @@
+mod bare_root;
 mod lexer;
 
 #[test]

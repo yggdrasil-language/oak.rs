@@ -149,11 +149,11 @@ impl<'config> VonParser<'config> {
             }
 
             self.skip_trivia(state);
-            if state.at(VonTokenType::Eq) {
+            if state.at(VonTokenType::Eq) || state.at(VonTokenType::Colon) {
                 state.bump();
             }
             else {
-                state.record_expected("=");
+                state.record_expected("= or :");
             }
             self.skip_trivia(state);
             // Ensure we haven't reached EOF or } before trying to parse a value
