@@ -19,6 +19,8 @@ pub mod parser;
 
 /// CST token-gap source formatter.
 pub mod formatter;
+/// AST pretty printer (`source` → parse → AST → text).
+pub mod printer;
 
 pub use crate::{
     ast::ValkyrieRoot,
