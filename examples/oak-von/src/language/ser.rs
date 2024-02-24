@@ -17,15 +17,21 @@ pub fn to_string<T>(value: &T) -> Result<String, OakError>
 where
     T: serde::Serialize,
 {
-    // 首先序列化到纯值 VonValue
     let von_value = value.serialize(VonValueSerializer {})?;
-    // 然后转换为 AST VonValue
-    let ast_value = to_ast(&von_value);
-    // 最后转换为字符串
-    use oak_core::source::{SourceBuffer, ToSource};
-    let mut buffer = SourceBuffer::new();
-    ast_value.to_source(&mut buffer);
-    Ok(buffer.to_string())
+    Ok(crate::printer::print_value(&von_value, crate::printer::PrintStyle::Compact, &crate::printer::PrintOptions::default()))
+}
+
+/// Serializes a Rust type into an indented VON string.
+pub fn to_string_indented<T>(value: &T, indent_width: usize) -> Result<String, OakError>
+where
+    T: serde::Serialize,
+{
+    let von_value = value.serialize(VonValueSerializer {})?;
+    Ok(crate::printer::print_value(
+        &von_value,
+        crate::printer::PrintStyle::Indented,
+        &crate::printer::PrintOptions { indent_width },
+    ))
 }
 
 struct VonValueSerializer {}

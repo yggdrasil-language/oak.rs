@@ -15,7 +15,7 @@ mod de;
 #[cfg(feature = "serde")]
 mod ser;
 #[cfg(feature = "serde")]
-pub use self::{de::deserialize, de::from_str, ser::serialize, ser::to_string};
+pub use self::{de::deserialize, de::from_str, ser::serialize, ser::to_string, ser::to_string_indented};
 
 /// Configuration for comments in VON.
 #[derive(Debug, Clone, PartialEq, Eq)]

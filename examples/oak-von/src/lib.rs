@@ -12,6 +12,8 @@ pub mod ast;
 pub mod builder;
 /// CST token-gap source formatter.
 pub mod formatter;
+/// AST pretty printer (`ToSource` + indented layout).
+pub mod printer;
 /// Language configuration module.
 pub mod language;
 /// Lexer module.
@@ -28,7 +30,7 @@ pub use crate::{
 };
 
 #[cfg(feature = "serde")]
-pub use crate::language::{from_str, to_string};
+pub use crate::language::{from_str, to_string, to_string_indented};
 
 /// Parses a Von string into a `VonValueNode`.
 pub fn parse(von: &str) -> Result<VonValueNode, String> {
