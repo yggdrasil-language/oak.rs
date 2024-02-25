@@ -49,10 +49,14 @@ impl<'config> Builder<VonLanguage> for VonBuilder<'config> {
 impl<'config> VonBuilder<'config> {
     fn build_root<'a>(&self, green_tree: &GreenNode<'a, VonLanguage>, source: &SourceText) -> Result<VonRoot, OakError> {
         // eprintln!("GreenTree: {:#?}", green_tree);
-        let root_node = match green_tree.children.first() {
-            Some(oak_core::GreenTree::Node(n)) => n,
-            _ => return Err(OakError::unexpected_eof(0, None)),
-        };
+        let root_node = green_tree
+            .children
+            .iter()
+            .find_map(|child| match child {
+                oak_core::GreenTree::Node(n) => Some(n),
+                oak_core::GreenTree::Leaf(_) => None,
+            })
+            .ok_or_else(|| OakError::unexpected_eof(0, None))?;
 
         let value = self.build_value(root_node, 0, source)?;
         Ok(VonRoot { value })
