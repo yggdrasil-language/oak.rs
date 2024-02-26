@@ -4,8 +4,6 @@ use super::{Attribute, Pattern, Span, TermExpression, TypeExpression};
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Let {
-    /// Whether the binding is mutable.
-    pub is_mutable: bool,
     /// The pattern to bind to.
     pub pattern: Pattern,
     /// The expression being bound.

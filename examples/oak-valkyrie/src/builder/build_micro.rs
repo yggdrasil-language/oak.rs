@@ -74,16 +74,20 @@ impl<'config> ValkyrieBuilder<'config> {
                             name.span = t.span;
                         }
                     }
-                    ValkyrieTokenType::Keyword(ValkyrieKeywords::Abstract) => {
-                        is_abstract = true;
-                    }
-                    ValkyrieTokenType::Keyword(ValkyrieKeywords::Final) => {
-                        is_final = true;
-                    }
                     _ => {}
                 },
                 RedTree::Node(n) => match n.green.kind {
                     ValkyrieElementType::Whitespace | ValkyrieElementType::Newline | ValkyrieElementType::LineComment | ValkyrieElementType::BlockComment => continue,
+                    ValkyrieElementType::Modifier => {
+                        let modifier = self.build_modifier(n, source)?;
+                        if modifier.name.name == "abstract" {
+                            is_abstract = true;
+                        }
+                        if modifier.name.name == "final" {
+                            is_final = true;
+                        }
+                        annotations.push(ValkyrieBuilder::modifier_to_attribute(modifier));
+                    }
                     ValkyrieElementType::Attribute => {
                         annotations.push(self.build_attribute(n, source)?);
                     }
@@ -235,6 +239,7 @@ impl<'config> ValkyrieBuilder<'config> {
         let mut name: Option<Identifier> = None;
         let mut ty = None;
         let mut default = None;
+        let mut annotations = Vec::new();
         for child in node.children() {
             match child {
                 RedTree::Leaf(t) => match t.kind {
@@ -250,6 +255,10 @@ impl<'config> ValkyrieBuilder<'config> {
                 },
                 RedTree::Node(n) => match n.green.kind {
                     ValkyrieElementType::Whitespace | ValkyrieElementType::Newline | ValkyrieElementType::LineComment | ValkyrieElementType::BlockComment => continue,
+                    ValkyrieElementType::Modifier => {
+                        let modifier = self.build_modifier(n, source)?;
+                        annotations.push(ValkyrieBuilder::modifier_to_attribute(modifier));
+                    }
                     ValkyrieElementType::Type => ty = Some(self.build_type(n, source)?),
                     _ => {
                         if default.is_none() {
@@ -259,6 +268,11 @@ impl<'config> ValkyrieBuilder<'config> {
                 },
             }
         }
-        if let Some(name) = name { Ok(Param { name, ty, default, span }) } else { Err(source.syntax_error(format!("Missing name in parameter at {:?}", span), span.start)) }
+        if let Some(name) = name {
+            Ok(Param { name, ty, default, annotations, span })
+        }
+        else {
+            Err(source.syntax_error(format!("Missing name in parameter at {:?}", span), span.start))
+        }
     }
 }

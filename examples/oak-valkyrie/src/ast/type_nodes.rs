@@ -150,6 +150,8 @@ pub struct Param {
     pub ty: Option<TypeExpression>,
     /// Optional default value expression.
     pub default: Option<TermExpression>,
+    /// Modifiers such as `mut` lowered from [`Modifier`] nodes.
+    pub annotations: Vec<super::Attribute>,
     /// The source code span.
     #[cfg_attr(feature = "serde", serde(with = "oak_core::serde_range"))]
     pub span: Span,

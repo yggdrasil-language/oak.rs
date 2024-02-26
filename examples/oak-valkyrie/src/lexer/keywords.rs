@@ -20,35 +20,6 @@ pub enum ValkyrieKeywords {
     /// class Point { x: f64, y: f64 }
     /// ```
     Class,
-    /// Declare an abstract class or abstract method.
-    ///
-    /// ```v
-    /// abstract class Shape { ... }
-    /// ```
-    ///
-    /// ```v
-    /// abstract micro method()
-    /// ```
-    Abstract,
-    /// Declare a sealed class (restricted inheritance).
-    ///
-    /// Sealed classes restrict which classes can inherit from them.
-    /// All subclasses must be declared in the same file as the sealed class.
-    ///
-    /// ```v
-    /// sealed class Shape { ... }
-    /// ```
-    Sealed,
-    /// Declare a final class or final method that cannot be inherited or overridden.
-    ///
-    /// ```v
-    /// final class Constants { ... }
-    /// ```
-    ///
-    /// ```v
-    /// final micro get_value() -> i32 { ... }
-    /// ```
-    Final,
     /// Declare a structure (deprecated, use `structure` instead).
     ///
     /// ```v
@@ -85,30 +56,30 @@ pub enum ValkyrieKeywords {
     /// flags Permissions { Read, Write, Execute }
     /// ```
     Flags,
-    /// Declare enums.
-    ///
-    /// ```v
-    /// enums Priority { High = 3, Normal = 2, Low = 1 }
-    /// ```
-    Enums,
     /// Declare an enum (deprecated, use `unity` instead).
     ///
     /// ```v
     /// enum Priority { High, Normal, Low }
     /// ```
     Enum,
+    /// Declare enums.
+    ///
+    /// ```v
+    /// enums Priority { High = 3, Normal = 2, Low = 1 }
+    /// ```
+    Enums,
+    /// Declare a named union.
+    ///
+    /// ```v
+    /// union Integer { lamb1: i64, lamb2: [i64; 2], buffer: [i64] }
+    /// ```
+    Union,
     /// Declare a unite (preferred alternative to enum).
     ///
     /// ```v
     /// unite Option<T> { Some(T), None }
     /// ```
     Unity,
-    /// Declare a union.
-    ///
-    /// ```v
-    /// union Option<T> { Some(T), None }
-    /// ```
-    Union,
     /// Declare a micro function.
     ///
     /// ```v
@@ -254,12 +225,6 @@ pub enum ValkyrieKeywords {
     /// yield from list;
     /// ```
     From,
-    /// Mutable variable.
-    ///
-    /// ```v
-    /// let mut x = 1;
-    /// ```
-    Mut,
     /// Type check.
     ///
     /// ```v
@@ -333,30 +298,6 @@ pub enum ValkyrieKeywords {
     /// }
     /// ```
     Super,
-    /// Override modifier for method overriding.
-    ///
-    /// ```v
-    /// class Derived: Base {
-    ///     override micro method(self) { ... }
-    /// }
-    /// ```
-    Override,
-    /// Virtual method declaration.
-    ///
-    /// ```v
-    /// class Base {
-    ///     virtual micro method(self) { ... }
-    /// }
-    /// ```
-    Virtual,
-    /// Readonly field modifier.
-    ///
-    /// ```v
-    /// class Point {
-    ///     readonly x: f64
-    /// }
-    /// ```
-    Readonly,
     /// Initiate constructor method.
     ///
     /// ```v

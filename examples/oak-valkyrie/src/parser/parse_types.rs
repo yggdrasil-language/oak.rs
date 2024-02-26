@@ -1,7 +1,7 @@
 use crate::{
     ValkyrieLanguage,
     lexer::{keywords::ValkyrieKeywords, token_type::ValkyrieTokenType},
-    parser::element_type::ValkyrieElementType,
+    parser::{element_type::ValkyrieElementType, parse_modifiers::parse_parameter_modifiers},
 };
 use oak_core::parser::ParserState;
 
@@ -135,13 +135,10 @@ pub(crate) fn parse_parameter_list<S: oak_core::Source + ?Sized>(state: &mut Sta
     state.bump();
     while state.not_at_end() && !state.at(ValkyrieTokenType::RightParen) {
         let pcp = state.sink.checkpoint();
-        let progressed = state.at(ValkyrieTokenType::Keyword(ValkyrieKeywords::Mut))
-            || state.at(ValkyrieTokenType::Identifier)
+        let progressed = state.at(ValkyrieTokenType::Identifier)
             || state.at(ValkyrieTokenType::Colon)
             || state.at(ValkyrieTokenType::Eq);
-        if state.at(ValkyrieTokenType::Keyword(ValkyrieKeywords::Mut)) {
-            state.bump();
-        }
+        parse_parameter_modifiers(state)?;
         if state.at(ValkyrieTokenType::Identifier) {
             state.bump();
         }

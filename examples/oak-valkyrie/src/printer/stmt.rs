@@ -20,7 +20,7 @@ pub(crate) fn print_statement(statement: &Statement) -> Result<String, PrintErro
 
 fn print_let(let_stmt: &Let) -> Result<String, PrintError> {
     let mut out = String::from("let ");
-    if let_stmt.is_mutable {
+    if let_stmt.annotations.iter().any(|attribute| attribute.name.name == "mut") {
         out.push_str("mut ");
     }
     out.push_str(&print_pattern(&let_stmt.pattern)?);

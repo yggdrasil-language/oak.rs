@@ -1,7 +1,13 @@
 use crate::{
     ValkyrieLanguage,
     lexer::{keywords::ValkyrieKeywords, token_type::ValkyrieTokenType},
-    parser::element_type::ValkyrieElementType,
+    parser::{
+        element_type::ValkyrieElementType,
+        parse_modifiers::{
+            dispatch_prefixed_declaration, is_declaration_keyword, is_member_accessor_keyword, parse_field_modifiers, parse_modifiers,
+            parse_modifiers_followed_by,
+        },
+    },
 };
 use oak_core::parser::ParserState;
 
@@ -17,6 +23,12 @@ pub(crate) fn parse_item<S: oak_core::Source + ?Sized>(state: &mut State<'_, S>)
     while state.at(ValkyrieTokenType::At) {
         parse_attribute(state)?;
         state.skip_trivia();
+    }
+    if state.at(ValkyrieTokenType::Identifier) {
+        let next = state.peek_non_trivia_kind_at(1);
+        if next.is_some_and(|kind| is_declaration_keyword(&kind)) {
+            return dispatch_prefixed_declaration(state);
+        }
     }
     if let Some(token) = state.current() {
         match &token.kind {
@@ -59,6 +71,7 @@ pub(crate) fn parse_item<S: oak_core::Source + ?Sized>(state: &mut State<'_, S>)
 /// 解析 micro 函数定义
 pub(crate) fn parse_micro<S: oak_core::Source + ?Sized>(state: &mut State<'_, S>) -> Result<(), oak_core::OakError> {
     let cp = state.sink.checkpoint();
+    parse_modifiers(state)?;
     state.bump();
     if state.at(ValkyrieTokenType::Identifier) {
         state.bump();
@@ -81,6 +94,7 @@ pub(crate) fn parse_micro<S: oak_core::Source + ?Sized>(state: &mut State<'_, S>
 /// 解析 mezzo 函数定义
 pub(crate) fn parse_mezzo<S: oak_core::Source + ?Sized>(state: &mut State<'_, S>) -> Result<(), oak_core::OakError> {
     let cp = state.sink.checkpoint();
+    parse_modifiers(state)?;
     state.bump();
     if state.at(ValkyrieTokenType::Identifier) {
         state.bump();
@@ -121,6 +135,7 @@ pub(crate) fn parse_namespace<S: oak_core::Source + ?Sized>(state: &mut State<'_
 /// 解析 class 定义
 pub(crate) fn parse_class<S: oak_core::Source + ?Sized>(state: &mut State<'_, S>) -> Result<(), oak_core::OakError> {
     let cp = state.sink.checkpoint();
+    parse_modifiers(state)?;
     state.bump();
     if state.at(ValkyrieTokenType::Identifier) {
         state.bump();
@@ -154,6 +169,15 @@ pub(crate) fn parse_class_member<S: oak_core::Source + ?Sized>(state: &mut State
     while state.at(ValkyrieTokenType::At) {
         parse_attribute(state)?;
     }
+    if state.at(ValkyrieTokenType::Identifier) {
+        let next = state.peek_non_trivia_kind_at(1);
+        if next.is_some_and(|kind| is_declaration_keyword(&kind)) {
+            return dispatch_prefixed_declaration(state);
+        }
+        if next.is_some_and(|kind| is_member_accessor_keyword(&kind)) {
+            return parse_property(state);
+        }
+    }
     if let Some(token) = state.current() {
         match &token.kind {
             ValkyrieTokenType::Keyword(ValkyrieKeywords::Micro) => parse_micro(state),
@@ -180,6 +204,7 @@ pub(crate) fn parse_class_member<S: oak_core::Source + ?Sized>(state: &mut State
 /// 解析 property 定义
 pub(crate) fn parse_property<S: oak_core::Source + ?Sized>(state: &mut State<'_, S>) -> Result<(), oak_core::OakError> {
     let cp = state.sink.checkpoint();
+    parse_modifiers_followed_by(state, is_member_accessor_keyword)?;
     state.bump();
     if state.at(ValkyrieTokenType::Identifier) {
         state.bump();
@@ -198,6 +223,7 @@ pub(crate) fn parse_property<S: oak_core::Source + ?Sized>(state: &mut State<'_,
 /// 解析 struct 定义
 pub(crate) fn parse_struct<S: oak_core::Source + ?Sized>(state: &mut State<'_, S>) -> Result<(), oak_core::OakError> {
     let cp = state.sink.checkpoint();
+    parse_modifiers(state)?;
     state.bump();
     if state.at(ValkyrieTokenType::Identifier) {
         state.bump();
@@ -212,9 +238,7 @@ pub(crate) fn parse_struct<S: oak_core::Source + ?Sized>(state: &mut State<'_, S
                 parse_attribute(state)?;
             }
             let fcp = state.sink.checkpoint();
-            if state.at(ValkyrieTokenType::Keyword(ValkyrieKeywords::Mut)) {
-                state.bump();
-            }
+            parse_field_modifiers(state)?;
             if state.at(ValkyrieTokenType::Identifier) {
                 state.bump();
             }
@@ -242,6 +266,7 @@ pub(crate) fn parse_struct<S: oak_core::Source + ?Sized>(state: &mut State<'_, S
 /// 解析 enums 定义（带变体块）
 pub(crate) fn parse_enums<S: oak_core::Source + ?Sized>(state: &mut State<'_, S>) -> Result<(), oak_core::OakError> {
     let cp = state.sink.checkpoint();
+    parse_modifiers(state)?;
     state.bump();
     if state.at(ValkyrieTokenType::Identifier) {
         state.bump();
@@ -272,6 +297,7 @@ pub(crate) fn parse_enums<S: oak_core::Source + ?Sized>(state: &mut State<'_, S>
 /// 解析 enum 定义（简单枚举）
 pub(crate) fn parse_enum<S: oak_core::Source + ?Sized>(state: &mut State<'_, S>) -> Result<(), oak_core::OakError> {
     let cp = state.sink.checkpoint();
+    parse_modifiers(state)?;
     state.bump();
     if state.at(ValkyrieTokenType::Identifier) {
         state.bump();
@@ -327,6 +353,7 @@ pub(crate) fn parse_variant<S: oak_core::Source + ?Sized>(state: &mut State<'_, 
                 parse_attribute(state)?;
             }
             let fcp = state.sink.checkpoint();
+            parse_field_modifiers(state)?;
             if state.at(ValkyrieTokenType::Identifier) {
                 state.bump();
             }
@@ -350,6 +377,7 @@ pub(crate) fn parse_variant<S: oak_core::Source + ?Sized>(state: &mut State<'_, 
 /// 解析 flags 定义
 pub(crate) fn parse_flags<S: oak_core::Source + ?Sized>(state: &mut State<'_, S>) -> Result<(), oak_core::OakError> {
     let cp = state.sink.checkpoint();
+    parse_modifiers(state)?;
     state.bump();
     if state.at(ValkyrieTokenType::Identifier) {
         state.bump();
@@ -378,6 +406,7 @@ pub(crate) fn parse_flags<S: oak_core::Source + ?Sized>(state: &mut State<'_, S>
 /// 解析 `imply` 实现块。
 pub(crate) fn parse_imply<S: oak_core::Source + ?Sized>(state: &mut State<'_, S>) -> Result<(), oak_core::OakError> {
     let cp = state.sink.checkpoint();
+    parse_modifiers(state)?;
     state.bump();
     if state.at(ValkyrieTokenType::LessThan) {
         parse_generic_parameter_list(state)?;
@@ -431,6 +460,7 @@ pub(crate) fn parse_imply<S: oak_core::Source + ?Sized>(state: &mut State<'_, S>
 /// 解析 trait 定义
 pub(crate) fn parse_trait<S: oak_core::Source + ?Sized>(state: &mut State<'_, S>) -> Result<(), oak_core::OakError> {
     let cp = state.sink.checkpoint();
+    parse_modifiers(state)?;
     state.bump();
     if state.at(ValkyrieTokenType::Identifier) {
         state.bump();
@@ -497,6 +527,7 @@ pub(crate) fn parse_using<S: oak_core::Source + ?Sized>(state: &mut State<'_, S>
 /// 解析 widget 定义
 pub(crate) fn parse_widget<S: oak_core::Source + ?Sized>(state: &mut State<'_, S>) -> Result<(), oak_core::OakError> {
     let cp = state.sink.checkpoint();
+    parse_modifiers(state)?;
     state.bump();
     if state.at(ValkyrieTokenType::Identifier) {
         state.bump();
@@ -517,6 +548,7 @@ pub(crate) fn parse_widget<S: oak_core::Source + ?Sized>(state: &mut State<'_, S
 /// 解析 singleton 定义
 pub(crate) fn parse_singleton<S: oak_core::Source + ?Sized>(state: &mut State<'_, S>) -> Result<(), oak_core::OakError> {
     let cp = state.sink.checkpoint();
+    parse_modifiers(state)?;
     state.bump();
     if state.at(ValkyrieTokenType::Identifier) {
         state.bump();
@@ -686,6 +718,7 @@ pub(crate) fn parse_expression<S: oak_core::Source + ?Sized>(state: &mut State<'
 /// 解析 shader 定义
 pub(crate) fn parse_shader<S: oak_core::Source + ?Sized>(state: &mut State<'_, S>) -> Result<(), oak_core::OakError> {
     let cp = state.sink.checkpoint();
+    parse_modifiers(state)?;
     state.bump();
     if state.at(ValkyrieTokenType::Identifier) {
         state.bump();
@@ -712,6 +745,7 @@ pub(crate) fn parse_shader<S: oak_core::Source + ?Sized>(state: &mut State<'_, S
 /// 解析 component 定义
 pub(crate) fn parse_component<S: oak_core::Source + ?Sized>(state: &mut State<'_, S>) -> Result<(), oak_core::OakError> {
     let cp = state.sink.checkpoint();
+    parse_modifiers(state)?;
     state.bump();
     if state.at(ValkyrieTokenType::Identifier) {
         state.bump();
@@ -776,6 +810,7 @@ pub(crate) fn parse_event<S: oak_core::Source + ?Sized>(state: &mut State<'_, S>
 /// 解析 system 定义
 pub(crate) fn parse_system<S: oak_core::Source + ?Sized>(state: &mut State<'_, S>) -> Result<(), oak_core::OakError> {
     let cp = state.sink.checkpoint();
+    parse_modifiers(state)?;
     state.bump();
     if state.at(ValkyrieTokenType::Identifier) {
         state.bump();

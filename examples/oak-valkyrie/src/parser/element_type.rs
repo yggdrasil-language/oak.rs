@@ -22,8 +22,10 @@ pub enum ValkyrieElementType {
     Error,
 
     // Nodes
-    /// Attribute node.
+    /// Attribute node `[attribute(...)]`.
     Attribute,
+    /// Modifier node (`abstract` / `sealed` / arbitrary identifier before a declaration).
+    Modifier,
     /// Attribute argument node.
     AttributeArgument,
     /// Name path node.

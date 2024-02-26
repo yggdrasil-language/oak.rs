@@ -13,6 +13,17 @@ pub struct AttributeArgument {
     pub span: Span,
 }
 
+/// 声明修饰符；词法上是普通 `Identifier`，由 parser 在声明前位置建成此节点。
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct Modifier {
+    /// 修饰符名称（如 `abstract`、`sealed`、`lazy`，或任意标识符）。
+    pub name: Identifier,
+    /// 源码区间。
+    #[cfg_attr(feature = "serde", serde(with = "oak_core::serde_range"))]
+    pub span: Span,
+}
+
 /// An attribute
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]

@@ -1,7 +1,7 @@
 use crate::{
     ValkyrieLanguage,
     lexer::{keywords::ValkyrieKeywords, token_type::ValkyrieTokenType},
-    parser::element_type::ValkyrieElementType,
+    parser::{element_type::ValkyrieElementType, parse_modifiers::parse_binding_modifiers},
 };
 use oak_core::parser::ParserState;
 
@@ -30,9 +30,7 @@ pub(crate) fn parse_statement<S: oak_core::Source + ?Sized>(state: &mut State<'_
 /// 解析 let 语句
 pub(crate) fn parse_let_statement<S: oak_core::Source + ?Sized>(state: &mut State<'_, S>) -> Result<(), oak_core::OakError> {
     state.bump();
-    if state.at(ValkyrieTokenType::Keyword(ValkyrieKeywords::Mut)) {
-        state.bump();
-    }
+    parse_binding_modifiers(state)?;
     parse_pattern(state)?;
     if state.at(ValkyrieTokenType::Colon) {
         state.bump();

@@ -29,7 +29,6 @@
                               "value": "42"
                             }
                           },
-                          "is_mutable": false,
                           "pattern": {
                             "Variable": {
                               "name": {

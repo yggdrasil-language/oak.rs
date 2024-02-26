@@ -20,10 +20,6 @@ impl<'config> ValkyrieBuilder<'config> {
         let mut parents = Vec::new();
         let mut fields = Vec::new();
         let mut methods = Vec::new();
-        let mut is_abstract = false;
-        let mut is_sealed = false;
-        let mut is_final = false;
-
         for child in node.children() {
             match child {
                 RedTree::Leaf(t) => match t.kind {
@@ -34,15 +30,6 @@ impl<'config> ValkyrieBuilder<'config> {
                     }
                     ValkyrieTokenType::Keyword(ValkyrieKeywords::Class) => {
                         kind = 1;
-                    }
-                    ValkyrieTokenType::Keyword(ValkyrieKeywords::Abstract) => {
-                        is_abstract = true;
-                    }
-                    ValkyrieTokenType::Keyword(ValkyrieKeywords::Sealed) => {
-                        is_sealed = true;
-                    }
-                    ValkyrieTokenType::Keyword(ValkyrieKeywords::Final) => {
-                        is_final = true;
                     }
                     ValkyrieTokenType::Keyword(ValkyrieKeywords::Struct) => {
                         kind = 2;
@@ -59,6 +46,10 @@ impl<'config> ValkyrieBuilder<'config> {
                     _ => {}
                 },
                 RedTree::Node(n) => match n.green.kind {
+                    ValkyrieElementType::Modifier => {
+                        let modifier = self.build_modifier(n, source)?;
+                        annotations.push(ValkyrieBuilder::modifier_to_attribute(modifier));
+                    }
                     ValkyrieElementType::Attribute => {
                         annotations.push(self.build_attribute(n, source)?);
                     }
@@ -246,6 +237,10 @@ impl<'config> ValkyrieBuilder<'config> {
                     _ => {}
                 },
                 RedTree::Node(n) => match n.green.kind {
+                    ValkyrieElementType::Modifier => {
+                        let modifier = self.build_modifier(n, source)?;
+                        annotations.push(ValkyrieBuilder::modifier_to_attribute(modifier));
+                    }
                     ValkyrieElementType::Attribute => annotations.push(self.build_attribute(n, source)?),
                     ValkyrieElementType::Type => ty = Some(self.build_type(n, source)?),
                     _ => {

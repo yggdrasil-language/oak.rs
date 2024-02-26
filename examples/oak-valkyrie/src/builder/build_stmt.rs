@@ -40,7 +40,6 @@ impl<'config> ValkyrieBuilder<'config> {
 
     pub(crate) fn build_let<S: Source + ?Sized>(&self, node: RedNode<ValkyrieLanguage>, source: &S) -> Result<Let, OakError> {
         let span = node.span();
-        let mut is_mutable = false;
         let mut pattern = None;
         let mut expr = None;
         let mut ty = None;
@@ -50,6 +49,7 @@ impl<'config> ValkyrieBuilder<'config> {
             match child {
                 RedTree::Leaf(t) => match t.kind {
                     ValkyrieTokenType::Whitespace | ValkyrieTokenType::Newline | ValkyrieTokenType::LineComment | ValkyrieTokenType::BlockComment => continue,
+                    ValkyrieTokenType::Keyword(ValkyrieKeywords::Let) => continue,
                     ValkyrieTokenType::Identifier => {
                         if pattern.is_none() {
                             let name = text(source, t.span);
@@ -65,6 +65,10 @@ impl<'config> ValkyrieBuilder<'config> {
                 },
                 RedTree::Node(n) => match n.green.kind {
                     ValkyrieElementType::Whitespace | ValkyrieElementType::Newline | ValkyrieElementType::LineComment | ValkyrieElementType::BlockComment => continue,
+                    ValkyrieElementType::Modifier => {
+                        let modifier = self.build_modifier(n, source)?;
+                        annotations.push(ValkyrieBuilder::modifier_to_attribute(modifier));
+                    }
                     ValkyrieElementType::Attribute => {
                         annotations.push(self.build_attribute(n, source)?);
                     }
@@ -86,7 +90,7 @@ impl<'config> ValkyrieBuilder<'config> {
         let pattern = pattern.ok_or_else(|| source.syntax_error("Missing pattern in let statement".to_string(), span.start))?;
         let expr = expr.ok_or_else(|| source.syntax_error("Missing expression in let statement".to_string(), span.start))?;
 
-        Ok(Let { annotations, is_mutable, pattern, expr, ty, span })
+        Ok(Let { annotations, pattern, expr, ty, span })
     }
 
     pub(crate) fn build_expr_stmt<S: Source + ?Sized>(&self, node: RedNode<ValkyrieLanguage>, source: &S) -> Result<ExprStmt, OakError> {
@@ -214,16 +218,20 @@ impl<'config> ValkyrieBuilder<'config> {
                             name.span = t.span;
                         }
                     }
-                    ValkyrieTokenType::Keyword(ValkyrieKeywords::Abstract) => {
-                        is_abstract = true;
-                    }
-                    ValkyrieTokenType::Keyword(ValkyrieKeywords::Final) => {
-                        is_final = true;
-                    }
                     _ => {}
                 },
                 RedTree::Node(n) => match n.green.kind {
                     ValkyrieElementType::Whitespace | ValkyrieElementType::Newline | ValkyrieElementType::LineComment | ValkyrieElementType::BlockComment => continue,
+                    ValkyrieElementType::Modifier => {
+                        let modifier = self.build_modifier(n, source)?;
+                        if modifier.name.name == "abstract" {
+                            is_abstract = true;
+                        }
+                        if modifier.name.name == "final" {
+                            is_final = true;
+                        }
+                        annotations.push(Self::modifier_to_attribute(modifier));
+                    }
                     ValkyrieElementType::Attribute => {
                         annotations.push(self.build_attribute(n, source)?);
                     }
@@ -245,6 +253,27 @@ impl<'config> ValkyrieBuilder<'config> {
         }
 
         Ok(MethodDeclaration { name, generics, params, return_type, body, annotations, span })
+    }
+
+    pub(crate) fn build_modifier<S: Source + ?Sized>(&self, node: RedNode<ValkyrieLanguage>, source: &S) -> Result<Modifier, OakError> {
+        let span = node.span();
+        let mut name = Identifier { name: String::new(), span: Default::default() };
+        for child in node.children() {
+            if let RedTree::Leaf(t) = child {
+                if matches!(t.kind, ValkyrieTokenType::Whitespace | ValkyrieTokenType::Newline | ValkyrieTokenType::LineComment | ValkyrieTokenType::BlockComment) {
+                    continue;
+                }
+                if matches!(t.kind, ValkyrieTokenType::Identifier) {
+                    name.name = text(source, t.span);
+                    name.span = t.span;
+                }
+            }
+        }
+        Ok(Modifier { name, span })
+    }
+
+    pub(crate) fn modifier_to_attribute(modifier: Modifier) -> Attribute {
+        Attribute { name: modifier.name, args: Vec::new(), span: modifier.span }
     }
 
     pub(crate) fn build_attribute<S: Source + ?Sized>(&self, node: RedNode<ValkyrieLanguage>, source: &S) -> Result<Attribute, OakError> {

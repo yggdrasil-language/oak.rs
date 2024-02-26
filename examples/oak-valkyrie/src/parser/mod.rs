@@ -49,6 +49,7 @@ pub(crate) mod parse_blocks;
 pub(crate) mod parse_control;
 pub(crate) mod parse_expressions;
 pub(crate) mod parse_items;
+pub(crate) mod parse_modifiers;
 pub(crate) mod parse_statements;
 /// 字符串段解析器（插值和转义处理）
 pub(crate) mod parse_string_segments;
