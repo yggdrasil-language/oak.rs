@@ -3,6 +3,7 @@ use crate::ast::{
     ecs_nodes::{ComponentDeclaration, SystemDeclaration},
     statement_nodes::{ExprStmt, Let},
     structure_nodes::SingletonDeclaration,
+    template_nodes::TemplateNode,
 };
 
 /// A root node item in a Valkyrie module
@@ -52,6 +53,8 @@ pub enum StatementNode {
     Let(Box<Let>),
     /// An expression statement.
     ExprStmt(Box<ExprStmt>),
+    /// A TGrammar template node.
+    Template(Box<TemplateNode>),
 }
 
 /// A parent class with optional alias for renamed inheritance.

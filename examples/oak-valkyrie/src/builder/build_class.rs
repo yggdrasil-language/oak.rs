@@ -1,9 +1,6 @@
 use crate::{
     ValkyrieLanguage,
-    ast::{
-        ClassDeclaration, EnumVariant, Enums, EnumsKind, FieldDeclaration, Flags, Identifier, ImplyDeclaration, Parent, SingletonDeclaration, StatementNode,
-        StructureDeclaration, Trait, TypeExpression, Variant, VariantCase, WidgetDeclaration,
-    },
+    ast::{ClassDeclaration, EnumVariant, Enums, EnumsKind, FieldDeclaration, Flags, Identifier, ImplyDeclaration, Parent, SingletonDeclaration, StatementNode, StructureDeclaration, Trait, TypeExpression, Variant, VariantCase, WidgetDeclaration},
     builder::{ValkyrieBuilder, text},
     lexer::{ValkyrieKeywords, token_type::ValkyrieTokenType},
     parser::element_type::ValkyrieElementType,
@@ -434,6 +431,7 @@ impl<'config> ValkyrieBuilder<'config> {
         let mut generics = Vec::new();
         let mut annotations = Vec::new();
         let mut items = Vec::new();
+        let mut pending_annotations = Vec::new();
 
         for child in node.children() {
             match child {
@@ -445,49 +443,77 @@ impl<'config> ValkyrieBuilder<'config> {
                     _ => {}
                 },
                 RedTree::Node(n) => match n.green.kind {
-                    ValkyrieElementType::Attribute => annotations.push(self.build_attribute(n, source)?),
+                    ValkyrieElementType::Attribute => {
+                        if name.name.is_empty() {
+                            annotations.push(self.build_attribute(n, source)?);
+                        }
+                        else {
+                            pending_annotations.push(self.build_attribute(n, source)?);
+                        }
+                    }
                     ValkyrieElementType::GenericParameterList => {
                         generics = self.build_generic_params(n, source)?;
                     }
                     ValkyrieElementType::Namespace => {
                         let ns = self.build_namespace(n, source)?;
-                        items.push(StatementNode::Namespace(Box::new(ns)))
+                        let mut item = StatementNode::Namespace(Box::new(ns));
+                        Self::take_annotations_for_item(&mut item, std::mem::take(&mut pending_annotations));
+                        items.push(item);
                     }
                     ValkyrieElementType::Class => {
                         let class = self.build_class(n, source)?;
-                        items.push(StatementNode::Class(Box::new(class)))
+                        let mut item = StatementNode::Class(Box::new(class));
+                        Self::take_annotations_for_item(&mut item, std::mem::take(&mut pending_annotations));
+                        items.push(item);
                     }
                     ValkyrieElementType::Flags => {
                         let flags = self.build_flags(n, source)?;
-                        items.push(StatementNode::Flags(Box::new(flags)))
+                        let mut item = StatementNode::Flags(Box::new(flags));
+                        Self::take_annotations_for_item(&mut item, std::mem::take(&mut pending_annotations));
+                        items.push(item);
                     }
                     ValkyrieElementType::Trait => {
                         let trait_node = self.build_trait(n, source)?;
-                        items.push(StatementNode::Trait(Box::new(trait_node)))
+                        let mut item = StatementNode::Trait(Box::new(trait_node));
+                        Self::take_annotations_for_item(&mut item, std::mem::take(&mut pending_annotations));
+                        items.push(item);
                     }
                     ValkyrieElementType::Widget => {
                         let widget = self.build_widget(n, source)?;
-                        items.push(StatementNode::Widget(Box::new(widget)))
+                        let mut item = StatementNode::Widget(Box::new(widget));
+                        Self::take_annotations_for_item(&mut item, std::mem::take(&mut pending_annotations));
+                        items.push(item);
                     }
                     ValkyrieElementType::UsingStatement => {
                         let us = self.build_using(n, source)?;
-                        items.push(StatementNode::Using(Box::new(us)))
+                        let mut item = StatementNode::Using(Box::new(us));
+                        Self::take_annotations_for_item(&mut item, std::mem::take(&mut pending_annotations));
+                        items.push(item);
                     }
                     ValkyrieElementType::Micro => {
                         let micro = self.build_micro(n, source)?;
-                        items.push(StatementNode::Micro(Box::new(micro)))
+                        let mut item = StatementNode::Micro(Box::new(micro));
+                        Self::take_annotations_for_item(&mut item, std::mem::take(&mut pending_annotations));
+                        items.push(item);
                     }
                     ValkyrieElementType::LetStatement => {
                         let stmt = self.build_let(n, source)?;
-                        items.push(StatementNode::Let(Box::new(stmt)))
+                        let mut item = StatementNode::Let(Box::new(stmt));
+                        Self::take_annotations_for_item(&mut item, std::mem::take(&mut pending_annotations));
+                        items.push(item);
                     }
                     ValkyrieElementType::ExprStatement => {
                         let stmt = self.build_expr_stmt(n, source)?;
-                        items.push(StatementNode::ExprStmt(Box::new(stmt)))
+                        let mut item = StatementNode::ExprStmt(Box::new(stmt));
+                        Self::take_annotations_for_item(&mut item, std::mem::take(&mut pending_annotations));
+                        items.push(item);
                     }
                     _ => {}
                 },
             }
+        }
+        if !pending_annotations.is_empty() {
+            return Err(source.syntax_error("Attribute is not attached to a widget member".to_string(), span.end));
         }
         Ok(WidgetDeclaration { name, generics, items, annotations, span })
     }

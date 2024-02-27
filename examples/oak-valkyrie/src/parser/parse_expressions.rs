@@ -108,11 +108,11 @@ pub(crate) fn parse_postfix_expression<S: oak_core::Source + ?Sized>(state: &mut
             }
             state.sink.finish_node(cp, ValkyrieElementType::FieldExpression);
         }
-        else if state.at(ValkyrieTokenType::LeftBracket) {
+        else if state.at(ValkyrieTokenType::BracketL) {
             let cp = state.sink.checkpoint() - 1;
             state.bump();
             parse_expression(state)?;
-            if state.at(ValkyrieTokenType::RightBracket) {
+            if state.at(ValkyrieTokenType::BracketR) {
                 state.bump();
             }
             state.sink.finish_node(cp, ValkyrieElementType::IndexExpression);
@@ -123,12 +123,12 @@ pub(crate) fn parse_postfix_expression<S: oak_core::Source + ?Sized>(state: &mut
             crate::parser::parse_types::parse_generic_argument_list(state)?;
             state.sink.finish_node(cp, ValkyrieElementType::TurbofishExpression);
         }
-        else if state.at(ValkyrieTokenType::LeftParen) {
+        else if state.at(ValkyrieTokenType::ParenthesisL) {
             let cp = state.sink.checkpoint() - 1;
             parse_argument_list(state)?;
             state.sink.finish_node(cp, ValkyrieElementType::CallExpression);
         }
-        else if state.at(ValkyrieTokenType::LeftBrace) {
+        else if state.at(ValkyrieTokenType::BraceL) {
             let cp = state.sink.checkpoint() - 1;
             crate::parser::parse_blocks::parse_object_initializer(state)?;
             state.sink.finish_node(cp, ValkyrieElementType::ObjectExpression);
@@ -144,7 +144,7 @@ pub(crate) fn parse_postfix_expression<S: oak_core::Source + ?Sized>(state: &mut
 pub(crate) fn parse_argument_list<S: oak_core::Source + ?Sized>(state: &mut State<'_, S>) -> Result<(), oak_core::OakError> {
     let cp = state.sink.checkpoint();
     state.bump();
-    while state.not_at_end() && !state.at(ValkyrieTokenType::RightParen) {
+    while state.not_at_end() && !state.at(ValkyrieTokenType::ParenthesisR) {
         let before = state.checkpoint().0;
         parse_expression(state)?;
         if state.checkpoint().0 == before {
@@ -154,7 +154,7 @@ pub(crate) fn parse_argument_list<S: oak_core::Source + ?Sized>(state: &mut Stat
             state.bump();
         }
     }
-    if state.at(ValkyrieTokenType::RightParen) {
+    if state.at(ValkyrieTokenType::ParenthesisR) {
         state.bump();
     }
     state.sink.finish_node(cp, ValkyrieElementType::ArgList);
@@ -212,23 +212,23 @@ pub(crate) fn parse_primary_expression<S: oak_core::Source + ?Sized>(state: &mut
                 state.sink.finish_node(cp, ValkyrieElementType::LiteralExpression);
                 Ok(())
             }
-            ValkyrieTokenType::LeftParen => {
+            ValkyrieTokenType::ParenthesisL => {
                 let cp = state.sink.checkpoint();
                 state.bump();
-                if state.at(ValkyrieTokenType::RightParen) {
+                if state.at(ValkyrieTokenType::ParenthesisR) {
                     state.bump();
                     state.sink.finish_node(cp, ValkyrieElementType::LiteralExpression);
                 }
                 else {
                     parse_expression(state)?;
-                    if state.at(ValkyrieTokenType::RightParen) {
+                    if state.at(ValkyrieTokenType::ParenthesisR) {
                         state.bump();
                     }
                     state.sink.finish_node(cp, ValkyrieElementType::ParenthesizedExpression);
                 }
                 Ok(())
             }
-            ValkyrieTokenType::LeftBrace => parse_block_expression(state),
+            ValkyrieTokenType::BraceL => parse_block_expression(state),
             ValkyrieTokenType::Keyword(ValkyrieKeywords::If) => parse_if_expression(state),
             ValkyrieTokenType::Keyword(ValkyrieKeywords::Match) => parse_match_expression(state),
             ValkyrieTokenType::Keyword(ValkyrieKeywords::Loop) => parse_loop_expression(state),
@@ -283,7 +283,7 @@ pub(crate) fn parse_primary_expression<S: oak_core::Source + ?Sized>(state: &mut
                         state.bump();
                     }
                 }
-                if state.at(ValkyrieTokenType::LeftParen) {
+                if state.at(ValkyrieTokenType::ParenthesisL) {
                     parse_argument_list(state)?;
                 }
                 state.sink.finish_node(cp, ValkyrieElementType::SuperCallExpression);

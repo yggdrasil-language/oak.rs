@@ -40,7 +40,7 @@ pub use self::{
     shader_nodes::ShaderDeclaration,
     statement_nodes::{ExprStmt, Let, Statement},
     structure_nodes::{AnonymousClass, ClassDeclaration, FieldDeclaration, MethodDeclaration, SingletonDeclaration, StructureDeclaration},
-    template_nodes::{TemplateControlNode, TemplateInterpolationNode, TemplateTextNode},
+    template_nodes::{TemplateIf, TemplateIfArm, TemplateLoop, TemplateMatch, TemplateMatchArm, TemplateNode, TemplateTokenStream},
     term_nodes::{AnonymousMicro, Block, Break, Continue, Raise, Resume, Return, TermBinaryNode, TermExpression, TermUnaryNode},
     type_nodes::{GenericParam, Param, TypeExpression},
 };

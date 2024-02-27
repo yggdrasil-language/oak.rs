@@ -2,10 +2,12 @@
 
 use crate::ast::{MicroDeclaration, NamespaceDeclaration, StatementNode};
 
-use super::block::print_block;
-use super::common::print_identifier;
-use super::error::PrintError;
-use super::options::{PrintOptions, PrintStyle};
+use super::{
+    block::print_block,
+    common::print_identifier,
+    error::PrintError,
+    options::{PrintOptions, PrintStyle},
+};
 
 pub(crate) fn print_item(item: &StatementNode, style: PrintStyle, options: &PrintOptions) -> Result<String, PrintError> {
     match item {
@@ -16,13 +18,7 @@ pub(crate) fn print_item(item: &StatementNode, style: PrintStyle, options: &Prin
 }
 
 fn print_namespace(namespace: &NamespaceDeclaration, style: PrintStyle, options: &PrintOptions) -> Result<String, PrintError> {
-    let name = namespace
-        .name
-        .parts
-        .iter()
-        .map(|part| part.name.as_str())
-        .collect::<Vec<_>>()
-        .join("::");
+    let name = namespace.name.parts.iter().map(|part| part.name.as_str()).collect::<Vec<_>>().join("::");
     if namespace.items.is_empty() {
         return Ok(format!("namespace {name};"));
     }
@@ -45,12 +41,7 @@ fn print_micro(micro: &MicroDeclaration, style: PrintStyle, options: &PrintOptio
     let mut out = String::from("micro ");
     out.push_str(&print_identifier(&micro.name));
     out.push('(');
-    let params = micro
-        .params
-        .iter()
-        .map(|param| print_identifier(&param.name))
-        .collect::<Vec<_>>()
-        .join(",");
+    let params = micro.params.iter().map(|param| print_identifier(&param.name)).collect::<Vec<_>>().join(",");
     out.push_str(&params);
     out.push(')');
     out.push(' ');

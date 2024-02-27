@@ -353,4 +353,12 @@ pub enum ValkyrieKeywords {
     /// }
     /// ```
     Events,
+    /// TGrammar 块结束（仅在 `<% ... %>` 指令内作为关键词词法化）。
+    ///
+    /// ```text
+    /// <% end %>
+    /// <% end if %>
+    /// <% end loop %>
+    /// ```
+    End,
 }

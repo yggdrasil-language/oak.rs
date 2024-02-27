@@ -30,9 +30,9 @@ pub(crate) fn parse_type<S: oak_core::Source + ?Sized>(state: &mut State<'_, S>)
     if state.at(ValkyrieTokenType::LessThan) {
         parse_generic_argument_list(state)?;
     }
-    if state.at(ValkyrieTokenType::LeftParen) {
+    if state.at(ValkyrieTokenType::ParenthesisL) {
         state.bump();
-        while state.not_at_end() && !state.at(ValkyrieTokenType::RightParen) {
+        while state.not_at_end() && !state.at(ValkyrieTokenType::ParenthesisR) {
             let before = token_index(state);
             parse_type(state)?;
             if stalled(state, before) {
@@ -42,7 +42,7 @@ pub(crate) fn parse_type<S: oak_core::Source + ?Sized>(state: &mut State<'_, S>)
                 state.bump();
             }
         }
-        if state.at(ValkyrieTokenType::RightParen) {
+        if state.at(ValkyrieTokenType::ParenthesisR) {
             state.bump();
         }
     }
@@ -133,11 +133,9 @@ pub(crate) fn parse_generic_argument_list<S: oak_core::Source + ?Sized>(state: &
 pub(crate) fn parse_parameter_list<S: oak_core::Source + ?Sized>(state: &mut State<'_, S>) -> Result<(), oak_core::OakError> {
     let cp = state.sink.checkpoint();
     state.bump();
-    while state.not_at_end() && !state.at(ValkyrieTokenType::RightParen) {
+    while state.not_at_end() && !state.at(ValkyrieTokenType::ParenthesisR) {
         let pcp = state.sink.checkpoint();
-        let progressed = state.at(ValkyrieTokenType::Identifier)
-            || state.at(ValkyrieTokenType::Colon)
-            || state.at(ValkyrieTokenType::Eq);
+        let progressed = state.at(ValkyrieTokenType::Identifier) || state.at(ValkyrieTokenType::Colon) || state.at(ValkyrieTokenType::Eq);
         parse_parameter_modifiers(state)?;
         if state.at(ValkyrieTokenType::Identifier) {
             state.bump();
@@ -158,7 +156,7 @@ pub(crate) fn parse_parameter_list<S: oak_core::Source + ?Sized>(state: &mut Sta
             state.bump();
         }
     }
-    if state.at(ValkyrieTokenType::RightParen) {
+    if state.at(ValkyrieTokenType::ParenthesisR) {
         state.bump();
     }
     state.sink.finish_node(cp, ValkyrieElementType::ParameterList);

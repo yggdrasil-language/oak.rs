@@ -55,26 +55,10 @@ fn is_layout(kind: ValkyrieTokenType) -> bool {
 }
 
 fn should_preserve_gap(left: &str, gap: &str, right: &str) -> bool {
-    gap.contains('\n')
-        || left.starts_with('#')
-        || right.starts_with('#')
-        || left.starts_with("<#")
-        || right.starts_with("<#")
-        || gap.contains("<#")
-        || gap.contains("#>")
-        || gap.trim_start().starts_with('#')
+    gap.contains('\n') || left.starts_with('#') || right.starts_with('#') || left.starts_with("<#") || right.starts_with("<#") || gap.contains("<#") || gap.contains("#>") || gap.trim_start().starts_with('#')
 }
 
-fn valkyrie_gap_constraint(
-    left: &str,
-    gap: &str,
-    right: &str,
-    left_kind: ValkyrieTokenType,
-    right_kind: ValkyrieTokenType,
-    index: usize,
-    significant: &[&oak_core::Token<ValkyrieTokenType>],
-    source: &str,
-) -> GapConstraint {
+fn valkyrie_gap_constraint(left: &str, gap: &str, right: &str, left_kind: ValkyrieTokenType, right_kind: ValkyrieTokenType, index: usize, significant: &[&oak_core::Token<ValkyrieTokenType>], source: &str) -> GapConstraint {
     if should_preserve_gap(left, gap, right) {
         return GapConstraint::Preserve;
     }
@@ -174,26 +158,19 @@ fn valkyrie_gap_constraint(
         }
     }
 
-    if matches!(left_kind, ValkyrieTokenType::LineComment | ValkyrieTokenType::BlockComment)
-        || matches!(right_kind, ValkyrieTokenType::LineComment | ValkyrieTokenType::BlockComment)
-    {
+    if matches!(left_kind, ValkyrieTokenType::LineComment | ValkyrieTokenType::BlockComment) || matches!(right_kind, ValkyrieTokenType::LineComment | ValkyrieTokenType::BlockComment) {
         constraint = GapConstraint::Preserve;
     }
 
     constraint
 }
 
-fn token_text<'a>(
-    significant: &[&oak_core::Token<ValkyrieTokenType>],
-    index: usize,
-    source: &'a str,
-) -> Option<&'a str> {
+fn token_text<'a>(significant: &[&oak_core::Token<ValkyrieTokenType>], index: usize, source: &'a str) -> Option<&'a str> {
     significant.get(index).and_then(|token| source.get(token.span.clone()))
 }
 
 fn is_markup_name(text: &str) -> bool {
-    !text.is_empty()
-        && text.chars().all(|ch| ch.is_ascii_alphanumeric() || matches!(ch, '_' | '-' | '.'))
+    !text.is_empty() && text.chars().all(|ch| ch.is_ascii_alphanumeric() || matches!(ch, '_' | '-' | '.'))
 }
 
 fn find_closing_angle(significant: &[&oak_core::Token<ValkyrieTokenType>], open_index: usize, source: &str) -> Option<usize> {
@@ -291,36 +268,30 @@ fn is_generic_close(significant: &[&oak_core::Token<ValkyrieTokenType>], close_i
 fn validate_delimiters(source: &str, tokens: &[&oak_core::Token<ValkyrieTokenType>]) -> Result<(), oak_core::OakError> {
     let mut stack = Vec::new();
     for token in tokens {
-        if matches!(
-            token.kind,
-            ValkyrieTokenType::StringLiteral
-                | ValkyrieTokenType::CharLiteral
-                | ValkyrieTokenType::LineComment
-                | ValkyrieTokenType::BlockComment
-        ) {
+        if matches!(token.kind, ValkyrieTokenType::StringLiteral | ValkyrieTokenType::CharLiteral | ValkyrieTokenType::LineComment | ValkyrieTokenType::BlockComment) {
             continue;
         }
         match token.kind {
-            ValkyrieTokenType::LeftBrace => stack.push('{'),
-            ValkyrieTokenType::LeftParen => stack.push('('),
-            ValkyrieTokenType::LeftBracket => stack.push('['),
-            ValkyrieTokenType::LeftOffset => stack.push('\u{2045}'),
-            ValkyrieTokenType::RightBrace => {
+            ValkyrieTokenType::BraceL => stack.push('{'),
+            ValkyrieTokenType::ParenthesisL => stack.push('('),
+            ValkyrieTokenType::BracketL => stack.push('['),
+            ValkyrieTokenType::OffsetL => stack.push('\u{2045}'),
+            ValkyrieTokenType::BraceR => {
                 if stack.pop() != Some('{') {
                     return delimiter_error(source, token.span.start);
                 }
             }
-            ValkyrieTokenType::RightParen => {
+            ValkyrieTokenType::ParenthesisR => {
                 if stack.pop() != Some('(') {
                     return delimiter_error(source, token.span.start);
                 }
             }
-            ValkyrieTokenType::RightBracket => {
+            ValkyrieTokenType::BracketR => {
                 if stack.pop() != Some('[') {
                     return delimiter_error(source, token.span.start);
                 }
             }
-            ValkyrieTokenType::RightOffset => {
+            ValkyrieTokenType::OffsetR => {
                 if stack.pop() != Some('\u{2045}') {
                     return delimiter_error(source, token.span.start);
                 }
@@ -328,12 +299,7 @@ fn validate_delimiters(source: &str, tokens: &[&oak_core::Token<ValkyrieTokenTyp
             _ => {}
         }
     }
-    if stack.is_empty() {
-        Ok(())
-    }
-    else {
-        Err(oak_core::OakError::format_error(format!("formatter input has unbalanced delimiters: unclosed {stack:?}")))
-    }
+    if stack.is_empty() { Ok(()) } else { Err(oak_core::OakError::format_error(format!("formatter input has unbalanced delimiters: unclosed {stack:?}"))) }
 }
 
 fn delimiter_error(source: &str, pos: usize) -> Result<(), oak_core::OakError> {

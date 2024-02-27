@@ -9,10 +9,7 @@ type State<'a, S> = ParserState<'a, ValkyrieLanguage, S>;
 
 /// getter/setter 前的修饰符锚点（如 `virtual get area`）。
 pub(crate) fn is_member_accessor_keyword(kind: &ValkyrieTokenType) -> bool {
-    matches!(
-        kind,
-        ValkyrieTokenType::Keyword(ValkyrieKeywords::Get) | ValkyrieTokenType::Keyword(ValkyrieKeywords::Set)
-    )
+    matches!(kind, ValkyrieTokenType::Keyword(ValkyrieKeywords::Get) | ValkyrieTokenType::Keyword(ValkyrieKeywords::Set))
 }
 
 /// 字段名前的修饰符锚点（如 `readonly x: f64`、`mut total: i64`）。
@@ -55,10 +52,7 @@ pub(crate) fn is_declaration_keyword(kind: &ValkyrieTokenType) -> bool {
 }
 
 /// 解析锚点关键字前的 `Identifier` 修饰符序列。
-pub(crate) fn parse_modifiers_followed_by<S: oak_core::Source + ?Sized>(
-    state: &mut State<'_, S>,
-    is_follower: impl Fn(&ValkyrieTokenType) -> bool,
-) -> Result<(), oak_core::OakError> {
+pub(crate) fn parse_modifiers_followed_by<S: oak_core::Source + ?Sized>(state: &mut State<'_, S>, is_follower: impl Fn(&ValkyrieTokenType) -> bool) -> Result<(), oak_core::OakError> {
     while state.at(ValkyrieTokenType::Identifier) {
         let next = state.peek_non_trivia_kind_at(1);
         if !next.is_some_and(|kind| is_follower(&kind)) {

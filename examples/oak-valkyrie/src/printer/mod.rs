@@ -17,8 +17,7 @@ pub use options::{PrintOptions, PrintStyle};
 
 use oak_core::{Builder, ParseSession, SourceText};
 
-use crate::ast::ValkyrieRoot;
-use crate::{ValkyrieBuilder, ValkyrieLanguage};
+use crate::{ValkyrieBuilder, ValkyrieLanguage, ast::ValkyrieRoot};
 
 use items::print_item;
 

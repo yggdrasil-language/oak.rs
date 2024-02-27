@@ -268,11 +268,6 @@ impl<'config> ValkyrieBuilder<'config> {
                 },
             }
         }
-        if let Some(name) = name {
-            Ok(Param { name, ty, default, annotations, span })
-        }
-        else {
-            Err(source.syntax_error(format!("Missing name in parameter at {:?}", span), span.start))
-        }
+        if let Some(name) = name { Ok(Param { name, ty, default, annotations, span }) } else { Err(source.syntax_error(format!("Missing name in parameter at {:?}", span), span.start)) }
     }
 }

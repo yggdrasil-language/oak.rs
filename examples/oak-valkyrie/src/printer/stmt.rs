@@ -2,19 +2,19 @@
 
 use crate::ast::{Let, Pattern, Statement};
 
-use super::error::PrintError;
-use super::term::print_term;
+use super::{error::PrintError, term::print_term};
 
 pub(crate) fn print_statement(statement: &Statement) -> Result<String, PrintError> {
     match statement {
         Statement::Let(let_stmt) => print_let(let_stmt),
-        Statement::ExprStmt(expr_stmt) => {
+        Statement::Expression(expr_stmt) => {
             let mut out = print_term(&expr_stmt.expr)?;
             if expr_stmt.semi {
                 out.push(';');
             }
             Ok(out)
         }
+        Statement::Template(_) => Err(PrintError::Unsupported { context: "TGrammar template statement".into() }),
     }
 }
 

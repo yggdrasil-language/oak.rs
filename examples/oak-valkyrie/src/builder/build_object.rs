@@ -113,7 +113,8 @@ impl<'config> ValkyrieBuilder<'config> {
                                     }
                                 }
                             }
-                        } else if value.is_none() {
+                        }
+                        else if value.is_none() {
                             value = Some(self.build_identifier_expr(n.clone(), source)?);
                         }
                     }

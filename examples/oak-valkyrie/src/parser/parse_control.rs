@@ -11,10 +11,10 @@ type State<'a, S> = ParserState<'a, ValkyrieLanguage, S>;
 pub(crate) fn parse_if_expression<S: oak_core::Source + ?Sized>(state: &mut State<'_, S>) -> Result<(), oak_core::OakError> {
     let cp = state.sink.checkpoint();
     state.bump();
-    if state.at(ValkyrieTokenType::LeftParen) {
+    if state.at(ValkyrieTokenType::ParenthesisL) {
         state.bump();
         parse_expression(state)?;
-        if state.at(ValkyrieTokenType::RightParen) {
+        if state.at(ValkyrieTokenType::ParenthesisR) {
             state.bump();
         }
     }
@@ -40,12 +40,12 @@ pub(crate) fn parse_match_expression<S: oak_core::Source + ?Sized>(state: &mut S
     let cp = state.sink.checkpoint();
     state.bump();
     parse_expression(state)?;
-    if state.at(ValkyrieTokenType::LeftBrace) {
+    if state.at(ValkyrieTokenType::BraceL) {
         state.bump();
-        while state.not_at_end() && !state.at(ValkyrieTokenType::RightBrace) {
+        while state.not_at_end() && !state.at(ValkyrieTokenType::BraceR) {
             parse_match_arm(state)?;
         }
-        if state.at(ValkyrieTokenType::RightBrace) {
+        if state.at(ValkyrieTokenType::BraceR) {
             state.bump();
         }
     }
@@ -76,10 +76,10 @@ pub(crate) fn parse_match_arm<S: oak_core::Source + ?Sized>(state: &mut State<'_
 pub(crate) fn parse_loop_expression<S: oak_core::Source + ?Sized>(state: &mut State<'_, S>) -> Result<(), oak_core::OakError> {
     let cp = state.sink.checkpoint();
     state.bump();
-    if state.at(ValkyrieTokenType::LeftParen) {
+    if state.at(ValkyrieTokenType::ParenthesisL) {
         state.bump();
         parse_expression(state)?;
-        if state.at(ValkyrieTokenType::RightParen) {
+        if state.at(ValkyrieTokenType::ParenthesisR) {
             state.bump();
         }
     }
@@ -116,7 +116,7 @@ pub(crate) fn parse_for_expression<S: oak_core::Source + ?Sized>(state: &mut Sta
 pub(crate) fn parse_return_expression<S: oak_core::Source + ?Sized>(state: &mut State<'_, S>) -> Result<(), oak_core::OakError> {
     let cp = state.sink.checkpoint();
     state.bump();
-    if !state.at(ValkyrieTokenType::Semicolon) && !state.at(ValkyrieTokenType::RightBrace) && !state.at(ValkyrieTokenType::RightParen) && state.not_at_end() {
+    if !state.at(ValkyrieTokenType::Semicolon) && !state.at(ValkyrieTokenType::BraceR) && !state.at(ValkyrieTokenType::ParenthesisR) && state.not_at_end() {
         parse_expression(state)?;
     }
     state.sink.finish_node(cp, ValkyrieElementType::ReturnExpression);
@@ -127,13 +127,13 @@ pub(crate) fn parse_return_expression<S: oak_core::Source + ?Sized>(state: &mut 
 pub(crate) fn parse_lambda_expression<S: oak_core::Source + ?Sized>(state: &mut State<'_, S>) -> Result<(), oak_core::OakError> {
     let cp = state.sink.checkpoint();
     state.bump();
-    if state.at(ValkyrieTokenType::LeftParen) {
+    if state.at(ValkyrieTokenType::ParenthesisL) {
         parse_parameter_list(state)?;
     }
     if state.at(ValkyrieTokenType::Arrow) {
         state.bump();
     }
-    if state.at(ValkyrieTokenType::LeftBrace) {
+    if state.at(ValkyrieTokenType::BraceL) {
         parse_block_expression(state)?;
     }
     else {

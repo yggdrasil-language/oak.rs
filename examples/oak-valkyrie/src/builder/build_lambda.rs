@@ -33,7 +33,7 @@ impl<'config> ValkyrieBuilder<'config> {
                         if body.is_none() {
                             // 如果不是 BlockExpression，我们需要将表达式包装在一个 Block 中
                             let expr = self.build_expr(n, source)?;
-                            body = Some(Block { statements: vec![Statement::ExprStmt(ExprStmt { expr, semi: false, annotations: Vec::new(), span: n.span() })], span: n.span() });
+                            body = Some(Block { statements: vec![Statement::Expression(Box::new(ExprStmt { expr, semi: false, annotations: Vec::new(), span: n.span() }))], span: n.span() });
                         }
                     }
                 },

@@ -2,9 +2,11 @@
 
 use crate::ast::Block;
 
-use super::error::PrintError;
-use super::options::{PrintOptions, PrintStyle};
-use super::stmt::print_statement;
+use super::{
+    error::PrintError,
+    options::{PrintOptions, PrintStyle},
+    stmt::print_statement,
+};
 
 pub(crate) fn print_block(block: &Block, style: PrintStyle, options: &PrintOptions) -> Result<String, PrintError> {
     if block.statements.is_empty() {

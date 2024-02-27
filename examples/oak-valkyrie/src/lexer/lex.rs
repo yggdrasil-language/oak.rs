@@ -19,14 +19,40 @@ static VK_COMMENT: LazyLock<CommentConfig> = LazyLock::new(|| CommentConfig { li
 impl crate::lexer::ValkyrieLexer<'_> {
     /// Runs the lexer on the given state.
     pub(crate) fn run<S: Source + ?Sized>(&self, state: &mut State<'_, S>) -> Result<(), OakError> {
+        let mut template_mode = crate::lexer::lex_tgrammar::TemplateLexMode::default();
         while state.not_at_end() {
-            let start_pos = state.get_position();
-
-            if self.lex_whitespace(state) || self.lex_comments(state) {
+            if self.lex_tgrammar_fragment(state, &mut template_mode) {
                 continue;
             }
 
-            let matched = self.lex_string_literal(state) || self.lex_char_literal(state) || self.lex_number_literal(state) || self.lex_identifier_or_keyword(state) || self.lex_operators(state) || self.lex_single_char_tokens(state);
+            self.run_programming_once(state, false)?;
+        }
+
+        Ok(())
+    }
+
+    /// 普通 Valkyrie 词法（子区间全量扫描，供 `<% ... %>` 指令内等场景）。
+    pub(crate) fn run_programming<S: Source + ?Sized>(&self, state: &mut State<'_, S>) -> Result<(), OakError> {
+        self.run_programming_inner(state, false)
+    }
+
+    /// `<% ... %>` 指令内部词法（`end` 等 TGrammar 关键词仅在此上下文生效）。
+    pub(crate) fn run_template_directive_programming<S: Source + ?Sized>(&self, state: &mut State<'_, S>) -> Result<(), OakError> {
+        self.run_programming_inner(state, true)
+    }
+
+    /// 主词法循环用：每次仅前进一个 programming token，以便与 TGrammar 交错。
+    fn run_programming_once<S: Source + ?Sized>(&self, state: &mut State<'_, S>, template_directive: bool) -> Result<(), OakError> {
+        let end = state.get_length();
+        while state.get_position() < end {
+            let start_pos = state.get_position();
+
+            // 空白/注释单独成 token 后交还主循环，避免同一轮内吞掉紧随的 `<%`。
+            if self.lex_whitespace(state) || self.lex_comments(state) {
+                return Ok(());
+            }
+
+            let matched = self.lex_string_literal(state) || self.lex_char_literal(state) || self.lex_number_literal(state) || self.lex_identifier_or_keyword(state, template_directive) || self.lex_operators(state) || self.lex_single_char_tokens(state);
 
             if !matched {
                 if let Some(c) = state.current() {
@@ -35,6 +61,17 @@ impl crate::lexer::ValkyrieLexer<'_> {
                     state.advance(char_len);
                 }
             }
+
+            return Ok(());
+        }
+
+        Ok(())
+    }
+
+    fn run_programming_inner<S: Source + ?Sized>(&self, state: &mut State<'_, S>, template_directive: bool) -> Result<(), OakError> {
+        let end = state.get_length();
+        while state.get_position() < end {
+            self.run_programming_once(state, template_directive)?;
         }
 
         Ok(())
@@ -167,7 +204,7 @@ impl crate::lexer::ValkyrieLexer<'_> {
         false
     }
 
-    fn lex_identifier_or_keyword<'s, S: Source + ?Sized>(&self, state: &mut State<'s, S>) -> bool {
+    fn lex_identifier_or_keyword<'s, S: Source + ?Sized>(&self, state: &mut State<'s, S>, template_directive: bool) -> bool {
         let start = state.get_position();
         if let Some(ch) = state.current() {
             if ch == '_' || is_xid_start(ch) {
@@ -208,6 +245,7 @@ impl crate::lexer::ValkyrieLexer<'_> {
                     "catch" => ValkyrieTokenType::Keyword(ValkyrieKeywords::Catch),
                     "while" => ValkyrieTokenType::Keyword(ValkyrieKeywords::While),
                     "loop" => ValkyrieTokenType::Keyword(ValkyrieKeywords::Loop),
+                    "end" if template_directive => ValkyrieTokenType::Keyword(ValkyrieKeywords::End),
                     "for" => ValkyrieTokenType::Keyword(ValkyrieKeywords::For),
                     "in" => ValkyrieTokenType::Keyword(ValkyrieKeywords::In),
                     "return" => ValkyrieTokenType::Keyword(ValkyrieKeywords::Return),
@@ -407,20 +445,20 @@ impl crate::lexer::ValkyrieLexer<'_> {
                 _ => {}
             }
             let kind = match ch {
-                '(' => ValkyrieTokenType::LeftParen,
-                ')' => ValkyrieTokenType::RightParen,
-                '{' => ValkyrieTokenType::LeftBrace,
-                '}' => ValkyrieTokenType::RightBrace,
-                '[' => ValkyrieTokenType::LeftBracket,
-                ']' => ValkyrieTokenType::RightBracket,
+                '(' => ValkyrieTokenType::ParenthesisL,
+                ')' => ValkyrieTokenType::ParenthesisR,
+                '{' => ValkyrieTokenType::BraceL,
+                '}' => ValkyrieTokenType::BraceR,
+                '[' => ValkyrieTokenType::BracketL,
+                ']' => ValkyrieTokenType::BracketR,
                 ',' => ValkyrieTokenType::Comma,
                 ';' => ValkyrieTokenType::Semicolon,
                 '$' => ValkyrieTokenType::Dollar,
                 '?' => ValkyrieTokenType::Question,
-                '⟨' => ValkyrieTokenType::LeftAngle,
-                '⟩' => ValkyrieTokenType::RightAngle,
-                '⁅' => ValkyrieTokenType::LeftOffset,
-                '⁆' => ValkyrieTokenType::RightOffset,
+                '⟨' => ValkyrieTokenType::AngleL,
+                '⟩' => ValkyrieTokenType::AngleR,
+                '⁅' => ValkyrieTokenType::OffsetL,
+                '⁆' => ValkyrieTokenType::OffsetR,
                 _ => return false,
             };
             state.advance(ch.len_utf8());

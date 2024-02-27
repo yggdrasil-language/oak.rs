@@ -36,6 +36,8 @@ pub enum ValkyrieTokenType {
     Identifier,
     /// Label token.
     Label,
+    /// TGrammar 模板正文（`%>` 与下一 `<%` 之间的原文，可含 Valkyrie 源码）。
+    TemplateText,
 
     // Comments
     /// Line comment token.
@@ -46,6 +48,30 @@ pub enum ValkyrieTokenType {
     // Keywords
     /// Keyword token.
     Keyword(ValkyrieKeywords),
+    /// Left parenthesis `(`.
+    ParenthesisL,
+    /// Right parenthesis `)`.
+    ParenthesisR,
+    /// Left mathematical angle bracket `⟨` (U+27E8).
+    AngleL,
+    /// Right mathematical angle bracket `⟩` (U+27E9).
+    AngleR,
+    /// 左基数索引括号 `⁅` (U+2045)。
+    OffsetL,
+    /// 右基数索引括号 `⁆` (U+2046)。
+    OffsetR,
+    /// Left bracket `[`.
+    BracketL,
+    /// Right bracket `]`.
+    BracketR,
+    /// Left brace `{`.
+    BraceL,
+    /// Right brace `}`.
+    BraceR,
+    /// TGrammar 控制块开始 `<%`。
+    TemplateL,
+    /// TGrammar 控制块结束 `%>`。
+    TemplateR,
 
     // Operators & Punctuation
     /// Ampersand operator `&`.
@@ -82,26 +108,12 @@ pub enum ValkyrieTokenType {
     GreaterEq,
     /// Greater than operator `>`.
     GreaterThan,
-    /// Left brace `{`.
-    LeftBrace,
-    /// Left bracket `[`.
-    LeftBracket,
-    /// Left parenthesis `(`.
-    LeftParen,
     /// Left shift operator `<<`.
     LeftShift,
     /// Less than or equal operator `<=`.
     LessEq,
     /// Less than operator `<`.
     LessThan,
-    /// Left mathematical angle bracket `⟨` (U+27E8).
-    LeftAngle,
-    /// Right mathematical angle bracket `⟩` (U+27E9).
-    RightAngle,
-    /// 左基数索引括号 `⁅` (U+2045)。
-    LeftOffset,
-    /// 右基数索引括号 `⁆` (U+2046)。
-    RightOffset,
     /// Minus operator `-`.
     Minus,
     /// Not equal operator `!=`.
@@ -116,12 +128,6 @@ pub enum ValkyrieTokenType {
     Plus,
     /// Question operator `?`.
     Question,
-    /// Right brace `}`.
-    RightBrace,
-    /// Right bracket `]`.
-    RightBracket,
-    /// Right parenthesis `)`.
-    RightParen,
     /// Right shift operator `>>`.
     RightShift,
     /// Semicolon separator `;`.

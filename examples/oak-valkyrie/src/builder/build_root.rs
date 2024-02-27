@@ -16,8 +16,8 @@ impl<'config> ValkyrieBuilder<'config> {
         for child in red_root.children() {
             match child {
                 RedTree::Node(n) => {
-                    // 仅含 Eof 的空 ExprStatement 不进 AST。
-                    if n.green.kind == ValkyrieElementType::ExprStatement && is_eof_only_expr_stmt(&n) {
+                    // 仅含 trivia/Eof/空白 TemplateText 的空 ExprStatement 不进 AST。
+                    if n.green.kind == ValkyrieElementType::ExprStatement && is_trivia_only_expr_stmt(&n, source) {
                         continue;
                     }
                     if n.green.kind == ValkyrieElementType::Attribute {
@@ -37,8 +37,9 @@ impl<'config> ValkyrieBuilder<'config> {
                 }
                 RedTree::Leaf(t) => match t.kind {
                     ValkyrieTokenType::Whitespace | ValkyrieTokenType::Newline | ValkyrieTokenType::LineComment | ValkyrieTokenType::BlockComment => continue,
-                    ValkyrieTokenType::LeftBracket | ValkyrieTokenType::RightBracket | ValkyrieTokenType::Comma => continue,
+                    ValkyrieTokenType::BracketL | ValkyrieTokenType::BracketR | ValkyrieTokenType::Comma => continue,
                     ValkyrieTokenType::Eof => continue,
+                    ValkyrieTokenType::TemplateText if crate::builder::text(source, t.span).trim().is_empty() => continue,
                     _ => {
                         return Err(source.syntax_error(format!("Unexpected token in root: {:?}", t.kind), t.span.start));
                     }
@@ -92,17 +93,17 @@ impl<'config> ValkyrieBuilder<'config> {
         Ok(ShaderDeclaration { name, kind, items, annotations, span })
     }
 
-    fn take_annotations_for_item(item: &mut StatementNode, annotations: Vec<Attribute>) -> Vec<Attribute> {
+    pub(crate) fn take_annotations_for_item(item: &mut StatementNode, annotations: Vec<Attribute>) -> Vec<Attribute> {
         if annotations.is_empty() {
             return Vec::new();
         }
         match item {
             StatementNode::Micro(micro) => {
-                micro.annotations = annotations;
+                micro.annotations.splice(0..0, annotations);
                 Vec::new()
             }
             StatementNode::Let(let_stmt) => {
-                let_stmt.annotations = annotations;
+                let_stmt.annotations.splice(0..0, annotations);
                 Vec::new()
             }
             StatementNode::Namespace(ns) => {
@@ -199,22 +200,27 @@ impl<'config> ValkyrieBuilder<'config> {
                 let shader = self.build_shader(n, source)?;
                 Ok(StatementNode::Shader(Box::new(shader)))
             }
+            ValkyrieElementType::TemplateIfStatement | ValkyrieElementType::TemplateLoop | ValkyrieElementType::TemplateMatch | ValkyrieElementType::TemplateStatement => self.build_template_item(n, source),
             _ => Err(source.syntax_error(format!("Unexpected item: {:?}", n.green.kind), n.span().start)),
         }
     }
 }
 
-fn is_eof_only_expr_stmt(node: &RedNode<ValkyrieLanguage>) -> bool {
-    let mut saw_eof = false;
+fn is_trivia_only_expr_stmt<S: Source + ?Sized>(node: &RedNode<ValkyrieLanguage>, source: &S) -> bool {
     for child in node.children() {
         match child {
             RedTree::Leaf(t) => match t.kind {
-                ValkyrieTokenType::Whitespace | ValkyrieTokenType::Newline | ValkyrieTokenType::LineComment | ValkyrieTokenType::BlockComment => {}
-                ValkyrieTokenType::Eof => saw_eof = true,
+                ValkyrieTokenType::Whitespace | ValkyrieTokenType::Newline | ValkyrieTokenType::LineComment | ValkyrieTokenType::BlockComment | ValkyrieTokenType::Eof => {}
+                ValkyrieTokenType::TemplateText => {
+                    if crate::builder::text(source, t.span).trim().is_empty() {
+                        continue;
+                    }
+                    return false;
+                }
                 _ => return false,
             },
             RedTree::Node(_) => return false,
         }
     }
-    saw_eof
+    true
 }

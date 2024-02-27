@@ -42,3 +42,5 @@ pub mod keywords;
 
 /// Lexer implementation.
 mod lex;
+/// TGrammar (`<% ... %>`) lexing gated by `ValkyrieLanguage::support_t_grammar`.
+mod lex_tgrammar;

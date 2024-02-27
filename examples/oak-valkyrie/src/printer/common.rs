@@ -1,7 +1,9 @@
 //! 共享打印辅助。
 
-use crate::ast::{Identifier, NamePath};
-use crate::lexer::token_type::ValkyrieTokenType;
+use crate::{
+    ast::{Identifier, NamePath},
+    lexer::token_type::ValkyrieTokenType,
+};
 
 pub(crate) fn print_identifier(id: &Identifier) -> String {
     id.name.clone()

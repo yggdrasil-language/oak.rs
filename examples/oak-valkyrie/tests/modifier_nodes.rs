@@ -29,10 +29,7 @@ sealed class Shape {
             _ => None,
         })
         .expect("expected class item");
-    assert!(
-        class.annotations.iter().any(|attribute| attribute.name.name == "sealed"),
-        "sealed modifier should become annotation on class"
-    );
+    assert!(class.annotations.iter().any(|attribute| attribute.name.name == "sealed"), "sealed modifier should become annotation on class");
 }
 
 #[test]
@@ -60,10 +57,7 @@ class Derived: Base {
             _ => None,
         })
         .expect("expected base method");
-    assert!(
-        base_method.annotations.iter().any(|attribute| attribute.name.name == "virtual"),
-        "virtual modifier should become annotation on micro"
-    );
+    assert!(base_method.annotations.iter().any(|attribute| attribute.name.name == "virtual"), "virtual modifier should become annotation on micro");
 
     let derived_method = root
         .items
@@ -73,10 +67,7 @@ class Derived: Base {
             _ => None,
         })
         .expect("expected derived method");
-    assert!(
-        derived_method.annotations.iter().any(|attribute| attribute.name.name == "override"),
-        "override modifier should become annotation on micro"
-    );
+    assert!(derived_method.annotations.iter().any(|attribute| attribute.name.name == "override"), "override modifier should become annotation on micro");
 }
 
 #[test]
@@ -105,10 +96,7 @@ micro main() {
             _ => None,
         })
         .expect("expected let statement");
-    assert!(
-        let_stmt.annotations.iter().any(|attribute| attribute.name.name == "mut"),
-        "mut modifier should become annotation on let binding"
-    );
+    assert!(let_stmt.annotations.iter().any(|attribute| attribute.name.name == "mut"), "mut modifier should become annotation on let binding");
 }
 
 #[test]
@@ -129,10 +117,7 @@ micro increment(mut self) -> i64 {
         })
         .expect("expected micro parameter");
     assert_eq!(param.name.name, "self");
-    assert!(
-        param.annotations.iter().any(|attribute| attribute.name.name == "mut"),
-        "mut modifier should become annotation on parameter"
-    );
+    assert!(param.annotations.iter().any(|attribute| attribute.name.name == "mut"), "mut modifier should become annotation on parameter");
 }
 
 #[test]
@@ -153,10 +138,7 @@ struct Counter {
         })
         .expect("expected struct field");
     assert_eq!(field.name.name, "total");
-    assert!(
-        field.annotations.iter().any(|attribute| attribute.name.name == "mut"),
-        "mut modifier should become annotation on field"
-    );
+    assert!(field.annotations.iter().any(|attribute| attribute.name.name == "mut"), "mut modifier should become annotation on field");
 }
 
 #[test]
@@ -177,8 +159,5 @@ struct Point {
         })
         .expect("expected struct field");
     assert_eq!(field.name.name, "x");
-    assert!(
-        field.annotations.iter().any(|attribute| attribute.name.name == "readonly"),
-        "readonly modifier should become annotation on field"
-    );
+    assert!(field.annotations.iter().any(|attribute| attribute.name.name == "readonly"), "readonly modifier should become annotation on field");
 }

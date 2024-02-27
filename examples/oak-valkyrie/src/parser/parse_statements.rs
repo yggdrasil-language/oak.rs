@@ -10,6 +10,9 @@ type State<'a, S> = ParserState<'a, ValkyrieLanguage, S>;
 /// 解析语句
 pub(crate) fn parse_statement<S: oak_core::Source + ?Sized>(state: &mut State<'_, S>) -> Result<(), oak_core::OakError> {
     state.skip_trivia();
+    if state.at(ValkyrieTokenType::TemplateL) {
+        return super::parse_template::parse_template_statement(state);
+    }
     if state.at(ValkyrieTokenType::Keyword(ValkyrieKeywords::Let)) {
         let cp = state.sink.checkpoint();
         parse_let_statement(state)?;

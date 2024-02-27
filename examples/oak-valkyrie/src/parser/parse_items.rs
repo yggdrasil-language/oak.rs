@@ -3,10 +3,7 @@ use crate::{
     lexer::{keywords::ValkyrieKeywords, token_type::ValkyrieTokenType},
     parser::{
         element_type::ValkyrieElementType,
-        parse_modifiers::{
-            dispatch_prefixed_declaration, is_declaration_keyword, is_member_accessor_keyword, parse_field_modifiers, parse_modifiers,
-            parse_modifiers_followed_by,
-        },
+        parse_modifiers::{dispatch_prefixed_declaration, is_declaration_keyword, is_member_accessor_keyword, parse_field_modifiers, parse_modifiers, parse_modifiers_followed_by},
     },
 };
 use oak_core::parser::ParserState;
@@ -16,13 +13,27 @@ type State<'a, S> = ParserState<'a, ValkyrieLanguage, S>;
 /// 解析顶层项
 pub(crate) fn parse_item<S: oak_core::Source + ?Sized>(state: &mut State<'_, S>) -> Result<(), oak_core::OakError> {
     state.skip_trivia();
-    while state.at(ValkyrieTokenType::LeftBracket) {
+    while state.at(ValkyrieTokenType::BracketL) {
         parse_bracket_attribute_list(state)?;
         state.skip_trivia();
     }
     while state.at(ValkyrieTokenType::At) {
         parse_attribute(state)?;
         state.skip_trivia();
+    }
+    // `<% end %>` 之后若仍有仅空白 `TemplateText`（Resolver 拼接换行），跳过而不生成空 ExprStatement。
+    while state.at(ValkyrieTokenType::TemplateText) {
+        let token = *state.current().expect("template text");
+        let text = state.source.get_text_in(token.span);
+        if !text.trim().is_empty() {
+            break;
+        }
+        state.bump();
+        state.skip_trivia();
+    }
+    // Resolver 拼接源码后常在文件末尾留下换行；跳过 trivia 后若已到 Eof 则不再生成空 ExprStatement。
+    if state.at(ValkyrieTokenType::Eof) {
+        return Ok(());
     }
     if state.at(ValkyrieTokenType::Identifier) {
         let next = state.peek_non_trivia_kind_at(1);
@@ -32,6 +43,7 @@ pub(crate) fn parse_item<S: oak_core::Source + ?Sized>(state: &mut State<'_, S>)
     }
     if let Some(token) = state.current() {
         match &token.kind {
+            ValkyrieTokenType::TemplateL => super::parse_template::parse_template_item(state),
             ValkyrieTokenType::Keyword(ValkyrieKeywords::Micro) => parse_micro(state),
             ValkyrieTokenType::Keyword(ValkyrieKeywords::Mezzo) => parse_mezzo(state),
             ValkyrieTokenType::Keyword(ValkyrieKeywords::Namespace) => parse_namespace(state),
@@ -77,14 +89,14 @@ pub(crate) fn parse_micro<S: oak_core::Source + ?Sized>(state: &mut State<'_, S>
         state.bump();
     }
     parse_micro_generic_parameter_clause(state)?;
-    if state.at(ValkyrieTokenType::LeftParen) {
+    if state.at(ValkyrieTokenType::ParenthesisL) {
         parse_parameter_list(state)?;
     }
     if state.at(ValkyrieTokenType::Arrow) {
         state.bump();
         parse_type(state)?;
     }
-    if state.at(ValkyrieTokenType::LeftBrace) {
+    if state.at(ValkyrieTokenType::BraceL) {
         parse_block(state)?;
     }
     state.sink.finish_node(cp, ValkyrieElementType::Micro);
@@ -100,14 +112,14 @@ pub(crate) fn parse_mezzo<S: oak_core::Source + ?Sized>(state: &mut State<'_, S>
         state.bump();
     }
     parse_micro_generic_parameter_clause(state)?;
-    if state.at(ValkyrieTokenType::LeftParen) {
+    if state.at(ValkyrieTokenType::ParenthesisL) {
         parse_parameter_list(state)?;
     }
     if state.at(ValkyrieTokenType::Arrow) {
         state.bump();
         parse_type(state)?;
     }
-    if state.at(ValkyrieTokenType::LeftBrace) {
+    if state.at(ValkyrieTokenType::BraceL) {
         parse_block(state)?;
     }
     state.sink.finish_node(cp, ValkyrieElementType::Mezzo);
@@ -119,12 +131,12 @@ pub(crate) fn parse_namespace<S: oak_core::Source + ?Sized>(state: &mut State<'_
     let cp = state.sink.checkpoint();
     state.bump();
     parse_name_path(state)?;
-    if state.at(ValkyrieTokenType::LeftBrace) {
+    if state.at(ValkyrieTokenType::BraceL) {
         state.bump();
-        while state.not_at_end() && !state.at(ValkyrieTokenType::RightBrace) {
+        while state.not_at_end() && !state.at(ValkyrieTokenType::BraceR) {
             parse_item(state)?;
         }
-        if state.at(ValkyrieTokenType::RightBrace) {
+        if state.at(ValkyrieTokenType::BraceR) {
             state.bump();
         }
     }
@@ -151,12 +163,12 @@ pub(crate) fn parse_class<S: oak_core::Source + ?Sized>(state: &mut State<'_, S>
             parse_type(state)?;
         }
     }
-    if state.at(ValkyrieTokenType::LeftBrace) {
+    if state.at(ValkyrieTokenType::BraceL) {
         state.bump();
-        while state.not_at_end() && !state.at(ValkyrieTokenType::RightBrace) {
+        while state.not_at_end() && !state.at(ValkyrieTokenType::BraceR) {
             parse_class_member(state)?;
         }
-        if state.at(ValkyrieTokenType::RightBrace) {
+        if state.at(ValkyrieTokenType::BraceR) {
             state.bump();
         }
     }
@@ -213,7 +225,7 @@ pub(crate) fn parse_property<S: oak_core::Source + ?Sized>(state: &mut State<'_,
         state.bump();
         parse_type(state)?;
     }
-    if state.at(ValkyrieTokenType::LeftBrace) {
+    if state.at(ValkyrieTokenType::BraceL) {
         parse_block(state)?;
     }
     state.sink.finish_node(cp, ValkyrieElementType::Property);
@@ -231,9 +243,9 @@ pub(crate) fn parse_struct<S: oak_core::Source + ?Sized>(state: &mut State<'_, S
     if state.at(ValkyrieTokenType::LessThan) {
         parse_generic_parameter_list(state)?;
     }
-    if state.at(ValkyrieTokenType::LeftBrace) {
+    if state.at(ValkyrieTokenType::BraceL) {
         state.bump();
-        while state.not_at_end() && !state.at(ValkyrieTokenType::RightBrace) {
+        while state.not_at_end() && !state.at(ValkyrieTokenType::BraceR) {
             while state.at(ValkyrieTokenType::At) {
                 parse_attribute(state)?;
             }
@@ -255,7 +267,7 @@ pub(crate) fn parse_struct<S: oak_core::Source + ?Sized>(state: &mut State<'_, S
                 state.bump();
             }
         }
-        if state.at(ValkyrieTokenType::RightBrace) {
+        if state.at(ValkyrieTokenType::BraceR) {
             state.bump();
         }
     }
@@ -278,15 +290,15 @@ pub(crate) fn parse_enums<S: oak_core::Source + ?Sized>(state: &mut State<'_, S>
         state.bump();
         parse_type(state)?;
     }
-    if state.at(ValkyrieTokenType::LeftBrace) {
+    if state.at(ValkyrieTokenType::BraceL) {
         state.bump();
-        while state.not_at_end() && !state.at(ValkyrieTokenType::RightBrace) {
+        while state.not_at_end() && !state.at(ValkyrieTokenType::BraceR) {
             parse_variant(state)?;
             if state.at(ValkyrieTokenType::Comma) {
                 state.bump();
             }
         }
-        if state.at(ValkyrieTokenType::RightBrace) {
+        if state.at(ValkyrieTokenType::BraceR) {
             state.bump();
         }
     }
@@ -302,9 +314,9 @@ pub(crate) fn parse_enum<S: oak_core::Source + ?Sized>(state: &mut State<'_, S>)
     if state.at(ValkyrieTokenType::Identifier) {
         state.bump();
     }
-    if state.at(ValkyrieTokenType::LeftBrace) {
+    if state.at(ValkyrieTokenType::BraceL) {
         state.bump();
-        while state.not_at_end() && !state.at(ValkyrieTokenType::RightBrace) {
+        while state.not_at_end() && !state.at(ValkyrieTokenType::BraceR) {
             let vcp = state.sink.checkpoint();
             if state.at(ValkyrieTokenType::Identifier) {
                 state.bump();
@@ -314,7 +326,7 @@ pub(crate) fn parse_enum<S: oak_core::Source + ?Sized>(state: &mut State<'_, S>)
                 state.bump();
             }
         }
-        if state.at(ValkyrieTokenType::RightBrace) {
+        if state.at(ValkyrieTokenType::BraceR) {
             state.bump();
         }
     }
@@ -331,9 +343,9 @@ pub(crate) fn parse_variant<S: oak_core::Source + ?Sized>(state: &mut State<'_, 
     if state.at(ValkyrieTokenType::Identifier) {
         state.bump();
     }
-    if state.at(ValkyrieTokenType::LeftParen) {
+    if state.at(ValkyrieTokenType::ParenthesisL) {
         state.bump();
-        while state.not_at_end() && !state.at(ValkyrieTokenType::RightParen) {
+        while state.not_at_end() && !state.at(ValkyrieTokenType::ParenthesisR) {
             parse_type(state)?;
             if state.at(ValkyrieTokenType::Identifier) {
                 state.bump();
@@ -342,13 +354,13 @@ pub(crate) fn parse_variant<S: oak_core::Source + ?Sized>(state: &mut State<'_, 
                 state.bump();
             }
         }
-        if state.at(ValkyrieTokenType::RightParen) {
+        if state.at(ValkyrieTokenType::ParenthesisR) {
             state.bump();
         }
     }
-    if state.at(ValkyrieTokenType::LeftBrace) {
+    if state.at(ValkyrieTokenType::BraceL) {
         state.bump();
-        while state.not_at_end() && !state.at(ValkyrieTokenType::RightBrace) {
+        while state.not_at_end() && !state.at(ValkyrieTokenType::BraceR) {
             while state.at(ValkyrieTokenType::At) {
                 parse_attribute(state)?;
             }
@@ -366,7 +378,7 @@ pub(crate) fn parse_variant<S: oak_core::Source + ?Sized>(state: &mut State<'_, 
                 state.bump();
             }
         }
-        if state.at(ValkyrieTokenType::RightBrace) {
+        if state.at(ValkyrieTokenType::BraceR) {
             state.bump();
         }
     }
@@ -382,9 +394,9 @@ pub(crate) fn parse_flags<S: oak_core::Source + ?Sized>(state: &mut State<'_, S>
     if state.at(ValkyrieTokenType::Identifier) {
         state.bump();
     }
-    if state.at(ValkyrieTokenType::LeftBrace) {
+    if state.at(ValkyrieTokenType::BraceL) {
         state.bump();
-        while state.not_at_end() && !state.at(ValkyrieTokenType::RightBrace) {
+        while state.not_at_end() && !state.at(ValkyrieTokenType::BraceR) {
             if state.at(ValkyrieTokenType::Identifier) {
                 state.bump();
             }
@@ -395,7 +407,7 @@ pub(crate) fn parse_flags<S: oak_core::Source + ?Sized>(state: &mut State<'_, S>
                 break;
             }
         }
-        if state.at(ValkyrieTokenType::RightBrace) {
+        if state.at(ValkyrieTokenType::BraceR) {
             state.bump();
         }
     }
@@ -416,9 +428,9 @@ pub(crate) fn parse_imply<S: oak_core::Source + ?Sized>(state: &mut State<'_, S>
         state.bump();
         parse_type(state)?;
     }
-    if state.at(ValkyrieTokenType::LeftBrace) {
+    if state.at(ValkyrieTokenType::BraceL) {
         state.bump();
-        while state.not_at_end() && !state.at(ValkyrieTokenType::RightBrace) {
+        while state.not_at_end() && !state.at(ValkyrieTokenType::BraceR) {
             while state.at(ValkyrieTokenType::At) {
                 parse_attribute(state)?;
             }
@@ -436,7 +448,7 @@ pub(crate) fn parse_imply<S: oak_core::Source + ?Sized>(state: &mut State<'_, S>
             else if state.at(ValkyrieTokenType::Identifier) {
                 let mcp = state.sink.checkpoint();
                 state.bump();
-                if state.at(ValkyrieTokenType::LeftParen) {
+                if state.at(ValkyrieTokenType::ParenthesisL) {
                     parse_parameter_list(state)?;
                 }
                 if state.at(ValkyrieTokenType::Colon) {
@@ -449,7 +461,7 @@ pub(crate) fn parse_imply<S: oak_core::Source + ?Sized>(state: &mut State<'_, S>
                 state.bump();
             }
         }
-        if state.at(ValkyrieTokenType::RightBrace) {
+        if state.at(ValkyrieTokenType::BraceR) {
             state.bump();
         }
     }
@@ -468,9 +480,9 @@ pub(crate) fn parse_trait<S: oak_core::Source + ?Sized>(state: &mut State<'_, S>
     if state.at(ValkyrieTokenType::LessThan) {
         parse_generic_parameter_list(state)?;
     }
-    if state.at(ValkyrieTokenType::LeftBrace) {
+    if state.at(ValkyrieTokenType::BraceL) {
         state.bump();
-        while state.not_at_end() && !state.at(ValkyrieTokenType::RightBrace) {
+        while state.not_at_end() && !state.at(ValkyrieTokenType::BraceR) {
             while state.at(ValkyrieTokenType::At) {
                 parse_attribute(state)?;
             }
@@ -488,7 +500,7 @@ pub(crate) fn parse_trait<S: oak_core::Source + ?Sized>(state: &mut State<'_, S>
             else if state.at(ValkyrieTokenType::Identifier) {
                 let mcp = state.sink.checkpoint();
                 state.bump();
-                if state.at(ValkyrieTokenType::LeftParen) {
+                if state.at(ValkyrieTokenType::ParenthesisL) {
                     parse_parameter_list(state)?;
                 }
                 if state.at(ValkyrieTokenType::Colon) {
@@ -501,7 +513,7 @@ pub(crate) fn parse_trait<S: oak_core::Source + ?Sized>(state: &mut State<'_, S>
                 state.bump();
             }
         }
-        if state.at(ValkyrieTokenType::RightBrace) {
+        if state.at(ValkyrieTokenType::BraceR) {
             state.bump();
         }
     }
@@ -532,12 +544,12 @@ pub(crate) fn parse_widget<S: oak_core::Source + ?Sized>(state: &mut State<'_, S
     if state.at(ValkyrieTokenType::Identifier) {
         state.bump();
     }
-    if state.at(ValkyrieTokenType::LeftBrace) {
+    if state.at(ValkyrieTokenType::BraceL) {
         state.bump();
-        while state.not_at_end() && !state.at(ValkyrieTokenType::RightBrace) {
+        while state.not_at_end() && !state.at(ValkyrieTokenType::BraceR) {
             parse_item(state)?;
         }
-        if state.at(ValkyrieTokenType::RightBrace) {
+        if state.at(ValkyrieTokenType::BraceR) {
             state.bump();
         }
     }
@@ -557,12 +569,12 @@ pub(crate) fn parse_singleton<S: oak_core::Source + ?Sized>(state: &mut State<'_
         state.bump();
         parse_type(state)?;
     }
-    if state.at(ValkyrieTokenType::LeftBrace) {
+    if state.at(ValkyrieTokenType::BraceL) {
         state.bump();
-        while state.not_at_end() && !state.at(ValkyrieTokenType::RightBrace) {
+        while state.not_at_end() && !state.at(ValkyrieTokenType::BraceR) {
             parse_item(state)?;
         }
-        if state.at(ValkyrieTokenType::RightBrace) {
+        if state.at(ValkyrieTokenType::BraceR) {
             state.bump();
         }
     }
@@ -582,7 +594,7 @@ pub(crate) fn parse_attribute_item<S: oak_core::Source + ?Sized>(state: &mut Sta
 pub(crate) fn parse_bracket_attribute_list<S: oak_core::Source + ?Sized>(state: &mut State<'_, S>) -> Result<(), oak_core::OakError> {
     state.bump();
     state.skip_trivia();
-    while state.not_at_end() && !state.at(ValkyrieTokenType::RightBracket) {
+    while state.not_at_end() && !state.at(ValkyrieTokenType::BracketR) {
         let before = state.checkpoint().0;
         parse_bracket_attribute(state)?;
         if state.checkpoint().0 == before {
@@ -594,7 +606,7 @@ pub(crate) fn parse_bracket_attribute_list<S: oak_core::Source + ?Sized>(state: 
             state.skip_trivia();
         }
     }
-    if state.at(ValkyrieTokenType::RightBracket) {
+    if state.at(ValkyrieTokenType::BracketR) {
         state.bump();
     }
     Ok(())
@@ -604,15 +616,15 @@ pub(crate) fn parse_bracket_attribute_list<S: oak_core::Source + ?Sized>(state: 
 pub(crate) fn parse_bracket_attribute<S: oak_core::Source + ?Sized>(state: &mut State<'_, S>) -> Result<(), oak_core::OakError> {
     let cp = state.sink.checkpoint();
     parse_name_path(state)?;
-    if state.at(ValkyrieTokenType::LeftParen) {
+    if state.at(ValkyrieTokenType::ParenthesisL) {
         state.bump();
-        while state.not_at_end() && !state.at(ValkyrieTokenType::RightParen) {
+        while state.not_at_end() && !state.at(ValkyrieTokenType::ParenthesisR) {
             parse_attribute_argument(state)?;
             if state.at(ValkyrieTokenType::Comma) {
                 state.bump();
             }
         }
-        if state.at(ValkyrieTokenType::RightParen) {
+        if state.at(ValkyrieTokenType::ParenthesisR) {
             state.bump();
         }
     }
@@ -629,10 +641,12 @@ pub(crate) fn parse_attribute_argument<S: oak_core::Source + ?Sized>(state: &mut
             state.bump();
             state.bump();
             parse_expression(state)?;
-        } else {
+        }
+        else {
             parse_expression(state)?;
         }
-    } else {
+    }
+    else {
         parse_expression(state)?;
     }
     state.sink.finish_node(cp, ValkyrieElementType::AttributeArgument);
@@ -646,15 +660,15 @@ pub(crate) fn parse_attribute<S: oak_core::Source + ?Sized>(state: &mut State<'_
     if state.at(ValkyrieTokenType::Identifier) {
         state.bump();
     }
-    if state.at(ValkyrieTokenType::LeftParen) {
+    if state.at(ValkyrieTokenType::ParenthesisL) {
         state.bump();
-        while state.not_at_end() && !state.at(ValkyrieTokenType::RightParen) {
+        while state.not_at_end() && !state.at(ValkyrieTokenType::ParenthesisR) {
             parse_attribute_argument(state)?;
             if state.at(ValkyrieTokenType::Comma) {
                 state.bump();
             }
         }
-        if state.at(ValkyrieTokenType::RightParen) {
+        if state.at(ValkyrieTokenType::ParenthesisR) {
             state.bump();
         }
     }
@@ -729,12 +743,12 @@ pub(crate) fn parse_shader<S: oak_core::Source + ?Sized>(state: &mut State<'_, S
             state.bump();
         }
     }
-    if state.at(ValkyrieTokenType::LeftBrace) {
+    if state.at(ValkyrieTokenType::BraceL) {
         state.bump();
-        while state.not_at_end() && !state.at(ValkyrieTokenType::RightBrace) {
+        while state.not_at_end() && !state.at(ValkyrieTokenType::BraceR) {
             parse_item(state)?;
         }
-        if state.at(ValkyrieTokenType::RightBrace) {
+        if state.at(ValkyrieTokenType::BraceR) {
             state.bump();
         }
     }
@@ -750,12 +764,12 @@ pub(crate) fn parse_component<S: oak_core::Source + ?Sized>(state: &mut State<'_
     if state.at(ValkyrieTokenType::Identifier) {
         state.bump();
     }
-    if state.at(ValkyrieTokenType::LeftBrace) {
+    if state.at(ValkyrieTokenType::BraceL) {
         state.bump();
-        while state.not_at_end() && !state.at(ValkyrieTokenType::RightBrace) {
+        while state.not_at_end() && !state.at(ValkyrieTokenType::BraceR) {
             parse_component_member(state)?;
         }
-        if state.at(ValkyrieTokenType::RightBrace) {
+        if state.at(ValkyrieTokenType::BraceR) {
             state.bump();
         }
     }
@@ -815,12 +829,12 @@ pub(crate) fn parse_system<S: oak_core::Source + ?Sized>(state: &mut State<'_, S
     if state.at(ValkyrieTokenType::Identifier) {
         state.bump();
     }
-    if state.at(ValkyrieTokenType::LeftBrace) {
+    if state.at(ValkyrieTokenType::BraceL) {
         state.bump();
-        while state.not_at_end() && !state.at(ValkyrieTokenType::RightBrace) {
+        while state.not_at_end() && !state.at(ValkyrieTokenType::BraceR) {
             parse_class_member(state)?;
         }
-        if state.at(ValkyrieTokenType::RightBrace) {
+        if state.at(ValkyrieTokenType::BraceR) {
             state.bump();
         }
     }

@@ -138,10 +138,10 @@ impl<'config> ValkyrieBuilder<'config> {
             match child {
                 RedTree::Leaf(t) => match t.kind {
                     ValkyrieTokenType::Whitespace | ValkyrieTokenType::Newline | ValkyrieTokenType::LineComment | ValkyrieTokenType::BlockComment => continue,
-                    ValkyrieTokenType::LeftBrace => {
+                    ValkyrieTokenType::BraceL => {
                         in_import_list = true;
                     }
-                    ValkyrieTokenType::RightBrace => {
+                    ValkyrieTokenType::BraceR => {
                         in_import_list = false;
                     }
                     ValkyrieTokenType::Identifier => {

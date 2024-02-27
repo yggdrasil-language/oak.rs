@@ -157,16 +157,6 @@ pub enum ValkyrieElementType {
     /// Event definition node.
     Event,
 
-    // Template
-    /// Template text node.
-    TemplateText,
-    /// Template control node.
-    TemplateControl,
-    /// Interpolation node.
-    Interpolation,
-    /// Template comment node.
-    TemplateComment,
-
     // Others
     /// Pattern node.
     Pattern,
@@ -186,6 +176,31 @@ pub enum ValkyrieElementType {
     GenericParameter,
     /// Super call expression node.
     SuperCallExpression,
+    // Template (TGrammar)
+    /// `<% stmt %>` 单行 meta 语句。
+    TemplateStatement,
+    /// `<% if ... %>...<% end if %>` 块。
+    TemplateIfStatement,
+    /// `<% if ... %>` 分支。
+    TemplateIfFragment,
+    /// `<% else if ... %>` 分支。
+    TemplateElseIfFragment,
+    /// `<% else %>` 分支。
+    TemplateElseFragment,
+    /// `<% loop ... %>.,.<% end loop %>` 块。
+    TemplateLoop,
+    /// `<% loop ... %>` 分支。
+    TemplateLoopFragment,
+    /// `<% match %>...<% end %>` 块。
+    TemplateMatch,
+    /// `<% match ... %>` 头。
+    TemplateMatchFragment,
+    /// `<% case ... %>` 分支。
+    TemplateCaseFragment,
+    /// `<% end keyword %>` 结束。
+    TemplateEndFragment,
+    /// `%>` 与下一 `<%` 之间的模板正文。
+    TemplateText,
 }
 
 impl ElementType for ValkyrieElementType {

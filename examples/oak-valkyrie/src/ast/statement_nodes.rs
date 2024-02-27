@@ -1,4 +1,5 @@
 use super::{Attribute, Pattern, Span, TermExpression, TypeExpression};
+use crate::ast::template_nodes::TemplateNode;
 
 /// A let binding statement.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -39,5 +40,7 @@ pub enum Statement {
     /// A let binding statement.
     Let(Let),
     /// An expression statement.
-    ExprStmt(ExprStmt),
+    Expression(Box<ExprStmt>),
+    /// A TGrammar template node embedded in a block.
+    Template(Box<TemplateNode>),
 }

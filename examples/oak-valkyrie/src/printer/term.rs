@@ -2,8 +2,10 @@
 
 use crate::ast::{StringLiteral, TermBinaryNode, TermExpression};
 
-use super::common::{print_name_path, print_operator};
-use super::error::PrintError;
+use super::{
+    common::{print_name_path, print_operator},
+    error::PrintError,
+};
 
 pub(crate) fn print_term(expression: &TermExpression) -> Result<String, PrintError> {
     match expression {
@@ -18,9 +20,7 @@ pub(crate) fn print_term(expression: &TermExpression) -> Result<String, PrintErr
 }
 
 fn print_binary(node: &TermBinaryNode) -> Result<String, PrintError> {
-    let operator = print_operator(node.operator).ok_or_else(|| PrintError::Unsupported {
-        context: format!("binary operator `{:?}`", node.operator),
-    })?;
+    let operator = print_operator(node.operator).ok_or_else(|| PrintError::Unsupported { context: format!("binary operator `{:?}`", node.operator) })?;
     let lhs = print_term(&node.lhs)?;
     let rhs = print_term(&node.rhs)?;
     Ok(format!("{lhs}{operator}{rhs}"))

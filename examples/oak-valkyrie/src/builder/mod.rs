@@ -26,6 +26,7 @@ mod build_object;
 mod build_pratt;
 mod build_root;
 mod build_stmt;
+mod build_template;
 mod build_unary;
 mod utils;
 

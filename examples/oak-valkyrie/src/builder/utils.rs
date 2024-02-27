@@ -279,6 +279,7 @@ pub(crate) fn build_block_expr<S: Source + ?Sized>(
     source: &S,
     build_let: impl Fn(&RedNode<ValkyrieLanguage>, &S) -> Result<Statement, OakError>,
     build_expr_stmt: impl Fn(&RedNode<ValkyrieLanguage>, &S) -> Result<Statement, OakError>,
+    build_template_stmt: impl Fn(&RedNode<ValkyrieLanguage>, &S) -> Result<Statement, OakError>,
     build_expr: impl Fn(&RedNode<ValkyrieLanguage>, &S) -> Result<TermExpression, OakError>,
 ) -> Result<Vec<Statement>, OakError> {
     let mut statements = Vec::new();
@@ -300,9 +301,17 @@ pub(crate) fn build_block_expr<S: Source + ?Sized>(
                         statements.push(stmt);
                     }
                 }
+                crate::parser::element_type::ValkyrieElementType::TemplateIfStatement
+                | crate::parser::element_type::ValkyrieElementType::TemplateLoop
+                | crate::parser::element_type::ValkyrieElementType::TemplateMatch
+                | crate::parser::element_type::ValkyrieElementType::TemplateStatement => {
+                    if let Ok(stmt) = build_template_stmt(&n, source) {
+                        statements.push(stmt);
+                    }
+                }
                 _ => {
                     if let Ok(expr) = build_expr(&n, source) {
-                        statements.push(Statement::ExprStmt(ExprStmt { annotations: Vec::new(), expr, semi: false, span: n.span() }));
+                        statements.push(Statement::Expression(Box::new(ExprStmt { annotations: Vec::new(), expr, semi: false, span: n.span() })));
                     }
                 }
             }
