@@ -18,7 +18,7 @@ where
     T: serde::Serialize,
 {
     let von_value = value.serialize(VonValueSerializer {})?;
-    Ok(crate::printer::print_value(&von_value, crate::printer::PrintStyle::Compact, &crate::printer::PrintOptions::default()))
+    Ok(crate::printer::print_value(&von_value, &crate::printer::PrintOptions::compact()))
 }
 
 /// Serializes a Rust type into an indented VON string.
@@ -27,11 +27,9 @@ where
     T: serde::Serialize,
 {
     let von_value = value.serialize(VonValueSerializer {})?;
-    Ok(crate::printer::print_value(
-        &von_value,
-        crate::printer::PrintStyle::Indented,
-        &crate::printer::PrintOptions { indent_width },
-    ))
+    let mut options = crate::printer::PrintOptions::indented();
+    options.indent_width = indent_width;
+    Ok(crate::printer::print_value(&von_value, &options))
 }
 
 struct VonValueSerializer {}

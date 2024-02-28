@@ -26,7 +26,7 @@ use alloc::{boxed::Box, string::String, vec::Vec};
 /// impl AsDocument for MyType {
 ///     type Params = MyTypeParams;
 ///
-///     fn as_document(&self, params: &Self::Params) -> Doc<'_> {
+///     fn as_document(&self, config: &Self::Config) -> Doc<'_> {
 ///         // Use params to customize formatting
 ///         Doc::text(format!("MyType({}) with indent {}", self.value, params.indent))
 ///     }
@@ -42,16 +42,16 @@ use alloc::{boxed::Box, string::String, vec::Vec};
 pub trait AsDocument {
     /// The type of parameters used for formatting.
     /// Defaults to `()` if not specified.
-    type Params = ();
+    type Config = ();
 
     /// Converts this type to a document for pretty printing.
     ///
     /// # Parameters
-    /// - `params`: Formatting parameters specific to this type.
+    /// - `config`: Formatting parameters specific to this type.
     ///
     /// # Returns
     /// A `Document` representing the formatted type.
-    fn as_document(&self, params: &Self::Params) -> Document<'_>;
+    fn as_document(&self, config: &Self::Config) -> Document<'_>;
 }
 
 /// A trait for types that can be converted to a document value, potentially consuming the input.
@@ -61,55 +61,55 @@ pub trait ToDocument<'a> {
 }
 
 impl AsDocument for String {
-    fn as_document(&self, _params: &Self::Params) -> Document<'_> {
+    fn as_document(&self, _config: &Self::Config) -> Document<'_> {
         Document::Text(self.as_str().into())
     }
 }
 
 impl AsDocument for str {
-    fn as_document(&self, _params: &Self::Params) -> Document<'_> {
+    fn as_document(&self, _config: &Self::Config) -> Document<'_> {
         Document::Text(self.into())
     }
 }
 
 impl<'a> AsDocument for Document<'a> {
-    fn as_document(&self, _params: &Self::Params) -> Document<'_> {
+    fn as_document(&self, _config: &Self::Config) -> Document<'_> {
         self.clone()
     }
 }
 
 impl<T: AsDocument> AsDocument for Vec<T> {
-    type Params = T::Params;
+    type Config = T::Config;
 
-    fn as_document(&self, params: &Self::Params) -> Document<'_> {
-        Document::Concat(self.iter().map(|t| t.as_document(params)).collect())
+    fn as_document(&self, config: &Self::Config) -> Document<'_> {
+        Document::Concat(self.iter().map(|t| t.as_document(config)).collect())
     }
 }
 
 impl<T: AsDocument> AsDocument for Option<T> {
-    type Params = T::Params;
+    type Config = T::Config;
 
-    fn as_document(&self, params: &Self::Params) -> Document<'_> {
+    fn as_document(&self, config: &Self::Config) -> Document<'_> {
         match self {
-            Some(t) => t.as_document(params),
+            Some(t) => t.as_document(config),
             None => Document::Nil,
         }
     }
 }
 
 impl<T: AsDocument + ?Sized> AsDocument for &T {
-    type Params = T::Params;
+    type Config = T::Config;
 
-    fn as_document(&self, params: &Self::Params) -> Document<'_> {
-        (**self).as_document(params)
+    fn as_document(&self, config: &Self::Config) -> Document<'_> {
+        (**self).as_document(config)
     }
 }
 
 impl<T: AsDocument + ?Sized> AsDocument for Box<T> {
-    type Params = T::Params;
+    type Config = T::Config;
 
-    fn as_document(&self, params: &Self::Params) -> Document<'_> {
-        self.as_ref().as_document(params)
+    fn as_document(&self, config: &Self::Config) -> Document<'_> {
+        self.as_ref().as_document(config)
     }
 }
 
@@ -121,10 +121,10 @@ impl<'a> ToDocument<'a> for Document<'a> {
 
 impl<'a, T: AsDocument + ?Sized> ToDocument<'a> for &'a T
 where
-    T::Params: Default,
+    T::Config: Default,
 {
     fn to_document(self) -> Document<'a> {
-        self.as_document(&T::Params::default())
+        self.as_document(&T::Config::default())
     }
 }
 

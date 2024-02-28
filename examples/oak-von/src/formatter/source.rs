@@ -55,24 +55,10 @@ fn is_layout(kind: VonTokenType) -> bool {
 }
 
 fn should_preserve_gap(left: &str, gap: &str, right: &str, left_kind: VonTokenType, right_kind: VonTokenType) -> bool {
-    gap.contains('\n')
-        || left.starts_with('#')
-        || right.starts_with('#')
-        || gap.trim_start().starts_with('#')
-        || matches!(left_kind, VonTokenType::Comment)
-        || matches!(right_kind, VonTokenType::Comment)
+    gap.contains('\n') || left.starts_with('#') || right.starts_with('#') || gap.trim_start().starts_with('#') || matches!(left_kind, VonTokenType::Comment) || matches!(right_kind, VonTokenType::Comment)
 }
 
-fn von_gap_constraint(
-    left: &str,
-    gap: &str,
-    right: &str,
-    left_kind: VonTokenType,
-    right_kind: VonTokenType,
-    _index: usize,
-    _significant: &[&oak_core::Token<VonTokenType>],
-    _source: &str,
-) -> GapConstraint {
+fn von_gap_constraint(left: &str, gap: &str, right: &str, left_kind: VonTokenType, right_kind: VonTokenType, _index: usize, _significant: &[&oak_core::Token<VonTokenType>], _source: &str) -> GapConstraint {
     if should_preserve_gap(left, gap, right, left_kind, right_kind) {
         return GapConstraint::Preserve;
     }
@@ -107,10 +93,7 @@ fn von_gap_constraint(
 fn validate_delimiters(source: &str, tokens: &[&oak_core::Token<VonTokenType>]) -> Result<(), oak_core::OakError> {
     let mut stack = Vec::new();
     for token in tokens {
-        if matches!(
-            token.kind,
-            VonTokenType::StringLiteral | VonTokenType::NumberLiteral | VonTokenType::Comment | VonTokenType::BoolLiteral | VonTokenType::NullLiteral
-        ) {
+        if matches!(token.kind, VonTokenType::StringLiteral | VonTokenType::NumberLiteral | VonTokenType::Comment | VonTokenType::BoolLiteral | VonTokenType::NullLiteral) {
             continue;
         }
         match token.kind {
@@ -135,12 +118,7 @@ fn validate_delimiters(source: &str, tokens: &[&oak_core::Token<VonTokenType>]) 
             _ => {}
         }
     }
-    if stack.is_empty() {
-        Ok(())
-    }
-    else {
-        Err(oak_core::OakError::format_error(format!("formatter input has unbalanced delimiters: unclosed {stack:?}")))
-    }
+    if stack.is_empty() { Ok(()) } else { Err(oak_core::OakError::format_error(format!("formatter input has unbalanced delimiters: unclosed {stack:?}"))) }
 }
 
 fn delimiter_error(source: &str, pos: usize) -> Result<(), oak_core::OakError> {

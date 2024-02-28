@@ -4,7 +4,6 @@ use alloc::{borrow::Cow, string::String};
 /// Indent style
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(feature = "serde", serde(tag = "type", content = "value"))]
 pub enum IndentStyle {
     /// Use spaces
     Spaces(u8),
@@ -21,7 +20,6 @@ impl Default for IndentStyle {
 /// Line ending
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
 pub enum LineEnding {
     /// Unix style (\n)
     Unix,

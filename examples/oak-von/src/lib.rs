@@ -12,12 +12,12 @@ pub mod ast;
 pub mod builder;
 /// CST token-gap source formatter.
 pub mod formatter;
-/// AST pretty printer (`ToSource` + indented layout).
-pub mod printer;
 /// Language configuration module.
 pub mod language;
 /// Lexer module.
 pub mod lexer;
+/// AST pretty printer（`AsDocument` → `Document` → text）。
+pub mod printer;
 
 pub mod parser;
 

@@ -9,7 +9,6 @@ pub use self::printer::{IndentStyle, LineEnding, Printer, PrinterConfig};
 /// Document abstraction for describing layout logic
 #[derive(Clone)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
-#[cfg_attr(feature = "serde", serde(tag = "kind", content = "value", rename_all = "camelCase"))]
 pub enum Document<'a> {
     /// Empty document
     Nil,
