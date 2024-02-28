@@ -414,6 +414,58 @@ impl<'config> Parser<MarkdownLanguage> for MarkdownParser<'config> {
 }
 
 impl<'config> MarkdownParser<'config> {
+    fn is_opening_bracket(kind: Option<MarkdownTokenType>, text: Option<&str>) -> bool {
+        kind == Some(MarkdownTokenType::LBracket) || text == Some("[")
+    }
+
+    fn is_closing_bracket(kind: Option<MarkdownTokenType>, text: Option<&str>) -> bool {
+        kind == Some(MarkdownTokenType::RBracket) || text == Some("]")
+    }
+
+    fn is_opening_paren(kind: Option<MarkdownTokenType>, text: Option<&str>) -> bool {
+        kind == Some(MarkdownTokenType::LParen) || text == Some("(")
+    }
+
+    fn is_closing_paren(kind: Option<MarkdownTokenType>, text: Option<&str>) -> bool {
+        kind == Some(MarkdownTokenType::RParen) || text == Some(")")
+    }
+
+    fn bump_if_closing_bracket<'a, S: Source + ?Sized>(state: &mut ParserState<'a, MarkdownLanguage, S>) -> bool {
+        let kind = state.peek_kind();
+        let text = state.peek_text();
+        if Self::is_closing_bracket(kind, text.as_deref()) {
+            state.bump();
+            true
+        }
+        else {
+            false
+        }
+    }
+
+    fn bump_if_opening_bracket<'a, S: Source + ?Sized>(state: &mut ParserState<'a, MarkdownLanguage, S>) -> bool {
+        let kind = state.peek_kind();
+        let text = state.peek_text();
+        if Self::is_opening_bracket(kind, text.as_deref()) {
+            state.bump();
+            true
+        }
+        else {
+            false
+        }
+    }
+
+    fn bump_if_closing_paren<'a, S: Source + ?Sized>(state: &mut ParserState<'a, MarkdownLanguage, S>) -> bool {
+        let kind = state.peek_kind();
+        let text = state.peek_text();
+        if Self::is_closing_paren(kind, text.as_deref()) {
+            state.bump();
+            true
+        }
+        else {
+            false
+        }
+    }
+
     fn is_block_start(&self, kind: MarkdownTokenType) -> bool {
         matches!(
             kind,
@@ -489,45 +541,52 @@ impl<'config> MarkdownParser<'config> {
                 }
                 MarkdownTokenType::Link | MarkdownTokenType::Image => {
                     let is_image = kind == MarkdownTokenType::Image;
-                    state.bump(); // [ or ![
-                    // Parse link text
-                    while state.not_at_end() && state.peek_text().as_deref() != Some("]") && state.peek_kind() != Some(MarkdownTokenType::Newline) {
+                    state.bump();
+                    while state.not_at_end() && state.peek_kind() != Some(MarkdownTokenType::Newline) {
+                        let text = state.peek_text();
+                        if Self::is_closing_bracket(state.peek_kind(), text.as_deref()) {
+                            break;
+                        }
                         self.parse_inline(state);
                     }
-                    if state.peek_text().as_deref() == Some("]") {
-                        state.bump();
-                    }
-                    // Parse URL if present (
-                    if state.peek_text().as_deref() == Some("(") {
-                        state.bump();
-                        while state.not_at_end() && state.peek_text().as_deref() != Some(")") && state.peek_kind() != Some(MarkdownTokenType::Newline) {
+                    Self::bump_if_closing_bracket(state);
+                    {
+                        let text = state.peek_text();
+                        if Self::is_opening_bracket(state.peek_kind(), text.as_deref()) {
                             state.bump();
+                            while state.not_at_end() && state.peek_kind() != Some(MarkdownTokenType::Newline) {
+                                let text = state.peek_text();
+                                if Self::is_closing_bracket(state.peek_kind(), text.as_deref()) {
+                                    break;
+                                }
+                                state.bump();
+                            }
+                            Self::bump_if_closing_bracket(state);
                         }
-                        if state.peek_text().as_deref() == Some(")") {
-                            state.bump();
+                        else {
+                            let text = state.peek_text();
+                            if Self::is_opening_paren(state.peek_kind(), text.as_deref()) {
+                                state.bump();
+                                while state.not_at_end() && state.peek_kind() != Some(MarkdownTokenType::Newline) {
+                                    let text = state.peek_text();
+                                    if Self::is_closing_paren(state.peek_kind(), text.as_deref()) {
+                                        break;
+                                    }
+                                    state.bump();
+                                }
+                                Self::bump_if_closing_paren(state);
+                            }
                         }
                     }
                     state.finish_at(checkpoint, if is_image { ET::Image } else { ET::Link });
                 }
                 MarkdownTokenType::InlineCode => {
-                    state.bump(); // Start backtick
-                    while state.not_at_end() && state.peek_kind() != Some(MarkdownTokenType::InlineCode) && state.peek_kind() != Some(MarkdownTokenType::Newline) {
-                        self.parse_inline(state);
-                    }
-                    if state.peek_kind() == Some(MarkdownTokenType::InlineCode) {
-                        state.bump(); // End backtick
-                    }
+                    state.bump();
                     state.finish_at(checkpoint, ET::InlineCode);
                 }
-                MarkdownTokenType::MathInline => {
-                    state.bump(); // Start $
-                    while state.not_at_end() && state.peek_kind() != Some(MarkdownTokenType::MathInline) && state.peek_kind() != Some(MarkdownTokenType::Newline) {
-                        self.parse_inline(state);
-                    }
-                    if state.peek_kind() == Some(MarkdownTokenType::MathInline) {
-                        state.bump(); // End $
-                    }
-                    state.finish_at(checkpoint, ET::MathInline);
+                MarkdownTokenType::MathInline | MarkdownTokenType::MathBlock => {
+                    state.bump();
+                    state.finish_at(checkpoint, ET::from(kind));
                 }
                 MarkdownTokenType::Superscript | MarkdownTokenType::Subscript => {
                     let marker_kind = kind;
@@ -540,15 +599,9 @@ impl<'config> MarkdownParser<'config> {
                     }
                     state.finish_at(checkpoint, ET::from(marker_kind));
                 }
-                MarkdownTokenType::FootnoteReference => {
-                    state.bump(); // Start [^...]
-                    while state.not_at_end() && state.peek_text().as_deref() != Some("]") && state.peek_kind() != Some(MarkdownTokenType::Newline) {
-                        state.bump();
-                    }
-                    if state.peek_text().as_deref() == Some("]") {
-                        state.bump(); // End ]
-                    }
-                    state.finish_at(checkpoint, ET::FootnoteReference);
+                MarkdownTokenType::FootnoteReference | MarkdownTokenType::FootnoteDefinition => {
+                    state.bump();
+                    state.finish_at(checkpoint, ET::from(kind));
                 }
                 MarkdownTokenType::TaskMarker => {
                     state.bump(); // [ ] or [x]

@@ -21,7 +21,7 @@ fn generate_markdown(n: usize) -> String {
 }
 
 fn bench_markdown_comparison(c: &mut Criterion) {
-    let lang = Box::leak(Box::new(MarkdownLanguage::default()));
+    let lang = Box::leak(Box::new(MarkdownLanguage::github_flavored()));
     let lexer = MarkdownLexer::new(lang);
     let parser = MarkdownParser::new(lang);
 

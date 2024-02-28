@@ -171,34 +171,36 @@ impl<'config> MarkdownLexer<'config> {
         }
     }
 
-    /// Lexes footnotes.
-    pub fn lex_footnote<S: Source + ?Sized>(&self, state: &mut State<S>) -> bool {
+    /// Lexes footnote references and definitions starting at `[`.
+    pub fn lex_footnote_from_bracket<S: Source + ?Sized>(&self, state: &mut State<S>) -> bool {
         let start_pos = state.get_position();
 
-        if let Some('^') = state.peek() {
-            let check_pos = start_pos;
-            if check_pos > 0 && state.source().get_char_at(check_pos - 1) == Some('[') {
-                state.advance(1);
-                while let Some(ch) = state.peek() {
-                    if ch == ']' {
-                        state.advance(1);
-                        if state.peek() == Some(':') {
-                            state.advance(1);
-                            state.add_token(MarkdownTokenType::FootnoteDefinition, start_pos - 1, state.get_position())
-                        }
-                        else {
-                            state.add_token(MarkdownTokenType::FootnoteReference, start_pos - 1, state.get_position())
-                        }
-                        return true;
-                    }
-                    else if ch == '\n' || ch == '\r' {
-                        break;
-                    }
-                    state.advance(ch.len_utf8())
-                }
-            }
-            state.set_position(start_pos);
+        if state.peek() != Some('[') || state.source().get_char_at(start_pos + 1) != Some('^') {
+            return false;
         }
+
+        state.advance(1);
+        state.advance(1);
+        while let Some(ch) = state.peek() {
+            if ch == ']' {
+                state.advance(1);
+                let kind = if state.peek() == Some(':') {
+                    state.advance(1);
+                    MarkdownTokenType::FootnoteDefinition
+                }
+                else {
+                    MarkdownTokenType::FootnoteReference
+                };
+                state.add_token(kind, start_pos, state.get_position());
+                return true;
+            }
+            else if ch == '\n' || ch == '\r' {
+                break;
+            }
+            state.advance(ch.len_utf8());
+        }
+
+        state.set_position(start_pos);
         false
     }
 

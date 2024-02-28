@@ -82,7 +82,7 @@ impl<V: Vfs + Send + Sync + 'static + oak_vfs::WritableVfs> LanguageService for 
         let source = self.vfs().get_source(uri);
         async move {
             let source = source?;
-            let language = MarkdownLanguage::default();
+            let language = MarkdownLanguage::github_flavored();
             let parser = crate::parser::MarkdownParser::new(&language);
             let lexer = crate::lexer::MarkdownLexer::new(&language);
             let mut cache = oak_core::parser::session::ParseSession::<Self::Lang>::default();

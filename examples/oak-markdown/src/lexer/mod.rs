@@ -44,11 +44,8 @@ impl<'config> MarkdownLexer<'config> {
                         }
                         self.lex_special_char(state);
                     }
-                    '^' if self.config.allow_subscript || self.config.allow_footnotes => {
-                        if self.config.allow_footnotes && self.lex_footnote(state) {
-                            continue;
-                        }
-                        if self.config.allow_subscript && self.lex_sub_superscript(state) {
+                    '^' if self.config.allow_subscript => {
+                        if self.lex_sub_superscript(state) {
                             continue;
                         }
                         self.lex_special_char(state);
@@ -120,6 +117,9 @@ impl<'config> MarkdownLexer<'config> {
                         self.lex_special_char(state);
                     }
                     '[' => {
+                        if self.config.allow_footnotes && self.lex_footnote_from_bracket(state) {
+                            continue;
+                        }
                         if self.config.allow_task_lists && self.lex_task_marker(state) {
                             continue;
                         }
@@ -150,6 +150,9 @@ impl<'config> MarkdownLexer<'config> {
                         self.lex_text(state);
                     }
                     '<' => {
+                        if self.config.allow_autolinks && self.lex_angle_autolink(state) {
+                            continue;
+                        }
                         if self.config.allow_mdx && self.lex_mdx_import_export(state) {
                             continue;
                         }
@@ -461,8 +464,42 @@ impl<'config> MarkdownLexer<'config> {
         }
     }
 
-    /// Lexes automatic links (HTTP/HTTPS URLs).
+    /// Lexes angle-bracket autolinks such as `<https://example.com>`.
+    fn lex_angle_autolink<S: Source + ?Sized>(&self, state: &mut State<S>) -> bool {
+        let start_pos = state.get_position();
+        if state.peek() != Some('<') {
+            return false;
+        }
+
+        let mut pos = start_pos + 1;
+        while pos < state.source().length() {
+            let ch = match state.source().get_char_at(pos) {
+                Some(ch) => ch,
+                None => break,
+            };
+            if ch == '>' {
+                if pos > start_pos + 1 {
+                    state.set_position(pos + 1);
+                    state.add_token(MarkdownTokenType::AutoLink, start_pos, pos + 1);
+                    return true;
+                }
+                break;
+            }
+            if ch == '\n' || ch == '\r' || ch == '<' {
+                break;
+            }
+            pos += 1;
+        }
+
+        false
+    }
+
+    /// Lexes bare links (HTTP/HTTPS URLs).
     fn lex_auto_link<S: Source + ?Sized>(&self, state: &mut State<S>) -> bool {
+        if !self.config.allow_barelinks {
+            return false;
+        }
+
         let start_pos = state.get_position();
 
         if state.source().get_char_at(start_pos) == Some('h') && state.source().get_char_at(start_pos + 1) == Some('t') && state.source().get_char_at(start_pos + 2) == Some('t') && state.source().get_char_at(start_pos + 3) == Some('p') {

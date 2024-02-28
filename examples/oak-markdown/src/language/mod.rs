@@ -45,10 +45,14 @@ pub struct MarkdownLanguage {
     ///
     /// Example: `^sup^` or `~sub~`
     pub allow_subscript: bool,
-    /// Enable autolinks.
+    /// Enable CommonMark autolinks.
     ///
-    /// Example: `<https://example.com>`
+    /// Example: `<https://example.com>` or `<foo@bar.com>`
     pub allow_autolinks: bool,
+    /// Enable bare links in plain text.
+    ///
+    /// Example: `https://example.com`
+    pub allow_barelinks: bool,
     /// Enable abbreviations.
     ///
     /// Example: `*[HTML]: HyperText Markup Language`
@@ -66,10 +70,6 @@ pub struct MarkdownLanguage {
     ///
     /// Example: Two spaces at the end of a line or a backslash.
     pub allow_hard_line_breaks: bool,
-    /// Enable GFM-style autolinks.
-    ///
-    /// Example: `https://example.com`
-    pub allow_gfm_autolinks: bool,
     /// Enable ATX headings.
     ///
     /// Example: `# Heading`
@@ -96,10 +96,8 @@ pub struct MarkdownLanguage {
     /// Heading
     /// =======
     pub allow_setext_headings: bool,
-    /// Enable GFM Tagfilter.
-    ///
-    /// Filters certain HTML tags like `<script>`.
-    pub allow_html_tagfilter: bool,
+    /// Filter certain HTML tags like `<script>`.
+    pub allow_html_tag_filter: bool,
     /// Enable XML/TSX syntax.
     ///
     /// Example: `<Component />`
@@ -115,9 +113,55 @@ pub struct MarkdownLanguage {
 }
 
 impl MarkdownLanguage {
-    /// Creates a new Markdown language configuration with default settings.
-    pub fn new() -> Self {
-        Self::default()
+    /// Creates a Markdown language configuration with every feature flag set to `enable`.
+    pub fn new(enable: bool) -> Self {
+        Self {
+            allow_math: enable,
+            allow_tables: enable,
+            allow_task_lists: enable,
+            allow_strikethrough: enable,
+            allow_footnotes: enable,
+            allow_front_matter: enable,
+            allow_definition_lists: enable,
+            allow_subscript: enable,
+            allow_autolinks: enable,
+            allow_barelinks: enable,
+            allow_abbreviations: enable,
+            allow_indented_code_blocks: enable,
+            allow_html: enable,
+            allow_hard_line_breaks: enable,
+            allow_headings: enable,
+            allow_lists: enable,
+            allow_blockquotes: enable,
+            allow_fenced_code_blocks: enable,
+            allow_horizontal_rules: enable,
+            allow_setext_headings: enable,
+            allow_html_tag_filter: enable,
+            allow_xml: enable,
+            allow_mdx: enable,
+        }
+    }
+
+    /// CommonMark baseline: core block and inline syntax without optional extensions.
+    pub fn common_mark() -> Self {
+        Self {
+            allow_autolinks: true,
+            allow_indented_code_blocks: true,
+            allow_html: true,
+            allow_hard_line_breaks: true,
+            allow_headings: true,
+            allow_lists: true,
+            allow_blockquotes: true,
+            allow_fenced_code_blocks: true,
+            allow_horizontal_rules: true,
+            allow_setext_headings: true,
+            ..Self::new(false)
+        }
+    }
+
+    /// [`common_mark`] plus tables, task lists, strikethrough, bare links, and HTML tag filtering.
+    pub fn github_flavored() -> Self {
+        Self { allow_tables: true, allow_task_lists: true, allow_strikethrough: true, allow_barelinks: true, allow_html_tag_filter: true, ..Self::common_mark() }
     }
 }
 
@@ -132,30 +176,6 @@ impl Language for MarkdownLanguage {
 
 impl Default for MarkdownLanguage {
     fn default() -> Self {
-        Self {
-            allow_math: true,
-            allow_tables: true,
-            allow_task_lists: true,
-            allow_strikethrough: true,
-            allow_footnotes: true,
-            allow_front_matter: true,
-            allow_definition_lists: false,
-            allow_subscript: false,
-            allow_autolinks: true,
-            allow_abbreviations: true,
-            allow_indented_code_blocks: true,
-            allow_html: true,
-            allow_hard_line_breaks: true,
-            allow_gfm_autolinks: true,
-            allow_headings: true,
-            allow_lists: true,
-            allow_blockquotes: true,
-            allow_fenced_code_blocks: true,
-            allow_horizontal_rules: true,
-            allow_setext_headings: true,
-            allow_html_tagfilter: false,
-            allow_xml: false,
-            allow_mdx: false,
-        }
+        Self::new(false)
     }
 }

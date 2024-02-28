@@ -1,7 +1,10 @@
+//! Due to excessive testing time, testing has been moved downstream:
+//!
+//! - [notedown-fixtures](https://github.com/notedge/notedown/tree/dev/projects/crates/notedown-fixtures/tests/xml/)
+//!
+//! **Do NOT** add any tests here.
+
 #[test]
-fn main() {
-    println!(
-        "oak-xml: lexer, parser, and diagnostic conformance tests belong outside this workspace. \
-Do not re-add heavyweight golden fixtures in oak.rs CI."
-    );
+fn smoke() {
+    println!("XML tests moved!")
 }

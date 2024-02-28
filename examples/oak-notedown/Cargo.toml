@@ -33,3 +33,7 @@ mcp = ["lsp", "oak-mcp/io-std"]
 
 [package.metadata.docs.rs]
 all-features = true
+
+[[test]]
+name = "main"
+required-features = ["serde"]
