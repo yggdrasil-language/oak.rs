@@ -1,3 +1,0 @@
-let obj = class { x: 10, y: 20 }
-let obj2 = class { x, y }
-let obj3 = class { x: 10, y }

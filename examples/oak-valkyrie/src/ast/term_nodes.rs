@@ -11,7 +11,10 @@
 //! - Object and class expressions
 
 use super::{Identifier, LoopKind, MatchArm, NamePath, Param, Pattern, Span, StringLiteral, TypeExpression};
-use crate::{ast::structure_nodes::AnonymousClass, lexer::token_type::ValkyrieTokenType};
+use crate::{
+    ast::{class_nodes::AnonymousClass, structure_nodes::AnonymousStructure},
+    lexer::token_type::ValkyrieTokenType,
+};
 
 /// An expression in the Valkyrie language.
 ///
@@ -48,7 +51,6 @@ pub enum TermExpression {
     /// let result = &value  // Reference
     /// ```
     Unary(Box<TermUnaryNode>),
-
     /// A string literal expression.
     ///
     /// # V Language Example
@@ -59,13 +61,17 @@ pub enum TermExpression {
     StringLiteral(StringLiteral),
     /// An integer literal preserving its lexical text and source span.
     IntegerLiteral {
+        /// The literal text as written in source.
         value: String,
+        /// The source code span.
         #[cfg_attr(feature = "serde", serde(with = "oak_core::serde_range"))]
         span: Span,
     },
     /// A floating-point literal preserving its lexical text and source span.
     FloatLiteral {
+        /// The literal text as written in source.
         value: String,
+        /// The source code span.
         #[cfg_attr(feature = "serde", serde(with = "oak_core::serde_range"))]
         span: Span,
     },
@@ -80,6 +86,16 @@ pub enum TermExpression {
         /// The boolean value.
         value: bool,
         /// The source code span.
+        #[cfg_attr(feature = "serde", serde(with = "oak_core::serde_range"))]
+        span: Span,
+    },
+    /// `expr as Type` 显式类型转换。
+    Cast {
+        /// 被转换的表达式。
+        expr: Box<TermExpression>,
+        /// 目标类型。
+        ty: TypeExpression,
+        /// 源码区间。
         #[cfg_attr(feature = "serde", serde(with = "oak_core::serde_range"))]
         span: Span,
     },
@@ -101,6 +117,7 @@ pub enum TermExpression {
     /// let result = Math::sqrt(25)
     /// ```
     ApplyCall {
+        /// The callee expression.
         callee: Box<TermExpression>,
         /// The call arguments.
         args: Vec<TermExpression>,
@@ -208,14 +225,23 @@ pub enum TermExpression {
         #[cfg_attr(feature = "serde", serde(with = "oak_core::serde_range"))]
         span: Span,
     },
-    /// Anonymous class expression.
+    /// Anonymous `class { ... }` expression.
     ///
     /// # V Language Example
     /// ```v
     /// let obj = class { x: 10, y: 20 }
-    /// let impl_trait = class: Trait { ... }
+    /// let impl_trait = class: Drawable { radius: 1.0 }
+    /// let derived = class(Animal) { micro speak(self) -> utf8 { "woof" } }
+    /// let renamed = class(file: FileReader) { micro read(self) -> i32 { 1 } }
     /// ```
     AnonymousClass(Box<AnonymousClass>),
+    /// Anonymous `structure { ... }` expression.
+    ///
+    /// # V Language Example
+    /// ```v
+    /// let value = structure { x: 1.0, y: 2.0 }
+    /// ```
+    AnonymousStructure(Box<AnonymousStructure>),
     /// An if expression.
     ///
     /// # V Language Example
@@ -654,6 +680,7 @@ impl TermExpression {
             TermExpression::Binary(node) => node.span,
             TermExpression::Unary(node) => node.span,
             TermExpression::Turbofish { span, .. } => *span,
+            TermExpression::Cast { span, .. } => *span,
             TermExpression::ApplyCall { span, .. } => *span,
             TermExpression::DotCall { span, .. } => *span,
             TermExpression::Index { span, .. } => *span,
@@ -663,6 +690,7 @@ impl TermExpression {
             TermExpression::Micro(lambda) => lambda.span,
             TermExpression::Object { span, .. } => *span,
             TermExpression::AnonymousClass(node) => node.span,
+            TermExpression::AnonymousStructure(node) => node.span,
             TermExpression::If { span, .. } => *span,
             TermExpression::Match { span, .. } => *span,
             TermExpression::Loop { span, .. } => *span,

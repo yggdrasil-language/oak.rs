@@ -39,10 +39,14 @@ pub(crate) fn parse_if_expression<S: oak_core::Source + ?Sized>(state: &mut Stat
 pub(crate) fn parse_match_expression<S: oak_core::Source + ?Sized>(state: &mut State<'_, S>) -> Result<(), oak_core::OakError> {
     let cp = state.sink.checkpoint();
     state.bump();
-    parse_expression(state)?;
+    crate::parser::parse_expressions::parse_scrutinee_expression(state)?;
     if state.at(ValkyrieTokenType::BraceL) {
         state.bump();
         while state.not_at_end() && !state.at(ValkyrieTokenType::BraceR) {
+            state.skip_trivia();
+            if state.at(ValkyrieTokenType::BraceR) {
+                break;
+            }
             parse_match_arm(state)?;
         }
         if state.at(ValkyrieTokenType::BraceR) {
@@ -53,17 +57,63 @@ pub(crate) fn parse_match_expression<S: oak_core::Source + ?Sized>(state: &mut S
     Ok(())
 }
 
+/// 解析 match 模式：`Some(value)` / `None` / `_`。
+fn parse_match_pattern<S: oak_core::Source + ?Sized>(state: &mut State<'_, S>) -> Result<(), oak_core::OakError> {
+    let pcp = state.sink.checkpoint();
+    if state.at(ValkyrieTokenType::Underscore) {
+        state.bump();
+    }
+    else if state.at(ValkyrieTokenType::Identifier) {
+        state.bump();
+        if state.at(ValkyrieTokenType::ParenthesisL) {
+            state.bump();
+            while state.not_at_end() && !state.at(ValkyrieTokenType::ParenthesisR) {
+                state.skip_trivia();
+                if state.at(ValkyrieTokenType::ParenthesisR) {
+                    break;
+                }
+                parse_match_pattern(state)?;
+                state.skip_trivia();
+                if state.at(ValkyrieTokenType::Comma) {
+                    state.bump();
+                }
+            }
+            if state.at(ValkyrieTokenType::ParenthesisR) {
+                state.bump();
+            }
+        }
+    }
+    state.sink.finish_node(pcp, ValkyrieElementType::Pattern);
+    Ok(())
+}
+
 /// 解析 match arm
 pub(crate) fn parse_match_arm<S: oak_core::Source + ?Sized>(state: &mut State<'_, S>) -> Result<(), oak_core::OakError> {
     let cp = state.sink.checkpoint();
-    parse_pattern(state)?;
+    state.skip_trivia();
+    if state.at(ValkyrieTokenType::Keyword(ValkyrieKeywords::Case)) {
+        state.bump();
+        state.skip_trivia();
+        parse_match_pattern(state)?;
+    }
+    else if state.at(ValkyrieTokenType::Keyword(ValkyrieKeywords::Else)) {
+        state.bump();
+    }
+    else {
+        parse_match_pattern(state)?;
+    }
     if state.at(ValkyrieTokenType::Keyword(ValkyrieKeywords::If)) {
         state.bump();
         parse_expression(state)?;
     }
-    if state.at(ValkyrieTokenType::Arrow) {
+    if state.at(ValkyrieTokenType::Colon) || state.at(ValkyrieTokenType::Arrow) {
         state.bump();
-        parse_expression(state)?;
+        if state.at(ValkyrieTokenType::BraceL) {
+            parse_block_expression(state)?;
+        }
+        else {
+            parse_expression(state)?;
+        }
     }
     if state.at(ValkyrieTokenType::Comma) {
         state.bump();

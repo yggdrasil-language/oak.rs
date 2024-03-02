@@ -1,7 +1,0 @@
-micro main() {
-    arr[1];
-    arr[3];
-    arr[-1];
-    arr[-2];
-    nested[1][2];
-}

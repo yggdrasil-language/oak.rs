@@ -1,6 +1,0 @@
-list.map { $ * 2 };
-list.fold(0) { $1 + $2 };
-button.on_click {
-    let current = $count;
-    print("Click count: ${current}");
-};

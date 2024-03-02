@@ -18,14 +18,40 @@ fn stalled<S: oak_core::Source + ?Sized>(state: &State<'_, S>, before: usize) ->
     token_index(state) == before
 }
 
+/// 类型名起始 token：`Self` / `micro` / `mezzo` 为关键词，raw id 与普通标识符同为 `Identifier`。
+fn is_type_name_token(kind: &ValkyrieTokenType) -> bool {
+    matches!(
+        kind,
+        ValkyrieTokenType::Identifier
+            | ValkyrieTokenType::Keyword(ValkyrieKeywords::SelfType)
+            | ValkyrieTokenType::Keyword(ValkyrieKeywords::Micro)
+            | ValkyrieTokenType::Keyword(ValkyrieKeywords::Mezzo)
+    )
+}
+
 /// 解析类型
 pub(crate) fn parse_type<S: oak_core::Source + ?Sized>(state: &mut State<'_, S>) -> Result<(), oak_core::OakError> {
     let cp = state.sink.checkpoint();
+    if state.at(ValkyrieTokenType::BracketL) {
+        state.bump();
+        parse_type(state)?;
+        if state.at(ValkyrieTokenType::Semicolon) {
+            state.bump();
+            parse_expression(state)?;
+        }
+        if state.at(ValkyrieTokenType::BracketR) {
+            state.bump();
+        }
+        state.sink.finish_node(cp, ValkyrieElementType::Type);
+        return Ok(());
+    }
     if state.at(ValkyrieTokenType::Question) {
         state.bump();
     }
-    if state.at(ValkyrieTokenType::Identifier) {
-        state.bump();
+    if let Some(token) = state.current() {
+        if is_type_name_token(&token.kind) {
+            state.bump();
+        }
     }
     if state.at(ValkyrieTokenType::LessThan) {
         parse_generic_argument_list(state)?;

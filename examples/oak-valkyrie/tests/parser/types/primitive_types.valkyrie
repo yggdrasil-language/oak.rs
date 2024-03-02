@@ -1,6 +1,0 @@
-micro main() {
-    let a: i32 = 1;
-    let b: f64 = 3.14;
-    let c: bool = true;
-    let d: char = 'A';
-}

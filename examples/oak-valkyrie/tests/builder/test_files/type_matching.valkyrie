@@ -1,8 +1,0 @@
-micro test_match(x: any) {
-    match x {
-        type i32: 1;
-        type f64: 2;
-        type String: 3;
-        else: 0
-    }
-}

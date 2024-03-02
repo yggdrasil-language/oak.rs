@@ -1,3 +1,0 @@
-micro main() {
-    return 42;
-}

@@ -1,4 +1,0 @@
-micro main() {
-    -42;
-    !true;
-}

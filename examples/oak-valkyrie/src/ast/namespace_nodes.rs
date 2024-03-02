@@ -1,11 +1,15 @@
+//! Namespace and import nodes for the Valkyrie language AST.
+
 use crate::ast::{Attribute, Identifier, NamePath, Span, items_nodes::StatementNode};
 
-/// A namespace declaration
+/// A namespace declaration.
 ///
+/// # V Language Example
 /// ```v
-/// namespace a::b::C;
-/// namespace a::b::c {
-///     namespace e::f::g { }
+/// namespace core::text;
+///
+/// namespace game::player {
+///     micro spawn() -> Player { }
 /// }
 /// ```
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -22,11 +26,13 @@ pub struct NamespaceDeclaration {
     pub span: Span,
 }
 
-/// A using (import) statement
+/// A using (import) statement.
 ///
+/// # V Language Example
 /// ```v
-/// using core::primitive::{Never, Unit};
-/// using core::primitive::Bool as bool;
+/// using core::primitive::{Never, Unit}
+/// using core::primitive::Bool as bool
+/// using std::text::utf8
 /// ```
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]

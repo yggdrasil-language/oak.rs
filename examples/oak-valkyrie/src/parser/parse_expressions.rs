@@ -98,6 +98,15 @@ pub(crate) fn parse_unary_expression<S: oak_core::Source + ?Sized>(state: &mut S
 
 /// 解析后缀表达式（字段访问、索引、调用）
 pub(crate) fn parse_postfix_expression<S: oak_core::Source + ?Sized>(state: &mut State<'_, S>) -> Result<(), oak_core::OakError> {
+    parse_postfix_expression_with_options(state, true)
+}
+
+/// 解析 match / catch 等结构的 scrutinee，禁止把紧随其后的 `{` 当作对象字面量。
+pub(crate) fn parse_scrutinee_expression<S: oak_core::Source + ?Sized>(state: &mut State<'_, S>) -> Result<(), oak_core::OakError> {
+    parse_postfix_expression_with_options(state, false)
+}
+
+fn parse_postfix_expression_with_options<S: oak_core::Source + ?Sized>(state: &mut State<'_, S>, allow_object_literal: bool) -> Result<(), oak_core::OakError> {
     parse_primary_expression(state)?;
     loop {
         if state.at(ValkyrieTokenType::Dot) {
@@ -128,10 +137,16 @@ pub(crate) fn parse_postfix_expression<S: oak_core::Source + ?Sized>(state: &mut
             parse_argument_list(state)?;
             state.sink.finish_node(cp, ValkyrieElementType::CallExpression);
         }
-        else if state.at(ValkyrieTokenType::BraceL) {
+        else if allow_object_literal && state.at(ValkyrieTokenType::BraceL) {
             let cp = state.sink.checkpoint() - 1;
             crate::parser::parse_blocks::parse_object_initializer(state)?;
             state.sink.finish_node(cp, ValkyrieElementType::ObjectExpression);
+        }
+        else if state.at(ValkyrieTokenType::Keyword(ValkyrieKeywords::As)) {
+            let cp = state.sink.checkpoint() - 1;
+            state.bump();
+            crate::parser::parse_types::parse_type(state)?;
+            state.sink.finish_node(cp, ValkyrieElementType::CastExpression);
         }
         else {
             break;

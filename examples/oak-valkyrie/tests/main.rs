@@ -1,6 +1,10 @@
-mod template_micro_body;
+//! Due to excessive testing time, testing has been moved downstream:
+//!
+//! - [valkyrie-fixtures](https://github.com/valkyrie-language/valkyrie.rs/tree/dev/projects/compilers/valkyrie-fixtures/tests/)
+//!
+//! **Do NOT** add any tests here.
 
 #[test]
-fn ready() {
-    println!("Valkyrie tests are ready!")
+fn smoke() {
+    println!("Valkyrie tests moved!")
 }

@@ -72,4 +72,28 @@ impl<'config> ValkyrieBuilder<'config> {
         let expr = utils::get_required_expr(&node, source, |n, s| self.build_expr(*n, s), "Missing parenthesized expression", span.start)?;
         Ok(TermExpression::Paren { expr, span })
     }
+
+    pub(crate) fn build_cast<S: Source + ?Sized>(&self, node: RedNode<ValkyrieLanguage>, source: &S) -> Result<TermExpression, OakError> {
+        let span = node.span();
+        let mut expr = None;
+        let mut ty = None;
+        for child in node.children() {
+            if utils::should_skip_node(&child) {
+                continue;
+            }
+            if let RedTree::Node(n) = child {
+                match n.green.kind {
+                    ValkyrieElementType::Type => ty = Some(self.build_type(n, source)?),
+                    _ => {
+                        if expr.is_none() {
+                            expr = Some(Box::new(self.build_expr(n, source)?));
+                        }
+                    }
+                }
+            }
+        }
+        let expr = expr.ok_or_else(|| source.syntax_error("Missing cast expression".to_string(), span.start))?;
+        let ty = ty.ok_or_else(|| source.syntax_error("Missing cast target type".to_string(), span.start))?;
+        Ok(TermExpression::Cast { expr, ty, span })
+    }
 }

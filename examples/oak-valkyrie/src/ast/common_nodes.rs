@@ -1,3 +1,5 @@
+//! Shared AST nodes such as attributes, literals, modifiers, and enum variants.
+
 use super::{Block, FieldDeclaration, GenericParam, Identifier, Param, Pattern, Span, TermExpression, TypeExpression};
 
 /// One attribute argument, optionally keyed (`name: "answer"`).

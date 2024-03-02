@@ -1,12 +1,38 @@
+//! Top-level item nodes for the Valkyrie language AST.
+//!
+//! This module defines module-level declarations such as classes, traits,
+//! enums, micros, imply blocks, and the `StatementNode` root item enum.
+
 use super::*;
 use crate::ast::{
     ecs_nodes::{ComponentDeclaration, SystemDeclaration},
     statement_nodes::{ExprStmt, Let},
-    structure_nodes::SingletonDeclaration,
+    singleton_nodes::SingletonDeclaration,
     template_nodes::TemplateNode,
+    trait_nodes::{AssociatedType, ImplyDeclaration, Trait},
+    union_nodes::UnionDeclaration,
+    widget_nodes::WidgetDeclaration,
 };
 
-/// A root node item in a Valkyrie module
+/// A top-level item in a Valkyrie module.
+///
+/// Each variant corresponds to one syntactic form that may appear at module
+/// scope or inside a namespace.
+///
+/// # V Language Example
+/// ```v
+/// namespace game::player {
+///     structure Vec2 { x: f64, y: f64 }
+///
+///     trait Movable {
+///         micro move_by(self, delta: Vec2)
+///     }
+///
+///     micro spawn(name: utf8) -> Player {
+///         return Player { name: name, position: Vec2 { x: 0.0, y: 0.0 } }
+///     }
+/// }
+/// ```
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum StatementNode {
@@ -18,6 +44,8 @@ pub enum StatementNode {
     Class(Box<ClassDeclaration>),
     /// A value type structure (immutable, copied on assignment).
     Structure(Box<StructureDeclaration>),
+    /// A named union declaration.
+    Union(Box<UnionDeclaration>),
     /// A singleton declaration.
     Singleton(Box<SingletonDeclaration>),
     /// A flags (bitflags) declaration.
@@ -57,20 +85,36 @@ pub enum StatementNode {
     Template(Box<TemplateNode>),
 }
 
-/// A parent class with optional alias for renamed inheritance.
+/// A parent class or trait with optional alias for renamed inheritance.
+///
+/// # V Language Example
+/// ```v
+/// class Sprite implements primary: Drawable, secondary: Updatable {
+///     micro draw(self) { primary.draw(self) }
+/// }
+/// ```
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Parent {
-    /// Optional alias for disambiguation (e.g., "primary" in "primary: Parent1").
+    /// Optional alias for disambiguation (e.g., `primary` in `primary: Drawable`).
     pub alias: Option<Identifier>,
-    /// Parent class name path.
+    /// Parent class or trait name path.
     pub name: NamePath,
-    /// Source span.
+    /// The source code span.
     #[cfg_attr(feature = "serde", serde(with = "oak_core::serde_range"))]
     pub span: Span,
 }
 
-/// A flags (bitflags) declaration
+/// A flags (bitflags) declaration.
+///
+/// # V Language Example
+/// ```v
+/// flags FileMode {
+///     Read = 1
+///     Write = 2
+///     Execute = 4
+/// }
+/// ```
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Flags {
@@ -85,11 +129,26 @@ pub struct Flags {
     pub span: Span,
 }
 
-/// An enum declaration
+/// An enum declaration.
+///
+/// # V Language Example
+/// ```v
+/// enums Direction {
+///     North
+///     East
+///     South
+///     West
+/// }
+///
+/// unite Option<T> {
+///     Some { value: T }
+///     None
+/// }
+/// ```
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Enums {
-    /// The keyword kind used for this enum (enums, enum, unity).
+    /// The keyword kind used for this enum (`enums`, `enum`, or `unity`).
     pub kind: EnumsKind,
     /// The enum name.
     pub name: Identifier,
@@ -104,79 +163,18 @@ pub struct Enums {
     pub span: Span,
 }
 
-/// A trait declaration
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Default)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct Trait {
-    /// The trait name.
-    pub name: Identifier,
-    /// Generic parameters for the trait.
-    pub generics: Vec<GenericParam>,
-    /// Methods declared in the trait.
-    pub methods: Vec<MethodDeclaration>,
-    /// Associated types declared in the trait.
-    pub associated_types: Vec<AssociatedType>,
-    /// Annotations applied to the trait.
-    pub annotations: Vec<Attribute>,
-    /// The source code span.
-    #[cfg_attr(feature = "serde", serde(with = "oak_core::serde_range"))]
-    pub span: Span,
-}
-
-/// An associated type declaration in a trait.
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Default)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct AssociatedType {
-    /// The associated type name.
-    pub name: Identifier,
-    /// Type bounds that the associated type must satisfy.
-    pub bounds: Vec<TypeExpression>,
-    /// Default type for the associated type, if any.
-    pub default: Option<TypeExpression>,
-    /// Annotations applied to the associated type.
-    pub annotations: Vec<Attribute>,
-    /// The source code span.
-    #[cfg_attr(feature = "serde", serde(with = "oak_core::serde_range"))]
-    pub span: Span,
-}
-
-/// A widget declaration
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Default)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct WidgetDeclaration {
-    /// The widget name.
-    pub name: Identifier,
-    /// Generic parameters for the widget.
-    pub generics: Vec<GenericParam>,
-    /// Items (properties, methods) declared within the widget.
-    pub items: Vec<StatementNode>,
-    /// Annotations applied to the widget.
-    pub annotations: Vec<Attribute>,
-    /// The source code span.
-    #[cfg_attr(feature = "serde", serde(with = "oak_core::serde_range"))]
-    pub span: Span,
-}
-
-/// An `imply` block attaching methods to a type or trait witness.
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct ImplyDeclaration {
-    /// Annotations applied to the imply block.
-    pub annotations: Vec<Attribute>,
-    /// Generic parameters declared on the imply header.
-    pub generics: Vec<GenericParam>,
-    /// Target type being extended or implemented.
-    pub target_type: TypeExpression,
-    /// Optional trait or protocol being implemented.
-    pub trait_type: Option<TypeExpression>,
-    /// Methods defined in the imply block.
-    pub methods: Vec<MethodDeclaration>,
-    /// The source code span.
-    #[cfg_attr(feature = "serde", serde(with = "oak_core::serde_range"))]
-    pub span: Span,
-}
-
-/// A micro (small function) declaration
+/// A micro (small function) declaration.
+///
+/// # V Language Example
+/// ```v
+/// micro add(left: i32, right: i32) -> i32 {
+///     return left + right
+/// }
+///
+/// micro<T> identity(value: T) -> T {
+///     return value
+/// }
+/// ```
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct MicroDeclaration {
@@ -201,7 +199,14 @@ pub struct MicroDeclaration {
     pub is_final: bool,
 }
 
-/// A type function declaration
+/// A type function declaration.
+///
+/// # V Language Example
+/// ```v
+/// mezzo Pair<A, B>(left: A, right: B) -> (A, B) {
+///     return (left, right)
+/// }
+/// ```
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct TypeFunction {
@@ -222,7 +227,16 @@ pub struct TypeFunction {
     pub span: Span,
 }
 
-/// A variant declaration
+/// A variant declaration.
+///
+/// # V Language Example
+/// ```v
+/// variant HttpStatus {
+///     Ok { code: i32 }
+///     Redirect { code: i32, location: utf8 }
+///     Error { code: i32, message: utf8 }
+/// }
+/// ```
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Variant {
@@ -239,7 +253,15 @@ pub struct Variant {
     pub span: Span,
 }
 
-/// An effect declaration
+/// An effect declaration.
+///
+/// # V Language Example
+/// ```v
+/// effect Console {
+///     micro print_line(message: utf8)
+///     micro read_line() -> utf8
+/// }
+/// ```
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Effect {
@@ -265,6 +287,18 @@ pub enum PropertyKind {
 }
 
 /// A property declaration (getter or setter).
+///
+/// # V Language Example
+/// ```v
+/// class Temperature {
+///     _celsius: f64 = 0.0
+///
+///     property celsius: f64 {
+///         get { return self._celsius }
+///         set(value) { self._celsius = value }
+///     }
+/// }
+/// ```
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Property {
@@ -276,13 +310,13 @@ pub struct Property {
     pub generics: Vec<GenericParam>,
     /// Annotations on the property.
     pub annotations: Vec<Attribute>,
-    /// Parameters for the property (self for getter, self + value for setter).
+    /// Parameters for the property (`self` for getter, `self` + value for setter).
     pub params: Vec<Param>,
-    /// Return type for getter, None for setter.
+    /// Return type for getter, `None` for setter.
     pub return_type: Option<TypeExpression>,
     /// The body of the property.
     pub body: Block,
-    /// Source span.
+    /// The source code span.
     #[cfg_attr(feature = "serde", serde(with = "oak_core::serde_range"))]
     pub span: Span,
     /// Whether this property is abstract (has no body implementation).

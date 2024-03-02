@@ -214,7 +214,7 @@ impl<'config> ValkyrieBuilder<'config> {
                     ValkyrieTokenType::Whitespace | ValkyrieTokenType::Newline | ValkyrieTokenType::LineComment | ValkyrieTokenType::BlockComment => continue,
                     ValkyrieTokenType::Identifier => {
                         if name.name.is_empty() {
-                            name.name = text(source, t.span);
+                            name.name = crate::builder::identifier_text(source, t.span);
                             name.span = t.span;
                         }
                     }
@@ -252,7 +252,7 @@ impl<'config> ValkyrieBuilder<'config> {
             }
         }
 
-        Ok(MethodDeclaration { name, generics, params, return_type, body, annotations, span })
+        Ok(MethodDeclaration { name, generics, parameters: params, return_type, body, annotations, span })
     }
 
     pub(crate) fn build_modifier<S: Source + ?Sized>(&self, node: RedNode<ValkyrieLanguage>, source: &S) -> Result<Modifier, OakError> {

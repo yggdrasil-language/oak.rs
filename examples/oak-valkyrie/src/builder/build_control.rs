@@ -93,8 +93,7 @@ impl<'config> ValkyrieBuilder<'config> {
     pub(crate) fn build_match_arm<S: Source + ?Sized>(&self, node: RedNode<ValkyrieLanguage>, source: &S) -> Result<MatchArm, OakError> {
         let span = node.span();
         let mut pattern = None;
-        let mut guard = None;
-        let mut body = None;
+        let mut expressions = Vec::new();
 
         for child in node.children() {
             match child {
@@ -110,20 +109,22 @@ impl<'config> ValkyrieBuilder<'config> {
                     crate::parser::element_type::ValkyrieElementType::Pattern => {
                         pattern = Some(self.build_pattern(n, source)?);
                     }
-                    _ => {
-                        if body.is_none() {
-                            body = Some(self.build_expr(n, source)?);
-                        }
-                        else if guard.is_none() {
-                            guard = Some(self.build_expr(n, source)?);
-                        }
-                    }
+                    _ => expressions.push(self.build_expr(n, source)?),
                 },
             }
         }
 
         let pattern = pattern.ok_or_else(|| source.syntax_error("Missing match arm pattern".to_string(), span.start))?;
-        let body = body.ok_or_else(|| source.syntax_error("Missing match arm body".to_string(), span.start))?;
+        let (guard, body) = match expressions.len() {
+            0 => {
+                return Err(source.syntax_error("Missing match arm body".to_string(), span.start));
+            }
+            1 => (None, expressions.remove(0)),
+            2 => (Some(expressions.remove(0)), expressions.remove(0)),
+            _ => {
+                return Err(source.syntax_error("Match arm has too many expressions".to_string(), span.start));
+            }
+        };
 
         Ok(MatchArm { pattern, guard, body, span })
     }
@@ -374,24 +375,26 @@ impl<'config> ValkyrieBuilder<'config> {
         let span = node.span();
         let mut name_path: Option<NamePath> = None;
         let mut fields: Option<Vec<(Identifier, Option<Pattern>)>> = None;
+        let mut nested_patterns: Vec<Pattern> = Vec::new();
+        let mut lone_identifier: Option<(Identifier, Span)> = None;
 
         for child in node.children() {
             match child {
                 RedTree::Leaf(t) => match t.kind {
                     ValkyrieTokenType::Whitespace | ValkyrieTokenType::Newline | ValkyrieTokenType::LineComment | ValkyrieTokenType::BlockComment => continue,
                     ValkyrieTokenType::Underscore => {
-                        if name_path.is_none() && fields.is_none() {
+                        if name_path.is_none() && fields.is_none() && nested_patterns.is_empty() && lone_identifier.is_none() {
                             return Ok(Pattern::Wildcard(Box::new(WildcardPattern { span: t.span })));
                         }
                     }
                     ValkyrieTokenType::Identifier => {
-                        if name_path.is_none() && fields.is_none() {
+                        if name_path.is_none() && fields.is_none() && nested_patterns.is_empty() && lone_identifier.is_none() {
                             let name = crate::builder::text(source, t.span);
-                            return Ok(Pattern::Variable(Box::new(VariablePattern { name: Identifier { name, span: t.span }, span: t.span })));
+                            lone_identifier = Some((Identifier { name, span: t.span }, t.span));
                         }
                     }
                     ValkyrieTokenType::IntegerLiteral | ValkyrieTokenType::FloatLiteral | ValkyrieTokenType::StringLiteral => {
-                        if name_path.is_none() && fields.is_none() {
+                        if name_path.is_none() && fields.is_none() && nested_patterns.is_empty() && lone_identifier.is_none() {
                             let value = crate::builder::text(source, t.span);
                             return Ok(Pattern::Literal(Box::new(LiteralPattern { value, span: t.span })));
                         }
@@ -413,16 +416,47 @@ impl<'config> ValkyrieBuilder<'config> {
                             fields = Some(self.build_pattern_fields(&n, source)?);
                         }
                     }
+                    crate::parser::element_type::ValkyrieElementType::Pattern => {
+                        nested_patterns.push(self.build_pattern(n, source)?);
+                    }
                     _ => {}
                 },
             }
         }
 
-        match (name_path, fields) {
-            (Some(name), Some(fields)) => Ok(Pattern::Class(Box::new(ClassPattern { name, fields, span }))),
-            (Some(name), None) => Ok(Pattern::Type(Box::new(TypePattern { name, span }))),
-            _ => Ok(Pattern::Wildcard(Box::new(WildcardPattern { span }))),
+        if let Some(name) = name_path {
+            if let Some(fields) = fields {
+                return Ok(Pattern::Class(Box::new(ClassPattern { name, fields, span })));
+            }
+            if !nested_patterns.is_empty() {
+                return Ok(Pattern::Class(Box::new(ClassPattern { name, fields: Self::positional_variant_fields(&nested_patterns, span), span })));
+            }
+            return Ok(Pattern::Type(Box::new(TypePattern { name, span })));
         }
+
+        if let Some((identifier, id_span)) = lone_identifier {
+            if !nested_patterns.is_empty() {
+                let name = NamePath { parts: vec![identifier], span: id_span };
+                return Ok(Pattern::Class(Box::new(ClassPattern { name, fields: Self::positional_variant_fields(&nested_patterns, span), span })));
+            }
+            if identifier.name.chars().next().is_some_and(|ch| ch.is_uppercase()) {
+                return Ok(Pattern::Type(Box::new(TypePattern { name: NamePath { parts: vec![identifier], span: id_span }, span })));
+            }
+            return Ok(Pattern::Variable(Box::new(VariablePattern { name: identifier, span: id_span })));
+        }
+
+        Ok(Pattern::Wildcard(Box::new(WildcardPattern { span })))
+    }
+
+    fn positional_variant_fields(nested_patterns: &[Pattern], fallback_span: Span) -> Vec<(Identifier, Option<Pattern>)> {
+        nested_patterns
+            .iter()
+            .enumerate()
+            .map(|(index, pattern)| match pattern {
+                Pattern::Variable(variable) => (variable.name.clone(), None),
+                _ => (Identifier { name: format!("_{index}"), span: fallback_span }, Some(pattern.clone())),
+            })
+            .collect()
     }
 
     /// Builds pattern fields from a block expression.

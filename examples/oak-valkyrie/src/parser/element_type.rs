@@ -74,6 +74,8 @@ pub enum ValkyrieElementType {
     UnaryExpression,
     /// Parenthesized expression node.
     ParenthesizedExpression,
+    /// `expr as Type` 显式转型表达式。
+    CastExpression,
     /// Index expression node.
     IndexExpression,
     /// Offset expression node (cardinal indexing, 0-based).
@@ -142,6 +144,8 @@ pub enum ValkyrieElementType {
     Flags,
     /// Widget definition node.
     Widget,
+    /// Union definition node.
+    Union,
     /// Singleton definition node.
     Singleton,
     /// Shader definition node.

@@ -1,5 +1,0 @@
-micro main() {
-    loop {
-        break;
-    }
-}

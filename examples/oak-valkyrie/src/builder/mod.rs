@@ -45,6 +45,17 @@ pub(crate) fn text(source: &(impl Source + ?Sized), range: oak_core::Range<usize
     source.get_text_in(range).to_string()
 }
 
+/// 从源码区间取出标识符文本；raw id（`` `any` ``）去掉两侧反引号。
+pub(crate) fn identifier_text(source: &(impl Source + ?Sized), range: oak_core::Range<usize>) -> String {
+    let raw = source.get_text_in(range);
+    if raw.len() >= 2 && raw.starts_with('`') && raw.ends_with('`') {
+        raw[1..raw.len() - 1].to_string()
+    }
+    else {
+        raw.to_string()
+    }
+}
+
 /// Valkyrie builder for constructing AST from parsed syntax trees.
 ///
 /// The Valkyrie builder takes the green tree produced by the parser and transforms it into a

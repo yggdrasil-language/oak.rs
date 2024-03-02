@@ -1,141 +1,157 @@
-use crate::ast::{Attribute, Block, GenericParam, Identifier, Param, Parent, Span, TermExpression, TypeExpression};
+//! Structure nodes for the Valkyrie language AST.
+//!
+//! Value-type `struct` / `structure` declarations use [`StructureDeclaration`].
+//! Anonymous `structure { ... }` literals use [`AnonymousStructure`].
+//! Anonymous `class { ... }` literals use [`AnonymousClass`](crate::ast::class_nodes::AnonymousClass).
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Default)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct StructureDeclaration {
-    /// The class name.
-    pub name: Identifier,
-    /// Generic parameters for the class.
-    pub generics: Vec<GenericParam>,
-    /// Parent classes or traits this class inherits from.
-    pub parents: Vec<Parent>,
-    /// Items (fields, methods) declared within the class.
-    pub fields: Vec<FieldDeclaration>,
-    /// Annotations applied to the class.
-    pub annotations: Vec<Attribute>,
-    /// The source code span.
-    #[cfg_attr(feature = "serde", serde(with = "oak_core::serde_range"))]
-    pub span: Span,
-}
+use crate::ast::{Attribute, Block, GenericParam, Identifier, Param, Parent, Span, TermExpression, TypeExpression, trait_nodes::AssociatedType};
 
-/// A class declaration
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Default)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct ClassDeclaration {
-    /// Annotations applied to the class.
-    pub annotations: Vec<Attribute>,
-    /// The class name.
-    pub name: Identifier,
-    /// Generic parameters for the class.
-    pub generics: Vec<GenericParam>,
-    /// Parent classes or traits this class inherits from.
-    pub parents: Vec<Parent>,
-    /// Fields declared within the class.
-    pub fields: Vec<FieldDeclaration>,
-    /// Methods declared within the class.
-    pub methods: Vec<MethodDeclaration>,
-    /// The source code span.
-    #[cfg_attr(feature = "serde", serde(with = "oak_core::serde_range"))]
-    pub span: Span,
-}
-
-/// A lambda expression
+/// Named value-type declaration keyword (`struct` / `structure`).
 ///
+/// # V Language Example
 /// ```v
-/// let add = class { x: 10, y: 10 }
+/// struct LegacyPoint { x: f64, y: f64 }
+/// structure Point { x: f64, y: f64 }
 /// ```
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct AnonymousClass {
-    /// Parent traits or classes to implement/extend.
-    pub parents: Vec<String>,
-    /// Fields declared within the class.
-    pub fields: Vec<FieldDeclaration>,
-    /// Methods declared within the class.
-    pub methods: Vec<MethodDeclaration>,
-    /// Variables captured from the enclosing scope.
-    pub captures: Vec<Identifier>,
-    /// Source span.
-    #[cfg_attr(feature = "serde", serde(with = "oak_core::serde_range"))]
-    pub span: Span,
+pub enum StructureKind {
+    /// `struct <name>? { ... }` spelling (value type), deprecated.
+    Struct,
+    /// `structure <name>? { ... }` (value type).
+    #[default]
+    Structure,
 }
 
-/// A singleton declaration.
+/// A named `struct` / `structure` declaration.
 ///
-/// Singletons are classes that have exactly one instance globally.
-/// They are useful for managing global state, configuration, or resources.
-///
-/// # Example
-///
+/// # V Language Example
 /// ```v
-/// singleton GlobalConfig {
-///     host: String = "localhost"
-///     port: i32 = 8080
+/// structure Point {
+///     x: f64
+///     y: f64
 ///
-///     micro get_url(self) -> String {
-///         f"{self.host}:{self.port}"
+///     micro distance(self, other: Point) -> f64 {
+///         let dx = other.x - self.x
+///         let dy = other.y - self.y
+///         return sqrt(dx * dx + dy * dy)
 ///     }
 /// }
 /// ```
-///
-/// # Semantics
-///
-/// - A singleton has exactly one global instance
-/// - The instance is lazily initialized on first access
-/// - Singleton members are accessed through the singleton name directly
-/// - Singletons cannot be instantiated with constructors
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct SingletonDeclaration {
-    /// The singleton name.
+pub struct StructureDeclaration {
+    /// Whether this item uses `struct` or `structure`.
+    pub kind: StructureKind,
+    /// The declared type name.
     pub name: Identifier,
-    /// Generic parameters for the singleton.
-    pub generics: Vec<GenericParam>,
-    /// Parent traits this singleton implements.
-    pub parents: Vec<Parent>,
-    /// Fields declared within the class.
-    pub fields: Vec<FieldDeclaration>,
-    /// Methods declared within the class.
-    pub methods: Vec<MethodDeclaration>,
-    /// Annotations applied to the singleton.
+    /// Annotations applied to the declaration.
     pub annotations: Vec<Attribute>,
-    /// The source code span.
+    /// Generic parameters declared on the header.
+    pub generics: Vec<GenericParam>,
+    /// Parents listed on the header.
+    pub parents: Vec<Parent>,
+    /// Declaration body.
+    pub body: StructureBody,
+    /// The source code span covering the declaration.
     #[cfg_attr(feature = "serde", serde(with = "oak_core::serde_range"))]
     pub span: Span,
 }
 
-/// A field in a class or struct
+/// An anonymous `structure { ... }` expression literal.
+///
+/// # V Language Example
+/// ```v
+/// let point = structure {
+///     x: 1.0
+///     y: 2.0
+/// }
+/// ```
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Default)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct AnonymousStructure {
+    /// Annotations applied to the literal.
+    pub annotations: Vec<Attribute>,
+    /// Generic parameters on the header, when present.
+    pub generics: Vec<GenericParam>,
+    /// Parents listed on the header, when present.
+    pub parents: Vec<Parent>,
+    /// Literal body.
+    pub body: StructureBody,
+    /// Variables captured from the enclosing scope.
+    pub captures: Vec<Identifier>,
+    /// The source code span covering the whole literal.
+    #[cfg_attr(feature = "serde", serde(with = "oak_core::serde_range"))]
+    pub span: Span,
+}
+
+/// Field/method body shared by class, structure, singleton, trait, and anonymous literals.
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Default)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct StructureBody {
+    /// Fields declared in the body.
+    pub fields: Vec<FieldDeclaration>,
+    /// Methods declared in the body.
+    pub methods: Vec<MethodDeclaration>,
+    /// Associated types declared in trait bodies.
+    pub associated_types: Vec<AssociatedType>,
+    /// The source code span covering the body braces.
+    #[cfg_attr(feature = "serde", serde(with = "oak_core::serde_range"))]
+    pub span: Span,
+}
+
+/// A field declaration inside a class, structure, or singleton.
+///
+/// # V Language Example
+/// ```v
+/// class Packet {
+///     id: i32
+///     payload: utf8 = ""
+/// }
+/// ```
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct FieldDeclaration {
+    /// Annotations applied to the field.
+    pub annotations: Vec<Attribute>,
     /// The field name.
     pub name: Identifier,
     /// The field type.
-    pub ty: TypeExpression,
+    pub typing: TypeExpression,
     /// Optional default value expression.
     pub default: Option<TermExpression>,
-    /// Annotations applied to the field.
-    pub annotations: Vec<Attribute>,
     /// The source code span.
     #[cfg_attr(feature = "serde", serde(with = "oak_core::serde_range"))]
     pub span: Span,
 }
 
-/// A function definition
+/// A method declaration inside a class, structure, trait, singleton, or imply block.
+///
+/// # V Language Example
+/// ```v
+/// structure Rect {
+///     width: f64
+///     height: f64
+///
+///     micro area(self) -> f64 {
+///         return self.width * self.height
+///     }
+/// }
+/// ```
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct MethodDeclaration {
-    /// The function name.
+    /// The method name.
     pub name: Identifier,
-    /// Generic parameters for the function.
+    /// Generic parameters for the method.
     pub generics: Vec<GenericParam>,
-    /// The function parameters.
-    pub params: Vec<Param>,
+    /// The method parameters.
+    pub parameters: Vec<Param>,
     /// Optional return type annotation.
     pub return_type: Option<TypeExpression>,
-    /// The optional function body.
+    /// The optional method body.
     pub body: Option<Block>,
-    /// Annotations applied to the function.
+    /// Annotations applied to the method.
     pub annotations: Vec<Attribute>,
     /// The source code span.
     #[cfg_attr(feature = "serde", serde(with = "oak_core::serde_range"))]

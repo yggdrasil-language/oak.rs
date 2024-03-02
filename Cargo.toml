@@ -22,10 +22,10 @@ repository = "https://github.com/yggdrasil-language/oak.rs"
 [workspace.dependencies]
 # External dependencies removed to achieve architectural independence
 walkdir = { version = "2.5.0" }
-serde = { version = "1.0.228", features = ["derive", "rc"] }
+serde = { version = "1.0.229", features = ["derive", "rc"] }
 serde_json = { version = "1.0.149" }
 schemars = { version = "1.2.1", features = ["derive"] }
-logger = { git = "https://github.com/oovm/rust-boost", branch = "dev", package = "logger" }
+logger = { git = "https://github.com/oovm/rust-boost", branch = "dev" }
 serial_test = { version = "3.2.0" }
 unicode-ident = { version = "1.0.24" }
 url = { version = "2.5.8", features = ["serde"] }
@@ -86,7 +86,7 @@ oak-actionscript = { path = "examples/oak-actionscript", version = "0.0.12" }
 oak-ada = { path = "examples/oak-ada", version = "0.0.12" }
 oak-apl = { path = "examples/oak-apl", version = "0.0.12" }
 oak-ascii-doc = { path = "examples/oak-ascii-doc", version = "0.0.12" }
-oak-awsl = { path = "examples/oak-awsl", version = "0.0.12" }
+oak-awsl = { path = "examples/oak-voc", version = "0.0.12" }
 oak-bash = { path = "examples/oak-bash", version = "0.0.12" }
 oak-bat = { path = "examples/oak-bat", version = "0.0.12" }
 oak-c = { path = "examples/oak-c", version = "0.0.12" }
@@ -195,7 +195,6 @@ oak-vampire = { path = "examples/oak-vampire", version = "0.0.12" }
 oak-verilog = { path = "examples/oak-verilog", version = "0.0.12" }
 oak-vhdl = { path = "examples/oak-vhdl", version = "0.0.12" }
 oak-vlang = { path = "examples/oak-vlang", version = "0.0.12" }
-oak-voc = { path = "examples/oak-voc", version = "0.0.12" }
 oak-voml = { path = "examples/oak-voml", version = "0.0.12" }
 oak-von = { path = "examples/oak-von", version = "0.0.12" }
 oak-vue = { path = "examples/oak-vue", version = "0.0.12" }

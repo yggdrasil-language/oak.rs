@@ -1,5 +1,0 @@
-let Point { x, y } = p1;
-let Point { x: a, y: b } = p2;
-let Point { x, y: new_y } = p3;
-let Person { name, age } = person;
-let Person { name: n, age: a } = person2;

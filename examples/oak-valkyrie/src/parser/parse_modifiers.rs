@@ -27,6 +27,11 @@ pub(crate) fn is_parameter_name_follower(kind: &ValkyrieTokenType) -> bool {
     matches!(kind, ValkyrieTokenType::Identifier)
 }
 
+/// raw id（`` `any` `` / `` `==` `` 词法化为 `Identifier`）前的运算符修饰符锚点。
+pub(crate) fn is_raw_id_follower(kind: &ValkyrieTokenType) -> bool {
+    matches!(kind, ValkyrieTokenType::Identifier)
+}
+
 /// 声明项起始关键字；其前的 `Identifier` 序列解析为 [`ValkyrieElementType::Modifier`]。
 pub(crate) fn is_declaration_keyword(kind: &ValkyrieTokenType) -> bool {
     matches!(

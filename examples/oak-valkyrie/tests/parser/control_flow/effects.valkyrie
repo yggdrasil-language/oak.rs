@@ -1,5 +1,0 @@
-let x = try {
-    raise "error"
-} .catch {
-    case e: resume 1
-}

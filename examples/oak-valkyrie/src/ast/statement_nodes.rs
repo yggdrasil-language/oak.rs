@@ -1,7 +1,21 @@
+//! Statement nodes for the Valkyrie language AST.
+//!
+//! This module defines block-level statements such as `let` bindings and
+//! expression statements.
+
 use super::{Attribute, Pattern, Span, TermExpression, TypeExpression};
 use crate::ast::template_nodes::TemplateNode;
 
-/// A let binding statement.
+/// A `let` binding statement.
+///
+/// # V Language Example
+/// ```v
+/// micro demo() {
+///     let count: i32 = 0
+///     let (x, y) = (1, 2)
+///     let Point { x: px, y: py } = point
+/// }
+/// ```
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Let {
@@ -19,6 +33,14 @@ pub struct Let {
 }
 
 /// An expression statement.
+///
+/// # V Language Example
+/// ```v
+/// micro demo() {
+///     println("ready")
+///     do_work()
+/// }
+/// ```
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ExprStmt {
@@ -33,7 +55,15 @@ pub struct ExprStmt {
     pub span: Span,
 }
 
-/// A statement
+/// A statement inside a block.
+///
+/// # V Language Example
+/// ```v
+/// micro run() {
+///     let total = 0
+///     total = total + step()
+/// }
+/// ```
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum Statement {

@@ -67,7 +67,7 @@ pub(crate) fn build_identifier<S: Source + ?Sized>(node: &RedNode<ValkyrieLangua
     for child in node.children() {
         if let RedTree::Leaf(t) = child {
             if t.kind == ValkyrieTokenType::Identifier {
-                name = crate::builder::text(source, t.span);
+                name = crate::builder::identifier_text(source, t.span);
                 return Ok(Identifier { name, span: t.span });
             }
         }
@@ -83,7 +83,7 @@ pub(crate) fn build_name_path<S: Source + ?Sized>(node: &RedNode<ValkyrieLanguag
     for child in node.children() {
         if let RedTree::Leaf(t) = child {
             if !should_skip_node(&child) && t.kind == ValkyrieTokenType::Identifier {
-                parts.push(Identifier { name: crate::builder::text(source, t.span), span: t.span });
+                parts.push(Identifier { name: crate::builder::identifier_text(source, t.span), span: t.span });
             }
         }
     }

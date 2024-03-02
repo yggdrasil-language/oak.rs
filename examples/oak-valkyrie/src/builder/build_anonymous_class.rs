@@ -2,27 +2,42 @@ use crate::{
     ValkyrieLanguage,
     ast::*,
     builder::{ValkyrieBuilder, text},
-    lexer::token_type::ValkyrieTokenType,
+    lexer::{ValkyrieKeywords, token_type::ValkyrieTokenType},
 };
 use oak_core::{OakError, RedNode, RedTree, Source};
 
 impl<'config> ValkyrieBuilder<'config> {
-    /// Builds an anonymous class expression.
+    /// Builds an anonymous `class { ... }` / `structure { ... }` expression.
     ///
-    /// Syntax: `class { ... }` or `class: Trait { ... }`
+    /// Supported shapes:
+    /// - `class { ... }`
+    /// - `structure { ... }`
+    /// - `class: Trait { ... }`
+    /// - `class(Parent)` / `class(alias: Parent)` / `class()`
     pub(crate) fn build_anonymous_class<S: Source + ?Sized>(&self, node: RedNode<ValkyrieLanguage>, source: &S) -> Result<TermExpression, OakError> {
         let span = node.span();
+        let mut is_structure = false;
+        let mut annotations = Vec::new();
+        let mut generics = Vec::new();
         let mut parents = Vec::new();
         let mut fields = Vec::new();
         let mut methods = Vec::new();
         let mut captures = Vec::new();
+        let mut saw_colon = false;
+        let mut parent_nodes = Vec::new();
 
         for child in node.children() {
             match child {
                 RedTree::Leaf(t) => match t.kind {
                     ValkyrieTokenType::Whitespace | ValkyrieTokenType::Newline | ValkyrieTokenType::LineComment | ValkyrieTokenType::BlockComment => continue,
-                    ValkyrieTokenType::Identifier => {
-                        parents.push(text(source, t.span));
+                    ValkyrieTokenType::Keyword(ValkyrieKeywords::Structure) => {
+                        is_structure = true;
+                    }
+                    ValkyrieTokenType::Keyword(ValkyrieKeywords::Class) => {
+                        is_structure = false;
+                    }
+                    ValkyrieTokenType::Colon => {
+                        saw_colon = true;
                     }
                     _ => {}
                 },
@@ -31,11 +46,24 @@ impl<'config> ValkyrieBuilder<'config> {
                     | crate::parser::element_type::ValkyrieElementType::Newline
                     | crate::parser::element_type::ValkyrieElementType::LineComment
                     | crate::parser::element_type::ValkyrieElementType::BlockComment => continue,
+                    crate::parser::element_type::ValkyrieElementType::Modifier => {
+                        let modifier = self.build_modifier(n, source)?;
+                        annotations.push(ValkyrieBuilder::modifier_to_attribute(modifier));
+                    }
+                    crate::parser::element_type::ValkyrieElementType::Attribute => {
+                        annotations.push(self.build_attribute(n, source)?);
+                    }
+                    crate::parser::element_type::ValkyrieElementType::GenericParameterList => {
+                        generics = self.build_generic_params(n, source)?;
+                    }
                     crate::parser::element_type::ValkyrieElementType::NamePath => {
-                        let path = self.build_name_path(n, source)?;
-                        if let Some(first) = path.parts.first() {
-                            parents.push(first.name.clone());
+                        if saw_colon {
+                            let path = self.build_name_path(n, source)?;
+                            parents.push(Parent { alias: None, name: path, span: n.span() });
                         }
+                    }
+                    crate::parser::element_type::ValkyrieElementType::ParameterList | crate::parser::element_type::ValkyrieElementType::ArgList => {
+                        parent_nodes.push(n);
                     }
                     crate::parser::element_type::ValkyrieElementType::Field => {
                         if let Ok(field) = self.build_field(n, source) {
@@ -52,7 +80,49 @@ impl<'config> ValkyrieBuilder<'config> {
             }
         }
 
-        Ok(TermExpression::AnonymousClass(Box::new(AnonymousClass { parents, fields, methods, captures, span })))
+        if !parent_nodes.is_empty() {
+            for parent_node in parent_nodes {
+                for child in parent_node.children() {
+                    match child {
+                        RedTree::Leaf(t) => match t.kind {
+                            ValkyrieTokenType::Whitespace | ValkyrieTokenType::Newline | ValkyrieTokenType::LineComment | ValkyrieTokenType::BlockComment => continue,
+                            ValkyrieTokenType::Identifier => {
+                                let name = Identifier { name: text(source, t.span), span: t.span };
+                                parents.push(Parent { alias: None, name: NamePath { parts: vec![name], span: t.span }, span: t.span });
+                            }
+                            _ => {}
+                        },
+                        RedTree::Node(n) => {
+                            if n.green.kind == crate::parser::element_type::ValkyrieElementType::NamePath {
+                                parents.push(Parent { alias: None, name: self.build_name_path(n, source)?, span: n.span() });
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        let body = StructureBody { fields, methods, associated_types: Vec::new(), span };
+        if is_structure {
+            Ok(TermExpression::AnonymousStructure(Box::new(AnonymousStructure {
+                annotations,
+                generics,
+                parents,
+                body,
+                captures,
+                span,
+            })))
+        }
+        else {
+            Ok(TermExpression::AnonymousClass(Box::new(AnonymousClass {
+                annotations,
+                generics,
+                parents,
+                body,
+                captures,
+                span,
+            })))
+        }
     }
 
     /// Builds a super call expression for constructor chaining.

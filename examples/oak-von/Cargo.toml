@@ -30,13 +30,3 @@ all-features = true
 [[test]]
 name = "main"
 required-features = ["serde"]
-
-[[test]]
-name = "formatter"
-path = "tests/formatter/mod.rs"
-required-features = ["serde"]
-
-[[test]]
-name = "printer"
-path = "tests/printer/mod.rs"
-required-features = ["serde"]

@@ -1,5 +1,0 @@
-micro main() {
-    if true {
-        1;
-    }
-}

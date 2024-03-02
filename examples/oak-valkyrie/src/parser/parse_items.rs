@@ -3,12 +3,26 @@ use crate::{
     lexer::{keywords::ValkyrieKeywords, token_type::ValkyrieTokenType},
     parser::{
         element_type::ValkyrieElementType,
-        parse_modifiers::{dispatch_prefixed_declaration, is_declaration_keyword, is_member_accessor_keyword, parse_field_modifiers, parse_modifiers, parse_modifiers_followed_by},
+        parse_modifiers::{
+            dispatch_prefixed_declaration, is_declaration_keyword, is_member_accessor_keyword, is_raw_id_follower, parse_field_modifiers, parse_modifiers,
+            parse_modifiers_followed_by,
+        },
     },
 };
 use oak_core::parser::ParserState;
 
 type State<'a, S> = ParserState<'a, ValkyrieLanguage, S>;
+
+#[inline]
+fn token_index<S: oak_core::Source + ?Sized>(state: &State<'_, S>) -> usize {
+    state.checkpoint().0
+}
+
+/// 容错循环若未消耗 token 则必须退出，否则 green tree 会指数膨胀并撑爆内存。
+#[inline]
+fn stalled<S: oak_core::Source + ?Sized>(state: &State<'_, S>, before: usize) -> bool {
+    token_index(state) == before
+}
 
 /// 解析顶层项
 pub(crate) fn parse_item<S: oak_core::Source + ?Sized>(state: &mut State<'_, S>) -> Result<(), oak_core::OakError> {
@@ -62,11 +76,16 @@ pub(crate) fn parse_item<S: oak_core::Source + ?Sized>(state: &mut State<'_, S>)
                 Ok(())
             }
             ValkyrieTokenType::Keyword(ValkyrieKeywords::Widget) => parse_widget(state),
+            ValkyrieTokenType::Keyword(ValkyrieKeywords::Union) => parse_union(state),
             ValkyrieTokenType::Keyword(ValkyrieKeywords::Singleton) => parse_singleton(state),
             ValkyrieTokenType::Keyword(ValkyrieKeywords::Shader) => parse_shader(state),
             ValkyrieTokenType::Keyword(ValkyrieKeywords::Component) => parse_component(state),
             ValkyrieTokenType::Keyword(ValkyrieKeywords::System) => parse_system(state),
             ValkyrieTokenType::At => parse_attribute_item(state),
+            ValkyrieTokenType::Error => {
+                let offset = token.span.start;
+                Err(state.source.syntax_error("unexpected lexical error token while parsing item".to_string(), offset))
+            }
             _ => {
                 let cp = state.sink.checkpoint();
                 parse_expr_statement(state)?;
@@ -92,12 +111,18 @@ pub(crate) fn parse_micro<S: oak_core::Source + ?Sized>(state: &mut State<'_, S>
     if state.at(ValkyrieTokenType::ParenthesisL) {
         parse_parameter_list(state)?;
     }
-    if state.at(ValkyrieTokenType::Arrow) {
+    if state.at(ValkyrieTokenType::Arrow) || state.at(ValkyrieTokenType::Colon) {
         state.bump();
         parse_type(state)?;
     }
     if state.at(ValkyrieTokenType::BraceL) {
         parse_block(state)?;
+    }
+    else if state.at(ValkyrieTokenType::Semicolon) {
+        // intrinsic 前向声明：`private micro __i64_add(...): i64;`
+        let bcp = state.sink.checkpoint();
+        state.bump();
+        state.sink.finish_node(bcp, ValkyrieElementType::BlockExpression);
     }
     state.sink.finish_node(cp, ValkyrieElementType::Micro);
     Ok(())
@@ -115,7 +140,7 @@ pub(crate) fn parse_mezzo<S: oak_core::Source + ?Sized>(state: &mut State<'_, S>
     if state.at(ValkyrieTokenType::ParenthesisL) {
         parse_parameter_list(state)?;
     }
-    if state.at(ValkyrieTokenType::Arrow) {
+    if state.at(ValkyrieTokenType::Arrow) || state.at(ValkyrieTokenType::Colon) {
         state.bump();
         parse_type(state)?;
     }
@@ -130,6 +155,10 @@ pub(crate) fn parse_mezzo<S: oak_core::Source + ?Sized>(state: &mut State<'_, S>
 pub(crate) fn parse_namespace<S: oak_core::Source + ?Sized>(state: &mut State<'_, S>) -> Result<(), oak_core::OakError> {
     let cp = state.sink.checkpoint();
     state.bump();
+    // `namespace! core::types;` 文件级命名空间声明。
+    if state.at(ValkyrieTokenType::Bang) {
+        state.bump();
+    }
     parse_name_path(state)?;
     if state.at(ValkyrieTokenType::BraceL) {
         state.bump();
@@ -139,6 +168,10 @@ pub(crate) fn parse_namespace<S: oak_core::Source + ?Sized>(state: &mut State<'_
         if state.at(ValkyrieTokenType::BraceR) {
             state.bump();
         }
+    }
+    else if state.at(ValkyrieTokenType::Semicolon) {
+        // `namespace marker;` 空命名空间块是 core/std 源码的标准写法。
+        state.bump();
     }
     state.sink.finish_node(cp, ValkyrieElementType::Namespace);
     Ok(())
@@ -246,10 +279,17 @@ pub(crate) fn parse_struct<S: oak_core::Source + ?Sized>(state: &mut State<'_, S
     if state.at(ValkyrieTokenType::BraceL) {
         state.bump();
         while state.not_at_end() && !state.at(ValkyrieTokenType::BraceR) {
+            state.skip_trivia();
             while state.at(ValkyrieTokenType::At) {
                 parse_attribute(state)?;
+                state.skip_trivia();
+            }
+            if state.at(ValkyrieTokenType::Keyword(ValkyrieKeywords::Micro)) {
+                parse_micro(state)?;
+                continue;
             }
             let fcp = state.sink.checkpoint();
+            let before = state.tokens.index();
             parse_field_modifiers(state)?;
             if state.at(ValkyrieTokenType::Identifier) {
                 state.bump();
@@ -265,6 +305,10 @@ pub(crate) fn parse_struct<S: oak_core::Source + ?Sized>(state: &mut State<'_, S
             state.sink.finish_node(fcp, ValkyrieElementType::Field);
             if state.at(ValkyrieTokenType::Comma) {
                 state.bump();
+            }
+            if state.tokens.index() == before {
+                let offset = state.current().map(|token| token.span.start).unwrap_or(0);
+                return Err(state.source.syntax_error("structure 成员解析停滞，遇到无法识别的记号".to_string(), offset));
             }
         }
         if state.at(ValkyrieTokenType::BraceR) {
@@ -293,7 +337,12 @@ pub(crate) fn parse_enums<S: oak_core::Source + ?Sized>(state: &mut State<'_, S>
     if state.at(ValkyrieTokenType::BraceL) {
         state.bump();
         while state.not_at_end() && !state.at(ValkyrieTokenType::BraceR) {
+            state.skip_trivia();
+            let before = token_index(state);
             parse_variant(state)?;
+            if stalled(state, before) {
+                break;
+            }
             if state.at(ValkyrieTokenType::Comma) {
                 state.bump();
             }
@@ -317,11 +366,20 @@ pub(crate) fn parse_enum<S: oak_core::Source + ?Sized>(state: &mut State<'_, S>)
     if state.at(ValkyrieTokenType::BraceL) {
         state.bump();
         while state.not_at_end() && !state.at(ValkyrieTokenType::BraceR) {
+            state.skip_trivia();
+            let before = token_index(state);
             let vcp = state.sink.checkpoint();
             if state.at(ValkyrieTokenType::Identifier) {
                 state.bump();
             }
+            if state.at(ValkyrieTokenType::Eq) {
+                state.bump();
+                parse_expression(state)?;
+            }
             state.sink.finish_node(vcp, ValkyrieElementType::Variant);
+            if stalled(state, before) {
+                break;
+            }
             if state.at(ValkyrieTokenType::Comma) {
                 state.bump();
             }
@@ -337,16 +395,30 @@ pub(crate) fn parse_enum<S: oak_core::Source + ?Sized>(state: &mut State<'_, S>)
 /// 解析 variant 定义
 pub(crate) fn parse_variant<S: oak_core::Source + ?Sized>(state: &mut State<'_, S>) -> Result<(), oak_core::OakError> {
     let cp = state.sink.checkpoint();
+    state.skip_trivia();
+    while state.at(ValkyrieTokenType::BracketL) {
+        parse_bracket_attribute_list(state)?;
+        state.skip_trivia();
+    }
     while state.at(ValkyrieTokenType::At) {
         parse_attribute(state)?;
+        state.skip_trivia();
     }
     if state.at(ValkyrieTokenType::Identifier) {
         state.bump();
     }
+    if state.at(ValkyrieTokenType::Eq) {
+        state.bump();
+        parse_expression(state)?;
+    }
     if state.at(ValkyrieTokenType::ParenthesisL) {
         state.bump();
         while state.not_at_end() && !state.at(ValkyrieTokenType::ParenthesisR) {
+            let before = token_index(state);
             parse_type(state)?;
+            if stalled(state, before) {
+                break;
+            }
             if state.at(ValkyrieTokenType::Identifier) {
                 state.bump();
             }
@@ -361,6 +433,8 @@ pub(crate) fn parse_variant<S: oak_core::Source + ?Sized>(state: &mut State<'_, 
     if state.at(ValkyrieTokenType::BraceL) {
         state.bump();
         while state.not_at_end() && !state.at(ValkyrieTokenType::BraceR) {
+            state.skip_trivia();
+            let before = token_index(state);
             while state.at(ValkyrieTokenType::At) {
                 parse_attribute(state)?;
             }
@@ -374,6 +448,9 @@ pub(crate) fn parse_variant<S: oak_core::Source + ?Sized>(state: &mut State<'_, 
                 parse_type(state)?;
             }
             state.sink.finish_node(fcp, ValkyrieElementType::Field);
+            if stalled(state, before) {
+                break;
+            }
             if state.at(ValkyrieTokenType::Comma) {
                 state.bump();
             }
@@ -397,14 +474,20 @@ pub(crate) fn parse_flags<S: oak_core::Source + ?Sized>(state: &mut State<'_, S>
     if state.at(ValkyrieTokenType::BraceL) {
         state.bump();
         while state.not_at_end() && !state.at(ValkyrieTokenType::BraceR) {
+            state.skip_trivia();
+            let before = token_index(state);
             if state.at(ValkyrieTokenType::Identifier) {
                 state.bump();
             }
+            if state.at(ValkyrieTokenType::Eq) {
+                state.bump();
+                parse_expression(state)?;
+            }
+            if stalled(state, before) {
+                break;
+            }
             if state.at(ValkyrieTokenType::Comma) {
                 state.bump();
-            }
-            else {
-                break;
             }
         }
         if state.at(ValkyrieTokenType::BraceR) {
@@ -412,6 +495,30 @@ pub(crate) fn parse_flags<S: oak_core::Source + ?Sized>(state: &mut State<'_, S>
         }
     }
     state.sink.finish_node(cp, ValkyrieElementType::Flags);
+    Ok(())
+}
+
+/// imply 成员：`prefix`/`infix`/`postfix` + raw id（`` `==` ``），或普通标识符方法。
+fn parse_imply_method<S: oak_core::Source + ?Sized>(state: &mut State<'_, S>) -> Result<(), oak_core::OakError> {
+    let cp = state.sink.checkpoint();
+    parse_modifiers_followed_by(state, is_raw_id_follower)?;
+    if !state.at(ValkyrieTokenType::Identifier) {
+        let offset = state.current().map(|token| token.span.start).unwrap_or(0);
+        return Err(state.source.syntax_error("imply 成员缺少方法名（raw id 或标识符）".to_string(), offset));
+    }
+    state.bump();
+    parse_micro_generic_parameter_clause(state)?;
+    if state.at(ValkyrieTokenType::ParenthesisL) {
+        parse_parameter_list(state)?;
+    }
+    if state.at(ValkyrieTokenType::Arrow) || state.at(ValkyrieTokenType::Colon) {
+        state.bump();
+        parse_type(state)?;
+    }
+    if state.at(ValkyrieTokenType::BraceL) {
+        parse_block(state)?;
+    }
+    state.sink.finish_node(cp, ValkyrieElementType::Micro);
     Ok(())
 }
 
@@ -431,9 +538,12 @@ pub(crate) fn parse_imply<S: oak_core::Source + ?Sized>(state: &mut State<'_, S>
     if state.at(ValkyrieTokenType::BraceL) {
         state.bump();
         while state.not_at_end() && !state.at(ValkyrieTokenType::BraceR) {
+            state.skip_trivia();
             while state.at(ValkyrieTokenType::At) {
                 parse_attribute(state)?;
+                state.skip_trivia();
             }
+            let before = token_index(state);
             if state.at(ValkyrieTokenType::Keyword(ValkyrieKeywords::Micro)) {
                 parse_micro(state)?;
             }
@@ -446,16 +556,10 @@ pub(crate) fn parse_imply<S: oak_core::Source + ?Sized>(state: &mut State<'_, S>
                 state.sink.finish_node(acp, ValkyrieElementType::AssociatedType);
             }
             else if state.at(ValkyrieTokenType::Identifier) {
-                let mcp = state.sink.checkpoint();
-                state.bump();
-                if state.at(ValkyrieTokenType::ParenthesisL) {
-                    parse_parameter_list(state)?;
-                }
-                if state.at(ValkyrieTokenType::Colon) {
-                    state.bump();
-                    parse_type(state)?;
-                }
-                state.sink.finish_node(mcp, ValkyrieElementType::Method);
+                parse_imply_method(state)?;
+            }
+            else if stalled(state, before) {
+                break;
             }
             else {
                 state.bump();
@@ -480,11 +584,17 @@ pub(crate) fn parse_trait<S: oak_core::Source + ?Sized>(state: &mut State<'_, S>
     if state.at(ValkyrieTokenType::LessThan) {
         parse_generic_parameter_list(state)?;
     }
+    if state.at(ValkyrieTokenType::Colon) {
+        state.bump();
+        parse_type(state)?;
+    }
     if state.at(ValkyrieTokenType::BraceL) {
         state.bump();
         while state.not_at_end() && !state.at(ValkyrieTokenType::BraceR) {
+            state.skip_trivia();
             while state.at(ValkyrieTokenType::At) {
                 parse_attribute(state)?;
+                state.skip_trivia();
             }
             if state.at(ValkyrieTokenType::Keyword(ValkyrieKeywords::Micro)) {
                 parse_micro(state)?;
@@ -533,6 +643,56 @@ pub(crate) fn parse_using<S: oak_core::Source + ?Sized>(state: &mut State<'_, S>
         }
     }
     state.sink.finish_node(cp, ValkyrieElementType::UsingStatement);
+    Ok(())
+}
+
+/// 解析 union 定义
+pub(crate) fn parse_union<S: oak_core::Source + ?Sized>(state: &mut State<'_, S>) -> Result<(), oak_core::OakError> {
+    let cp = state.sink.checkpoint();
+    parse_modifiers(state)?;
+    state.bump();
+    if state.at(ValkyrieTokenType::Identifier) {
+        state.bump();
+    }
+    if state.at(ValkyrieTokenType::LessThan) {
+        parse_generic_parameter_list(state)?;
+    }
+    if state.at(ValkyrieTokenType::BraceL) {
+        state.bump();
+        while state.not_at_end() && !state.at(ValkyrieTokenType::BraceR) {
+            state.skip_trivia();
+            while state.at(ValkyrieTokenType::At) {
+                parse_attribute(state)?;
+                state.skip_trivia();
+            }
+            let fcp = state.sink.checkpoint();
+            let before = state.tokens.index();
+            parse_field_modifiers(state)?;
+            if state.at(ValkyrieTokenType::Identifier) {
+                state.bump();
+            }
+            if state.at(ValkyrieTokenType::Colon) {
+                state.bump();
+                parse_type(state)?;
+            }
+            if state.at(ValkyrieTokenType::Eq) {
+                state.bump();
+                parse_expression(state)?;
+            }
+            state.sink.finish_node(fcp, ValkyrieElementType::Field);
+            if state.at(ValkyrieTokenType::Comma) {
+                state.bump();
+            }
+            if state.tokens.index() == before {
+                let offset = state.current().map(|token| token.span.start).unwrap_or(0);
+                return Err(state.source.syntax_error("union 成员解析停滞，遇到无法识别的记号".to_string(), offset));
+            }
+        }
+        if state.at(ValkyrieTokenType::BraceR) {
+            state.bump();
+        }
+    }
+    state.sink.finish_node(cp, ValkyrieElementType::Union);
     Ok(())
 }
 

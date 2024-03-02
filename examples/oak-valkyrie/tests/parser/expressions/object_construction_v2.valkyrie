@@ -1,8 +1,0 @@
-let p = Point { x: 1.0, y: 2.0 };
-let q = Point {
-    x: 1.0,
-    y: 2.0,
-};
-let r = Point { x, y };
-let mixed = Point { x: 1.0, y };
-let nested = Outer { inner: Inner { a: 1, b: 2 } };

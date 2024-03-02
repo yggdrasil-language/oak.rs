@@ -1,6 +1,0 @@
-let p1 = Point { x: 1.0, y: 2.0 };
-let p2 = Point {
-    x: 1.0,
-    y: 2.0,
-};
-let p3 = Point { x, y };

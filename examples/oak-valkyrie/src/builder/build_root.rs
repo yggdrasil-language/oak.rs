@@ -140,6 +140,10 @@ impl<'config> ValkyrieBuilder<'config> {
                 let structure = self.build_struct(n, source)?;
                 Ok(StatementNode::Structure(Box::new(structure)))
             }
+            ValkyrieElementType::Union => {
+                let union_decl = self.build_union(n, source)?;
+                Ok(StatementNode::Union(Box::new(union_decl)))
+            }
             ValkyrieElementType::System => {
                 let system = self.build_system(n, source)?;
                 Ok(StatementNode::System(Box::new(system)))

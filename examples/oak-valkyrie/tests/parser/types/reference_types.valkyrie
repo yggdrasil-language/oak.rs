@@ -1,4 +1,0 @@
-micro main() {
-    let a: &i32 = &42;
-    let b: &mut i32 = &mut 42;
-}

@@ -52,7 +52,13 @@ impl crate::lexer::ValkyrieLexer<'_> {
                 return Ok(());
             }
 
-            let matched = self.lex_string_literal(state) || self.lex_char_literal(state) || self.lex_number_literal(state) || self.lex_identifier_or_keyword(state, template_directive) || self.lex_operators(state) || self.lex_single_char_tokens(state);
+            let matched = self.lex_string_literal(state)
+                || self.lex_char_literal(state)
+                || self.lex_number_literal(state)
+                || self.lex_backtick_identifier(state)
+                || self.lex_identifier_or_keyword(state, template_directive)
+                || self.lex_operators(state)
+                || self.lex_single_char_tokens(state);
 
             if !matched {
                 if let Some(c) = state.current() {
@@ -90,8 +96,46 @@ impl crate::lexer::ValkyrieLexer<'_> {
         }
     }
 
+    /// raw id：`` `any` `` / `` `==` `` 等反引号引用（保留字或运算符作声明名）。
+    fn lex_backtick_identifier<S: Source + ?Sized>(&self, state: &mut State<'_, S>) -> bool {
+        if state.current() != Some('`') {
+            return false;
+        }
+        let start = state.get_position();
+        state.advance('`'.len_utf8());
+        let inner_start = state.get_position();
+        while let Some(ch) = state.current() {
+            if ch == '`' {
+                state.advance('`'.len_utf8());
+                if inner_start == state.get_position() - '`'.len_utf8() {
+                    state.add_token(ValkyrieTokenType::Error, start, state.get_position());
+                }
+                else {
+                    // span 须含两侧反引号，否则 green tree 按 bump 累计长度对齐源码时会落在开引号字节上。
+                    state.add_token(ValkyrieTokenType::Identifier, start, state.get_position());
+                }
+                return true;
+            }
+            state.advance(ch.len_utf8());
+        }
+        state.add_token(ValkyrieTokenType::Error, start, state.get_position());
+        true
+    }
+
     fn lex_comments<S: Source + ?Sized>(&self, state: &mut State<'_, S>) -> bool {
-        VK_COMMENT.scan(state, ValkyrieTokenType::LineComment, ValkyrieTokenType::BlockComment)
+        if VK_COMMENT.scan(state, ValkyrieTokenType::LineComment, ValkyrieTokenType::BlockComment) {
+            return true;
+        }
+        // ⍝ (U+235D) 文档行注释：stdlib / core 源码广泛使用，须与 `#` 同等视为行注释。
+        const DOC_LINE: &str = "\u{235d}";
+        if state.starts_with(DOC_LINE) {
+            let start = state.get_position();
+            state.advance(DOC_LINE.len());
+            state.skip_until(b'\n');
+            state.add_token(ValkyrieTokenType::LineComment, start, state.get_position());
+            return true;
+        }
+        false
     }
 
     fn lex_string_literal<S: Source + ?Sized>(&self, state: &mut State<'_, S>) -> bool {
@@ -361,11 +405,8 @@ impl crate::lexer::ValkyrieLexer<'_> {
                         state.advance('='.len_utf8());
                         ValkyrieTokenType::GreaterEq
                     }
-                    else if let Some('>') = state.current() {
-                        state.advance('>'.len_utf8());
-                        ValkyrieTokenType::RightShift
-                    }
                     else {
+                        // 嵌套泛型 `Option<Option<T>>` 须词法化为两个 `>`，不可合并为 `>>`。
                         ValkyrieTokenType::GreaterThan
                     }
                 }
