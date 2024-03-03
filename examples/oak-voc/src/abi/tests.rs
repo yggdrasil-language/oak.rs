@@ -1,8 +1,6 @@
 //! vcc-data ABI index / template / symbols tests.
 
-use crate::{
-    AwslParser, ComponentAbiIndex, TemplateBindingKind, collect_abi_references, collect_template_bindings, extract_component_abi_from_script,
-};
+use crate::{AwslParser, ComponentAbiIndex, TemplateBindingKind, collect_abi_references, collect_template_bindings, extract_component_abi_from_script};
 
 #[test]
 fn template_bindings_on_child_component() {

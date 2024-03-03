@@ -123,12 +123,7 @@ fn is_punct(ch: char) -> bool {
 }
 
 fn should_preserve_gap(left: &str, gap: &str, right: &str) -> bool {
-    gap.contains('\n')
-        || left.starts_with("<!--")
-        || right.starts_with("<!--")
-        || gap.contains("<!--")
-        || left.starts_with('#')
-        || right.starts_with('#')
+    gap.contains('\n') || left.starts_with("<!--") || right.starts_with("<!--") || gap.contains("<!--") || left.starts_with('#') || right.starts_with('#')
 }
 
 fn awsl_gap_constraint(left: &str, gap: &str, right: &str) -> GapConstraint {
@@ -186,12 +181,7 @@ fn validate_delimiters(source: &str, tokens: &[ScannedToken]) -> Result<(), oak_
             _ => {}
         }
     }
-    if stack.is_empty() {
-        Ok(())
-    }
-    else {
-        Err(oak_core::OakError::format_error(format!("formatter input has unbalanced delimiters: unclosed {stack:?}")))
-    }
+    if stack.is_empty() { Ok(()) } else { Err(oak_core::OakError::format_error(format!("formatter input has unbalanced delimiters: unclosed {stack:?}"))) }
 }
 
 fn delimiter_error(source: &str, pos: usize) -> Result<(), oak_core::OakError> {

@@ -62,12 +62,7 @@ impl ComponentAbiIndex {
 fn validate_binding(binding: &TemplateBinding, index: &ComponentAbiIndex, issues: &mut Vec<AbiIssue>) {
     let target = awsl_stem_from_component_tag(&binding.component_tag);
     if !is_snake_case(&binding.name) {
-        issues.push(AbiIssue {
-            kind: AbiIssueKind::NotSnakeCase,
-            message: format!("Name '{}' should be snake_case", binding.name),
-            span: Some(binding.key_span.clone()),
-            severity: AbiSeverity::Warning,
-        });
+        issues.push(AbiIssue { kind: AbiIssueKind::NotSnakeCase, message: format!("Name '{}' should be snake_case", binding.name), span: Some(binding.key_span.clone()), severity: AbiSeverity::Warning });
     }
     let Some(abi) = index.get(&target)
     else {
@@ -75,20 +70,10 @@ fn validate_binding(binding: &TemplateBinding, index: &ComponentAbiIndex, issues
     };
     match binding.kind {
         TemplateBindingKind::Property if abi.property(&binding.name).is_none() => {
-            issues.push(AbiIssue {
-                kind: AbiIssueKind::PropertyOnNonLet,
-                message: format!("`:{}` is not declared on component `{target}`", binding.name),
-                span: Some(binding.key_span.clone()),
-                severity: AbiSeverity::Error,
-            });
+            issues.push(AbiIssue { kind: AbiIssueKind::PropertyOnNonLet, message: format!("`:{}` is not declared on component `{target}`", binding.name), span: Some(binding.key_span.clone()), severity: AbiSeverity::Error });
         }
         TemplateBindingKind::Event if abi.event(&binding.name).is_none() => {
-            issues.push(AbiIssue {
-                kind: AbiIssueKind::EventOnNonMicro,
-                message: format!("`@{}` is not declared on component `{target}`", binding.name),
-                span: Some(binding.key_span.clone()),
-                severity: AbiSeverity::Error,
-            });
+            issues.push(AbiIssue { kind: AbiIssueKind::EventOnNonMicro, message: format!("`@{}` is not declared on component `{target}`", binding.name), span: Some(binding.key_span.clone()), severity: AbiSeverity::Error });
         }
         _ => {}
     }

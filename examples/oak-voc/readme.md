@@ -1,18 +1,6 @@
-# 🚀 oak-voc
+# oak-awsl
 
-[![Crates.io](https://img.shields.io/crates/v/oak-voc.svg)](https://crates.io/crates/oak-voc)
-[![Documentation](https://docs.rs/oak-voc/badge.svg)](https://docs.rs/oak-voc)
+Asgard AWSL (`.awsl`) template **source formatter** for the Oak ecosystem.
 
-**Making VOC processing simple** — A high-performance, incremental VOC parser built on the Oak framework.
-
-## 🎯 Project Vision
-
-`oak-voc` is dedicated to providing industrial-grade parsing support for the VOC language. By leveraging Rust's high-performance characteristics and Oak's incremental parsing architecture, it can easily handle a variety of application scenarios, from simple script analysis to complex IDE language servers.
-
-## ✨ Core Features
-
-- **⚡ Blazing Fast**: Fully utilizes Rust's performance advantages to achieve sub-millisecond parsing response times.
-- **🔄 Incremental Parsing**: Built-in support for partial updates, demonstrating extremely high efficiency when processing large files.
-- **🌳 Structured Output**: Provides a clear, easy-to-traverse syntax tree or data structure.
-- **🛡️ Robustness**: Features a comprehensive error recovery mechanism, ensuring normal operation even when input is incomplete.
-- **🧩 Easy Integration**: Designed with high cohesion and low coupling, allowing for quick integration into existing Rust projects.
+- Public API: `oak_awsl::formatter::format_source`
+- Full Oak parser / LSP frontend is out of scope for this crate revision

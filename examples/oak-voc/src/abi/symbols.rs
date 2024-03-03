@@ -40,12 +40,7 @@ pub struct AbiReference {
 pub fn collect_abi_references(component_abi: &ComponentAbi, _script_source: &str, root: &AwslRoot) -> Vec<AbiReference> {
     let mut refs = Vec::new();
     for property in &component_abi.properties {
-        refs.push(AbiReference {
-            kind: AbiSymbolKind::Property,
-            name: property.name.clone(),
-            component_tag: None,
-            span: property.span.clone(),
-        });
+        refs.push(AbiReference { kind: AbiSymbolKind::Property, name: property.name.clone(), component_tag: None, span: property.span.clone() });
     }
     for event in &component_abi.events {
         refs.push(AbiReference { kind: AbiSymbolKind::Event, name: event.name.clone(), component_tag: None, span: event.span.clone() });
@@ -61,12 +56,7 @@ pub fn collect_abi_references(component_abi: &ComponentAbi, _script_source: &str
             TemplateBindingKind::Property => AbiSymbolKind::Property,
             TemplateBindingKind::Event => AbiSymbolKind::Event,
         };
-        refs.push(AbiReference {
-            kind,
-            name: binding.name.clone(),
-            component_tag: Some(binding.component_tag.clone()),
-            span: binding.key_span.clone(),
-        });
+        refs.push(AbiReference { kind, name: binding.name.clone(), component_tag: Some(binding.component_tag.clone()), span: binding.key_span.clone() });
     }
     refs
 }

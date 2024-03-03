@@ -73,7 +73,7 @@ Oaks supports a wide range of languages through its modular architecture. Below 
 - `oak-cobol`, `oak-pascal`, `oak-delphi`, `oak-vhdl`
 
 ### Internal & Experimental
-- `oak-voc`, `oak-voml`, `oak-von`, `oak-gsgl`, `oak-jasm`, `oak-msil`, `oak-mojo`
+- `oak-awsl`, `oak-voml`, `oak-von`, `oak-gsgl`, `oak-jasm`, `oak-msil`, `oak-mojo`
 
 *...and many more being added regularly.*
 

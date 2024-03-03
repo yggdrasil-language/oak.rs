@@ -1,41 +1,25 @@
-﻿[package]
-name = "oak-voc"
+[package]
+name = "oak-awsl"
 version.workspace = true
 authors.workspace = true
-description = "High-performance incremental VOC parser for the oak ecosystem with flexible configuration."
+description = "Asgard AWSL template parser and formatter for the oak ecosystem."
 edition.workspace = true
 license.workspace = true
 homepage.workspace = true
-repository = "https://github.com/yggdrasil-language/oak.rs/tree/master/examples/oak-voc"
-documentation = "https://docs.rs/oak-voc"
+repository = "https://github.com/yggdrasil-language/oak.rs/tree/master/examples/oak-awsl"
 categories = ["parsing"]
-keywords = ["parser", "voc", "experimental"]
+keywords = ["parser", "awsl", "asgard", "template"]
 
 [dependencies]
 oak-core = { workspace = true }
-oak-von = { workspace = true }
-oak-highlight = { workspace = true, optional = true }
-oak-pretty-print = { workspace = true, optional = true }
-oak-lsp = { workspace = true, optional = true }
-oak-hover = { workspace = true, optional = true }
-serde = { workspace = true, optional = true }
-oak-vfs = { workspace = true, optional = true }
-oak-mcp = { workspace = true, optional = true }
-futures = { workspace = true, optional = true }
-tokio = { workspace = true, optional = true }
+oak-formatter = { workspace = true }
+oak-valkyrie = { workspace = true }
+
+[features]
+default = []
 
 [dev-dependencies]
 oak-testing = { workspace = true }
 
-[features]
-default = ["serde"]
-serde = ["dep:serde", "oak-core/serde"]
-lsp = ["dep:oak-lsp", "dep:oak-hover", "dep:oak-vfs", "oak-highlight", "oak-pretty-print", "dep:futures"]
-mcp = ["lsp", "oak-mcp/io-std"]
-
-[package.metadata.docs.rs]
-all-features = true
-
 [[test]]
 name = "main"
-required-features = ["serde"]

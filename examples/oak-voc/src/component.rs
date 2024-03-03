@@ -56,18 +56,12 @@ pub fn resolve_widget_name(file_stem: &str) -> String {
 /// 校验「一文件 = 一 widget」契约。
 pub fn validate_component_contract(root: &AwslRoot, file_stem: &str) -> Result<(), AwslParseError> {
     if !root.has_widget_shell {
-        return Err(AwslParseError {
-            message: "each .awsl file must define exactly one top-level <widget> block".into(),
-            span: root.span.clone(),
-        });
+        return Err(AwslParseError { message: "each .awsl file must define exactly one top-level <widget> block".into(), span: root.span.clone() });
     }
     let expected = widget_name_from_stem(file_stem);
     if let Some(tag) = root.widget_name.as_deref().filter(|name| !name.is_empty()) {
         if tag != expected {
-            return Err(AwslParseError {
-                message: format!("<widget {tag}> does not match file stem `{file_stem}` (expected <widget {expected}>)"),
-                span: root.span.clone(),
-            });
+            return Err(AwslParseError { message: format!("<widget {tag}> does not match file stem `{file_stem}` (expected <widget {expected}>)"), span: root.span.clone() });
         }
     }
     Ok(())

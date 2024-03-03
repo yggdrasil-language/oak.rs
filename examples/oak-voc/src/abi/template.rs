@@ -61,13 +61,7 @@ fn collect_element_bindings(element: &AwslElement, out: &mut Vec<TemplateBinding
     for attr in &element.attributes {
         let name = normalize_prop_name(&attr.name);
         let key_start = attr.span.start;
-        out.push(TemplateBinding {
-            component_tag: element.tag.clone(),
-            name,
-            kind: TemplateBindingKind::Property,
-            key_span: key_start..key_start + attr.name.len() + 1,
-            element_span: element.span.clone(),
-        });
+        out.push(TemplateBinding { component_tag: element.tag.clone(), name, kind: TemplateBindingKind::Property, key_span: key_start..key_start + attr.name.len() + 1, element_span: element.span.clone() });
     }
     for directive in &element.directives {
         if let Some(binding) = directive_to_binding(element, directive) {
@@ -82,13 +76,7 @@ fn directive_to_binding(element: &AwslElement, directive: &crate::AwslDirective)
         _ => return None,
     };
     let key_start = directive.span.start;
-    Some(TemplateBinding {
-        component_tag: element.tag.clone(),
-        name: event_name,
-        kind: TemplateBindingKind::Event,
-        key_span: key_start..key_start + key_len,
-        element_span: element.span.clone(),
-    })
+    Some(TemplateBinding { component_tag: element.tag.clone(), name: event_name, kind: TemplateBindingKind::Event, key_span: key_start..key_start + key_len, element_span: element.span.clone() })
 }
 
 fn is_non_abi_directive(name: &str) -> bool {

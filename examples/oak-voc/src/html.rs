@@ -1,8 +1,7 @@
 //! HTML void-element helpers for AWSL parsing.
 
 /// HTML elements that do not require a closing tag.
-pub const HTML_VOID_ELEMENTS: &[&str] =
-    &["area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta", "param", "source", "track", "wbr"];
+pub const HTML_VOID_ELEMENTS: &[&str] = &["area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta", "param", "source", "track", "wbr"];
 
 /// Returns true when `tag` is a void HTML element.
 ///

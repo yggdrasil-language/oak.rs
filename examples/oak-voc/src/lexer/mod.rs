@@ -1,297 +1,329 @@
-use oak_core::{
-    Lexer, LexerState, OakError, Source, TextEdit,
-    lexer::{LexOutput, LexerCache},
-};
+//! AWSL 词法扫描器（字符级）。
 
-/// Token types for the VOC language.
-pub mod token_type;
+use std::ops::Range;
 
-use crate::language::VocLanguage;
-pub use token_type::VocTokenType;
+use super::error::AwslParseError;
 
-pub(crate) type State<'a, S> = LexerState<'a, S, VocLanguage>;
+/// 顶层模板容器标签（`<widget>` 与 `<template>` 语义等价）。
+pub const TOP_LEVEL_TEMPLATE_TAGS: &[&str] = &["widget", "template"];
 
-/// A lexer for the VOC language.
-#[derive(Clone, Debug)]
-pub struct VocLexer<'config> {
-    /// Language configuration reference.
-    #[allow(dead_code)]
-    config: &'config VocLanguage,
+/// AWSL 词法扫描状态。
+pub struct Lexer<'a> {
+    /// 源文本。
+    pub source: &'a str,
+    /// 当前字节偏移。
+    pub pos: usize,
 }
 
-impl<'config> VocLexer<'config> {
-    /// Creates a new `VocLexer` with the given configuration.
-    pub fn new(config: &'config VocLanguage) -> Self {
-        Self { config }
+impl<'a> Lexer<'a> {
+    pub fn new(source: &'a str) -> Self {
+        Self { source, pos: 0 }
     }
 
-    fn skip_whitespace<'a, S: Source + ?Sized>(&self, state: &mut State<'a, S>) -> bool {
-        let start_pos = state.get_position();
+    /// 当前位置是否以某个顶层模板开标签开头（`<widget` / `<template`）。
+    pub fn peek_top_level_template_open(&self) -> Option<&'static str> {
+        for tag in TOP_LEVEL_TEMPLATE_TAGS {
+            if self.peek_starts_with(&format!("<{tag}")) {
+                return Some(tag);
+            }
+        }
+        None
+    }
 
-        while let Some(ch) = state.peek() {
-            if ch.is_whitespace() {
-                state.advance(ch.len_utf8());
+    pub fn read_raw_expr_until_gt(&mut self) -> String {
+        let start = self.pos;
+        let mut depth_paren = 0i32;
+        let mut depth_brace = 0i32;
+        let mut in_string = None::<char>;
+        while self.pos < self.source.len() {
+            let ch = self.peek_char().unwrap();
+            if let Some(quote) = in_string {
+                if ch == '\\' {
+                    self.pos += 1;
+                    if self.pos < self.source.len() {
+                        self.pos += self.peek_char().unwrap().len_utf8();
+                    }
+                    continue;
+                }
+                if ch == quote {
+                    in_string = None;
+                }
+                self.pos += ch.len_utf8();
+                continue;
+            }
+            if ch == '"' || ch == '\'' {
+                in_string = Some(ch);
+                self.pos += ch.len_utf8();
+                continue;
+            }
+            if ch == '(' {
+                depth_paren += 1;
+            }
+            else if ch == ')' {
+                depth_paren -= 1;
+            }
+            else if ch == '{' {
+                depth_brace += 1;
+            }
+            else if ch == '}' {
+                depth_brace -= 1;
+            }
+            else if ch == '>' && depth_paren == 0 && depth_brace == 0 && !self.peek_starts_with("/>") {
+                break;
+            }
+            else if self.source[self.pos..].starts_with("/>") && depth_paren == 0 && depth_brace == 0 {
+                break;
+            }
+            self.pos += ch.len_utf8();
+        }
+        self.source[start..self.pos].trim().to_string()
+    }
+
+    pub fn read_attribute_value_raw(&mut self) -> String {
+        if self.peek_char_eq('"') || self.peek_char_eq('\'') {
+            return self.read_quoted_string().unwrap_or_default();
+        }
+        if self.peek_char_eq('{') {
+            return self.read_braced_expr().unwrap_or_default();
+        }
+        self.read_unquoted_attr_value()
+    }
+
+    pub fn read_braced_expr(&mut self) -> Result<String, AwslParseError> {
+        self.expect_char('{')?;
+        let mut depth = 1;
+        let start = self.pos;
+        while self.pos < self.source.len() {
+            let ch = self.peek_char().unwrap();
+            if ch == '{' {
+                depth += 1;
+            }
+            else if ch == '}' {
+                depth -= 1;
+                if depth == 0 {
+                    let expr = self.source[start..self.pos].trim().to_string();
+                    self.pos += 1;
+                    return Ok(expr);
+                }
+            }
+            self.pos += ch.len_utf8();
+        }
+        Err(self.error("unclosed `{` in expression"))
+    }
+
+    pub fn read_quoted_string(&mut self) -> Result<String, AwslParseError> {
+        let quote = self.peek_char().ok_or_else(|| self.error("expected quoted string"))?;
+        if quote != '"' && quote != '\'' {
+            return Err(self.error("expected quoted string"));
+        }
+        self.pos += 1;
+        let start = self.pos;
+        while self.pos < self.source.len() {
+            let ch = self.peek_char().unwrap();
+            if ch == quote {
+                let value = self.source[start..self.pos].to_string();
+                self.pos += 1;
+                return Ok(value);
+            }
+            if ch == '\\' {
+                self.pos += 1;
+                if self.pos < self.source.len() {
+                    self.pos += self.peek_char().unwrap().len_utf8();
+                }
+                continue;
+            }
+            self.pos += ch.len_utf8();
+        }
+        Err(self.error("unclosed string literal"))
+    }
+
+    pub fn read_quoted_or_bare(&mut self) -> String {
+        if self.peek_char_eq('"') || self.peek_char_eq('\'') {
+            return self.read_quoted_string().unwrap_or_default();
+        }
+        self.read_unquoted_attr_value()
+    }
+
+    pub fn read_unquoted_attr_value(&mut self) -> String {
+        let start = self.pos;
+        while self.pos < self.source.len() {
+            let ch = self.peek_char().unwrap();
+            if ch.is_whitespace() || ch == '>' || ch == '/' {
+                break;
+            }
+            self.pos += ch.len_utf8();
+        }
+        self.source[start..self.pos].to_string()
+    }
+
+    pub fn read_name(&mut self) -> String {
+        let start = self.pos;
+        while self.pos < self.source.len() {
+            let ch = self.peek_char().unwrap();
+            if ch.is_alphanumeric() || ch == '_' || ch == '-' {
+                self.pos += ch.len_utf8();
             }
             else {
                 break;
             }
         }
+        self.source[start..self.pos].to_string()
+    }
 
-        if state.get_position() > start_pos {
-            state.add_token(VocTokenType::Whitespace, start_pos, state.get_position());
-            true
+    pub fn read_name_with_colon(&mut self) -> String {
+        let start = self.pos;
+        while self.pos < self.source.len() {
+            let ch = self.peek_char().unwrap();
+            if ch.is_alphanumeric() || ch == '_' || ch == '-' || ch == ':' {
+                self.pos += ch.len_utf8();
+            }
+            else {
+                break;
+            }
+        }
+        self.source[start..self.pos].to_string()
+    }
+
+    pub fn read_text_until(&mut self, stop: &[char]) -> String {
+        let start = self.pos;
+        while self.pos < self.source.len() {
+            let ch = self.peek_char().unwrap();
+            if stop.contains(&ch) {
+                break;
+            }
+            self.pos += ch.len_utf8();
+        }
+        self.source[start..self.pos].to_string()
+    }
+
+    pub fn read_until_literal(&mut self, literal: &str) -> Result<String, AwslParseError> {
+        let start = self.pos;
+        while self.pos < self.source.len() {
+            if self.peek_starts_with(literal) {
+                return Ok(self.source[start..self.pos].to_string());
+            }
+            self.pos += self.peek_char().unwrap().len_utf8();
+        }
+        Err(self.error(format!("expected `{literal}`")))
+    }
+
+    pub fn skip_until(&mut self, ch: char) -> Result<(), AwslParseError> {
+        while self.pos < self.source.len() {
+            if self.peek_char() == Some(ch) {
+                return Ok(());
+            }
+            self.pos += self.peek_char().unwrap().len_utf8();
+        }
+        Err(self.error(format!("expected `{ch}`")))
+    }
+
+    pub fn skip_trivia(&mut self) {
+        while self.pos < self.source.len() {
+            let ch = self.peek_char().unwrap();
+            if ch.is_whitespace() {
+                self.pos += ch.len_utf8();
+            }
+            else {
+                break;
+            }
+        }
+    }
+
+    pub fn peek_starts_with(&self, literal: &str) -> bool {
+        self.source[self.pos..].starts_with(literal)
+    }
+
+    pub fn peek_starts_with_ignore_case(&self, literal: &str) -> bool {
+        self.source[self.pos..].len() >= literal.len() && self.source[self.pos..self.pos + literal.len()].eq_ignore_ascii_case(literal)
+    }
+
+    pub fn peek_char_eq(&self, ch: char) -> bool {
+        self.peek_char() == Some(ch)
+    }
+
+    pub fn peek_is_name_start(&self) -> bool {
+        self.peek_char().is_some_and(|ch| ch.is_alphabetic() || ch == '_')
+    }
+
+    pub fn peek_char(&self) -> Option<char> {
+        self.source[self.pos..].chars().next()
+    }
+
+    pub fn expect_char(&mut self, expected: char) -> Result<(), AwslParseError> {
+        if self.peek_char() == Some(expected) {
+            self.pos += expected.len_utf8();
+            Ok(())
         }
         else {
-            false
+            Err(self.error(format!("expected `{expected}`")))
         }
     }
 
-    fn is_section_tag<'a, S: Source + ?Sized>(&self, state: &mut State<'a, S>) -> bool {
-        let mut offset = 1;
-        if state.peek_next_n(offset) == Some('/') {
-            offset += 1;
-        }
-
-        for name in &["template", "script", "style"] {
-            let mut matches = true;
-            for (i, c) in name.chars().enumerate() {
-                if state.peek_next_n(offset + i) != Some(c) {
-                    matches = false;
-                    break;
-                }
-            }
-            if matches && state.peek_next_n(offset + name.len()) == Some('>') {
-                return true;
-            }
-        }
-        false
-    }
-
-    fn scan_section<'a, S: Source + ?Sized>(&self, state: &mut State<'a, S>) -> bool {
-        let start = state.get_position();
-        state.advance(1);
-
-        let is_close = state.peek() == Some('/');
-        if is_close {
-            state.advance(1);
-        }
-
-        while let Some(c) = state.peek() {
-            if c == '>' {
-                state.advance(1);
-                let kind = if is_close { VocTokenType::SectionClose } else { VocTokenType::SectionOpen };
-                state.add_token(kind, start, state.get_position());
-                return true;
-            }
-            state.advance(c.len_utf8());
-        }
-
-        state.add_error(OakError::unexpected_eof(state.get_position(), None));
-        let kind = if is_close { VocTokenType::SectionClose } else { VocTokenType::SectionOpen };
-        state.add_token(kind, start, state.get_position());
-        true
-    }
-
-    fn scan_tag<'a, S: Source + ?Sized>(&self, state: &mut State<'a, S>) -> bool {
-        let start = state.get_position();
-        state.advance(1);
-
-        let is_close = state.peek() == Some('/');
-        if is_close {
-            state.advance(1);
-        }
-
-        while let Some(c) = state.peek() {
-            if c == '>' {
-                state.advance(1);
-                let kind = if is_close { VocTokenType::TagClose } else { VocTokenType::TagOpen };
-                state.add_token(kind, start, state.get_position());
-                return true;
-            }
-            if !is_close && c == '/' && state.peek_next() == Some('>') {
-                state.advance(1);
-                state.advance(1);
-                state.add_token(VocTokenType::SelfCloseTag, start, state.get_position());
-                return true;
-            }
-            state.advance(c.len_utf8());
-        }
-
-        state.add_error(OakError::unexpected_eof(state.get_position(), None));
-        let kind = if is_close { VocTokenType::TagClose } else { VocTokenType::TagOpen };
-        state.add_token(kind, start, state.get_position());
-        true
-    }
-
-    #[allow(dead_code)]
-    fn scan_attribute<'a, S: Source + ?Sized>(&self, state: &mut State<'a, S>) -> bool {
-        let start = state.get_position();
-
-        while let Some(c) = state.peek() {
-            if c == '=' {
-                state.advance(1);
-                break;
-            }
-            state.advance(c.len_utf8());
-        }
-
-        if state.peek() == Some('"') {
-            state.advance(1);
-            while let Some(c) = state.peek() {
-                if c == '"' {
-                    state.advance(1);
-                    break;
-                }
-                state.advance(c.len_utf8());
-            }
-        }
-
-        state.add_token(VocTokenType::Attribute, start, state.get_position());
-        true
-    }
-
-    fn scan_text<'a, S: Source + ?Sized>(&self, state: &mut State<'a, S>) -> bool {
-        let start = state.get_position();
-
-        while let Some(c) = state.peek() {
-            if c == '<' {
-                break;
-            }
-            state.advance(c.len_utf8());
-        }
-
-        if state.get_position() > start {
-            state.add_token(VocTokenType::Text, start, state.get_position());
-            true
+    pub fn expect_literal(&mut self, literal: &str) -> Result<(), AwslParseError> {
+        if self.peek_starts_with(literal) {
+            self.pos += literal.len();
+            Ok(())
         }
         else {
-            false
+            Err(self.error(format!("expected `{literal}`")))
         }
     }
 
-    fn scan_style_selector<'a, S: Source + ?Sized>(&self, state: &mut State<'a, S>) -> bool {
-        let start = state.get_position();
-
-        while let Some(c) = state.peek() {
-            if c == '{' {
-                break;
-            }
-            state.advance(c.len_utf8());
-        }
-
-        state.add_token(VocTokenType::Selector, start, state.get_position());
-        true
+    pub fn span_before(&self, len: usize) -> Range<usize> {
+        self.pos - len..self.pos
     }
 
-    fn scan_style_property<'a, S: Source + ?Sized>(&self, state: &mut State<'a, S>) -> bool {
-        let start = state.get_position();
-
-        while let Some(c) = state.peek() {
-            if c == ':' {
-                state.advance(1);
-                break;
-            }
-            state.advance(c.len_utf8());
-        }
-
-        while let Some(c) = state.peek() {
-            if c == ';' || c == '}' {
-                break;
-            }
-            state.advance(c.len_utf8());
-        }
-
-        state.add_token(VocTokenType::Property, start, state.get_position());
-        true
+    pub fn error(&self, message: impl Into<String>) -> AwslParseError {
+        self.error_at(self.pos, message)
     }
 
-    fn scan_variable<'a, S: Source + ?Sized>(&self, state: &mut State<'a, S>) -> bool {
-        let start = state.get_position();
-        state.advance(1);
-
-        while let Some(c) = state.peek() {
-            if c == ':' {
-                state.advance(1);
-                break;
-            }
-            state.advance(c.len_utf8());
-        }
-
-        while let Some(c) = state.peek() {
-            if c == ';' || c == '}' {
-                break;
-            }
-            state.advance(c.len_utf8());
-        }
-
-        state.add_token(VocTokenType::Variable, start, state.get_position());
-        true
-    }
-
-    fn is_style_property<'a, S: Source + ?Sized>(&self, state: &mut State<'a, S>) -> bool {
-        let rest = state.rest();
-        for c in rest.chars() {
-            if c == ':' {
-                return true;
-            }
-            if !c.is_alphanumeric() && c != '-' {
-                return false;
-            }
-        }
-        false
+    pub fn error_at(&self, pos: usize, message: impl Into<String>) -> AwslParseError {
+        AwslParseError { message: message.into(), span: pos..pos.saturating_add(1) }
     }
 }
 
-impl<'config> Lexer<VocLanguage> for VocLexer<'config> {
-    fn lex<'a, S: Source + ?Sized>(&self, source: &'a S, _edits: &[TextEdit], _cache: &'a mut impl LexerCache<VocLanguage>) -> LexOutput<VocLanguage> {
-        let mut state = State::new(source);
+#[cfg(test)]
+mod tests {
+    use super::*;
 
-        while state.not_at_end() {
-            if self.skip_whitespace(&mut state) {
-                continue;
-            }
+    #[test]
+    fn peek_top_level_template_open_recognizes_widget_and_template() {
+        let widget = Lexer::new("<widget todo>");
+        assert_eq!(widget.peek_top_level_template_open(), Some("widget"));
 
-            match state.peek() {
-                Some('<') => {
-                    if self.is_section_tag(&mut state) {
-                        self.scan_section(&mut state);
-                    }
-                    else {
-                        self.scan_tag(&mut state);
-                    }
-                }
-                Some('{') => {
-                    let start = state.get_position();
-                    state.advance(1);
-                    state.add_token(VocTokenType::BlockOpen, start, state.get_position());
-                }
-                Some('}') => {
-                    let start = state.get_position();
-                    state.advance(1);
-                    state.add_token(VocTokenType::BlockClose, start, state.get_position());
-                }
-                Some('.') | Some('#') => {
-                    self.scan_style_selector(&mut state);
-                }
-                Some('$') => {
-                    self.scan_variable(&mut state);
-                }
-                Some(c) if c.is_alphabetic() => {
-                    if self.is_style_property(&mut state) {
-                        self.scan_style_property(&mut state);
-                    }
-                    else {
-                        self.scan_text(&mut state);
-                    }
-                }
-                Some(_) => {
-                    self.scan_text(&mut state);
-                }
-                None => break,
-            }
-        }
+        let template = Lexer::new("<template App>");
+        assert_eq!(template.peek_top_level_template_open(), Some("template"));
 
-        state.add_eof();
-        state.finish(Ok(()))
+        let div = Lexer::new("<div>");
+        assert_eq!(div.peek_top_level_template_open(), None);
+    }
+
+    #[test]
+    fn read_name_reads_tag_and_attr_names() {
+        let mut lexer = Lexer::new("TodoItem on:click");
+        assert_eq!(lexer.read_name(), "TodoItem");
+        lexer.skip_trivia();
+        assert_eq!(lexer.read_name_with_colon(), "on:click");
+    }
+
+    #[test]
+    fn read_quoted_string_supports_single_and_double_quotes() {
+        let mut single = Lexer::new("'all'");
+        assert_eq!(single.read_quoted_string().unwrap(), "all");
+
+        let mut double = Lexer::new("\"active\"");
+        assert_eq!(double.read_quoted_string().unwrap(), "active");
+    }
+
+    #[test]
+    fn read_braced_expr_handles_nested_braces() {
+        let mut lexer = Lexer::new("{filter == 'all' ? 'active' : ''}");
+        assert_eq!(lexer.read_braced_expr().unwrap(), "filter == 'all' ? 'active' : ''");
+    }
+
+    #[test]
+    fn read_raw_expr_until_gt_stops_at_tag_close() {
+        let mut lexer = Lexer::new("todos() key=\"item.id\"");
+        assert_eq!(lexer.read_raw_expr_until_gt(), "todos() key=\"item.id\"");
     }
 }

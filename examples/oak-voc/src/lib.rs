@@ -1,55 +1,58 @@
 #![doc = include_str!("readme.md")]
 #![feature(new_range_api)]
 #![warn(missing_docs)]
-#![doc(html_logo_url = "https://raw.githubusercontent.com/ygg-lang/oaks/refs/heads/dev/documents/logo.svg")]
-#![doc(html_favicon_url = "https://raw.githubusercontent.com/ygg-lang/oaks/refs/heads/dev/documents/logo.svg")]
 
-/// AST module.
+mod frontend;
+
+/// AWSL component ABI (`[property]` / `[event]` / `[memoize]`).
+pub mod abi;
+
+/// AWSL AST nodes.
 pub mod ast;
-/// Builder module.
-pub mod builder;
 
-/// Language configuration module.
-pub mod language;
-/// Lexer module.
+/// Component naming helpers.
+pub mod component;
+
+/// Parse errors.
+pub mod error;
+
+/// CST token-gap source formatter (markup-aware lossless scan).
+pub mod formatter;
+
+/// HTML void-element helpers.
+pub mod html;
+
+/// AWSL lexer.
 pub mod lexer;
-/// LSP module.
-#[cfg(any(feature = "lsp", feature = "oak-highlight", feature = "oak-pretty-print"))]
-pub mod lsp;
-/// MCP module.
-#[cfg(feature = "mcp")]
-pub mod mcp;
 
-/// Parser module.
+/// AWSL parser.
 pub mod parser;
 
-pub use crate::{
-    ast::{Attribute, ScriptAst, StyleAst, StyleRule, TemplateNode, VxDocument, VxParseError},
-    builder::VocBuilder,
-    language::VocLanguage,
-    lexer::VocLexer,
-    parser::VocParser,
+pub use abi::{
+    AbiDerived, AbiEffect, AbiEvent, AbiExtractResult, AbiIssue, AbiIssueKind, AbiMemo, AbiParam, AbiProperty, AbiReference, AbiSeverity, AbiState, AbiSymbolKind, ComponentAbi, ComponentAbiIndex, TemplateBinding, TemplateBindingKind, abi_declaration_span,
+    classify_abi_cursor, collect_abi_references, collect_template_bindings, extract_component_abi_from_script, extract_component_abi_from_vx, find_template_binding_at, is_snake_case, normalize_event_name, normalize_prop_name, refine_binding_kind,
 };
 
-pub use oak_core::{Builder, ElementType, TokenType};
+pub use ast::{AwslAttribute, AwslAttributeValue, AwslDirective, AwslDirectiveKind, AwslElement, AwslImport, AwslRoot, AwslTemplateNode, AwslTextPart};
 
-/// Parses a VX document from source text.
-pub fn parse_vx(source: &str) -> Result<VxDocument, VxParseError> {
-    use oak_core::Builder;
-    let language = VocLanguage::new();
-    let builder = VocBuilder::new(&language);
-    let source_text = oak_core::SourceText::new(source.to_string());
-    let mut cache = oak_core::parser::session::ParseSession::<VocLanguage>::default();
-    let result = builder.build(&source_text, &[], &mut cache);
-    result.result.map_err(|e| VxParseError { message: format!("{:?}", e), line: 1, column: 1 })
+pub use component::{awsl_stem_from_component_tag, resolve_widget_name, validate_component_contract, widget_name_from_stem};
+
+pub use error::AwslParseError;
+
+pub use html::{HTML_VOID_ELEMENTS, is_html_void_element};
+
+pub use lexer::Lexer;
+
+pub use parser::AwslParser;
+
+/// Parse an AWSL source file into [`AwslRoot`].
+
+pub fn parse_root(source: &str) -> Result<AwslRoot, AwslParseError> {
+    AwslParser::parse_root(source)
 }
 
-/// Highlighter implementation.
-#[cfg(feature = "oak-highlight")]
-pub use crate::lsp::VocLanguageService;
+/// Parse an AWSL source file with strict-mode options.
 
-/// MCP service implementation.
-#[cfg(feature = "mcp")]
-pub use crate::mcp::serve_voc_mcp;
-pub use lexer::token_type::VocTokenType;
-pub use parser::element_type::VocElementType;
+pub fn parse_root_with_options(source: &str, strict_mode: bool) -> Result<AwslRoot, AwslParseError> {
+    AwslParser::parse_root_with_options(source, strict_mode)
+}

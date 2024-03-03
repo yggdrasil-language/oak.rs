@@ -1,4 +1,0 @@
-// TODO: This file contains dummy content because the VOC lexer implementation is currently minimal (only whitespace and EOF).
-// Once the VOC language specification is implemented, this file should be updated with valid VOC syntax.
-
-hello world
