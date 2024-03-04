@@ -104,7 +104,7 @@ fn term_document(expression: &TermExpression) -> Result<Document<'static>, Print
         TermExpression::Binary(node) => binary_document(node),
         TermExpression::IntegerLiteral { value, .. } => Ok(Document::text(value.clone())),
         TermExpression::FloatLiteral { value, .. } => Ok(Document::text(value.clone())),
-        TermExpression::Bool { value, .. } => Ok(Document::text(if *value { "true" } else { "false" })),
+        TermExpression::BooleanLiteral { value, .. } => Ok(Document::text(if *value { "true" } else { "false" })),
         TermExpression::StringLiteral(literal) => Ok(string_literal_document(literal)),
         TermExpression::NamePath(path) => Ok(Document::text(name_path_text(path))),
         TermExpression::ApplyCall { callee, args, .. } => apply_call_document(callee, args),

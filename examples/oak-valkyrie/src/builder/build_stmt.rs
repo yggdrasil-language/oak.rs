@@ -204,6 +204,7 @@ impl<'config> ValkyrieBuilder<'config> {
         let mut annotations = Vec::new();
         let mut params = Vec::new();
         let mut return_type = None;
+        let mut where_constraints = Vec::new();
         let mut body = None;
         let mut is_abstract = false;
         let mut is_final = false;
@@ -244,6 +245,9 @@ impl<'config> ValkyrieBuilder<'config> {
                     ValkyrieElementType::Type => {
                         return_type = Some(self.build_type(n, source)?);
                     }
+                    ValkyrieElementType::WhereClause => {
+                        where_constraints = self.build_where_clause(n, source)?;
+                    }
                     ValkyrieElementType::BlockExpression => {
                         body = Some(self.build_block(n, source)?);
                     }
@@ -252,7 +256,7 @@ impl<'config> ValkyrieBuilder<'config> {
             }
         }
 
-        Ok(MethodDeclaration { name, generics, parameters: params, return_type, body, annotations, span })
+        Ok(MethodDeclaration { where_constraints, name, generics, parameters: params, return_type, body, annotations, span })
     }
 
     pub(crate) fn build_modifier<S: Source + ?Sized>(&self, node: RedNode<ValkyrieLanguage>, source: &S) -> Result<Modifier, OakError> {
@@ -327,14 +331,14 @@ impl<'config> ValkyrieBuilder<'config> {
             match child {
                 RedTree::Leaf(t) => match t.kind {
                     ValkyrieTokenType::Whitespace | ValkyrieTokenType::Newline | ValkyrieTokenType::LineComment | ValkyrieTokenType::BlockComment => continue,
-                    ValkyrieTokenType::Identifier if key.is_none() && value.is_none() => {
+                    ValkyrieTokenType::Identifier | ValkyrieTokenType::Keyword(_) if key.is_none() && value.is_none() => {
                         key = Some(Identifier { name: text(source, t.span), span: t.span });
                     }
                     _ => {}
                 },
                 RedTree::Node(n) => {
                     if value.is_none() {
-                        value = Some(self.build_expr(n, source)?);
+                        value = Some(if n.green.kind == ValkyrieElementType::NamePath { TermExpression::NamePath(Box::new(self.build_name_path(n, source)?)) } else { self.build_expr(n, source)? });
                     }
                 }
             }

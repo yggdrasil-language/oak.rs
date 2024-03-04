@@ -327,6 +327,7 @@ impl<'config> ValkyrieBuilder<'config> {
         let mut target_type = TypeExpression::Namepath(Box::new(crate::ast::NamePath { parts: Vec::new(), span: Default::default() }));
         let mut trait_type = None;
         let mut methods = Vec::new();
+        let mut pending_annotations = Vec::new();
         let mut saw_target = false;
 
         for child in node.children() {
@@ -336,7 +337,15 @@ impl<'config> ValkyrieBuilder<'config> {
                     _ => {}
                 },
                 RedTree::Node(n) => match n.green.kind {
-                    ValkyrieElementType::Attribute => annotations.push(self.build_attribute(n, source)?),
+                    ValkyrieElementType::Attribute => {
+                        let attribute = self.build_attribute(n, source)?;
+                        if saw_target {
+                            pending_annotations.push(attribute);
+                        }
+                        else {
+                            annotations.push(attribute);
+                        }
+                    }
                     ValkyrieElementType::GenericParameterList => generics = self.build_generic_params(n, source)?,
                     ValkyrieElementType::Type => {
                         let ty = self.build_type(n, source)?;
@@ -349,14 +358,14 @@ impl<'config> ValkyrieBuilder<'config> {
                         }
                     }
                     ValkyrieElementType::Micro => {
-                        if let Ok(func) = self.build_function(n, source) {
-                            methods.push(func);
-                        }
+                        let mut func = self.build_function(n, source)?;
+                        func.annotations.splice(0..0, pending_annotations.drain(..));
+                        methods.push(func);
                     }
                     ValkyrieElementType::Method => {
-                        if let Ok(func) = self.build_function(n, source) {
-                            methods.push(func);
-                        }
+                        let mut func = self.build_function(n, source)?;
+                        func.annotations.splice(0..0, pending_annotations.drain(..));
+                        methods.push(func);
                     }
                     ValkyrieElementType::BlockExpression => {
                         for inner_child in n.children() {

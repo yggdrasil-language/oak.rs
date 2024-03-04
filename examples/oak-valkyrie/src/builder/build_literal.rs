@@ -86,7 +86,7 @@ impl<'config> ValkyrieBuilder<'config> {
                 }
             }
         }
-        Ok(TermExpression::Bool { value, span })
+        Ok(TermExpression::BooleanLiteral { value, span })
     }
 
     pub(crate) fn build_identifier_expr<S: Source + ?Sized>(&self, node: RedNode<ValkyrieLanguage>, source: &S) -> Result<TermExpression, OakError> {

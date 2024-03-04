@@ -22,6 +22,24 @@ use crate::{
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum TermExpression {
+    /// 结构数组字面量；空数组也必须作为明确的表达式节点保留。
+    ArrayLiteral {
+        /// 源码顺序的元素。
+        items: Vec<TermExpression>,
+        /// 单文件源码位置。
+        #[cfg_attr(feature = "serde", serde(with = "oak_core::serde_range"))]
+        span: Span,
+    },
+    /// A unary operation expression.
+    ///
+    /// # V Language Example
+    /// ```v
+    /// let result = -5      // Negation
+    /// let result = !true   // Logical NOT
+    /// let result = *ptr    // Dereference
+    /// let result = &value  // Reference
+    /// ```
+    Unary(Box<TermUnaryNode>),
     /// A binary operation expression.
     ///
     /// # V Language Example
@@ -41,16 +59,6 @@ pub enum TermExpression {
     /// let result = true || false // Logical OR
     /// ```
     Binary(Box<TermBinaryNode>),
-    /// A unary operation expression.
-    ///
-    /// # V Language Example
-    /// ```v
-    /// let result = -5      // Negation
-    /// let result = !true   // Logical NOT
-    /// let result = *ptr    // Dereference
-    /// let result = &value  // Reference
-    /// ```
-    Unary(Box<TermUnaryNode>),
     /// A string literal expression.
     ///
     /// # V Language Example
@@ -82,7 +90,7 @@ pub enum TermExpression {
     /// let is_true = true
     /// let is_false = false
     /// ```
-    Bool {
+    BooleanLiteral {
         /// The boolean value.
         value: bool,
         /// The source code span.
@@ -180,7 +188,7 @@ pub enum TermExpression {
     /// let result = (10 + 5) * 2
     /// let result = (a && b) || (c && d)
     /// ```
-    Paren {
+    Group {
         /// The inner expression.
         expr: Box<TermExpression>,
         /// The source code span.
@@ -676,7 +684,7 @@ impl TermExpression {
             TermExpression::StringLiteral(string) => string.span,
             TermExpression::IntegerLiteral { span, .. } => *span,
             TermExpression::FloatLiteral { span, .. } => *span,
-            TermExpression::Bool { span, .. } => *span,
+            TermExpression::BooleanLiteral { span, .. } | TermExpression::ArrayLiteral { span, .. } => *span,
             TermExpression::Binary(node) => node.span,
             TermExpression::Unary(node) => node.span,
             TermExpression::Turbofish { span, .. } => *span,
@@ -685,7 +693,7 @@ impl TermExpression {
             TermExpression::DotCall { span, .. } => *span,
             TermExpression::Index { span, .. } => *span,
             TermExpression::Offset { span, .. } => *span,
-            TermExpression::Paren { span, .. } => *span,
+            TermExpression::Group { span, .. } => *span,
             TermExpression::Block(block) => block.span,
             TermExpression::Micro(lambda) => lambda.span,
             TermExpression::Object { span, .. } => *span,

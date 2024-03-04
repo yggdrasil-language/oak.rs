@@ -1,7 +1,7 @@
 use crate::{ValkyrieLanguage, ast::*, lexer::token_type::ValkyrieTokenType};
 use oak_core::{OakError, RedNode, RedTree, Source};
 
-/// 跳过空白、换行和注释节点
+/// Skip whitespace, newline, and comment nodes
 pub(crate) fn should_skip_node(node: &RedTree<ValkyrieLanguage>) -> bool {
     match node {
         RedTree::Leaf(t) => {
@@ -19,7 +19,7 @@ pub(crate) fn should_skip_node(node: &RedTree<ValkyrieLanguage>) -> bool {
     }
 }
 
-/// 遍历子节点，跳过空白和注释
+/// Iterate child nodes, skipping whitespace and comments
 pub(crate) fn for_each_non_skip_node<F>(node: &RedNode<ValkyrieLanguage>, f: &mut F)
 where
     F: FnMut(&RedTree<ValkyrieLanguage>),
@@ -31,7 +31,7 @@ where
     }
 }
 
-/// 获取必需的子表达式，如果不存在则返回错误
+/// Get a required child expression, or return an error if missing
 pub(crate) fn get_required_expr<S: Source + ?Sized>(
     node: &RedNode<ValkyrieLanguage>,
     source: &S,
@@ -51,7 +51,7 @@ pub(crate) fn get_required_expr<S: Source + ?Sized>(
     expr.ok_or_else(|| source.syntax_error(error_msg.to_string(), span_start))
 }
 
-/// 获取必需的子节点，如果不存在则返回错误
+/// Get a required child node, or return an error if missing
 pub(crate) fn get_required_child<'a, S: Source + ?Sized>(node: &'a RedNode<'a, ValkyrieLanguage>, source: &S, error_msg: &str, span_start: usize) -> Result<RedTree<'a, ValkyrieLanguage>, OakError> {
     for child in node.children() {
         if !should_skip_node(&child) {
@@ -61,12 +61,12 @@ pub(crate) fn get_required_child<'a, S: Source + ?Sized>(node: &'a RedNode<'a, V
     Err(source.syntax_error(error_msg.to_string(), span_start))
 }
 
-/// 构建标识符表达式
+/// Build an identifier expression
 pub(crate) fn build_identifier<S: Source + ?Sized>(node: &RedNode<ValkyrieLanguage>, source: &S, span: oak_core::Range<usize>) -> Result<Identifier, OakError> {
     let mut name = String::new();
     for child in node.children() {
         if let RedTree::Leaf(t) = child {
-            if t.kind == ValkyrieTokenType::Identifier {
+            if matches!(t.kind, ValkyrieTokenType::Identifier | ValkyrieTokenType::Keyword(crate::lexer::ValkyrieKeywords::Get | crate::lexer::ValkyrieKeywords::Set | crate::lexer::ValkyrieKeywords::SelfType)) {
                 name = crate::builder::identifier_text(source, t.span);
                 return Ok(Identifier { name, span: t.span });
             }
@@ -75,37 +75,44 @@ pub(crate) fn build_identifier<S: Source + ?Sized>(node: &RedNode<ValkyrieLangua
     Ok(Identifier { name, span })
 }
 
-/// 构建名称路径
+/// Build a name path
 pub(crate) fn build_name_path<S: Source + ?Sized>(node: &RedNode<ValkyrieLanguage>, source: &S) -> Result<NamePath, OakError> {
     let span = node.span();
     let mut parts = Vec::new();
 
     for child in node.children() {
         if let RedTree::Leaf(t) = child {
-            if !should_skip_node(&child) && t.kind == ValkyrieTokenType::Identifier {
-                parts.push(Identifier { name: crate::builder::identifier_text(source, t.span), span: t.span });
+            if should_skip_node(&child) {
+                continue;
+            }
+            match t.kind {
+                ValkyrieTokenType::Identifier => {
+                    parts.push(Identifier { name: crate::builder::identifier_text(source, t.span), span: t.span });
+                }
+                ValkyrieTokenType::Keyword(crate::lexer::ValkyrieKeywords::SelfType) => {
+                    parts.push(Identifier { name: "Self".to_string(), span: t.span });
+                }
+                _ => {}
             }
         }
     }
     Ok(NamePath { parts, span })
 }
 
-/// 构建参数列表
-pub(crate) fn build_arg_list<S: Source + ?Sized>(node: &RedNode<ValkyrieLanguage>, source: &S, build_expr: &impl Fn(&RedNode<ValkyrieLanguage>, &S) -> Result<TermExpression, OakError>) -> Vec<TermExpression> {
+/// Build an argument list
+pub(crate) fn build_arg_list<S: Source + ?Sized>(node: &RedNode<ValkyrieLanguage>, source: &S, build_expr: &impl Fn(&RedNode<ValkyrieLanguage>, &S) -> Result<TermExpression, OakError>) -> Result<Vec<TermExpression>, OakError> {
     let mut args = Vec::new();
     for child in node.children() {
         if let RedTree::Node(arg_n) = child {
             if !should_skip_node(&child) {
-                if let Ok(arg) = build_expr(&arg_n, source) {
-                    args.push(arg);
-                }
+                args.push(build_expr(&arg_n, source)?);
             }
         }
     }
-    args
+    Ok(args)
 }
 
-/// 构建二元表达式的通用函数
+/// Shared helper to build binary expressions
 pub(crate) fn build_binary_expr<S: Source + ?Sized>(
     node: &RedNode<ValkyrieLanguage>,
     source: &S,
@@ -116,6 +123,7 @@ pub(crate) fn build_binary_expr<S: Source + ?Sized>(
     let mut left = None;
     let mut right = None;
     let mut op = None;
+    let mut operator_end = None;
 
     for child in node.children() {
         if should_skip_node(&child) {
@@ -126,6 +134,10 @@ pub(crate) fn build_binary_expr<S: Source + ?Sized>(
             RedTree::Leaf(t) => {
                 if op.is_none() && left.is_some() {
                     op = Some(t.kind);
+                    operator_end = Some(t.span.end);
+                }
+                else if op == Some(ValkyrieTokenType::GreaterThan) && t.kind == ValkyrieTokenType::GreaterThan && operator_end == Some(t.span.start) {
+                    op = Some(ValkyrieTokenType::RightShift);
                 }
             }
             RedTree::Node(n) => {
@@ -146,7 +158,7 @@ pub(crate) fn build_binary_expr<S: Source + ?Sized>(
     Ok((left, op, right))
 }
 
-/// 构建一元表达式的通用函数
+/// Shared helper to build unary expressions
 pub(crate) fn build_unary_expr<S: Source + ?Sized>(
     node: &RedNode<ValkyrieLanguage>,
     source: &S,
@@ -180,7 +192,7 @@ pub(crate) fn build_unary_expr<S: Source + ?Sized>(
     Ok((op, expr))
 }
 
-/// 构建字段访问表达式的通用函数
+/// Shared helper to build field-access expressions
 pub(crate) fn build_field_expr<S: Source + ?Sized>(node: &RedNode<ValkyrieLanguage>, source: &S, build_expr: impl Fn(&RedNode<ValkyrieLanguage>, &S) -> Result<TermExpression, OakError>) -> Result<(Box<TermExpression>, Identifier), OakError> {
     let span = node.span();
     let mut receiver = None;
@@ -193,7 +205,7 @@ pub(crate) fn build_field_expr<S: Source + ?Sized>(node: &RedNode<ValkyrieLangua
 
         match child {
             RedTree::Leaf(t) => {
-                if t.kind == ValkyrieTokenType::Identifier && receiver.is_some() && field.is_none() {
+                if matches!(t.kind, ValkyrieTokenType::Identifier | ValkyrieTokenType::Keyword(crate::lexer::ValkyrieKeywords::Get | crate::lexer::ValkyrieKeywords::Set)) && receiver.is_some() && field.is_none() {
                     field = Some(Identifier { name: crate::builder::text(source, t.span), span: t.span });
                 }
             }
@@ -211,7 +223,7 @@ pub(crate) fn build_field_expr<S: Source + ?Sized>(node: &RedNode<ValkyrieLangua
     Ok((receiver, field))
 }
 
-/// 构建索引表达式的通用函数
+/// Shared helper to build index expressions
 pub(crate) fn build_index_expr<S: Source + ?Sized>(
     node: &RedNode<ValkyrieLanguage>,
     source: &S,
@@ -243,7 +255,7 @@ pub(crate) fn build_index_expr<S: Source + ?Sized>(
     Ok((receiver, index))
 }
 
-/// 构建调用表达式的通用函数
+/// Shared helper to build call expressions
 pub(crate) fn build_call_expr<S: Source + ?Sized>(node: &RedNode<ValkyrieLanguage>, source: &S, build_expr: impl Fn(&RedNode<ValkyrieLanguage>, &S) -> Result<TermExpression, OakError>) -> Result<(Box<TermExpression>, Vec<TermExpression>), OakError> {
     let span = node.span();
     let mut callee = None;
@@ -257,7 +269,7 @@ pub(crate) fn build_call_expr<S: Source + ?Sized>(node: &RedNode<ValkyrieLanguag
         if let RedTree::Node(n) = child {
             match n.green.kind {
                 crate::parser::element_type::ValkyrieElementType::ArgList => {
-                    args = build_arg_list(&n, source, &build_expr);
+                    args = build_arg_list(&n, source, &build_expr)?;
                 }
                 _ => {
                     if callee.is_none() {
@@ -273,7 +285,7 @@ pub(crate) fn build_call_expr<S: Source + ?Sized>(node: &RedNode<ValkyrieLanguag
     Ok((callee, args))
 }
 
-/// 构建块表达式的通用函数
+/// Shared helper to build block expressions
 pub(crate) fn build_block_expr<S: Source + ?Sized>(
     node: &RedNode<ValkyrieLanguage>,
     source: &S,
@@ -292,27 +304,20 @@ pub(crate) fn build_block_expr<S: Source + ?Sized>(
         if let RedTree::Node(n) = child {
             match n.green.kind {
                 crate::parser::element_type::ValkyrieElementType::LetStatement => {
-                    if let Ok(stmt) = build_let(&n, source) {
-                        statements.push(stmt);
-                    }
+                    statements.push(build_let(&n, source)?);
                 }
                 crate::parser::element_type::ValkyrieElementType::ExprStatement => {
-                    if let Ok(stmt) = build_expr_stmt(&n, source) {
-                        statements.push(stmt);
-                    }
+                    statements.push(build_expr_stmt(&n, source)?);
                 }
                 crate::parser::element_type::ValkyrieElementType::TemplateIfStatement
                 | crate::parser::element_type::ValkyrieElementType::TemplateLoop
                 | crate::parser::element_type::ValkyrieElementType::TemplateMatch
                 | crate::parser::element_type::ValkyrieElementType::TemplateStatement => {
-                    if let Ok(stmt) = build_template_stmt(&n, source) {
-                        statements.push(stmt);
-                    }
+                    statements.push(build_template_stmt(&n, source)?);
                 }
                 _ => {
-                    if let Ok(expr) = build_expr(&n, source) {
-                        statements.push(Statement::Expression(Box::new(ExprStmt { annotations: Vec::new(), expr, semi: false, span: n.span() })));
-                    }
+                    let expr = build_expr(&n, source)?;
+                    statements.push(Statement::Expression(Box::new(ExprStmt { annotations: Vec::new(), expr, semi: false, span: n.span() })));
                 }
             }
         }

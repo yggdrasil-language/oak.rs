@@ -17,6 +17,7 @@ mod build_root;
 mod build_stmt;
 mod build_template;
 mod build_unary;
+mod build_where;
 mod utils;
 
 use crate::{ValkyrieLanguage, ValkyrieParser};

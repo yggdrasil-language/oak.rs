@@ -1,23 +1,23 @@
-//! TGrammar 词法：`support_t_grammar` 控制 `<% ... %>` 是否进入词法流。
+//! TGrammar lexing: `support_t_grammar` controls whether `<% ... %>` enters the token stream.
 //!
 //! - `<%` / `%>` → `TemplateL` / `TemplateR`
-//! - `<%` 与 `%>` 之间 → 正常 Valkyrie 词法 token（keyword / identifier 等）
-//! - 模板区内 `%>` 与下一 `<%` 之间 → 一律为 `TemplateText`（含 `aaa` 与 `micro fx() { ... }` 等）
+//! - Between `<%` and `%>` → normal Valkyrie tokens (keywords, identifiers, etc.)
+//! - Between `%>` and the next `<%` in template regions → always `TemplateText` (includes `aaa` and `micro fx() { ... }`, etc.)
 
 use crate::lexer::{State, token_type::ValkyrieTokenType};
-use oak_core::source::Source;
+use oak_core::{TokenType, source::Source};
 
 const TG_CONTROL_L: &str = "<%";
 const TG_CONTROL_R: &str = "%>";
 
-/// 已进入模板交错区（见过首个 `<% ... %>`）。
+/// Entered the interleaved template region (seen the first `<% ... %>`).
 #[derive(Debug, Clone, Copy, Default)]
 pub(crate) struct TemplateLexMode {
     pub region: bool,
 }
 
 impl crate::lexer::ValkyrieLexer<'_> {
-    /// 尝试消费 TGrammar 片段；返回 `true` 表示已处理当前位置。
+    /// Try to consume a TGrammar fragment; returns `true` if the current position was handled.
     pub(crate) fn lex_tgrammar_fragment<S: Source + ?Sized>(&self, state: &mut State<'_, S>, mode: &mut TemplateLexMode) -> bool {
         if state.starts_with(TG_CONTROL_L) {
             if !self.config.support_t_grammar {
@@ -58,10 +58,13 @@ fn lex_tgrammar_control<S: Source + ?Sized>(lexer: &crate::lexer::ValkyrieLexer<
 
     let content_start = state.get_position();
     let content_end = scan_control_end(state);
+    let mut closes_template_region = false;
     if content_start < content_end {
         let mut sub_state = state.sub_state(content_start, content_end);
         let _ = lexer.run_template_directive_programming(&mut sub_state);
-        for token in sub_state.get_tokens() {
+        let directive_tokens = sub_state.get_tokens();
+        closes_template_region = directive_tokens.iter().find(|token| !token.kind.is_ignored()).is_some_and(|token| token.kind == ValkyrieTokenType::Keyword(crate::lexer::ValkyrieKeywords::End));
+        for token in directive_tokens {
             state.add_token(token.kind, token.span.start, token.span.end);
         }
         state.set_position(content_end);
@@ -71,7 +74,10 @@ fn lex_tgrammar_control<S: Source + ?Sized>(lexer: &crate::lexer::ValkyrieLexer<
         let end_start = state.get_position();
         state.advance(TG_CONTROL_R.len());
         state.add_token(ValkyrieTokenType::TemplateR, end_start, state.get_position());
-        mode.region = true;
+        // `<% end %>` closes the interleaved template region.  The following
+        // source must be lexed as ordinary Valkyrie again; otherwise the whole
+        // remainder of the file becomes TemplateText and cannot form items.
+        mode.region = !closes_template_region;
     }
     else {
         state.add_token(ValkyrieTokenType::Error, block_start, state.get_position());

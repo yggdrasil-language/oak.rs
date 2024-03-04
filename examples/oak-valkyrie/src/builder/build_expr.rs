@@ -1,10 +1,19 @@
 use crate::{ValkyrieLanguage, ast::*, builder::ValkyrieBuilder};
-use oak_core::{OakError, RedNode, Source};
+use oak_core::{OakError, RedNode, RedTree, Source};
 
 impl<'config> ValkyrieBuilder<'config> {
     pub(crate) fn build_expr<S: Source + ?Sized>(&self, node: RedNode<ValkyrieLanguage>, source: &S) -> Result<TermExpression, OakError> {
         let span = node.span();
         match node.green.kind {
+            crate::parser::element_type::ValkyrieElementType::ArrayExpression => {
+                let mut items = Vec::new();
+                for child in node.children() {
+                    if let RedTree::Node(child) = child {
+                        items.push(self.build_expr(child, source)?);
+                    }
+                }
+                Ok(TermExpression::ArrayLiteral { items, span })
+            }
             crate::parser::element_type::ValkyrieElementType::LiteralExpression => self.build_literal(node, source),
             crate::parser::element_type::ValkyrieElementType::BooleanLiteral => self.build_bool_literal(node, source),
             crate::parser::element_type::ValkyrieElementType::BinaryExpression => self.build_binary(node, source),

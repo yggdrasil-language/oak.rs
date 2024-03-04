@@ -34,11 +34,14 @@ pub mod union_nodes;
 /// Widget declaration nodes.
 pub mod widget_nodes;
 
+/// Valkyrie 控制流 AST 节点。
+pub mod control_nodes;
+
 pub use self::{
     class_nodes::{AnonymousClass, ClassDeclaration},
     common_nodes::{Attribute, AttributeArgument, EnumVariant, InterpolationSegment, Modifier, StringLiteral, StringSegment, TextSegment, VariantCase},
     ecs_nodes::{ComponentDeclaration, EventDeclaration, SystemDeclaration},
-    items_nodes::{Effect, Enums, Flags, MicroDeclaration, Parent, Property, PropertyKind, StatementNode, TypeFunction, Variant},
+    items_nodes::{Effect, Enums, Flags, MicroDeclaration, Parent, Property, PropertyKind, StatementNode, TypeAliasDeclaration, TypeFunction, Variant},
     namespace_nodes::{NamespaceDeclaration, UsingDeclaration},
     pattern_nodes::{ClassPattern, LiteralPattern, MatchArm, Pattern, TypePattern, VariablePattern, WildcardPattern},
     root_nodes::{EnumsKind, Identifier, LoopKind, NamePath, Span, ValkyrieRoot},

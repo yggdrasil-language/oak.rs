@@ -149,6 +149,8 @@ pub struct MethodDeclaration {
     pub parameters: Vec<Param>,
     /// Optional return type annotation.
     pub return_type: Option<TypeExpression>,
+    /// 独立于返回类型的结构化函数约束。
+    pub where_constraints: Vec<crate::ast::type_nodes::WhereConstraint>,
     /// The optional method body.
     pub body: Option<Block>,
     /// Annotations applied to the method.

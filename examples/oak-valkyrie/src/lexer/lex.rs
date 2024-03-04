@@ -230,14 +230,45 @@ impl crate::lexer::ValkyrieLexer<'_> {
         let start = state.get_position();
         if let Some(ch) = state.current() {
             if ch.is_ascii_digit() {
+                let radix = if ch == '0' {
+                    match state.peek_next() {
+                        Some('x' | 'X') => Some(16),
+                        Some('b' | 'B') => Some(2),
+                        Some('o' | 'O') => Some(8),
+                        _ => None,
+                    }
+                }
+                else {
+                    None
+                };
+                if let Some(radix) = radix {
+                    state.advance(2);
+                    let mut has_digit = false;
+                    while let Some(ch) = state.current() {
+                        if ch.is_digit(radix) {
+                            has_digit = true;
+                            state.advance(ch.len_utf8());
+                        }
+                        else if ch == '_' {
+                            state.advance(ch.len_utf8());
+                        }
+                        else {
+                            break;
+                        }
+                    }
+                    state.add_token(if has_digit { ValkyrieTokenType::IntegerLiteral } else { ValkyrieTokenType::Error }, start, state.get_position());
+                    return true;
+                }
                 state.advance(ch.len_utf8());
 
                 let mut has_fraction = false;
                 while let Some(ch) = state.current() {
-                    if ch == '.' {
+                    if ch == '.' && !has_fraction && state.peek_next().is_some_and(|next| next.is_ascii_digit()) {
                         has_fraction = true;
+                        state.advance(1);
+                        continue;
                     }
-                    if ch.is_ascii_digit() || ch == '.' || ch == '_' { state.advance(ch.len_utf8()) } else { break }
+                    if ch.is_ascii_digit() || ch == '_' { state.advance(ch.len_utf8()) } else { break }
                 }
 
                 let kind = if has_fraction { ValkyrieTokenType::FloatLiteral } else { ValkyrieTokenType::IntegerLiteral };

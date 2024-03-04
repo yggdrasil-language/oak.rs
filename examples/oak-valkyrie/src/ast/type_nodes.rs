@@ -245,3 +245,38 @@ pub struct Param {
     #[cfg_attr(feature = "serde", serde(with = "oak_core::serde_range"))]
     pub span: Span,
 }
+
+/// 函数约束的语法事实；名称绑定由语言前端负责。
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct WhereConstraint {
+    /// 受约束的类型。
+    pub target: TypeExpression,
+    /// 此目标必须满足的所有 trait bound。
+    pub bounds: Vec<TraitBound>,
+    /// 约束的源码区间。
+    #[cfg_attr(feature = "serde", serde(with = "oak_core::serde_range"))]
+    pub span: Span,
+}
+
+/// 参数与关联等式必须归属于同一个 trait bound。
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct TraitBound {
+    /// 完整声明路径。
+    pub trait_path: NamePath,
+    /// 按源码顺序保存的位置类型参数。
+    pub type_arguments: Vec<TypeExpression>,
+    /// 此 bound 的关联类型等式。
+    pub associated_types: Vec<AssociatedTypeEquation>,
+}
+
+/// 关联类型等式的语法事实。
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct AssociatedTypeEquation {
+    /// 关联成员名。
+    pub name: Identifier,
+    /// 等式右侧类型。
+    pub ty: TypeExpression,
+}

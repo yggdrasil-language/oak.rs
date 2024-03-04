@@ -62,6 +62,8 @@ pub enum StatementNode {
     Micro(Box<MicroDeclaration>),
     /// A type function declaration.
     TypeFunction(Box<TypeFunction>),
+    /// A module-scoped type alias.
+    TypeAlias(Box<TypeAliasDeclaration>),
     /// A statement at module level.
     Statement(Box<StatementNode>),
     /// A variant declaration.
@@ -186,6 +188,8 @@ pub struct MicroDeclaration {
     pub params: Vec<Param>,
     /// Return type annotation, if any.
     pub return_type: Option<TypeExpression>,
+    /// 独立于返回类型的结构化函数约束。
+    pub where_constraints: Vec<crate::ast::type_nodes::WhereConstraint>,
     /// The body of the micro.
     pub body: Block,
     /// Annotations applied to the micro.
@@ -197,6 +201,19 @@ pub struct MicroDeclaration {
     pub is_abstract: bool,
     /// Whether this function is final (cannot be overridden).
     pub is_final: bool,
+}
+
+/// A module-scoped type alias.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct TypeAliasDeclaration {
+    /// Alias name.
+    pub name: Identifier,
+    /// Alias target type.
+    pub target: TypeExpression,
+    /// Source span.
+    #[cfg_attr(feature = "serde", serde(with = "oak_core::serde_range"))]
+    pub span: Span,
 }
 
 /// A type function declaration.
@@ -218,6 +235,8 @@ pub struct TypeFunction {
     pub params: Vec<Param>,
     /// Return type annotation, if any.
     pub return_type: Option<TypeExpression>,
+    /// 独立于返回类型的类型函数约束。
+    pub where_constraints: Vec<crate::ast::type_nodes::WhereConstraint>,
     /// The body of the type function.
     pub body: Block,
     /// Annotations applied to the type function.

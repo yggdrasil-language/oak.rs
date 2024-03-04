@@ -22,6 +22,7 @@ impl<'config> ValkyrieBuilder<'config> {
         let mut annotations = Vec::new();
         let mut params = Vec::new();
         let mut return_type = None;
+        let mut where_constraints = Vec::new();
         let mut body = None;
 
         for child in node.children() {
@@ -47,6 +48,9 @@ impl<'config> ValkyrieBuilder<'config> {
                     ValkyrieElementType::Type => {
                         return_type = Some(self.build_type(n, source)?);
                     }
+                    ValkyrieElementType::WhereClause => {
+                        where_constraints = self.build_where_clause(n, source)?;
+                    }
                     ValkyrieElementType::BlockExpression => {
                         body = Some(self.build_block(n, source)?);
                     }
@@ -57,7 +61,7 @@ impl<'config> ValkyrieBuilder<'config> {
 
         let body = body.ok_or_else(|| source.syntax_error(format!("Missing mezzo body at {:?}", span), span.start))?;
 
-        Ok(TypeFunction { name, generics, annotations, params, return_type, body, span })
+        Ok(TypeFunction { where_constraints, name, generics, annotations, params, return_type, body, span })
     }
 
     pub(crate) fn build_micro<S: Source + ?Sized>(&self, node: RedNode<ValkyrieLanguage>, source: &S) -> Result<MicroDeclaration, OakError> {
@@ -67,6 +71,7 @@ impl<'config> ValkyrieBuilder<'config> {
         let mut annotations = Vec::new();
         let mut params = Vec::new();
         let mut return_type = None;
+        let mut where_constraints = Vec::new();
         let mut body = None;
         let mut is_abstract = false;
         let mut is_final = false;
@@ -75,7 +80,8 @@ impl<'config> ValkyrieBuilder<'config> {
             match child {
                 RedTree::Leaf(t) => match t.kind {
                     ValkyrieTokenType::Whitespace | ValkyrieTokenType::Newline | ValkyrieTokenType::LineComment | ValkyrieTokenType::BlockComment => continue,
-                    ValkyrieTokenType::Identifier => {
+                    ValkyrieTokenType::Keyword(ValkyrieKeywords::Micro) => continue,
+                    ValkyrieTokenType::Identifier | ValkyrieTokenType::Keyword(_) => {
                         if name.name.is_empty() {
                             name.name = crate::builder::identifier_text(source, t.span);
                             name.span = t.span;
@@ -107,6 +113,9 @@ impl<'config> ValkyrieBuilder<'config> {
                     ValkyrieElementType::Type => {
                         return_type = Some(self.build_type(n, source)?);
                     }
+                    ValkyrieElementType::WhereClause => {
+                        where_constraints = self.build_where_clause(n, source)?;
+                    }
                     ValkyrieElementType::BlockExpression => {
                         body = Some(self.build_block(n, source)?);
                     }
@@ -117,7 +126,7 @@ impl<'config> ValkyrieBuilder<'config> {
 
         let body = if is_abstract { Block { statements: Vec::new(), span: span.clone() } } else { body.ok_or_else(|| source.syntax_error(format!("Missing micro body at {:?}", span), span.start))? };
 
-        Ok(MicroDeclaration { name, generics, annotations, params, return_type, body, span, is_abstract, is_final })
+        Ok(MicroDeclaration { where_constraints, name, generics, annotations, params, return_type, body, span, is_abstract, is_final })
     }
 
     pub(crate) fn build_generic_params<S: Source + ?Sized>(&self, node: RedNode<ValkyrieLanguage>, source: &S) -> Result<Vec<GenericParam>, OakError> {

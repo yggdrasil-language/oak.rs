@@ -19,7 +19,7 @@ pub(crate) fn parse_if_expression<S: oak_core::Source + ?Sized>(state: &mut Stat
         }
     }
     else {
-        parse_expression(state)?;
+        crate::parser::parse_expressions::parse_condition_expression(state)?;
     }
     parse_block_expression(state)?;
     if state.at(ValkyrieTokenType::Keyword(ValkyrieKeywords::Else)) {
@@ -43,11 +43,15 @@ pub(crate) fn parse_match_expression<S: oak_core::Source + ?Sized>(state: &mut S
     if state.at(ValkyrieTokenType::BraceL) {
         state.bump();
         while state.not_at_end() && !state.at(ValkyrieTokenType::BraceR) {
+            let before = state.checkpoint().0;
             state.skip_trivia();
             if state.at(ValkyrieTokenType::BraceR) {
                 break;
             }
             parse_match_arm(state)?;
+            if state.checkpoint().0 == before {
+                state.bump();
+            }
         }
         if state.at(ValkyrieTokenType::BraceR) {
             state.bump();
@@ -82,6 +86,36 @@ fn parse_match_pattern<S: oak_core::Source + ?Sized>(state: &mut State<'_, S>) -
                 state.bump();
             }
         }
+        else if state.at(ValkyrieTokenType::BraceL) {
+            state.bump();
+            while state.not_at_end() && !state.at(ValkyrieTokenType::BraceR) {
+                state.skip_trivia();
+                if state.at(ValkyrieTokenType::BraceR) {
+                    break;
+                }
+                let before = state.checkpoint().0;
+                if state.at(ValkyrieTokenType::Identifier) || state.at(ValkyrieTokenType::Underscore) {
+                    state.bump();
+                    if state.at(ValkyrieTokenType::Colon) {
+                        state.bump();
+                        parse_match_pattern(state)?;
+                    }
+                }
+                else {
+                    parse_match_pattern(state)?;
+                }
+                if state.checkpoint().0 == before {
+                    state.bump();
+                }
+                state.skip_trivia();
+                if state.at(ValkyrieTokenType::Comma) {
+                    state.bump();
+                }
+            }
+            if state.at(ValkyrieTokenType::BraceR) {
+                state.bump();
+            }
+        }
     }
     state.sink.finish_node(pcp, ValkyrieElementType::Pattern);
     Ok(())
@@ -104,7 +138,7 @@ pub(crate) fn parse_match_arm<S: oak_core::Source + ?Sized>(state: &mut State<'_
     }
     if state.at(ValkyrieTokenType::Keyword(ValkyrieKeywords::If)) {
         state.bump();
-        parse_expression(state)?;
+        crate::parser::parse_expressions::parse_condition_expression(state)?;
     }
     if state.at(ValkyrieTokenType::Colon) || state.at(ValkyrieTokenType::Arrow) {
         state.bump();
@@ -126,12 +160,20 @@ pub(crate) fn parse_match_arm<S: oak_core::Source + ?Sized>(state: &mut State<'_
 pub(crate) fn parse_loop_expression<S: oak_core::Source + ?Sized>(state: &mut State<'_, S>) -> Result<(), oak_core::OakError> {
     let cp = state.sink.checkpoint();
     state.bump();
-    if state.at(ValkyrieTokenType::ParenthesisL) {
+    if (state.at(ValkyrieTokenType::Identifier) || state.at(ValkyrieTokenType::Underscore)) && state.peek_non_trivia_kind_at(1) == Some(ValkyrieTokenType::Keyword(ValkyrieKeywords::In)) {
+        parse_pattern(state)?;
+        state.bump();
+        crate::parser::parse_expressions::parse_scrutinee_expression(state)?;
+    }
+    else if state.at(ValkyrieTokenType::ParenthesisL) {
         state.bump();
         parse_expression(state)?;
         if state.at(ValkyrieTokenType::ParenthesisR) {
             state.bump();
         }
+    }
+    if !state.at(ValkyrieTokenType::BraceL) {
+        return Err(state.source.syntax_error("循环缺少主体".into(), state.current_offset()));
     }
     parse_block_expression(state)?;
     state.sink.finish_node(cp, ValkyrieElementType::LoopExpression);
@@ -142,7 +184,7 @@ pub(crate) fn parse_loop_expression<S: oak_core::Source + ?Sized>(state: &mut St
 pub(crate) fn parse_while_expression<S: oak_core::Source + ?Sized>(state: &mut State<'_, S>) -> Result<(), oak_core::OakError> {
     let cp = state.sink.checkpoint();
     state.bump();
-    parse_expression(state)?;
+    crate::parser::parse_expressions::parse_condition_expression(state)?;
     parse_block_expression(state)?;
     state.sink.finish_node(cp, ValkyrieElementType::LoopExpression);
     Ok(())
@@ -193,7 +235,27 @@ pub(crate) fn parse_lambda_expression<S: oak_core::Source + ?Sized>(state: &mut 
     Ok(())
 }
 
-// 以下函数在其他模块中定义
+// Functions below are defined in other modules
+/// 匿名 micro 的参数、返回类型与主体均由结构节点保存。
+pub(crate) fn parse_anonymous_micro<S: oak_core::Source + ?Sized>(state: &mut State<'_, S>) -> Result<(), oak_core::OakError> {
+    let cp = state.sink.checkpoint();
+    state.bump();
+    if !state.at(ValkyrieTokenType::ParenthesisL) {
+        return Err(state.source.syntax_error("匿名 micro 缺少参数列表".into(), state.current_offset()));
+    }
+    parse_parameter_list(state)?;
+    if state.at(ValkyrieTokenType::Arrow) || state.at(ValkyrieTokenType::Colon) {
+        state.bump();
+        super::parse_types::parse_type(state)?;
+    }
+    if !state.at(ValkyrieTokenType::BraceL) {
+        return Err(state.source.syntax_error("匿名 micro 缺少主体".into(), state.current_offset()));
+    }
+    parse_block_expression(state)?;
+    state.sink.finish_node(cp, ValkyrieElementType::LambdaExpression);
+    Ok(())
+}
+
 pub(crate) fn parse_expression<S: oak_core::Source + ?Sized>(state: &mut State<'_, S>) -> Result<(), oak_core::OakError> {
     crate::parser::parse_expressions::parse_expression(state)
 }

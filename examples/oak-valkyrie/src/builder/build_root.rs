@@ -16,7 +16,7 @@ impl<'config> ValkyrieBuilder<'config> {
         for child in red_root.children() {
             match child {
                 RedTree::Node(n) => {
-                    // 仅含 trivia/Eof/空白 TemplateText 的空 ExprStatement 不进 AST。
+                    // Empty ExprStatement with only trivia/Eof/whitespace TemplateText is omitted from the AST.
                     if n.green.kind == ValkyrieElementType::ExprStatement && is_trivia_only_expr_stmt(&n, source) {
                         continue;
                     }
@@ -183,6 +183,23 @@ impl<'config> ValkyrieBuilder<'config> {
             ValkyrieElementType::Mezzo => {
                 let mezzo = self.build_mezzo(n, source)?;
                 Ok(StatementNode::TypeFunction(Box::new(mezzo)))
+            }
+            ValkyrieElementType::TypeAlias => {
+                let span = n.span();
+                let mut name = crate::ast::Identifier::default();
+                let mut target = None;
+                for child in n.children() {
+                    match child {
+                        RedTree::Leaf(t) if t.kind == ValkyrieTokenType::Identifier && name.name.is_empty() => {
+                            name = crate::ast::Identifier { name: crate::builder::text(source, t.span), span: t.span };
+                        }
+                        RedTree::Node(node) if node.green.kind == ValkyrieElementType::Type => {
+                            target = Some(self.build_type(node, source)?);
+                        }
+                        _ => {}
+                    }
+                }
+                Ok(StatementNode::TypeAlias(Box::new(crate::ast::TypeAliasDeclaration { name, target: target.unwrap_or(crate::ast::TypeExpression::Namepath(Box::new(crate::ast::NamePath::default()))), span })))
             }
             ValkyrieElementType::LetStatement => {
                 let stmt = self.build_let(n, source)?;

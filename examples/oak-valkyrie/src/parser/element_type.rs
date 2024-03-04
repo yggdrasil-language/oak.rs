@@ -32,6 +32,16 @@ pub enum ValkyrieElementType {
     NamePath,
     /// Type node.
     Type,
+    /// 函数约束子句。
+    WhereClause,
+    /// 单个受约束类型及其 bounds。
+    WhereConstraint,
+    /// 一个完整 trait bound。
+    TraitBound,
+    /// bound 的关联类型等式。
+    AssociatedTypeEquation,
+    /// Module-scoped type alias.
+    TypeAlias,
     /// Namespace node.
     Namespace,
     /// Class node.
@@ -66,6 +76,8 @@ pub enum ValkyrieElementType {
     ReturnExpression,
     /// Literal expression node.
     LiteralExpression,
+    /// 数组字面量，元素按源码顺序保留。
+    ArrayExpression,
     /// Boolean literal node.
     BooleanLiteral,
     /// Binary expression node.
@@ -74,15 +86,16 @@ pub enum ValkyrieElementType {
     UnaryExpression,
     /// Parenthesized expression node.
     ParenthesizedExpression,
-    /// `expr as Type` 显式转型表达式。
+    /// Explicit cast expression: `expr as Type`.
     CastExpression,
-    /// Index expression node.
+    /// Ordinal index node: `receiver[index]` (1-based).
     IndexExpression,
-    /// Offset expression node (cardinal indexing, 0-based).
+    /// Cardinal index node: `receiver⁅cardinal⁆` (0-based; alias `receiver::[cardinal]`).
+    /// Type name is historically `OffsetExpression`; semantics are cardinal indexing.
     OffsetExpression,
     /// Field expression node.
     FieldExpression,
-    /// Term 层显式泛型应用：`expr::<T>`。
+    /// Term-level explicit generic application: `expr::<T>`.
     TurbofishExpression,
     /// If expression node.
     IfExpression,
@@ -181,29 +194,29 @@ pub enum ValkyrieElementType {
     /// Super call expression node.
     SuperCallExpression,
     // Template (TGrammar)
-    /// `<% stmt %>` 单行 meta 语句。
+    /// `<% stmt %>` single-line meta statement.
     TemplateStatement,
-    /// `<% if ... %>...<% end if %>` 块。
+    /// `<% if ... %>...<% end if %>` block.
     TemplateIfStatement,
-    /// `<% if ... %>` 分支。
+    /// `<% if ... %>` branch.
     TemplateIfFragment,
-    /// `<% else if ... %>` 分支。
+    /// `<% else if ... %>` branch.
     TemplateElseIfFragment,
-    /// `<% else %>` 分支。
+    /// `<% else %>` branch.
     TemplateElseFragment,
-    /// `<% loop ... %>.,.<% end loop %>` 块。
+    /// `<% loop ... %>...<% end loop %>` block.
     TemplateLoop,
-    /// `<% loop ... %>` 分支。
+    /// `<% loop ... %>` branch.
     TemplateLoopFragment,
-    /// `<% match %>...<% end %>` 块。
+    /// `<% match %>...<% end %>` block.
     TemplateMatch,
-    /// `<% match ... %>` 头。
+    /// `<% match ... %>` header.
     TemplateMatchFragment,
-    /// `<% case ... %>` 分支。
+    /// `<% case ... %>` branch.
     TemplateCaseFragment,
-    /// `<% end keyword %>` 结束。
+    /// `<% end keyword %>` terminator.
     TemplateEndFragment,
-    /// `%>` 与下一 `<%` 之间的模板正文。
+    /// Template body between `%>` and the next `<%`.
     TemplateText,
 }
 
