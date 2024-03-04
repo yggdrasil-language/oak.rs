@@ -3,10 +3,7 @@ use crate::{
     lexer::{keywords::ValkyrieKeywords, token_type::ValkyrieTokenType},
     parser::{
         element_type::ValkyrieElementType,
-        parse_modifiers::{
-            dispatch_prefixed_declaration, is_declaration_keyword, is_member_accessor_keyword, is_raw_id_follower, parse_field_modifiers, parse_modifiers,
-            parse_modifiers_followed_by,
-        },
+        parse_modifiers::{dispatch_prefixed_declaration, is_declaration_keyword, is_member_accessor_keyword, is_raw_id_follower, parse_field_modifiers, parse_modifiers, parse_modifiers_followed_by},
     },
 };
 use oak_core::parser::ParserState;

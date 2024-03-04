@@ -20,13 +20,7 @@ fn stalled<S: oak_core::Source + ?Sized>(state: &State<'_, S>, before: usize) ->
 
 /// 类型名起始 token：`Self` / `micro` / `mezzo` 为关键词，raw id 与普通标识符同为 `Identifier`。
 fn is_type_name_token(kind: &ValkyrieTokenType) -> bool {
-    matches!(
-        kind,
-        ValkyrieTokenType::Identifier
-            | ValkyrieTokenType::Keyword(ValkyrieKeywords::SelfType)
-            | ValkyrieTokenType::Keyword(ValkyrieKeywords::Micro)
-            | ValkyrieTokenType::Keyword(ValkyrieKeywords::Mezzo)
-    )
+    matches!(kind, ValkyrieTokenType::Identifier | ValkyrieTokenType::Keyword(ValkyrieKeywords::SelfType) | ValkyrieTokenType::Keyword(ValkyrieKeywords::Micro) | ValkyrieTokenType::Keyword(ValkyrieKeywords::Mezzo))
 }
 
 /// 解析类型

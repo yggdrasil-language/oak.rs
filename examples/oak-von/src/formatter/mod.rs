@@ -1,7 +1,4 @@
-//! Public formatter API for VON source text.
-//!
-//! Product entry: [`format_source`] with [`FormatOptions`]. CST rules live in private submodules.
-
+#![doc = include_str!("readme.md")]
 mod bridge;
 mod engine;
 mod error;

@@ -1,7 +1,4 @@
-//! Public formatter API for Vue SFC source text.
-//!
-//! Product entry: [`format_source`] with [`FormatOptions`].
-
+#![doc = include_str!("readme.md")]
 mod engine;
 mod error;
 mod options;

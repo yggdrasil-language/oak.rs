@@ -543,19 +543,31 @@ impl<'config> TypeScriptBuilder<'config> {
     }
 }
 
-fn decode_string_literal_text(raw: &str) -> Result<String, OakError> {
+pub fn decode_string_literal_text(raw: &str) -> Result<String, OakError> {
     let text = raw.trim();
     let text = if text.len() >= 2 && matches!(text.as_bytes()[0], b'"' | b'\'') && text.as_bytes().last() != text.as_bytes().first() {
         let quote = text.as_bytes()[0] as char;
         let mut escaped = false;
         let mut end = None;
         for (index, character) in text.char_indices().skip(1) {
-            if escaped { escaped = false; continue; }
-            if character == '\\' { escaped = true; continue; }
-            if character == quote { end = Some(index + character.len_utf8()); break; }
+            if escaped {
+                escaped = false;
+                continue;
+            }
+            if character == '\\' {
+                escaped = true;
+                continue;
+            }
+            if character == quote {
+                end = Some(index + character.len_utf8());
+                break;
+            }
         }
         if let Some(end) = end { &text[..end] } else { text }
-    } else { text };
+    }
+    else {
+        text
+    };
     if text.len() < 2 || !matches!(text.as_bytes()[0], b'"' | b'\'') || text.as_bytes().last() != text.as_bytes().first() {
         return Err(OakError::custom_error("invalid string literal"));
     }
@@ -622,24 +634,4 @@ fn decode_string_literal_text(raw: &str) -> Result<String, OakError> {
         units.extend_from_slice(decoded.encode_utf16(&mut buffer));
     }
     String::from_utf16(&units).map_err(|_| OakError::custom_error("unpaired Unicode surrogate"))
-}
-
-#[cfg(test)]
-mod string_literal_tests {
-    use super::decode_string_literal_text;
-
-    #[test]
-    fn decodes_javascript_string_escapes() {
-        assert_eq!(decode_string_literal_text(r#"'sku\u002d1'"#).unwrap(), "sku-1");
-        assert_eq!(decode_string_literal_text(r#"'a\'b'"#).unwrap(), "a'b");
-        assert_eq!(decode_string_literal_text(r#"'\x41\u{1f600}\ud83d\ude00'"#).unwrap(), "A😀😀");
-        assert_eq!(decode_string_literal_text("'a\\\r\nb'").unwrap(), "ab");
-    }
-
-    #[test]
-    fn rejects_invalid_string_escapes() {
-        for source in [r#"'\u12'"#, r#"'\xZZ'"#, r#"'\u{110000}'"#, r#"'\ud800'"#] {
-            assert!(decode_string_literal_text(source).is_err(), "{source}");
-        }
-    }
 }

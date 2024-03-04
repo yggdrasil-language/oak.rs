@@ -72,7 +72,9 @@ impl<'config> TypeScriptParser<'config> {
                     while self.eat(state, Comma) {
                         let param = PrattParser::parse(state, 0, self);
                         state.push_child(param);
-                        if self.eat(state, Colon) { self.parse_type_annotation(state).ok(); }
+                        if self.eat(state, Colon) {
+                            self.parse_type_annotation(state).ok();
+                        }
                     }
                 }
                 self.expect(state, RightParen).ok();
@@ -290,7 +292,9 @@ impl<'config> TypeScriptParser<'config> {
                         let acp = state.checkpoint();
                         PrattParser::parse(state, 0, self);
                         state.finish_at(acp, crate::parser::element_type::TypeScriptElementType::CallArgument);
-                        if !self.eat(state, Comma) { break; }
+                        if !self.eat(state, Comma) {
+                            break;
+                        }
                     }
                     self.expect(state, RightParen).ok();
                     return Some(state.finish_at(cp, crate::parser::element_type::TypeScriptElementType::CallExpression.into()));

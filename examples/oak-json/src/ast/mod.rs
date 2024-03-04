@@ -277,7 +277,7 @@ impl ToSource for JsonObject {
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "oak-pretty-print", derive(AsDocument))]
-#[cfg_attr(feature = "oak-pretty-print", oak(doc = [self.name.as_document(params), ": ", self.value.as_document(params)]))]
+#[cfg_attr(feature = "oak-pretty-print", oak(doc = [self.name.as_document(config), ": ", self.value.as_document(config)]))]
 pub struct JsonField {
     /// The name (key) of the field.
     pub name: JsonString,

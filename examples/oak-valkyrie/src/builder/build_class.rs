@@ -1,9 +1,8 @@
 use crate::{
     ValkyrieLanguage,
     ast::{
-        AssociatedType, ClassDeclaration, EnumVariant, Enums, EnumsKind, FieldDeclaration, Flags, Identifier, ImplyDeclaration, Parent,
-        SingletonDeclaration, StatementNode, StructureBody, StructureDeclaration, StructureKind, Trait, TypeExpression, UnionBody,
-        UnionDeclaration, Variant, VariantCase, WidgetDeclaration,
+        AssociatedType, ClassDeclaration, EnumVariant, Enums, EnumsKind, FieldDeclaration, Flags, Identifier, ImplyDeclaration, Parent, SingletonDeclaration, StatementNode, StructureBody, StructureDeclaration, StructureKind, Trait, TypeExpression,
+        UnionBody, UnionDeclaration, Variant, VariantCase, WidgetDeclaration,
     },
     builder::{ValkyrieBuilder, text},
     lexer::{ValkyrieKeywords, token_type::ValkyrieTokenType},
@@ -85,14 +84,7 @@ impl<'config> ValkyrieBuilder<'config> {
                 },
             }
         }
-        Ok(ClassDeclaration {
-            name,
-            annotations,
-            generics,
-            parents,
-            body: StructureBody { fields, methods, associated_types: Vec::new(), span },
-            span,
-        })
+        Ok(ClassDeclaration { name, annotations, generics, parents, body: StructureBody { fields, methods, associated_types: Vec::new(), span }, span })
     }
 
     pub(crate) fn build_flags<S: Source + ?Sized>(&self, node: RedNode<ValkyrieLanguage>, source: &S) -> Result<Flags, OakError> {
@@ -446,20 +438,10 @@ impl<'config> ValkyrieBuilder<'config> {
                 },
             }
         }
-        Ok(Trait {
-            name,
-            generics,
-            annotations,
-            body: StructureBody { fields: Vec::new(), methods, associated_types, span },
-            span,
-        })
+        Ok(Trait { name, generics, annotations, body: StructureBody { fields: Vec::new(), methods, associated_types, span }, span })
     }
 
-    pub(crate) fn build_trait_associated_type<S: Source + ?Sized>(
-        &self,
-        node: RedNode<ValkyrieLanguage>,
-        source: &S,
-    ) -> Result<AssociatedType, OakError> {
+    pub(crate) fn build_trait_associated_type<S: Source + ?Sized>(&self, node: RedNode<ValkyrieLanguage>, source: &S) -> Result<AssociatedType, OakError> {
         let span = node.span();
         let mut name = Identifier { name: String::new(), span: Default::default() };
         let mut bounds = Vec::new();
@@ -542,13 +524,7 @@ impl<'config> ValkyrieBuilder<'config> {
             }
         }
 
-        Ok(UnionDeclaration {
-            name,
-            generics,
-            annotations,
-            body: UnionBody { fields, span },
-            span,
-        })
+        Ok(UnionDeclaration { name, generics, annotations, body: UnionBody { fields, span }, span })
     }
 
     pub(crate) fn build_widget<S: Source + ?Sized>(&self, node: RedNode<ValkyrieLanguage>, source: &S) -> Result<WidgetDeclaration, OakError> {
@@ -695,14 +671,7 @@ impl<'config> ValkyrieBuilder<'config> {
                 },
             }
         }
-        Ok(SingletonDeclaration {
-            name,
-            annotations,
-            generics,
-            parents,
-            body: StructureBody { fields, methods, associated_types: Vec::new(), span },
-            span,
-        })
+        Ok(SingletonDeclaration { name, annotations, generics, parents, body: StructureBody { fields, methods, associated_types: Vec::new(), span }, span })
     }
 
     pub(crate) fn build_struct<S: Source + ?Sized>(&self, node: RedNode<ValkyrieLanguage>, source: &S) -> Result<StructureDeclaration, OakError> {
@@ -786,14 +755,6 @@ impl<'config> ValkyrieBuilder<'config> {
                 },
             }
         }
-        Ok(StructureDeclaration {
-            kind,
-            name,
-            annotations,
-            generics,
-            parents,
-            body: StructureBody { fields, methods, associated_types: Vec::new(), span },
-            span,
-        })
+        Ok(StructureDeclaration { kind, name, annotations, generics, parents, body: StructureBody { fields, methods, associated_types: Vec::new(), span }, span })
     }
 }

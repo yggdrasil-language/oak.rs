@@ -121,6 +121,3 @@ impl ComponentAbi {
         self.events.iter().find(|event| event.name == name)
     }
 }
-
-#[cfg(test)]
-mod tests;

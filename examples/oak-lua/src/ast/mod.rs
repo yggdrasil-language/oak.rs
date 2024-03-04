@@ -26,7 +26,7 @@ impl ToSource for LuaRoot {
 
 #[cfg(feature = "oak-pretty-print")]
 impl AsDocument for LuaRoot {
-    fn as_document(&self, _params: &Self::Params) -> Document<'_> {
+    fn as_document(&self, _config: &Self::Config) -> Document<'_> {
         Document::join(self.statements.iter().map(|s| s.as_document(&())), Document::Line)
     }
 }
@@ -99,7 +99,7 @@ impl ToSource for LuaStatement {
 
 #[cfg(feature = "oak-pretty-print")]
 impl AsDocument for LuaStatement {
-    fn as_document(&self, _params: &Self::Params) -> Document<'_> {
+    fn as_document(&self, _config: &Self::Config) -> Document<'_> {
         let mut buffer = SourceBuffer::new();
         self.to_source(&mut buffer);
         Document::Text(buffer.finish().into())
@@ -457,7 +457,7 @@ impl ToSource for LuaExpression {
 
 #[cfg(feature = "oak-pretty-print")]
 impl AsDocument for LuaExpression {
-    fn as_document(&self, _params: &Self::Params) -> Document<'_> {
+    fn as_document(&self, _config: &Self::Config) -> Document<'_> {
         let mut buffer = SourceBuffer::new();
         self.to_source(&mut buffer);
         Document::Text(buffer.finish().into())

@@ -1,15 +1,4 @@
-//! Builder module for the Valkyrie language.
-//!
-//! This module contains the logic for building an AST (Abstract Syntax Tree) from the parsed syntax tree.
-//! It includes builders for various language constructs:
-//! - Root level items
-//! - Classes and structures
-//! - Expressions
-//! - Statements
-//! - Micro functions (lambdas)
-//! - Namespaces
-//! - Terms (binary operations, unary operations, etc.)
-
+#![doc = include_str!("readme.md")]
 mod build_access;
 mod build_anonymous_class;
 mod build_binary;
@@ -48,12 +37,7 @@ pub(crate) fn text(source: &(impl Source + ?Sized), range: oak_core::Range<usize
 /// 从源码区间取出标识符文本；raw id（`` `any` ``）去掉两侧反引号。
 pub(crate) fn identifier_text(source: &(impl Source + ?Sized), range: oak_core::Range<usize>) -> String {
     let raw = source.get_text_in(range);
-    if raw.len() >= 2 && raw.starts_with('`') && raw.ends_with('`') {
-        raw[1..raw.len() - 1].to_string()
-    }
-    else {
-        raw.to_string()
-    }
+    if raw.len() >= 2 && raw.starts_with('`') && raw.ends_with('`') { raw[1..raw.len() - 1].to_string() } else { raw.to_string() }
 }
 
 /// Valkyrie builder for constructing AST from parsed syntax trees.

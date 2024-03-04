@@ -541,7 +541,9 @@ impl<'config> Pratt<VueLanguage> for VueParser<'config> {
                 else {
                     state.bump();
                 }
-                if state.at(Comma) { state.bump(); }
+                if state.at(Comma) {
+                    state.bump();
+                }
             }
             state.expect(RightBrace).ok();
             state.finish_at(cp, crate::parser::element_type::VueElementType::ObjectExpr)

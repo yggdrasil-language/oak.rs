@@ -5,5 +5,5 @@
 protocol = "sparse"
 
 [patch."https://github.com/oovm/rust-boost"]
-diagnostic = { path = "../path/rust-boost/projects/diagnostic" }
-logger = { path = "../path/rust-boost/projects/logger" }
+diagnostic = { path = "<your-path>/rust-boost/projects/diagnostic" }
+logger = { path = "<your-path>/rust-boost/projects/logger" }

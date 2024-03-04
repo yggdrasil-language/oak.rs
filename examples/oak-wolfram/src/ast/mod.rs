@@ -1,5 +1,4 @@
-//! Owned abstract syntax tree for Wolfram Language.
-
+#![doc = include_str!("readme.md")]
 pub mod expression_nodes;
 pub mod full_form;
 pub mod root_nodes;

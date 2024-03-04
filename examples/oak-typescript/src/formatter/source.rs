@@ -218,14 +218,7 @@ fn is_layout(kind: TypeScriptTokenType) -> bool {
 fn validate_delimiters(source: &str, tokens: &[&oak_core::Token<TypeScriptTokenType>]) -> Result<(), oak_core::OakError> {
     let mut stack = Vec::new();
     for token in tokens {
-        if matches!(
-            token.kind,
-            TypeScriptTokenType::StringLiteral
-                | TypeScriptTokenType::TemplateString
-                | TypeScriptTokenType::RegexLiteral
-                | TypeScriptTokenType::LineComment
-                | TypeScriptTokenType::BlockComment
-        ) {
+        if matches!(token.kind, TypeScriptTokenType::StringLiteral | TypeScriptTokenType::TemplateString | TypeScriptTokenType::RegexLiteral | TypeScriptTokenType::LineComment | TypeScriptTokenType::BlockComment) {
             continue;
         }
         match token.kind {

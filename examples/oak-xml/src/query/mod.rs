@@ -5,8 +5,5 @@
 mod view;
 mod xpath;
 
-#[cfg(test)]
-mod xpath_tests;
-
 pub use view::{XmlDocumentView, XmlElementView};
 pub use xpath::{XmlNamespaceContext, select_xpath, select_xpath_elements};

@@ -1,5 +1,4 @@
-//! Owned abstract syntax tree for MATLAB.
-
+#![doc = include_str!("readme.md")]
 pub mod expression_nodes;
 pub mod root_nodes;
 pub mod statement_nodes;

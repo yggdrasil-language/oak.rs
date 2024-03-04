@@ -1,10 +1,10 @@
-use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 /// VON value representation.
 ///
 /// This represents the pure value of a VON element without any source code location information.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum VonValue {
     /// String value.
     String(String),
@@ -31,32 +31,37 @@ pub enum VonValue {
 }
 
 /// Array wrapper of VON
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct VonArray {
     pub elements: Vec<VonValue>,
 }
 
 /// Tuple wrapper of VON
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct VonTuple {
     pub elements: Vec<VonValue>,
 }
 
 /// Object wrapper of VON
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct VonObject {
     pub fields: Vec<VonField>,
 }
 
 /// Field of VON object
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct VonField {
     pub name: String,
     pub value: VonValue,
 }
 
 /// Enum value of VON
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct VonEnum {
     pub variant: String,
     pub payload: Option<Box<VonValue>>,

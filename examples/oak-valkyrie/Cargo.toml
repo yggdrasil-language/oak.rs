@@ -17,7 +17,7 @@ oak-dejavu = { workspace = true }
 oak-formatter = { workspace = true }
 oak-pretty-print = { workspace = true }
 serde = { workspace = true, optional = true, features = ["unstable"]}
-unicode-ident = "1.0.12"
+unicode-ident = { workspace = true }
 
 [dev-dependencies]
 oak-testing = { workspace = true }

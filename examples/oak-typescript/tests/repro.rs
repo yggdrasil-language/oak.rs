@@ -1,6 +1,7 @@
-use oak_core::{Builder, parser::ParseSession, SourceText};
+use oak_core::{Builder, SourceText, parser::ParseSession};
 use oak_typescript::{
-    TypeScriptBuilder, TypeScriptLanguage, formatter::{FormatOptions, format_source},
+    TypeScriptBuilder, TypeScriptLanguage,
+    formatter::{FormatOptions, format_source},
 };
 
 #[test]

@@ -6,8 +6,8 @@
 use super::*;
 use crate::ast::{
     ecs_nodes::{ComponentDeclaration, SystemDeclaration},
-    statement_nodes::{ExprStmt, Let},
     singleton_nodes::SingletonDeclaration,
+    statement_nodes::{ExprStmt, Let},
     template_nodes::TemplateNode,
     trait_nodes::{AssociatedType, ImplyDeclaration, Trait},
     union_nodes::UnionDeclaration,

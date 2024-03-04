@@ -3,11 +3,7 @@
 use oak_pretty_print::{Document, SOFT_LINE as soft_line, doc, indent};
 
 use crate::{
-    ast::{
-        Attribute, Block, Identifier, Let, MicroDeclaration, NamePath, NamespaceDeclaration, Param, Pattern, Return,
-        Statement, StatementNode, StringLiteral, StringSegment, TermBinaryNode, TermExpression, TypeExpression,
-        ValkyrieRoot,
-    },
+    ast::{Attribute, Block, Identifier, Let, MicroDeclaration, NamePath, NamespaceDeclaration, Param, Pattern, Return, Statement, StatementNode, StringLiteral, StringSegment, TermBinaryNode, TermExpression, TypeExpression, ValkyrieRoot},
     lexer::token_type::ValkyrieTokenType,
 };
 
@@ -171,8 +167,7 @@ fn attribute_argument_document(argument: &crate::ast::AttributeArgument) -> Resu
 }
 
 fn binary_document(node: &TermBinaryNode) -> Result<Document<'static>, PrintError> {
-    let operator = operator_text(node.operator)
-        .ok_or_else(|| PrintError::Unsupported { context: format!("binary operator `{:?}`", node.operator) })?;
+    let operator = operator_text(node.operator).ok_or_else(|| PrintError::Unsupported { context: format!("binary operator `{:?}`", node.operator) })?;
     Ok(doc!(term_document(&node.lhs)?, operator, term_document(&node.rhs)?))
 }
 

@@ -1,7 +1,4 @@
-//! Public formatter API for AWSL source text.
-//!
-//! Product entry: [`format_source`] with [`FormatOptions`]. Markup gap rules live in private submodules.
-
+#![doc = include_str!("readme.md")]
 mod bridge;
 mod engine;
 mod error;

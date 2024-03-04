@@ -104,24 +104,10 @@ impl<'config> ValkyrieBuilder<'config> {
 
         let body = StructureBody { fields, methods, associated_types: Vec::new(), span };
         if is_structure {
-            Ok(TermExpression::AnonymousStructure(Box::new(AnonymousStructure {
-                annotations,
-                generics,
-                parents,
-                body,
-                captures,
-                span,
-            })))
+            Ok(TermExpression::AnonymousStructure(Box::new(AnonymousStructure { annotations, generics, parents, body, captures, span })))
         }
         else {
-            Ok(TermExpression::AnonymousClass(Box::new(AnonymousClass {
-                annotations,
-                generics,
-                parents,
-                body,
-                captures,
-                span,
-            })))
+            Ok(TermExpression::AnonymousClass(Box::new(AnonymousClass { annotations, generics, parents, body, captures, span })))
         }
     }
 

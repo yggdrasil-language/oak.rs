@@ -1,5 +1,4 @@
-//! Matlab Pratt expression parser (arithmetic / calls / arrays / control).
-
+#![doc = include_str!("readme.md")]
 /// Element kinds.
 pub mod element_type;
 

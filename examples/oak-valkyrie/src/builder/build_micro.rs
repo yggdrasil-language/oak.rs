@@ -1,6 +1,9 @@
 use crate::{
     ValkyrieLanguage,
-    ast::{type_nodes::{ApplyType, AssociatedType, FunctionType, OptionalType, TypeUnaryNode}, *},
+    ast::{
+        type_nodes::{ApplyType, AssociatedType, FunctionType, OptionalType, TypeUnaryNode},
+        *,
+    },
     builder::{ValkyrieBuilder, text},
     lexer::{ValkyrieKeywords, token_type::ValkyrieTokenType},
     parser::element_type::ValkyrieElementType,
@@ -8,12 +11,7 @@ use crate::{
 use oak_core::{OakError, RedNode, RedTree, Source};
 
 fn wrap_optional_type(inner: TypeExpression, nullable: bool, span: Span) -> TypeExpression {
-    if nullable {
-        TypeExpression::Optional(Box::new(OptionalType { inner: Box::new(inner), span }))
-    }
-    else {
-        inner
-    }
+    if nullable { TypeExpression::Optional(Box::new(OptionalType { inner: Box::new(inner), span })) } else { inner }
 }
 
 impl<'config> ValkyrieBuilder<'config> {
@@ -247,16 +245,7 @@ impl<'config> ValkyrieBuilder<'config> {
             return Ok(wrap_optional_type(TypeExpression::AssociatedType(Box::new(AssociatedType { base, name, span })), nullable, span));
         }
         if let Some(path) = base_namepath {
-            let inner = if generic_arguments.is_empty() {
-                TypeExpression::Namepath(Box::new(path))
-            }
-            else {
-                TypeExpression::Apply(Box::new(ApplyType {
-                    base: TypeExpression::Namepath(Box::new(path)),
-                    arguments: generic_arguments,
-                    span,
-                }))
-            };
+            let inner = if generic_arguments.is_empty() { TypeExpression::Namepath(Box::new(path)) } else { TypeExpression::Apply(Box::new(ApplyType { base: TypeExpression::Namepath(Box::new(path)), arguments: generic_arguments, span })) };
             return Ok(wrap_optional_type(inner, nullable, span));
         }
         if let Some(base) = base_ident {
@@ -264,11 +253,7 @@ impl<'config> ValkyrieBuilder<'config> {
                 TypeExpression::Namepath(Box::new(NamePath { parts: vec![base], span }))
             }
             else {
-                TypeExpression::Apply(Box::new(ApplyType {
-                    base: TypeExpression::Namepath(Box::new(NamePath { parts: vec![base], span })),
-                    arguments: generic_arguments,
-                    span,
-                }))
+                TypeExpression::Apply(Box::new(ApplyType { base: TypeExpression::Namepath(Box::new(NamePath { parts: vec![base], span })), arguments: generic_arguments, span }))
             };
             return Ok(wrap_optional_type(inner, nullable, span));
         }
@@ -288,10 +273,7 @@ impl<'config> ValkyrieBuilder<'config> {
                 RedTree::Node(n) => match n.green.kind {
                     ValkyrieElementType::Whitespace | ValkyrieElementType::Newline | ValkyrieElementType::LineComment | ValkyrieElementType::BlockComment => continue,
                     ValkyrieElementType::Type => element_type = Some(self.build_type(n, source)?),
-                    ValkyrieElementType::LiteralExpression
-                    | ValkyrieElementType::IdentifierExpression
-                    | ValkyrieElementType::BinaryExpression
-                    | ValkyrieElementType::UnaryExpression => {
+                    ValkyrieElementType::LiteralExpression | ValkyrieElementType::IdentifierExpression | ValkyrieElementType::BinaryExpression | ValkyrieElementType::UnaryExpression => {
                         if let Ok(expr) = self.build_expr(n, source) {
                             length = Some(expr);
                         }
@@ -301,12 +283,7 @@ impl<'config> ValkyrieBuilder<'config> {
             }
         }
         let base = element_type.unwrap_or_else(|| TypeExpression::Namepath(Box::new(NamePath { parts: Vec::new(), span })));
-        Ok(TypeExpression::Unary(Box::new(TypeUnaryNode {
-            operator: ValkyrieTokenType::BracketL,
-            base,
-            length,
-            span,
-        })))
+        Ok(TypeExpression::Unary(Box::new(TypeUnaryNode { operator: ValkyrieTokenType::BracketL, base, length, span })))
     }
 
     pub(crate) fn build_params<S: Source + ?Sized>(&self, node: RedNode<ValkyrieLanguage>, source: &S) -> Result<Vec<Param>, OakError> {
