@@ -1,8 +1,6 @@
 use oak_core::{Parser, RedNode, RedTree, SourceText, parser::session::ParseSession};
 use oak_html::{HtmlLanguage, HtmlParser, parser::element_type::HtmlElementType};
 
-use oak_core::{Parser, RedNode, RedTree, SourceText, parser::session::ParseSession};
-
 #[test]
 fn parse_simple_anchor() {
     const SOURCE: &str = r#"<a href="part.xhtml">Part One</a>"#;

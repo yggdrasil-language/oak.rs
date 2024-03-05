@@ -3,6 +3,7 @@ use oak_core::{Builder, BuilderCache, Lexer, OakDiagnostics, Parser, SourceText,
 
 mod build_class;
 mod build_expression;
+pub use build_expression::decode_string_literal_text;
 mod build_jsx;
 mod build_misc;
 mod build_root;

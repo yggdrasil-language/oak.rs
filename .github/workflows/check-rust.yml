@@ -21,7 +21,7 @@ jobs:
             - name: Install Rust toolchain
               uses: dtolnay/rust-toolchain@nightly
               with:
-                  components: rustfmt, clippy
+                  components: rustfmt
 
             - name: Cache cargo registry
               uses: actions/cache@v5
@@ -34,28 +34,21 @@ jobs:
                   restore-keys: |
                       ${{ runner.os }}-cargo-
 
+            # default-members = projects/*; examples are checked explicitly below.
             - name: Check formatting
               run: cargo fmt --all -- --check
 
-            - name: Check TypeScript formatter build
+            - name: Check projects
+              run: cargo check --all-targets --all-features
+
+            - name: Check oak-typescript
               run: cargo check --manifest-path examples/oak-typescript/Cargo.toml --all-targets
 
-            - name: Check compilation
-              shell: bash
+            - name: Test downstream language frontends
               run: |
-                  set -euo pipefail
-                  example_packages=()
-                  while IFS= read -r package; do
-                      example_packages+=("$package")
-                  done < <(
-                      cargo metadata --no-deps --format-version 1 \
-                        | jq -r '.packages[] | select(.manifest_path | contains("/examples/")) | .name'
-                  )
-                  args=()
-                  for package in "${example_packages[@]}"; do
-                      args+=(--exclude "$package")
-                  done
-                  cargo check --workspace --all-targets --all-features "${args[@]}"
+                  cargo test -p oak-valkyrie --lib --tests
+                  cargo test -p oak-html --test from_red --test parser
+                  cargo test -p oak-typescript --test decode_string_literal
 
     rust-test:
         name: Rust Test (${{ matrix.os }}, ${{ matrix.feature }})
@@ -84,35 +77,14 @@ jobs:
                       ${{ runner.os }}-cargo-
 
             # `--lib --tests` skips included-readme doctests (stale API snippets).
-            - name: Run tests (no-default features)
+            - name: Run tests (no feature)
               if: matrix.feature == 'no-default'
-              shell: bash
-              run: |
-                  set -euo pipefail
-                  packages=()
-                  while IFS= read -r package; do packages+=("$package"); done < <(cargo metadata --no-deps --format-version 1 | jq -r '.packages[] | select(.manifest_path | contains("/examples/")) | .name')
-                  excludes=()
-                  for package in "${packages[@]}"; do excludes+=(--exclude "$package"); done
-                  cargo test --workspace --lib --tests --no-default-features --no-fail-fast "${excludes[@]}"
+              run: cargo test --lib --tests --no-default-features --no-fail-fast
 
             - name: Run tests (default features)
               if: matrix.feature == 'default'
-              shell: bash
-              run: |
-                  set -euo pipefail
-                  packages=()
-                  while IFS= read -r package; do packages+=("$package"); done < <(cargo metadata --no-deps --format-version 1 | jq -r '.packages[] | select(.manifest_path | contains("/examples/")) | .name')
-                  excludes=()
-                  for package in "${packages[@]}"; do excludes+=(--exclude "$package"); done
-                  cargo test --workspace --lib --tests --no-fail-fast "${excludes[@]}"
+              run: cargo test --lib --tests --no-fail-fast
 
             - name: Run tests (all features)
               if: matrix.feature == 'all'
-              shell: bash
-              run: |
-                  set -euo pipefail
-                  packages=()
-                  while IFS= read -r package; do packages+=("$package"); done < <(cargo metadata --no-deps --format-version 1 | jq -r '.packages[] | select(.manifest_path | contains("/examples/")) | .name')
-                  excludes=()
-                  for package in "${packages[@]}"; do excludes+=(--exclude "$package"); done
-                  cargo test --workspace --lib --tests --all-features --no-fail-fast "${excludes[@]}"
+              run: cargo test --lib --tests --all-features --no-fail-fast

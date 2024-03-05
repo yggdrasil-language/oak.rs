@@ -1,5 +1,9 @@
 use oak_core::{Builder, Lexer, Parser, Source, SourceText, parser::session::ParseSession};
-use oak_html::{HtmlBuilder, HtmlLanguage, HtmlLexer, HtmlNode, HtmlParser, ast::Element, lexer::token_type::HtmlTokenType};
+use oak_html::{
+    HtmlBuilder, HtmlLanguage, HtmlLexer, HtmlParser,
+    ast::{Element, HtmlNode},
+    lexer::token_type::HtmlTokenType,
+};
 
 #[test]
 fn builder_lowers_nested_elements_and_attributes() {
@@ -27,8 +31,8 @@ fn builder_lowers_nav_links_for_selector_execution() {
     let source = SourceText::new(SOURCE);
     let mut cache = ParseSession::<HtmlLanguage>::default();
     let document = HtmlBuilder::new(language.clone()).build(&source, &[], &mut cache).result.expect("build html ast");
-    let view = crate::query::HtmlDocumentView::from_document(&document);
-    let matched = crate::query::select_css(&view, "nav a[href]", oak_core::query::QueryBudget::default()).expect("css selector");
+    let view = oak_html::query::HtmlDocumentView::from_document(&document);
+    let matched = oak_html::query::select_css(&view, "nav a[href]", oak_core::query::QueryBudget::default()).expect("css selector");
     assert_eq!(matched.matches.len(), 1);
 }
 
@@ -161,8 +165,8 @@ fn builder_lowers_nested_nav_anchor_text() {
     }
     let tree_dump = dump(nav, 0);
     assert_eq!(count_tag(nav, "a"), 2, "expected two anchors in nav tree:\n{tree_dump}");
-    let view = crate::query::HtmlDocumentView::from_document(&document);
-    let (_, anchors) = crate::query::select_css_elements(&view, "nav a[href]", oak_core::query::QueryBudget::default()).expect("css selector");
+    let view = oak_html::query::HtmlDocumentView::from_document(&document);
+    let (_, anchors) = oak_html::query::select_css_elements(&view, "nav a[href]", oak_core::query::QueryBudget::default()).expect("css selector");
     assert_eq!(anchors.len(), 2);
     let labels = anchors
         .iter()

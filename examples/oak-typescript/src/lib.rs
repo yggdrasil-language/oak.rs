@@ -19,7 +19,7 @@ pub mod parser;
 
 pub use crate::{
     ast::TypeScriptRoot,
-    builder::TypeScriptBuilder,
+    builder::{TypeScriptBuilder, decode_string_literal_text},
     formatter::{FormatError, FormatOptions, TypeScriptCstFormatter, format_source},
     language::TypeScriptLanguage,
     lexer::{TypeScriptLexer, token_type::TypeScriptTokenType},
