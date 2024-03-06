@@ -454,18 +454,6 @@ impl<'config> MarkdownParser<'config> {
         }
     }
 
-    fn bump_if_closing_paren<'a, S: Source + ?Sized>(state: &mut ParserState<'a, MarkdownLanguage, S>) -> bool {
-        let kind = state.peek_kind();
-        let text = state.peek_text();
-        if Self::is_closing_paren(kind, text.as_deref()) {
-            state.bump();
-            true
-        }
-        else {
-            false
-        }
-    }
-
     fn is_block_start(&self, kind: MarkdownTokenType) -> bool {
         matches!(
             kind,
@@ -567,14 +555,27 @@ impl<'config> MarkdownParser<'config> {
                             let text = state.peek_text();
                             if Self::is_opening_paren(state.peek_kind(), text.as_deref()) {
                                 state.bump();
+                                // 按括号深度配对，允许链接目标内出现成对括号，
+                                // 仅在深度回到 0 时才把该 `)` 视为链接收尾。
+                                let mut depth: usize = 1;
                                 while state.not_at_end() && state.peek_kind() != Some(MarkdownTokenType::Newline) {
                                     let text = state.peek_text();
-                                    if Self::is_closing_paren(state.peek_kind(), text.as_deref()) {
-                                        break;
+                                    let kind = state.peek_kind();
+                                    if Self::is_opening_paren(kind, text.as_deref()) {
+                                        depth += 1;
+                                        state.bump();
                                     }
-                                    state.bump();
+                                    else if Self::is_closing_paren(kind, text.as_deref()) {
+                                        depth -= 1;
+                                        state.bump();
+                                        if depth == 0 {
+                                            break;
+                                        }
+                                    }
+                                    else {
+                                        state.bump();
+                                    }
                                 }
-                                Self::bump_if_closing_paren(state);
                             }
                         }
                     }

@@ -431,6 +431,17 @@ impl<'config> MarkdownLexer<'config> {
         let start_pos = state.get_position();
 
         if let Some(ch) = state.peek() {
+            // 反斜杠转义：把 `\` 与其后的下一个字符作为一个整体 Escape token，
+            // 以免后续字符被当作定界符继续参与强调/链接等结构解析。
+            if ch == '\\' {
+                state.advance(1);
+                if let Some(next) = state.peek() {
+                    state.advance(next.len_utf8());
+                }
+                state.add_token(MarkdownTokenType::Escape, start_pos, state.get_position());
+                return true;
+            }
+
             let token_kind = match ch {
                 '[' => MarkdownTokenType::LBracket,
                 ']' => MarkdownTokenType::RBracket,
@@ -449,7 +460,6 @@ impl<'config> MarkdownLexer<'config> {
                 '.' => MarkdownTokenType::Dot,
                 ':' => MarkdownTokenType::Colon,
                 '!' => MarkdownTokenType::Exclamation,
-                '\\' => MarkdownTokenType::Escape,
                 '$' => MarkdownTokenType::Dollar,
                 '^' => MarkdownTokenType::Caret,
                 _ => return false,
