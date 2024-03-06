@@ -43,12 +43,16 @@ impl<'config> ValkyrieBuilder<'config> {
         let mut pattern = None;
         let mut expr = None;
         let mut ty = None;
+        let mut semi = false;
         let mut annotations = Vec::new();
 
         for child in node.children() {
             match child {
                 RedTree::Leaf(t) => match t.kind {
                     ValkyrieTokenType::Whitespace | ValkyrieTokenType::Newline | ValkyrieTokenType::LineComment | ValkyrieTokenType::BlockComment => continue,
+                    ValkyrieTokenType::Semicolon => {
+                        semi = true;
+                    }
                     ValkyrieTokenType::Keyword(ValkyrieKeywords::Let) => continue,
                     ValkyrieTokenType::Identifier => {
                         if pattern.is_none() {
@@ -88,7 +92,16 @@ impl<'config> ValkyrieBuilder<'config> {
         }
 
         let pattern = pattern.ok_or_else(|| source.syntax_error("Missing pattern in let statement".to_string(), span.start))?;
-        let expr = expr.ok_or_else(|| source.syntax_error("Missing expression in let statement".to_string(), span.start))?;
+        match (&expr, &ty) {
+            (None, None) => {
+                return Err(source.syntax_error("Missing expression in let statement".to_string(), span.start));
+            }
+            (None, Some(_)) if !semi => {
+                return Err(source.syntax_error("Uninitialized let binding must end with ';' (for example `let handle: i32;`)".to_string(), span.start));
+            }
+            (None, Some(_)) => {}
+            (Some(_), _) => {}
+        }
 
         Ok(Let { annotations, pattern, expr, ty, span })
     }

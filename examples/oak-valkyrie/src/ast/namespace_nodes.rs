@@ -1,6 +1,9 @@
 //! Namespace and import nodes for the Valkyrie language AST.
 
-use crate::ast::{Attribute, Identifier, NamePath, Span, items_nodes::StatementNode};
+use crate::{
+    ValkyrieRoot,
+    ast::{Attribute, Identifier, NamePath, Span, items_nodes::StatementNode, root_nodes::ProgramBody},
+};
 
 /// A namespace declaration.
 ///
@@ -19,11 +22,23 @@ pub struct NamespaceDeclaration {
     pub annotations: Vec<Attribute>,
     /// The name path of the namespace.
     pub name: NamePath,
-    /// Items declared within the namespace.
-    pub items: Vec<StatementNode>,
+    /// 该 namespace 是否有 body。
+    ///
+    /// ```v
+    /// namespace name {} -> Some([])
+    /// namespace name -> None;
+    /// ```
+    pub body: Option<ProgramBody>,
     /// The source code span.
     #[cfg_attr(feature = "serde", serde(with = "oak_core::serde_range"))]
     pub span: Span,
+}
+
+impl NamespaceDeclaration {
+    /// 是否为花括号作用域；空 body 仍然是作用域，不能被当成分号式指令。
+    pub fn has_body(&self) -> bool {
+        self.body.is_some()
+    }
 }
 
 /// A using (import) statement.

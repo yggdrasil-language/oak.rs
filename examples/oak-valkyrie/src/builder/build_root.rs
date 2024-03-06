@@ -199,7 +199,13 @@ impl<'config> ValkyrieBuilder<'config> {
                         _ => {}
                     }
                 }
-                Ok(StatementNode::TypeAlias(Box::new(crate::ast::TypeAliasDeclaration { name, target: target.unwrap_or(crate::ast::TypeExpression::Namepath(Box::new(crate::ast::NamePath::default()))), span })))
+                // A type alias without a target must not be completed with an empty `NamePath`
+                // default: fabricating an empty type hides the missing target from downstream.
+                let target = target.ok_or_else(|| source.syntax_error(format!("Missing type alias target at {:?}", span), span.start))?;
+                if name.name.is_empty() {
+                    return Err(source.syntax_error(format!("Missing type alias name at {:?}", span), span.start));
+                }
+                Ok(StatementNode::TypeAlias(Box::new(crate::ast::TypeAliasDeclaration { name, target, span })))
             }
             ValkyrieElementType::LetStatement => {
                 let stmt = self.build_let(n, source)?;

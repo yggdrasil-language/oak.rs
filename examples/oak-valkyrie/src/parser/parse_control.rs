@@ -1,11 +1,57 @@
 use crate::{
     ValkyrieLanguage,
     lexer::{keywords::ValkyrieKeywords, token_type::ValkyrieTokenType},
-    parser::element_type::ValkyrieElementType,
+    parser::{element_type::ValkyrieElementType, parse_blocks::parse_statement},
 };
 use oak_core::parser::ParserState;
 
 type State<'a, S> = ParserState<'a, ValkyrieLanguage, S>;
+
+fn at_default_arm_keyword<S: oak_core::Source + ?Sized>(state: &State<'_, S>) -> bool {
+    state.at(ValkyrieTokenType::Identifier) && state.peek_text().as_deref() == Some("default")
+}
+
+fn brace_balance_between<S: oak_core::Source + ?Sized>(state: &mut State<'_, S>, from: usize, to: usize) -> i32 {
+    let restore = state.checkpoint();
+    state.tokens.set_index(from);
+    let mut balance = 0i32;
+    while state.tokens.index() < to {
+        if state.at(ValkyrieTokenType::BraceL) {
+            balance += 1;
+        }
+        else if state.at(ValkyrieTokenType::BraceR) {
+            balance -= 1;
+        }
+        state.bump();
+    }
+    state.restore(restore);
+    balance
+}
+
+/// `case Pat:` 后允许多条语句，直到同级 `case` / `else` / `}`。
+fn parse_implicit_match_arm_body<S: oak_core::Source + ?Sized>(state: &mut State<'_, S>) -> Result<(), oak_core::OakError> {
+    let cp = state.sink.checkpoint();
+    let mut depth = 0i32;
+    while state.not_at_end() {
+        state.skip_trivia();
+        if depth == 0 {
+            if state.at(ValkyrieTokenType::Keyword(ValkyrieKeywords::Case)) || state.at(ValkyrieTokenType::Keyword(ValkyrieKeywords::Else)) || at_default_arm_keyword(state) {
+                break;
+            }
+            if state.at(ValkyrieTokenType::BraceR) {
+                break;
+            }
+        }
+        let before = state.checkpoint().0;
+        parse_statement(state)?;
+        if state.checkpoint().0 == before {
+            break;
+        }
+        depth += brace_balance_between(state, before, state.checkpoint().0);
+    }
+    state.sink.finish_node(cp, ValkyrieElementType::BlockExpression);
+    Ok(())
+}
 
 /// 解析 if 表达式
 pub(crate) fn parse_if_expression<S: oak_core::Source + ?Sized>(state: &mut State<'_, S>) -> Result<(), oak_core::OakError> {
@@ -130,7 +176,7 @@ pub(crate) fn parse_match_arm<S: oak_core::Source + ?Sized>(state: &mut State<'_
         state.skip_trivia();
         parse_match_pattern(state)?;
     }
-    else if state.at(ValkyrieTokenType::Keyword(ValkyrieKeywords::Else)) {
+    else if state.at(ValkyrieTokenType::Keyword(ValkyrieKeywords::Else)) || at_default_arm_keyword(state) {
         state.bump();
     }
     else {
@@ -143,10 +189,10 @@ pub(crate) fn parse_match_arm<S: oak_core::Source + ?Sized>(state: &mut State<'_
     if state.at(ValkyrieTokenType::Colon) || state.at(ValkyrieTokenType::Arrow) {
         state.bump();
         if state.at(ValkyrieTokenType::BraceL) {
-            parse_block_expression(state)?;
+            crate::parser::parse_blocks::parse_block_expression(state)?;
         }
         else {
-            parse_expression(state)?;
+            parse_implicit_match_arm_body(state)?;
         }
     }
     if state.at(ValkyrieTokenType::Comma) {
@@ -204,11 +250,21 @@ pub(crate) fn parse_for_expression<S: oak_core::Source + ?Sized>(state: &mut Sta
     Ok(())
 }
 
+fn can_start_return_value<S: oak_core::Source + ?Sized>(state: &State<'_, S>) -> bool {
+    if state.at(ValkyrieTokenType::Semicolon) || state.at(ValkyrieTokenType::BraceR) || state.at(ValkyrieTokenType::ParenthesisR) || state.at(ValkyrieTokenType::Eof) {
+        return false;
+    }
+    if matches!(state.current().map(|token| &token.kind), Some(ValkyrieTokenType::Keyword(ValkyrieKeywords::Case | ValkyrieKeywords::Else | ValkyrieKeywords::Let | ValkyrieKeywords::Return | ValkyrieKeywords::Break | ValkyrieKeywords::Continue))) {
+        return false;
+    }
+    !at_default_arm_keyword(state)
+}
+
 /// 解析 return 表达式
 pub(crate) fn parse_return_expression<S: oak_core::Source + ?Sized>(state: &mut State<'_, S>) -> Result<(), oak_core::OakError> {
     let cp = state.sink.checkpoint();
     state.bump();
-    if !state.at(ValkyrieTokenType::Semicolon) && !state.at(ValkyrieTokenType::BraceR) && !state.at(ValkyrieTokenType::ParenthesisR) && state.not_at_end() {
+    if can_start_return_value(state) {
         parse_expression(state)?;
     }
     state.sink.finish_node(cp, ValkyrieElementType::ReturnExpression);

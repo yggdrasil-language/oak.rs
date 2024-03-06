@@ -86,6 +86,8 @@ pub enum ValkyrieElementType {
     UnaryExpression,
     /// Parenthesized expression node.
     ParenthesizedExpression,
+    /// Tuple literal expression node: `(a, b, ...)`.
+    TupleExpression,
     /// Explicit cast expression: `expr as Type`.
     CastExpression,
     /// Ordinal index node: `receiver[index]` (1-based).
