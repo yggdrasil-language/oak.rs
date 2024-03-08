@@ -300,42 +300,19 @@ impl<'config> NotedownLexer<'config> {
     }
 
     /// Handles bold and italic (emphasis)
+    ///
+    /// 每个定界符字符单独成 token，连串（如 `**`、`***`）即为多个
+    /// `Emphasis` token。这样解析器才能按需把连串拆给相邻的强调元素，
+    /// 不会因为一个不可分割的 `Strong` token 同时充当内外两层的收尾。
     fn lex_emphasis<'a, S: Source + ?Sized>(&self, state: &mut State<'a, S>) -> bool {
         let start_pos = state.get_position();
 
-        let marker_char = if let Some('*') = state.peek() {
-            '*'
-        }
-        else if let Some('_') = state.peek() {
-            '_'
-        }
-        else {
-            return false;
-        };
-
-        let mut marker_count = 0;
-        let mut pos = start_pos;
-
-        // Count marker characters
-        while let Some(ch) = state.get_char_at(pos) {
-            if ch == marker_char {
-                marker_count += 1;
-                pos += 1;
-            }
-            else {
-                break;
-            }
-        }
-
-        if marker_count == 0 {
+        if !matches!(state.peek(), Some('*') | Some('_')) {
             return false;
         }
 
-        state.advance(marker_count);
-
-        let token_kind = if marker_count >= 2 { NoteTokenType::Strong } else { NoteTokenType::Emphasis };
-
-        state.add_token(token_kind, start_pos, state.get_position());
+        state.advance(1);
+        state.add_token(NoteTokenType::Emphasis, start_pos, state.get_position());
         true
     }
 
