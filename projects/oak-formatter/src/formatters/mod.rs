@@ -119,7 +119,7 @@ fn needs_space(left: &str, right: &str) -> bool {
     let left_quote = left.ends_with(['\'', '"', '`']);
     let right_quote = right.starts_with(['\'', '"', '`']);
     let left_operator = left.ends_with(['=', '+', '-', '*', '/', '%', ':', '&', '|']) || matches!(left, "??" | "??=" | "&&" | "&&=" | "||" | "||=" | "=>" | "<=" | ">=" | "==" | "===");
-    let right_operator = right.starts_with(['=', '+', '-', '*', '/', '%', ':', '&', '|']) || matches!(right, "??" | "??=" | "&&" | "&&=" | "||" | "||=" | "=>" | "<=" | ">=" | "==" | "===" | "!==");
+    let right_operator = right.starts_with(['=', '+', '-', '*', '/', '%', ':', '&', '|']) || matches!(right, "??" | "??=" | "&&" | "&&=" | "||" | "||=" | "=>" | "<=" | ">=" | "==" | "===" | "!=" | "!==");
     let brace_boundary = left.ends_with('{') || right.starts_with('}') || right == "{" || (left_word && right.starts_with('{')) || (left.ends_with('}') && right_word);
 
     (left_word && (right_word || right_quote))
