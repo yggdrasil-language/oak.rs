@@ -1,4 +1,4 @@
-use oak_vos::{VosDeclarationKind, VosSyntaxElement, VosTokenType, VosTypeArgument, VosTypeSyntax, parse};
+use oak_vos::{VosBinaryOp, VosDeclarationKind, VosExpr, VosLiteral, VosPathSep, VosProjItem, VosStmt, VosSyntaxElement, VosTokenType, VosTypeArgument, VosTypeSyntax, parse, parse_program};
 
 #[test]
 fn parses_vos_schema_through_oak() {
@@ -291,13 +291,180 @@ fn reference_optional_precedence_preserves_trivia_spans() {
 }
 
 #[test]
+fn projects_lazy_query_pipeline_program() {
+    let source = "let active_users = User.filter(x => x.active && x.user_name != \"\").sort_by(x => x.user_name)\nlet users = active_users.map(x => x.{ user_id, name: user_name }).collect()\n\nusers";
+    let program = parse_program(source).expect("Oak projects the operation program");
+
+    assert_eq!(program.statements.len(), 2);
+    assert!(matches!(program.result, Some(VosExpr::Name { ref name, .. }) if name == "users"));
+
+    let VosStmt::Let(first) = &program.statements[0]
+    else {
+        panic!("expected a let statement")
+    };
+    assert_eq!(first.name, "active_users");
+    assert!(first.type_expr.is_none());
+    let VosExpr::Call { callee, args, .. } = &first.value
+    else {
+        panic!("expected a call")
+    };
+    assert!(matches!(args.len(), 1));
+    let VosExpr::Member { object, name, sep, .. } = callee.as_ref()
+    else {
+        panic!("expected a member callee")
+    };
+    assert_eq!(name, "sort_by");
+    assert_eq!(*sep, VosPathSep::Dot);
+    assert!(matches!(object.as_ref(), VosExpr::Call { .. }));
+
+    let VosStmt::Let(second) = &program.statements[1]
+    else {
+        panic!("expected a let statement")
+    };
+    let VosExpr::Call { callee, .. } = &second.value
+    else {
+        panic!("expected a call")
+    };
+    let VosExpr::Member { object, name, .. } = callee.as_ref()
+    else {
+        panic!("expected a member callee")
+    };
+    assert_eq!(name, "collect");
+    let VosExpr::Call { args, .. } = object.as_ref()
+    else {
+        panic!("expected the map call")
+    };
+    let VosExpr::Lambda(lambda) = &args[0]
+    else {
+        panic!("expected a lambda argument")
+    };
+    let VosExpr::StructProj { items, .. } = lambda.body.as_ref()
+    else {
+        panic!("expected a struct projection")
+    };
+    assert_eq!(items.len(), 2);
+    assert!(matches!(&items[0], VosProjItem::Field(field) if field.name == "user_id" && field.value.is_none()));
+    assert!(matches!(&items[1], VosProjItem::Field(field) if field.name == "name" && field.value.is_some()));
+
+    assert_eq!(&source[program.span.clone()], source);
+}
+
+#[test]
+fn projects_binary_operators_in_precedence_order() {
+    let program = parse_program("x.active && x.user_name != \"\"").expect("Oak projects the filter predicate");
+    let Some(VosExpr::Binary { op, right, left, .. }) = program.result
+    else {
+        panic!("expected a binary result")
+    };
+    assert_eq!(op, VosBinaryOp::And);
+    assert!(matches!(left.as_ref(), VosExpr::Member { name, .. } if name == "active"));
+    let VosExpr::Binary { op: Ne, right: literal, .. } = right.as_ref()
+    else {
+        panic!("expected a comparison")
+    };
+    assert_eq!(*Ne, VosBinaryOp::Ne);
+    assert!(matches!(literal.as_ref(), VosExpr::Literal(VosLiteral::String(value)) if value.is_empty()));
+
+    let program = parse_program("a + b * 2 - c").expect("Oak projects arithmetic");
+    let Some(VosExpr::Binary { op, .. }) = program.result
+    else {
+        panic!("expected a binary result")
+    };
+    assert_eq!(op, VosBinaryOp::Sub);
+}
+
+#[test]
+fn projects_typed_object_construction_and_write_boundary() {
+    let source = "let draft = User { user_id: uuid(), user_name: \"alice\", avatar: null }\nlet stored: User = User { user_id: uuid() }.insert()\nstored";
+    let program = parse_program(source).expect("Oak projects construction and insert");
+
+    let VosStmt::Let(draft) = &program.statements[0]
+    else {
+        panic!("expected a let statement")
+    };
+    let VosExpr::TypedObject { ty, fields, .. } = &draft.value
+    else {
+        panic!("expected a typed object")
+    };
+    assert_eq!(ty, "User");
+    assert_eq!(fields.len(), 3);
+    assert!(matches!(&fields[0].value, Some(VosExpr::Call { .. })));
+    assert!(matches!(&fields[1].value, Some(VosExpr::Literal(VosLiteral::String(value))) if value == "alice"));
+    assert!(matches!(&fields[2].value, Some(VosExpr::Literal(VosLiteral::Null))));
+
+    let VosStmt::Let(stored) = &program.statements[1]
+    else {
+        panic!("expected a let statement")
+    };
+    assert!(matches!(stored.type_expr, Some(VosTypeSyntax::Named { ref path, .. }) if path == &["User".to_owned()]));
+    let VosExpr::Call { callee, args, .. } = &stored.value
+    else {
+        panic!("expected an insert call")
+    };
+    assert!(args.is_empty());
+    assert!(matches!(callee.as_ref(), VosExpr::Member { name, .. } if name == "insert"));
+}
+
+#[test]
+fn projects_lists_static_paths_try_and_star_projection() {
+    let program = parse_program("let rows = [User { id: 1 }, User { id: 2 }]\nUser::find(rows?).*").expect("Oak projects static paths and projections");
+    assert_eq!(program.statements.len(), 1);
+    let Some(VosExpr::StarProj { receiver, .. }) = program.result
+    else {
+        panic!("expected a star projection result")
+    };
+    let VosExpr::Call { callee, args, .. } = receiver.as_ref()
+    else {
+        panic!("expected a static call")
+    };
+    assert!(matches!(args[0], VosExpr::Try { .. }));
+    assert!(matches!(callee.as_ref(), VosExpr::Member { sep: VosPathSep::ColonColon, name, .. } if name == "find"));
+}
+
+#[test]
+fn projects_micro_declarations_with_nested_body_programs() {
+    let source = "micro normalize_name(value: utf8) -> utf8 { let name = value.trim() name.lower() }\nlet users = User.filter(x => normalize_name(x.user_name) != \"\").collect()\nusers";
+    let program = parse_program(source).expect("Oak projects micro declarations");
+
+    assert_eq!(program.micros.len(), 1);
+    let micro = &program.micros[0];
+    assert_eq!(micro.name, "normalize_name");
+    assert_eq!(micro.parameters.len(), 1);
+    assert_eq!(micro.parameters[0].name, "value");
+    assert!(matches!(micro.return_type, Some(VosTypeSyntax::Named { ref path, .. }) if path == &["utf8".to_owned()]));
+    assert_eq!(micro.body.statements.len(), 1);
+    assert!(matches!(micro.body.result, Some(VosExpr::Call { .. })));
+    assert_eq!(&source[micro.span.clone()], "micro normalize_name(value: utf8) -> utf8 { let name = value.trim() name.lower() }");
+    assert_eq!(&source[micro.body.span.clone()], "{ let name = value.trim() name.lower() }");
+    assert_eq!(program.statements.len(), 1);
+}
+
+#[test]
+fn declaration_bodies_carry_program_projection() {
+    let source = "query active_users(status: utf8) { User.filter(x => x.status == status) }";
+    let root = parse(source).expect("Oak parses the query declaration");
+    let query = &root.declarations[0];
+    let program = query.body_program.as_ref().expect("query body is a program");
+    assert!(program.statements.is_empty());
+    assert!(matches!(program.result, Some(VosExpr::Call { .. })));
+    assert_eq!(&source[program.span.clone()], "{ User.filter(x => x.status == status) }");
+    assert_eq!(&source[query.body.as_ref().unwrap().span.clone()], "{ User.filter(x => x.status == status) }");
+}
+
+#[test]
+fn program_projection_rejects_unbalanced_or_incomplete_expressions() {
+    for source in ["let value = ", "User.filter(", "x => ", "let = User"] {
+        assert!(parse_program(source).is_err(), "accepted incomplete program: {source}");
+    }
+}
+
+#[test]
 fn type_depth_has_process_bound() {
     use std::{
         process::Command,
         thread,
         time::{Duration, Instant},
     };
-
     const CHILD_ENV: &str = "OAK_VOS_TYPE_DEPTH_CHILD";
     if std::env::var_os(CHILD_ENV).is_some() {
         let source = format!("class T {{ field: {}utf8{} }}", "[".repeat(127), "]".repeat(127));
