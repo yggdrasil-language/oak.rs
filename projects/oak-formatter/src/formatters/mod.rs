@@ -105,13 +105,13 @@ fn needs_space(left: &str, right: &str) -> bool {
         return false;
     }
     // Control-flow keywords conventionally separate from their condition.
-    if matches!(left, "if" | "for" | "while" | "switch" | "catch" | "with") && right == "(" {
+    if matches!(left, "if" | "for" | "while" | "switch" | "catch" | "with" | "function") && right == "(" {
         return true;
     }
     if matches!(right, "as" | "instanceof" | "in") || matches!(left, "as" | "instanceof" | "in") {
         return true;
     }
-    if matches!(left, "return" | "throw" | "new" | "typeof" | "void" | "delete" | "await" | "yield") && matches!(right, "[" | "{" | "(") {
+    if matches!(left, "return" | "throw" | "new" | "typeof" | "void" | "delete" | "await" | "yield") && matches!(right, "[" | "{" | "(" | "!" | "~") {
         return true;
     }
     let left_word = left.chars().last().is_some_and(|ch| ch.is_ascii_alphanumeric() || ch == '_' || ch == '$');

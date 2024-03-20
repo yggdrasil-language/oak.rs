@@ -199,30 +199,13 @@ impl<'config> TypeScriptLexer<'config> {
     fn lex_template_literal<'a, S: Source + ?Sized>(&self, state: &mut State<'a, S>) -> bool {
         let start = state.get_position();
 
-        if state.peek() == Some('`') {
-            state.advance(1);
-
-            while let Some(ch) = state.peek() {
-                if ch == '`' {
-                    state.advance(1);
-                    break;
-                }
-                else if ch == '\\' {
-                    state.advance(1);
-                    if let Some(_) = state.peek() {
-                        state.advance(1);
-                    }
-                }
-                else {
-                    state.advance(ch.len_utf8());
-                }
-            }
-
-            state.add_token(TypeScriptTokenType::TemplateString, start, state.get_position());
-            return true;
+        if state.peek() != Some('`') {
+            return false;
         }
 
-        false
+        consume_template(state);
+        state.add_token(TypeScriptTokenType::TemplateString, start, state.get_position());
+        true
     }
 
     fn lex_numeric_literal<'a, S: Source + ?Sized>(&self, state: &mut State<'a, S>) -> bool {
@@ -486,6 +469,75 @@ fn consume_digits<S: Source + ?Sized>(state: &mut State<'_, S>, is_digit: fn(cha
                 consumed = true;
             }
             _ => break,
+        }
+    }
+}
+
+/// Consume a template literal from its opening backtick through its closing
+/// backtick, treating `${ ... }` interpolations (including nested templates and
+/// strings) as part of the same token.
+fn consume_template<S: Source + ?Sized>(state: &mut State<'_, S>) {
+    state.advance(1);
+    while let Some(ch) = state.peek() {
+        match ch {
+            '\\' => {
+                state.advance(1);
+                if state.peek().is_some() {
+                    state.advance(1);
+                }
+            }
+            '`' => {
+                state.advance(1);
+                return;
+            }
+            '$' if state.peek_next_n(1) == Some('{') => {
+                state.advance(2);
+                consume_template_expression(state);
+            }
+            _ => state.advance(ch.len_utf8()),
+        }
+    }
+}
+
+/// Consume an interpolation body up to and including its closing `}`.
+fn consume_template_expression<S: Source + ?Sized>(state: &mut State<'_, S>) {
+    let mut depth = 0usize;
+    while let Some(ch) = state.peek() {
+        match ch {
+            '\'' | '"' => consume_quoted(state, ch),
+            '`' => consume_template(state),
+            '{' => {
+                state.advance(1);
+                depth += 1;
+            }
+            '}' => {
+                state.advance(1);
+                if depth == 0 {
+                    return;
+                }
+                depth -= 1;
+            }
+            _ => state.advance(ch.len_utf8()),
+        }
+    }
+}
+
+/// Consume a single- or double-quoted string, including escapes.
+fn consume_quoted<S: Source + ?Sized>(state: &mut State<'_, S>, quote: char) {
+    state.advance(1);
+    while let Some(ch) = state.peek() {
+        if ch == '\\' {
+            state.advance(1);
+            if state.peek().is_some() {
+                state.advance(1);
+            }
+        }
+        else if ch == quote {
+            state.advance(1);
+            return;
+        }
+        else {
+            state.advance(ch.len_utf8());
         }
     }
 }

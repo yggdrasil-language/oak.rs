@@ -44,3 +44,29 @@ fn regex_literals_start_after_logical_operators() {
         assert_eq!(format(source), source, "source={source:?}");
     }
 }
+
+#[test]
+fn keyword_prefixes_keep_the_space_before_them() {
+    for (source, expected) in [
+        ("const f = function(a) { return a; };", "const f = function (a) { return a; };"),
+        ("function run() { return !!done; }", "function run() { return !!done; }"),
+        ("function pick() { return ~mask; }", "function pick() { return ~mask; }"),
+        ("const x = obj.function();", "const x = obj.function();"),
+    ] {
+        assert_eq!(format(source), expected, "source={source:?}");
+    }
+}
+
+#[test]
+fn division_operators_keep_the_space_on_both_sides() {
+    for (source, expected) in [("const x = a / b;", "const x = a / b;"), ("const pct = Math.round((i + 1) /total * 100);", "const pct = Math.round((i + 1) / total * 100);"), ("const ratio = (a) /b;", "const ratio = (a) / b;")] {
+        assert_eq!(format(source), expected, "source={source:?}");
+    }
+}
+
+#[test]
+fn nested_template_interpolations_stay_one_token() {
+    for source in ["const message = `outer ${ok ? `inner ${value}` : \"\"}`;", "const path = `${base}/${name}`;", "const nested = `a ${ { b: `c ${d}` } } e`;"] {
+        assert_eq!(format(source), source, "source={source:?}");
+    }
+}
