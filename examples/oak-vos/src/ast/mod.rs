@@ -322,7 +322,7 @@ pub enum VosExpr {
         name_span: Range<usize>,
         /// Separator as written.
         sep: VosPathSep,
-        /// Span covering the receiver, separator and name.
+        /// Source span of the member name.
         span: Range<usize>,
     },
     /// `callee(arguments...)`.
@@ -331,7 +331,7 @@ pub enum VosExpr {
         callee: Box<VosExpr>,
         /// Argument expressions in source order.
         args: Vec<VosExpr>,
-        /// Span covering the call including parentheses.
+        /// Span from the callee's own start token through the closing parenthesis.
         span: Range<usize>,
     },
     /// `!expression`.

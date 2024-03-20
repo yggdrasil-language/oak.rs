@@ -328,27 +328,26 @@ impl<'a, 'b> ProgramParser<'a, 'b> {
     }
 
     fn parse_or(&mut self) -> Result<VosExpr, OakError> {
-        let span_start = self.current_start();
         let mut left = self.parse_and()?;
         while self.eat_text("||") {
             let right = self.parse_and()?;
+            let span_start = Self::expr_start(&left);
             left = VosExpr::Binary { op: VosBinaryOp::Or, left: Box::new(left), right: Box::new(right), span: (span_start..self.last_end()).into() };
         }
         Ok(left)
     }
 
     fn parse_and(&mut self) -> Result<VosExpr, OakError> {
-        let span_start = self.current_start();
         let mut left = self.parse_cmp()?;
         while self.eat_text("&&") {
             let right = self.parse_cmp()?;
+            let span_start = Self::expr_start(&left);
             left = VosExpr::Binary { op: VosBinaryOp::And, left: Box::new(left), right: Box::new(right), span: (span_start..self.last_end()).into() };
         }
         Ok(left)
     }
 
     fn parse_cmp(&mut self) -> Result<VosExpr, OakError> {
-        let span_start = self.current_start();
         let mut left = self.parse_add()?;
         loop {
             let op = if self.eat_text("==") {
@@ -377,13 +376,13 @@ impl<'a, 'b> ProgramParser<'a, 'b> {
                 break;
             };
             let right = self.parse_add()?;
+            let span_start = Self::expr_start(&left);
             left = VosExpr::Binary { op, left: Box::new(left), right: Box::new(right), span: (span_start..self.last_end()).into() };
         }
         Ok(left)
     }
 
     fn parse_add(&mut self) -> Result<VosExpr, OakError> {
-        let span_start = self.current_start();
         let mut left = self.parse_mul()?;
         loop {
             let op = if self.eat_text("+") {
@@ -400,13 +399,13 @@ impl<'a, 'b> ProgramParser<'a, 'b> {
                 break;
             };
             let right = self.parse_mul()?;
+            let span_start = Self::expr_start(&left);
             left = VosExpr::Binary { op, left: Box::new(left), right: Box::new(right), span: (span_start..self.last_end()).into() };
         }
         Ok(left)
     }
 
     fn parse_mul(&mut self) -> Result<VosExpr, OakError> {
-        let span_start = self.current_start();
         let mut left = self.parse_unary()?;
         loop {
             let op = if self.eat_text("*") {
@@ -423,6 +422,7 @@ impl<'a, 'b> ProgramParser<'a, 'b> {
                 break;
             };
             let right = self.parse_unary()?;
+            let span_start = Self::expr_start(&left);
             left = VosExpr::Binary { op, left: Box::new(left), right: Box::new(right), span: (span_start..self.last_end()).into() };
         }
         Ok(left)
@@ -439,31 +439,34 @@ impl<'a, 'b> ProgramParser<'a, 'b> {
     }
 
     fn parse_postfix(&mut self) -> Result<VosExpr, OakError> {
-        let span_start = self.current_start();
         let mut expr = self.parse_primary()?;
         loop {
             if self.eat(VosTokenType::Question) {
+                let span_start = Self::expr_start(&expr);
                 expr = VosExpr::Try { expr: Box::new(expr), span: (span_start..self.last_end()).into() };
                 continue;
             }
             if self.eat(VosTokenType::Dot) {
                 if self.eat_text("*") {
+                    let span_start = Self::expr_start(&expr);
                     expr = VosExpr::StarProj { receiver: Box::new(expr), span: (span_start..self.last_end()).into() };
                     continue;
                 }
                 if self.at(VosTokenType::LeftBrace) {
+                    let span_start = Self::expr_start(&expr);
                     let items = self.parse_proj_items_block()?;
                     expr = VosExpr::StructProj { receiver: Box::new(expr), items, span: (span_start..self.last_end()).into() };
                     continue;
                 }
-                expr = self.finish_member(expr, VosPathSep::Dot, span_start)?;
+                expr = self.finish_member(expr, VosPathSep::Dot)?;
                 continue;
             }
             if self.eat_text("::") {
-                expr = self.finish_member(expr, VosPathSep::ColonColon, span_start)?;
+                expr = self.finish_member(expr, VosPathSep::ColonColon)?;
                 continue;
             }
             if self.at(VosTokenType::LeftParen) {
+                let span_start = Self::expr_start(&expr);
                 let args = self.parse_arg_list()?;
                 expr = VosExpr::Call { callee: Box::new(expr), args, span: (span_start..self.last_end()).into() };
                 continue;
@@ -473,18 +476,25 @@ impl<'a, 'b> ProgramParser<'a, 'b> {
         Ok(expr)
     }
 
-    fn finish_member(&mut self, expr: VosExpr, sep: VosPathSep, span_start: usize) -> Result<VosExpr, OakError> {
+    fn finish_member(&mut self, expr: VosExpr, sep: VosPathSep) -> Result<VosExpr, OakError> {
         let (name, name_span) = self.expect_name("expected VOS member name")?;
-        let mut expr = VosExpr::Member { object: Box::new(expr), name, name_span: name_span.clone(), sep, span: (span_start..name_span.end).into() };
+        let mut expr = VosExpr::Member { object: Box::new(expr), name, name_span: name_span.clone(), sep, span: name_span.clone() };
         if self.at(VosTokenType::LeftParen) {
             let args = self.parse_arg_list()?;
-            expr = VosExpr::Call { callee: Box::new(expr), args, span: (span_start..self.last_end()).into() };
+            expr = VosExpr::Call { callee: Box::new(expr), args, span: (name_span.start..self.last_end()).into() };
         }
         else if sep == VosPathSep::Dot && self.at(VosTokenType::LeftBrace) {
             let patch = self.parse_anon_object()?;
-            expr = VosExpr::Call { callee: Box::new(expr), args: vec![patch], span: (span_start..self.last_end()).into() };
+            expr = VosExpr::Call { callee: Box::new(expr), args: vec![patch], span: (name_span.start..self.last_end()).into() };
         }
         Ok(expr)
+    }
+
+    fn expr_start(expr: &VosExpr) -> usize {
+        match expr {
+            VosExpr::Literal(_) => 0,
+            other => other.span().start,
+        }
     }
 
     fn parse_primary(&mut self) -> Result<VosExpr, OakError> {
