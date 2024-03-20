@@ -86,7 +86,7 @@ pub trait LanguageService: Send + Sync {
             let _ = self.with_root(&uri, |_| {}).await;
             let symbols = self.workspace().symbols.query_file(&uri);
             if !symbols.is_empty() {
-                return symbols.into_iter().map(StructureItem::from).collect();
+                return symbols.into_iter().map(crate::types::structure_item_from_symbol).collect();
             }
             vec![]
         }
