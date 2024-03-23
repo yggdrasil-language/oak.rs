@@ -55,7 +55,7 @@ pub use crate::lsp::YamlLanguageService;
 #[cfg(feature = "oak-pretty-print")]
 pub use crate::lsp::formatter::YamlFormatter;
 
-#[cfg(feature = "lsp")]
+#[cfg(feature = "mcp")]
 pub use crate::mcp::serve_yaml_mcp;
 pub use lexer::token_type::YamlTokenType;
 pub use parser::element_type::YamlElementType;
