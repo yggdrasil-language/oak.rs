@@ -116,11 +116,67 @@ pub(crate) fn format_source(source: &str, options: &FormatOptions) -> Result<Str
                 constraint = oak_formatter::GapConstraint::NoSpace;
             }
         }
+        // `<<`, `>>` and `>>>` are shifts everywhere except where `>>` closes
+        // nested type arguments, which must stay tight.
+        if matches!(right_text, "<<" | ">>" | ">>>") {
+            let type_close = matches!(right_text, ">>" | ">>>") && is_type_argument_close(&significant, index + 1, source);
+            constraint = if type_close { oak_formatter::GapConstraint::NoSpace } else { oak_formatter::GapConstraint::RequiredSpace };
+        }
         if matches!(left_text, "+" | "-") {
             let previous = index.checked_sub(1).and_then(|previous| significant.get(previous)).and_then(|token| source.get(token.span.clone()));
-            if previous.is_none() || matches!(previous, Some("(" | "[" | "{" | "=" | "," | ":" | "?" | "return" | "throw" | "=>" | "!" | "+" | "-" | "*" | "/" | "%" | "??" | "&&" | "||")) {
+            if previous.is_none()
+                || matches!(
+                    previous,
+                    Some(
+                        "(" | "["
+                            | "{"
+                            | "="
+                            | ","
+                            | ":"
+                            | "?"
+                            | "return"
+                            | "throw"
+                            | "=>"
+                            | "!"
+                            | "+"
+                            | "-"
+                            | "*"
+                            | "/"
+                            | "%"
+                            | "??"
+                            | "&&"
+                            | "||"
+                            | "=="
+                            | "==="
+                            | "!="
+                            | "!=="
+                            | "<="
+                            | ">="
+                            | "<<"
+                            | ">>"
+                            | ">>>"
+                            | "&"
+                            | "|"
+                            | "^"
+                            | "case"
+                            | "in"
+                            | "of"
+                            | "typeof"
+                            | "void"
+                            | "delete"
+                            | "await"
+                            | "new"
+                    )
+                )
+            {
                 constraint = oak_formatter::GapConstraint::NoSpace;
             }
+        }
+        // `++`/`--` bind to an operand on their left as postfix operators and
+        // take a space before the operand they prefix.
+        if matches!(right_text, "++" | "--") {
+            let binds_left = left_text.chars().last().is_some_and(|ch| ch.is_ascii_alphanumeric() || matches!(ch, '_' | '$' | ')' | ']')) && !is_reserved_word(left_text);
+            constraint = if binds_left { oak_formatter::GapConstraint::NoSpace } else { oak_formatter::GapConstraint::RequiredSpace };
         }
         if (left_text == "async" && right_text == "(")
             || (matches!(left_text, "const" | "let" | "var") && right_text == "[")
@@ -140,6 +196,32 @@ pub(crate) fn format_source(source: &str, options: &FormatOptions) -> Result<Str
             let member = matches!(left_text, "if" | "for" | "while" | "switch" | "catch" | "with") && matches!(previous, Some("," | "static" | "async" | "get" | "set" | "*"));
             if property || member {
                 constraint = oak_formatter::GapConstraint::NoSpace;
+            }
+        }
+        // Generator markers stay attached to their keyword: `function*`,
+        // `yield*` and `async*`.
+        if right_text == "*" && matches!(left_text, "function" | "yield" | "async") {
+            constraint = oak_formatter::GapConstraint::NoSpace;
+        }
+        // A statement body that starts with `(` after a control-flow header
+        // needs the space that keeps `if (a)(b)` from reading as a call.
+        if right_text == "(" && left_text == ")" {
+            let mut nesting = 0usize;
+            for position in (0..=index).rev() {
+                match source.get(significant[position].span.clone()) {
+                    Some(")") => nesting += 1,
+                    Some("(") => {
+                        nesting = nesting.saturating_sub(1);
+                        if nesting == 0 {
+                            let keyword = position.checked_sub(1).and_then(|before| significant.get(before)).and_then(|token| source.get(token.span.clone()));
+                            if matches!(keyword, Some("if" | "for" | "while" | "switch" | "catch" | "with")) {
+                                constraint = oak_formatter::GapConstraint::RequiredSpace;
+                            }
+                            break;
+                        }
+                    }
+                    _ => {}
+                }
             }
         }
         // `< / div >` closes a JSX tag and binds tightly. Every other `/ name`
@@ -176,7 +258,10 @@ fn is_jsx_attribute_gap(significant: &[&oak_core::Token<TypeScriptTokenType>], i
             // levels at once or it mistakes the generic for an open JSX tag.
             ">>" => nesting += 2,
             ">>>" => nesting += 3,
-            "<" if nesting == 0 => return true,
+            "<" if nesting == 0 => {
+                let previous = token_index.checked_sub(1).and_then(|previous| significant.get(previous)).and_then(|token| source.get(token.span.clone()));
+                return matches!(previous, Some("=" | "return" | "=>" | "(" | "[" | "{" | "," | ":" | ">"));
+            }
             "<" if nesting > 0 => {
                 nesting -= 1;
                 if nesting == 0 {
@@ -214,7 +299,7 @@ fn looks_like_type_arguments(significant: &[&oak_core::Token<TypeScriptTokenType
                 return after.is_none_or(|next| matches!(next, "=" | "," | ";" | ")" | "]" | "}" | "." | "(" | "{" | "|" | "&" | "=>" | "?" | ":"));
             }
             ">>" => depth -= 2,
-            ";" | "=" | "?" | ":" if depth == 0 && delimiters == 0 => return false,
+            ";" | "?" | ":" if depth == 0 && delimiters == 0 => return false,
             _ => {}
         }
     }
@@ -232,7 +317,7 @@ fn is_type_argument_close(significant: &[&oak_core::Token<TypeScriptTokenType>],
             ">" => depth += 1,
             "<" if depth == 0 => return looks_like_type_arguments(significant, index, source),
             "<" => depth -= 1,
-            ";" | "=" | "?" | ":" if depth == 0 => return false,
+            ";" | "?" | ":" if depth == 0 => return false,
             _ => {}
         }
     }
