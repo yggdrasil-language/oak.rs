@@ -96,3 +96,10 @@ fn generic_defaults_and_statement_bodies_stay_readable() {
         assert_eq!(format(source), expected, "source={source:?}");
     }
 }
+
+#[test]
+fn triple_nested_type_arguments_stay_tight() {
+    for source in ["const params: Record<string, Array<Record<string, string>>> = {};", "class Store { staticParams?: Record<string, Array<Record<string, string>>>; }"] {
+        assert_eq!(format(source), source, "source={source:?}");
+    }
+}
