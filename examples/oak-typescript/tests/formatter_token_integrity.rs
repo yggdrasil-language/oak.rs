@@ -112,3 +112,25 @@ fn ternary_colons_after_braced_types_keep_the_space() {
         assert_eq!(format(source), source, "source={source:?}");
     }
 }
+
+#[test]
+fn member_calls_and_private_names_keep_their_boundaries() {
+    for source in ["async #render(): Promise<void> { this.#run(); }", "const sync = EditorView.updateListener.of((u) => { run(u); });", "class Store { static #count = 0; readonly items: readonly [string, string][] = []; }"] {
+        assert_eq!(format(source), source, "source={source:?}");
+    }
+}
+
+#[test]
+fn operators_and_type_arguments_stay_separated() {
+    for source in [
+        "const ok = guard++ < 64 && i-- > 0;",
+        "return cur ^ rhs;",
+        "const owned = new Map<string, Set<string>>();",
+        "export type Bag = Record<string, Array<(detail?: unknown) => void>>;",
+        "export type Locale = { locales?: Array<{ id: string } | string>; };",
+        "type Metas = ReturnType<typeof buildMeta>[];",
+        "export type Def = { circles?: readonly Readonly<{ cx: number; cy: number }>[]; };",
+    ] {
+        assert_eq!(format(source), source, "source={source:?}");
+    }
+}
