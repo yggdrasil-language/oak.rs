@@ -30,7 +30,9 @@ pub struct SymbolInformation {
 /// Trait for languages that support symbol search and navigation.
 pub trait SymbolProvider<L: Language> {
     /// Returns symbols defined in the document.
-    fn document_symbols<S: Source + ?Sized>(&self, uri: &str, root: &RedNode<L>, source: &S) -> Vec<SymbolInformation>;
+    ///
+    /// 源码以 `&dyn Source` 传入，使本能力可以在适配层以引用持有。
+    fn document_symbols(&self, uri: &str, root: &RedNode<L>, source: &dyn Source) -> Vec<SymbolInformation>;
 
     /// Returns symbols defined in the workspace matching the query.
     fn workspace_symbols(&self, query: &str) -> Vec<SymbolInformation> {
@@ -104,7 +106,7 @@ impl UniversalSymbolProvider {
 }
 
 impl<L: Language> SymbolProvider<L> for UniversalSymbolProvider {
-    fn document_symbols<S: Source + ?Sized>(&self, uri: &str, root: &RedNode<L>, source: &S) -> Vec<SymbolInformation> {
+    fn document_symbols(&self, uri: &str, root: &RedNode<L>, source: &dyn Source) -> Vec<SymbolInformation> {
         let mut symbols = Vec::new();
         self.collect_symbols(uri, root, &mut symbols, None, source);
         symbols

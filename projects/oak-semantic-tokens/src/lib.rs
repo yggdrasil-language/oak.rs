@@ -24,5 +24,7 @@ pub struct SemanticToken {
 /// Trait for languages that support semantic highlighting.
 pub trait SemanticTokensProvider<L: Language> {
     /// Returns the semantic tokens for the given document.
-    fn semantic_tokens<S: Source + ?Sized>(&self, root: &RedNode<L>, source: &S, line_map: &LineMap) -> Vec<SemanticToken>;
+    ///
+    /// 源码以 `&dyn Source` 传入，使本能力可以在适配层以引用持有。
+    fn semantic_tokens(&self, root: &RedNode<L>, source: &dyn Source, line_map: &LineMap) -> Vec<SemanticToken>;
 }

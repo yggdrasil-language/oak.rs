@@ -12,7 +12,7 @@ use oak_vfs::LineMap;
 pub struct RbqSemanticTokensProvider;
 
 impl SemanticTokensProvider<RbqLanguage> for RbqSemanticTokensProvider {
-    fn semantic_tokens<S: Source + ?Sized>(&self, root: &RedNode<RbqLanguage>, source: &S, line_map: &LineMap) -> Vec<SemanticToken> {
+    fn semantic_tokens(&self, root: &RedNode<RbqLanguage>, source: &dyn Source, line_map: &LineMap) -> Vec<SemanticToken> {
         let mut tokens = Vec::new();
         let mut last_line = 0;
         let mut last_start = 0;
