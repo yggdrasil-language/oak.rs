@@ -103,3 +103,12 @@ fn triple_nested_type_arguments_stay_tight() {
         assert_eq!(format(source), source, "source={source:?}");
     }
 }
+
+#[test]
+fn ternary_colons_after_braced_types_keep_the_space() {
+    let braced = "const sources = condition ? (table.profiles[table.default] as { sources?: unknown } | undefined)?.sources : null;";
+    let callback = "const shopLayout = Array.isArray(layouts) ? layouts.find((l: { bump?: () => void }) => typeof l?.bump === 'function') : null;";
+    for source in [braced, callback] {
+        assert_eq!(format(source), source, "source={source:?}");
+    }
+}
