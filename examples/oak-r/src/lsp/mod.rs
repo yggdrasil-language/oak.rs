@@ -65,8 +65,7 @@ impl<V: Vfs + Send + Sync + 'static + oak_vfs::WritableVfs> LanguageService for 
             Some(f(RedNode::new(green, 0)))
         }
     }
-    fn hover(&self, uri: &str, range: Range<usize>) -> impl Future<Output = Option<oak_lsp::Hover>> + Send + '_ {
-        let uri = uri.to_string();
-        async move { self.with_root(&uri, |root| self.hover_provider.hover(&root, range).map(|h| oak_lsp::Hover { contents: h.contents, range: h.range })).await.flatten() }
+    fn hover_provider(&self) -> Option<&(dyn HoverProvider<RLanguage> + Send + Sync)> {
+        Some(&self.hover_provider)
     }
 }
