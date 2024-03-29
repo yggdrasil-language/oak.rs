@@ -5,8 +5,13 @@ use oak_core::{
     source::Source,
     tree::RedNode,
 };
+use oak_folding::FoldingProvider;
+use oak_hover::HoverProvider;
+use oak_navigation::{DefinitionProvider, ReferencesProvider};
 use oak_resolver::ModuleResolver;
-use oak_vfs::{Vfs, WritableVfs};
+use oak_semantic_tokens::SemanticTokensProvider;
+use oak_symbols::SymbolProvider;
+use oak_vfs::{LineMap, Vfs, WritableVfs};
 use std::future::Future;
 
 /// A trait that defines the capabilities and behavior of a language-specific service.
@@ -42,6 +47,38 @@ pub trait LanguageService: Send + Sync {
     where
         R: Send,
         F: FnOnce(RedNode<'_, Self::Lang>) -> R + Send;
+
+    /// 返回本服务的 hover 能力实现；默认没有。
+    ///
+    /// 能力语义由 `oak-hover` 拥有，服务只提供接缝，不重复实现内容生成。
+    fn hover_provider(&self) -> Option<&(dyn HoverProvider<Self::Lang> + Send + Sync)> {
+        None
+    }
+
+    /// 返回本服务的定义跳转能力实现；默认没有。
+    fn definition_provider(&self) -> Option<&(dyn DefinitionProvider<Self::Lang> + Send + Sync)> {
+        None
+    }
+
+    /// 返回本服务的引用查找能力实现；默认没有。
+    fn references_provider(&self) -> Option<&(dyn ReferencesProvider<Self::Lang> + Send + Sync)> {
+        None
+    }
+
+    /// 返回本服务的符号能力实现；默认没有。
+    fn symbol_provider(&self) -> Option<&(dyn SymbolProvider<Self::Lang> + Send + Sync)> {
+        None
+    }
+
+    /// 返回本服务的折叠能力实现；默认没有。
+    fn folding_provider(&self) -> Option<&(dyn FoldingProvider<Self::Lang> + Send + Sync)> {
+        None
+    }
+
+    /// 返回本服务的语义 token 能力实现；默认没有。
+    fn semantic_tokens_provider(&self) -> Option<&(dyn SemanticTokensProvider<Self::Lang> + Send + Sync)> {
+        None
+    }
     /// Executes a closure with multiple root nodes.
     fn with_roots<'a, R, F>(&'a self, uris: Vec<String>, f: F) -> impl Future<Output = Vec<R>> + Send + 'a
     where
@@ -66,23 +103,36 @@ pub trait LanguageService: Send + Sync {
     /// # Arguments
     /// * `uri` - The URI of the file.
     /// * `range` - The byte range to provide information for.
-    fn hover(&self, _uri: &str, _range: Range<usize>) -> impl Future<Output = Option<Hover>> + Send + '_ {
-        async { None }
+    fn hover<'a>(&'a self, uri: &'a str, range: Range<usize>) -> impl Future<Output = Option<Hover>> + Send + 'a {
+        async move {
+            let provider = self.hover_provider()?;
+            self.with_root(uri, |root| provider.hover(&root, range)).await.flatten()
+        }
     }
 
     /// Provides folding ranges for a file.
-    fn folding_ranges(&self, _uri: &str) -> impl Future<Output = Vec<FoldingRange>> + Send + '_ {
-        async { vec![] }
+    fn folding_ranges<'a>(&'a self, uri: &'a str) -> impl Future<Output = Vec<FoldingRange>> + Send + 'a {
+        async move {
+            let Some(provider) = self.folding_provider()
+            else {
+                return vec![];
+            };
+            self.with_root(uri, |root| provider.folding_ranges(&root)).await.unwrap_or_default()
+        }
     }
 
     /// Provides document symbols (structure) for a file.
     ///
-    /// This method extracts structural elements like classes, functions, and variables
-    /// from the source file. It first tries to query the workspace symbol index,
-    /// falling back to parsing the file if necessary.
+    /// 优先委托 `oak-symbols` 的 provider；未提供 provider 时回退到工作区符号索引。
     fn document_symbols<'a>(&'a self, uri: &'a str) -> impl Future<Output = Vec<StructureItem>> + Send + 'a {
         let uri = uri.to_string();
         async move {
+            if let (Some(provider), Some(source)) = (self.symbol_provider(), self.get_source(&uri)) {
+                let symbols = self.with_root(&uri, |root| provider.document_symbols(&uri, &root, &source)).await;
+                if let Some(symbols) = symbols {
+                    return symbols.into_iter().map(crate::types::structure_item_from_symbol).collect();
+                }
+            }
             let _ = self.with_root(&uri, |_| {}).await;
             let symbols = self.workspace().symbols.query_file(&uri);
             if !symbols.is_empty() {
@@ -125,14 +175,15 @@ pub trait LanguageService: Send + Sync {
 
     /// Finds the definition(s) of a symbol at the specified range.
     ///
-    /// This method attempts to resolve the symbol under the cursor to its
-    /// original definition. It handles:
-    /// 1. Local symbol resolution (language-specific).
-    /// 2. Global symbol lookup via the workspace index.
-    /// 3. Module/file import resolution.
+    /// 优先委托 `oak-navigation` 的 provider，其次使用工作区符号索引与模块解析。
     fn definition<'a>(&'a self, uri: &'a str, range: Range<usize>) -> impl Future<Output = Vec<LocationRange>> + Send + 'a {
         let uri = uri.to_string();
         async move {
+            if let Some(provider) = self.definition_provider() {
+                if let Some(found) = self.with_root(&uri, |root| provider.definition(&root, range.start)).await {
+                    return found;
+                }
+            }
             let uri_clone = uri.clone();
             self.with_root(&uri, move |root| {
                 let source = match self.get_source(&uri_clone) {
@@ -188,8 +239,15 @@ pub trait LanguageService: Send + Sync {
     }
 
     /// Provides semantic tokens for a file.
-    fn semantic_tokens<'a>(&'a self, _uri: &'a str) -> impl Future<Output = Option<SemanticTokens>> + Send + 'a {
-        async { None }
+    fn semantic_tokens<'a>(&'a self, uri: &'a str) -> impl Future<Output = Option<SemanticTokens>> + Send + 'a {
+        let uri = uri.to_string();
+        async move {
+            let provider = self.semantic_tokens_provider()?;
+            let source = self.get_source(&uri)?;
+            let line_map = LineMap::from_source(&source);
+            let data = self.with_root(&uri, |root| provider.semantic_tokens(&root, &source, &line_map)).await?;
+            Some(SemanticTokens { result_id: None, data })
+        }
     }
 
     /// Provides completion items for a file at the specified position.
@@ -217,8 +275,15 @@ pub trait LanguageService: Send + Sync {
     }
 
     /// Finds all references to a symbol at the specified range.
-    fn references<'a>(&'a self, _uri: &'a str, _range: Range<usize>) -> impl Future<Output = Vec<LocationRange>> + Send + 'a {
-        async { vec![] }
+    fn references<'a>(&'a self, uri: &'a str, range: Range<usize>) -> impl Future<Output = Vec<LocationRange>> + Send + 'a {
+        let uri = uri.to_string();
+        async move {
+            let Some(provider) = self.references_provider()
+            else {
+                return vec![];
+            };
+            self.with_root(&uri, |root| provider.references(&root, range.start, true)).await.unwrap_or_default()
+        }
     }
 
     /// Finds the type definition of a symbol at the specified range.
