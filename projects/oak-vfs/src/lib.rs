@@ -38,7 +38,7 @@ pub struct FileMetadata {
 pub mod vfs;
 pub use vfs::MemoryVfs;
 #[cfg(feature = "disk")]
-pub use vfs::{DiskVfs, DiskWatcher, VfsEvent, VfsWatcher};
+pub use vfs::{DiskVfs, DiskWatcher, VfsEvent, VfsRescanReason, VfsWatchError, VfsWatcher};
 
 /// A trait for a Virtual File System that can provide source content and location mapping.
 ///
