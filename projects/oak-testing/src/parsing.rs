@@ -17,7 +17,7 @@ use std::{
     path::{Path, PathBuf},
     time::Duration,
 };
-use walkdir::WalkDir;
+use fs_tools::walk::{ErrorPolicy, Walker};
 
 /// A concurrent parser testing utility that can run tests against multiple files with timeout support.
 ///
@@ -126,7 +126,7 @@ impl ParserTester {
             return Ok(files);
         }
 
-        for entry in WalkDir::new(&self.root) {
+        for entry in Walker::new(&self.root).error_policy(ErrorPolicy::Strict) {
             let entry = entry.map_err(|e| OakError::custom_error(e.to_string()))?;
             let path = entry.path();
 

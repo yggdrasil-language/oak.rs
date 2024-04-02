@@ -25,7 +25,6 @@ futures = { workspace = true, optional = true }
 
 [dev-dependencies]
 oak-testing = { workspace = true }
-walkdir = { workspace = true }
 
 [features]
 default = ["serde"]
