@@ -219,6 +219,12 @@ impl<'p> NoteParser<'p> {
                     self.parse_markdown_link(state, false);
                     prev_blank = false;
                 }
+                Some(NoteTokenType::InlineCode) => {
+                    let start = state.checkpoint();
+                    state.bump();
+                    state.finish_at(start, NoteElementType::Token(NoteTokenType::InlineCode));
+                    prev_blank = false;
+                }
                 _ => {
                     let blank_after = Self::blank_after_current(state, 1);
                     state.bump();
