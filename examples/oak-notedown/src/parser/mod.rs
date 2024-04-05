@@ -206,6 +206,28 @@ impl<'p> NoteParser<'p> {
                 continue;
             }
 
+            if state.at(NoteTokenType::Strikethrough) {
+                // `~~` 是单个不可分 token，按 GFM 的 flanking 规则决定开/合：
+                // 左侧不是空白才能闭合，右侧不是空白才能开启。
+                let right_blank = Self::blank_after_current(state, 1);
+                let open = opens.iter().rposition(|(_, element, _, _)| matches!(element, NoteElementType::Token(NoteTokenType::Strikethrough)));
+                if !prev_blank && open.is_some() {
+                    state.bump();
+                    let (start, element, _, _) = opens.remove(open.unwrap());
+                    state.finish_at(start, element);
+                }
+                else if !right_blank {
+                    let start = state.checkpoint();
+                    state.bump();
+                    opens.push((start, NoteElementType::Token(NoteTokenType::Strikethrough), '~', 1));
+                }
+                else {
+                    state.bump();
+                }
+                prev_blank = right_blank;
+                continue;
+            }
+
             match state.peek_kind() {
                 Some(NoteTokenType::Link) => {
                     self.parse_markdown_link(state, false);
