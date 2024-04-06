@@ -7,7 +7,7 @@ use std::{
     time::{Duration, Instant},
 };
 
-use fs_tools::watch::{WatchBackend, WatchError, WatchOptions};
+use boost_fs::watch::{WatchBackend, WatchError, WatchOptions};
 use oak_vfs::{DiskWatcher, VfsEvent, VfsWatchError, VfsWatcher};
 
 const INTERVAL: Duration = Duration::from_millis(20);
@@ -17,7 +17,7 @@ fn options() -> WatchOptions {
     WatchOptions::new().queue_capacity(256).backend(WatchBackend::Polling { interval: INTERVAL })
 }
 
-fn root_of(folder: &fs_tools::temp::TempFolder) -> PathBuf {
+fn root_of(folder: &boost_fs::temp::TempFolder) -> PathBuf {
     normalize(fs::canonicalize(folder.path()).unwrap())
 }
 
@@ -79,7 +79,7 @@ fn quiet_for(rx: &Receiver<VfsEvent>, window: Duration, predicate: impl Fn(&VfsE
 
 #[test]
 fn polling_reports_uris_relative_to_the_root() {
-    let folder = fs_tools::temp::create_folder().unwrap();
+    let folder = boost_fs::temp::create_folder().unwrap();
     let root = root_of(&folder);
     let (events, received) = mpsc::channel();
     let mut watcher = DiskWatcher::with_options(&root, options(), move |event| drop(events.send(event))).unwrap();
@@ -100,7 +100,7 @@ fn polling_reports_uris_relative_to_the_root() {
 
 #[test]
 fn unwatch_all_unsubscribes_every_root() {
-    let folder = fs_tools::temp::create_folder().unwrap();
+    let folder = boost_fs::temp::create_folder().unwrap();
     let root = root_of(&folder);
     let (events, received) = mpsc::channel();
     let mut watcher = DiskWatcher::with_options(&root, options(), move |event| drop(events.send(event))).unwrap();
@@ -118,7 +118,7 @@ fn unwatch_all_unsubscribes_every_root() {
 
 #[test]
 fn missing_and_unsubscribed_roots_report_errors() {
-    let folder = fs_tools::temp::create_folder().unwrap();
+    let folder = boost_fs::temp::create_folder().unwrap();
     let root = root_of(&folder);
     let missing = root.join("missing");
     let mut watcher = DiskWatcher::with_options(&root, options(), |_| {}).unwrap();

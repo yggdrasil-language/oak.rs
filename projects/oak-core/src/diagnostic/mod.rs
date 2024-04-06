@@ -1,7 +1,7 @@
-//! Adapters from Oak parser errors to the shared `diagnostic` contract.
+//! Adapters from Oak parser errors to the shared `boost-diagnostic` contract.
 
-use diagnostic::{ByteRange, DiagnosticLabel, DiagnosticLocation, DiagnosticOrigin, DiagnosticSeverity, LabelRole, Message, MessageArg, SourceRef};
-pub use diagnostic::{
+use boost_diagnostic::{ByteRange, DiagnosticLabel, DiagnosticLocation, DiagnosticOrigin, DiagnosticSeverity, LabelRole, Message, MessageArg, SourceRef};
+pub use boost_diagnostic::{
     Diagnostic, DiagnosticAction, DiagnosticCode, DiagnosticEnvelope, DiagnosticLabel as UnifiedDiagnosticLabel, DiagnosticLocation as UnifiedDiagnosticLocation, DiagnosticOrigin as UnifiedDiagnosticOrigin, DiagnosticSet,
     DiagnosticSeverity as UnifiedSeverity, DiagnosticSink, Message as UnifiedMessage, SCHEMA_VERSION,
 };
@@ -146,18 +146,18 @@ impl<T> OakDiagnosticsExt<T> for OakDiagnostics<T> {
     }
 }
 
-/// Project parser output into unified diagnostics and emit each record through [`logger`].
+/// Project parser output into unified diagnostics and emit each record through [`boost_log`].
 #[cfg(feature = "logger")]
 pub fn emit_unified_output<T>(output: &OakDiagnostics<T>) {
-    diagnostic::emit_diagnostic_set(&output.unified_set());
+    boost_diagnostic::emit_diagnostic_set(&output.unified_set());
 }
 
-/// Project Oak parser errors and emit each unified diagnostic through [`logger`].
+/// Project Oak parser errors and emit each unified diagnostic through [`boost_log`].
 #[cfg(feature = "logger")]
 pub fn emit_oak_errors(errors: &[OakError]) {
     let mut set = DiagnosticSet::new();
     for error in errors {
         set.push(from_oak_error(error));
     }
-    diagnostic::emit_diagnostic_set(&set);
+    boost_diagnostic::emit_diagnostic_set(&set);
 }

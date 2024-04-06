@@ -1,6 +1,6 @@
 use std::sync::{Arc, Mutex};
 
-use logger::{EventKind, Filter, Level, LogSink, VecSink, clear_global_sink, reset_dropped_events, set_global_filter, set_global_sink};
+use boost_log::{EventKind, Filter, Level, LogSink, VecSink, clear_global_sink, reset_dropped_events, set_global_filter, set_global_sink};
 use oak_core::{
     diagnostic::{emit_oak_errors, emit_unified_output},
     errors::{OakDiagnostics, OakError},
@@ -10,7 +10,7 @@ use serial_test::serial;
 struct SharedSink(Arc<Mutex<VecSink>>);
 
 impl LogSink for SharedSink {
-    fn emit(&mut self, event: &logger::LogEvent) {
+    fn emit(&mut self, event: &boost_log::LogEvent) {
         self.0.lock().expect("vec sink mutex poisoned").emit(event);
     }
 }

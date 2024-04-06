@@ -15,7 +15,7 @@
 
 /// Incremental tree builder and cache management.
 pub mod builder;
-/// Unified `diagnostic` adapters for Oak parser output.
+/// Unified `boost-diagnostic` adapters for Oak parser output.
 #[cfg(feature = "diagnostic")]
 pub mod diagnostic;
 /// Error handling and diagnostic reporting for the parsing system.

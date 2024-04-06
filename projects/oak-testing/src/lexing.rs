@@ -21,7 +21,7 @@ use std::{
     thread,
     time::{Duration, Instant},
 };
-use fs_tools::walk::{ErrorPolicy, Walker};
+use boost_fs::walk::{ErrorPolicy, Walker};
 
 /// A lexer testing utility that can run tests against multiple files.
 ///
