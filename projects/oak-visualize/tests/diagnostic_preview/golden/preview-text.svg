@@ -1,0 +1,25 @@
+<svg viewBox="0 0 882 125" xmlns="http://www.w3.org/2000/svg">
+  <style>
+    pre {
+      background: #1d1f21;
+      margin: 0;
+      padding: 10px;
+      border-radius: 6px;
+      color: #ffffff;
+      font: 12px SFMono-Regular, Consolas, Liberation Mono, Menlo, monospace;
+      white-space: pre-wrap;
+    }
+  </style>
+  <foreignObject x="0" y="0" width="882" height="125">
+    <div xmlns="http://www.w3.org/1999/xhtml">
+      <pre>[31mERROR:[0m sample diagnostic
+   ╭─[main.rs:1:1]
+   │
+ 1 │ fn main() {
+   │ ─┬  
+   │  ╰── fn
+───╯
+</pre>
+    </div>
+  </foreignObject>
+</svg>

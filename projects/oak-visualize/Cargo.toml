@@ -12,6 +12,7 @@ categories = ["visualization", "algorithms"]
 keywords = ["visualization", "layout", "ast", "tree", "graph"]
 
 [dependencies]
+boost-diagnostic = { workspace = true, features = ["terminal"] }
 oak-core = { workspace = true }
 oak-highlight = { workspace = true, optional = true }
 oak-pretty-print = { workspace = true, optional = true }
