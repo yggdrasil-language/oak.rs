@@ -1,11 +1,15 @@
 use std::collections::BTreeMap;
 
+use oak_core::Arc;
+
 use boost_diagnostic::{
     ByteRange, Diagnostic, DiagnosticCode, DiagnosticLabel, DiagnosticLocation, DiagnosticOrigin, DiagnosticSeverity, LabelRole, Message,
     SourceRef, terminal::SourceID,
 };
-use lsp_types::{Position, Url};
-use oak_lsp::diagnostic::{SourceCache, SourceResolver, byte_index_to_position, position_to_byte_index, structured_to_lsp};
+use oak_lsp::{
+    diagnostic::{SourceCache, SourceResolver, byte_index_to_position, position_to_byte_index, structured_to_protocol},
+    types::{DiagnosticSeverity as ProtocolSeverity, TextPosition},
+};
 
 const UNICODE: &str = "åä t𐐀b";
 
@@ -30,10 +34,10 @@ fn unicode_get_byte_index() {
     let mut files = SourceCache::default();
     let file_id = files.load_text(UNICODE, "unicode");
 
-    let result = position_to_byte_index(&files, &file_id, &Position { line: 0, character: 3 });
+    let result = position_to_byte_index(&files, &file_id, &TextPosition { line: 0, character: 3 });
     assert_eq!(result.unwrap(), 5);
 
-    let result = position_to_byte_index(&files, &file_id, &Position { line: 0, character: 6 });
+    let result = position_to_byte_index(&files, &file_id, &TextPosition { line: 0, character: 6 });
     assert_eq!(result.unwrap(), 10);
 }
 
@@ -44,17 +48,17 @@ fn unicode_get_position() {
     let file_id2 = files.load_text(format!("\n{UNICODE}"), "unicode2");
 
     let result = byte_index_to_position(&files, &file_id, 5);
-    assert_eq!(result.unwrap(), Position { line: 0, character: 3 });
+    assert_eq!(result.unwrap(), TextPosition { line: 0, character: 3 });
 
     let result = byte_index_to_position(&files, &file_id, 10);
-    assert_eq!(result.unwrap(), Position { line: 0, character: 6 });
+    assert_eq!(result.unwrap(), TextPosition { line: 0, character: 6 });
 
     let result = byte_index_to_position(&files, &file_id2, 11);
-    assert_eq!(result.unwrap(), Position { line: 1, character: 6 });
+    assert_eq!(result.unwrap(), TextPosition { line: 1, character: 6 });
 }
 
 #[test]
-fn structured_text_diagnostic_to_lsp() {
+fn structured_text_diagnostic_to_protocol() {
     let mut cache = SourceCache::default();
     let source_ref = SourceRef::new("oak", "sample.tao").unwrap();
     let file_id = cache.load_text("let value = 1", "sample.tao");
@@ -72,11 +76,11 @@ fn structured_text_diagnostic_to_lsp() {
         LabelRole::Primary,
     ));
 
-    let lsp = structured_to_lsp(&diagnostic, &cache, &resolver, &|_| Some(Url::parse("file:///sample.tao").unwrap())).unwrap();
+    let protocol = structured_to_protocol(&diagnostic, &cache, &resolver, &|_| Some(Arc::from("file:///sample.tao"))).unwrap();
 
-    assert_eq!(lsp.message, "unexpected token");
-    assert_eq!(lsp.severity, Some(lsp_types::DiagnosticSeverity::ERROR));
-    assert_eq!(lsp.range.start.line, 0);
+    assert_eq!(protocol.message, "unexpected token");
+    assert_eq!(protocol.severity, Some(ProtocolSeverity::Error));
+    assert_eq!(protocol.range.start.line, 0);
 }
 
 #[test]
@@ -102,7 +106,7 @@ fn structured_member_diagnostic_uses_related_information() {
         LabelRole::Primary,
     ));
 
-    let lsp = structured_to_lsp(&diagnostic, &cache, &resolver, &|_| None).unwrap();
-    let related = lsp.related_information.expect("member location should become related info");
+    let protocol = structured_to_protocol(&diagnostic, &cache, &resolver, &|_| None).unwrap();
+    let related = protocol.related_information.expect("member location should become related info");
     assert!(related[0].message.contains("docx.zip"));
 }
