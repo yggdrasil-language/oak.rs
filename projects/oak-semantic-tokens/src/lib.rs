@@ -1,7 +1,7 @@
 #![warn(missing_docs)]
 #![doc = include_str!("readme.md")]
 use oak_core::{language::Language, source::Source, tree::RedNode};
-use oak_vfs::LineMap;
+use oak_core::source::LineMap;
 
 /// Represents a semantic token for syntax highlighting.
 ///

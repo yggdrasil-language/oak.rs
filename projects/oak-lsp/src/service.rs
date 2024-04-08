@@ -14,7 +14,8 @@ use oak_navigation::{DefinitionProvider, ReferencesProvider};
 use oak_resolver::ModuleResolver;
 use oak_semantic_tokens::SemanticTokensProvider;
 use oak_symbols::SymbolProvider;
-use oak_vfs::{LineMap, Vfs, WritableVfs};
+use oak_core::source::LineMap;
+use oak_vfs::{Vfs, WritableVfs};
 use std::future::Future;
 
 /// A trait that defines the capabilities and behavior of a language-specific service.

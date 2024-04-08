@@ -1,12 +1,14 @@
 use crate::{FileMetadata, FileType, Vfs, WritableVfs};
+use boost_fs::vfs::LayeredFs;
 use oak_core::{
     Arc,
     source::{SourceId, SourceText},
 };
-use std::{collections::HashMap, fs, path::PathBuf, sync::RwLock};
+use std::{collections::HashMap, path::PathBuf, sync::RwLock};
 
-/// A virtual file system that reads from and writes to the physical disk.
+/// A virtual file system that reads from disk through [`boost_fs::vfs::LayeredFs`].
 pub struct DiskVfs {
+    fs: LayeredFs,
     /// Mapping from file URIs to internal source IDs.
     uri_to_id: RwLock<HashMap<Arc<str>, SourceId>>,
     /// Mapping from source IDs back to file URIs.
@@ -18,7 +20,17 @@ pub struct DiskVfs {
 impl DiskVfs {
     /// Creates a new DiskVfs instance with the given root path.
     pub fn new(root_path: PathBuf) -> Self {
-        Self { uri_to_id: RwLock::new(HashMap::new()), id_to_uri: RwLock::new(HashMap::new()), root_path }
+        Self {
+            fs: LayeredFs::new(root_path.clone()),
+            uri_to_id: RwLock::new(HashMap::new()),
+            id_to_uri: RwLock::new(HashMap::new()),
+            root_path,
+        }
+    }
+
+    /// Returns the underlying layered filesystem for overlay updates.
+    pub fn layered(&self) -> &LayeredFs {
+        &self.fs
     }
 
     /// Converts a URI to a physical file path.
@@ -27,21 +39,32 @@ impl DiskVfs {
         if path.is_absolute() { Some(path) } else { Some(self.root_path.join(path)) }
     }
 
+    fn vfs_path(&self, uri: &str) -> Option<PathBuf> {
+        let path = PathBuf::from(uri);
+        if path.is_absolute() { path.strip_prefix(&self.root_path).ok().map(|p| p.to_path_buf()) } else { Some(path) }
+    }
+
     /// Converts a physical file path to a URI.
     fn path_to_uri(&self, path: PathBuf) -> Arc<str> {
-        let uri = if path.is_absolute() { path.to_string_lossy().to_string() } else { path.strip_prefix(&self.root_path).unwrap_or(&path).to_string_lossy().to_string() };
-        Arc::from(uri)
+        let uri = if path.is_absolute() {
+            path.to_string_lossy().to_string()
+        }
+        else {
+            path.strip_prefix(&self.root_path).unwrap_or(&path).to_string_lossy().to_string()
+        };
+        Arc::from(uri.as_str())
     }
 }
 
 impl Vfs for DiskVfs {
     type Source = SourceText;
 
-    /// Reads the content of a file from disk given its URI.
+    /// Reads the content of a file from the layered filesystem.
     fn get_source(&self, uri: &str) -> Option<Self::Source> {
-        let path = self.uri_to_path(uri)?;
-        let content = fs::read_to_string(path).ok()?;
-        Some(SourceText::new(&*content))
+        let vfs_path = self.vfs_path(uri)?;
+        let content = self.fs.read(vfs_path.as_path()).ok()?;
+        let text = String::from_utf8(content.bytes).ok()?;
+        Some(SourceText::new(text))
     }
 
     /// Returns the URI for a given source ID.
@@ -56,15 +79,15 @@ impl Vfs for DiskVfs {
         uri_to_id.get(uri).cloned()
     }
 
-    /// Checks if a file or directory exists at the given URI on disk.
+    /// Checks if a file or directory exists at the given URI.
     fn exists(&self, uri: &str) -> bool {
-        self.uri_to_path(uri).map(|p| p.exists()).unwrap_or(false)
+        self.vfs_path(uri).map(|path| self.fs.exists(path.as_path())).unwrap_or(false)
     }
 
-    /// Retrieves metadata for a file or directory from the disk.
+    /// Retrieves metadata for a file or directory from the disk layer.
     fn metadata(&self, uri: &str) -> Option<FileMetadata> {
         let path = self.uri_to_path(uri)?;
-        let meta = fs::metadata(path).ok()?;
+        let meta = boost_fs::metadata(&path).ok()?;
 
         let file_type = if meta.is_file() {
             FileType::File
@@ -83,36 +106,33 @@ impl Vfs for DiskVfs {
 
     /// Reads the contents of a directory on disk and returns their URIs.
     fn read_dir(&self, uri: &str) -> Option<Vec<Arc<str>>> {
-        let path = self.uri_to_path(uri)?;
-        if !path.is_dir() {
-            return None;
-        }
-
-        let mut entries = Vec::new();
-        for entry in fs::read_dir(path).ok()? {
-            if let Ok(entry) = entry {
-                entries.push(self.path_to_uri(entry.path()));
-            }
-        }
-        Some(entries)
+        let vfs_path = self.vfs_path(uri)?;
+        let entries = self.fs.read_dir(vfs_path.as_path()).ok()?;
+        Some(entries.into_iter().map(|path| self.path_to_uri(path)).collect())
     }
 }
 
 impl WritableVfs for DiskVfs {
-    /// Writes the given content to a file on disk at the specified URI.
+    /// Writes unsaved content into the overlay and persists to disk.
     fn write_file(&self, uri: &str, content: Arc<str>) {
         if let Some(path) = self.uri_to_path(uri) {
             if let Some(parent) = path.parent() {
-                let _ = fs::create_dir_all(parent);
+                let _ = boost_fs::create_folder_all(parent);
             }
-            let _ = fs::write(path, content.as_ref());
+            let _ = boost_fs::write(&path, content.as_bytes());
+            if let Some(vfs_path) = self.vfs_path(uri) {
+                self.fs.write_overlay(vfs_path, content.as_bytes().to_vec());
+            }
         }
     }
 
-    /// Removes a file from disk at the specified URI.
+    /// Removes a file from disk and clears overlay state.
     fn remove_file(&self, uri: &str) {
         if let Some(path) = self.uri_to_path(uri) {
-            let _ = fs::remove_file(path);
+            let _ = boost_fs::remove_file(&path);
+            if let Some(vfs_path) = self.vfs_path(uri) {
+                self.fs.remove_overlay(vfs_path.as_path());
+            }
         }
     }
 }

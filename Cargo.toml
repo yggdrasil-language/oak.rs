@@ -25,9 +25,9 @@ serde = { version = "1.0.229", features = ["derive", "rc"] }
 serde_json = { version = "1.0.149" }
 schemars = { version = "1.2.1", features = ["derive"] }
 # rust-boost consumer pin — bump `rev` intentionally, not via `Cargo.lock` (gitignored).
-boost-diagnostic = { git = "https://github.com/oovm/rust-boost", rev = "5d7e3c4b32710c2eb18afa69041df354a111eab6", default-features = false, features = ["std", "serde"] }
-boost-log = { git = "https://github.com/oovm/rust-boost", rev = "5d7e3c4b32710c2eb18afa69041df354a111eab6" }
-boost-fs = { git = "https://github.com/oovm/rust-boost", rev = "5d7e3c4b32710c2eb18afa69041df354a111eab6" }
+boost-diagnostic = { git = "https://github.com/oovm/rust-boost", rev = "2218a644af335aa4cef9f3e9e6b37475a829cfe2", default-features = false, features = ["std", "serde"] }
+boost-log = { git = "https://github.com/oovm/rust-boost", rev = "2218a644af335aa4cef9f3e9e6b37475a829cfe2" }
+boost-fs = { git = "https://github.com/oovm/rust-boost", rev = "2218a644af335aa4cef9f3e9e6b37475a829cfe2" }
 serial_test = { version = "4.0.1" }
 unicode-ident = { version = "1.0.24" }
 url = { version = "2.5.8", features = ["serde"] }
