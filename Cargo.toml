@@ -20,43 +20,11 @@ homepage = "https://github.com/yggdrasil-language/oak.rs"
 repository = "https://github.com/yggdrasil-language/oak.rs"
 
 [workspace.dependencies]
-# External dependencies removed to achieve architectural independence
-serde = { version = "1.0.229", features = ["derive", "rc"] }
-serde_json = { version = "1.0.149" }
-schemars = { version = "1.2.1", features = ["derive"] }
-# rust-boost consumer pin — bump `rev` intentionally, not via `Cargo.lock` (gitignored).
+# Boost dependencies
 boost-diagnostic = { git = "https://github.com/oovm/rust-boost", rev = "2218a644af335aa4cef9f3e9e6b37475a829cfe2", default-features = false, features = ["std", "serde"] }
 boost-log = { git = "https://github.com/oovm/rust-boost", rev = "2218a644af335aa4cef9f3e9e6b37475a829cfe2" }
 boost-fs = { git = "https://github.com/oovm/rust-boost", rev = "2218a644af335aa4cef9f3e9e6b37475a829cfe2" }
-serial_test = { version = "4.0.1" }
-unicode-ident = { version = "1.0.24" }
-url = { version = "2.5.8", features = ["serde"] }
-triomphe = { version = "0.1.15", default-features = false, features = ["serde"] }
-smallvec = { version = "1.15", features = ["union", "const_generics", "const_new"] }
-proc-macro2 = { version = "1.0.106" }
-quote = { version = "1.0.45" }
-syn = { version = "3.0.9", features = ["full"] }
-tokio = { version = "1.50.0", default-features = false }
-futures = { version = "0.3.32" }
-dashmap = { version = "6.1.0" }
-lazy_static = "1.5.0"
-anyhow = "1.0.102"
-thiserror = "2.0.18"
-itertools = "0.15.0"
-chrono = "0.4.44"
-crossterm = "0.29.0"
-unicode-width = "0.2.2"
-clap = { version = "4.5.60", features = ["derive"] }
-axum = "0.8.8"
-arcstr = { version = "1.2.0", features = ["serde"] }
-indexmap = { version = "2.13.0", features = ["serde"] }
-im-rc = "15.1.0"
-num = "0.4.3"
-bigdecimal = "0.4.10"
-ordered-float = "5.1.0"
-twox-hash = "2.1.2"
-regex = "1.12"
-base64 = "0.23.1"
+
 # Internal project dependencies
 oak-core = { path = "projects/oak-core", version = "0.0.12" }
 oak-macros = { path = "projects/oak-macros", version = "0.0.12" }
@@ -78,7 +46,7 @@ oak-visualize = { path = "projects/oak-visualize", version = "0.0.12" }
 oak-testing = { path = "projects/oak-testing", version = "0.0.12" }
 oak-mcp = { path = "projects/oak-mcp", version = "0.0.12" }
 oak-source-map = { path = "projects/oak-source-map", version = "0.0.12" }
-oaks = { path = "projects/oaks", version = "0.0.12" }
+oaks = { path = "projects/oak", version = "0.0.12" }
 
 # Language examples
 oak-actionscript = { path = "examples/oak-actionscript", version = "0.0.12" }
@@ -206,3 +174,36 @@ oak-xpath = { path = "examples/oak-xpath", version = "0.0.12" }
 oak-yaml = { path = "examples/oak-yaml", version = "0.0.12" }
 oak-zig = { path = "examples/oak-zig", version = "0.0.12" }
 
+# External dependencies removed to achieve architectural independence
+serde = { version = "1.0.229", features = ["derive", "rc"] }
+serde_json = { version = "1.0.149" }
+schemars = { version = "1.2.1", features = ["derive"] }
+serial_test = { version = "4.0.1" }
+unicode-ident = { version = "1.0.24" }
+url = { version = "2.5.8", features = ["serde"] }
+triomphe = { version = "0.1.15", default-features = false, features = ["serde"] }
+smallvec = { version = "1.15", features = ["union", "const_generics", "const_new"] }
+proc-macro2 = { version = "1.0.106" }
+quote = { version = "1.0.45" }
+syn = { version = "3.0.9", features = ["full"] }
+tokio = { version = "1.50.0", default-features = false }
+futures = { version = "0.3.32" }
+dashmap = { version = "6.1.0" }
+lazy_static = "1.5.0"
+anyhow = "1.0.102"
+thiserror = "2.0.18"
+itertools = "0.15.0"
+chrono = "0.4.44"
+crossterm = "0.29.0"
+unicode-width = "0.2.2"
+clap = { version = "4.5.60", features = ["derive"] }
+axum = "0.8.8"
+arcstr = { version = "1.2.0", features = ["serde"] }
+indexmap = { version = "2.13.0", features = ["serde"] }
+im-rc = "15.1.0"
+num = "0.4.3"
+bigdecimal = "0.4.10"
+ordered-float = "5.1.0"
+twox-hash = "2.1.2"
+regex = "1.12"
+base64 = "0.23.1"
