@@ -1,14 +1,15 @@
-use crate::{FileMetadata, FileType, Vfs, WritableVfs};
+use crate::{DocumentSession, FileMetadata, FileType, RevisionTracker, Vfs, WritableVfs};
 use boost_fs::vfs::LayeredFs;
 use oak_core::{
     Arc,
-    source::{SourceId, SourceText},
+    source::{DocumentSnapshot, SourceId, SourceText},
 };
 use std::{collections::HashMap, path::PathBuf, sync::RwLock};
 
 /// A virtual file system that reads from disk through [`boost_fs::vfs::LayeredFs`].
 pub struct DiskVfs {
     fs: LayeredFs,
+    revisions: RevisionTracker,
     /// Mapping from file URIs to internal source IDs.
     uri_to_id: RwLock<HashMap<Arc<str>, SourceId>>,
     /// Mapping from source IDs back to file URIs.
@@ -22,6 +23,7 @@ impl DiskVfs {
     pub fn new(root_path: PathBuf) -> Self {
         Self {
             fs: LayeredFs::new(root_path.clone()),
+            revisions: RevisionTracker::new(),
             uri_to_id: RwLock::new(HashMap::new()),
             id_to_uri: RwLock::new(HashMap::new()),
             root_path,
@@ -31,6 +33,17 @@ impl DiskVfs {
     /// Returns the underlying layered filesystem for overlay updates.
     pub fn layered(&self) -> &LayeredFs {
         &self.fs
+    }
+
+    /// Returns the revision tracker for open documents.
+    pub fn revisions(&self) -> &RevisionTracker {
+        &self.revisions
+    }
+
+    fn snapshot_after_write(&self, uri: &str) -> DocumentSnapshot {
+        let revision = self.revisions.get(uri).expect("revision was just assigned");
+        let source = self.get_source(uri).expect("document was just written");
+        DocumentSnapshot::new(source, revision)
     }
 
     /// Converts a URI to a physical file path.
@@ -112,6 +125,29 @@ impl Vfs for DiskVfs {
     }
 }
 
+impl DocumentSession for DiskVfs {
+    fn open_document(&self, uri: &str, text: Arc<str>) -> DocumentSnapshot {
+        self.write_file(uri, text);
+        self.snapshot_after_write(uri)
+    }
+
+    fn close_document(&self, uri: &str) {
+        self.revisions.clear(uri);
+        if let Some(vfs_path) = self.vfs_path(uri) {
+            self.fs.clear_overlay(vfs_path.as_path());
+        }
+    }
+
+    fn document_snapshot(&self, uri: &str) -> Option<DocumentSnapshot> {
+        let revision = self.revisions.get(uri)?;
+        self.get_source(uri).map(|source| DocumentSnapshot::new(source, revision))
+    }
+
+    fn request_source(&self, uri: &str) -> Option<SourceText> {
+        self.document_snapshot(uri).map(|snapshot| snapshot.source().clone()).or_else(|| self.get_source(uri))
+    }
+}
+
 impl WritableVfs for DiskVfs {
     /// Writes unsaved content into the overlay and persists to disk.
     fn write_file(&self, uri: &str, content: Arc<str>) {
@@ -124,6 +160,7 @@ impl WritableVfs for DiskVfs {
                 self.fs.write_overlay(vfs_path, content.as_bytes().to_vec());
             }
         }
+        self.revisions.bump(uri);
     }
 
     /// Removes a file from disk and clears overlay state.
@@ -134,5 +171,6 @@ impl WritableVfs for DiskVfs {
                 self.fs.remove_overlay(vfs_path.as_path());
             }
         }
+        self.revisions.clear(uri);
     }
 }
