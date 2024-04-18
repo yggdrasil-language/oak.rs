@@ -55,7 +55,7 @@ impl<V: Vfs> ActionScriptLanguageService<V> {
 }
 
 #[cfg(feature = "lsp")]
-impl<V: Vfs + Send + Sync + 'static + oak_vfs::WritableVfs> LanguageService for ActionScriptLanguageService<V> {
+impl<V: Vfs + Send + Sync + 'static + oak_vfs::DocumentSession> LanguageService for ActionScriptLanguageService<V> {
     type Lang = ActionScriptLanguage;
     type Vfs = V;
 
@@ -72,7 +72,7 @@ impl<V: Vfs + Send + Sync + 'static + oak_vfs::WritableVfs> LanguageService for 
         R: Send,
         F: FnOnce(RedNode<'_, Self::Lang>) -> R + Send,
     {
-        let source = self.vfs().get_source(uri);
+        let source = self.vfs().request_source(uri);
         async move {
             let source = source?;
             let language = ActionScriptLanguage::default();

@@ -35,7 +35,7 @@ impl<V: Vfs> SolidityLanguageService<V> {
         Self { vfs, workspace: oak_lsp::workspace::WorkspaceManager::default(), hover_provider: SolidityHoverProvider }
     }
 }
-impl<V: Vfs + Send + Sync + 'static + oak_vfs::WritableVfs> LanguageService for SolidityLanguageService<V> {
+impl<V: Vfs + Send + Sync + 'static + oak_vfs::DocumentSession> LanguageService for SolidityLanguageService<V> {
     type Lang = SolidityLanguage;
     type Vfs = V;
     fn vfs(&self) -> &Self::Vfs {

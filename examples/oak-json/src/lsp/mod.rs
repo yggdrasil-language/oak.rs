@@ -78,7 +78,7 @@ impl<V: Vfs> JsonLanguageService<V> {
         }
     }
 }
-impl<V: Vfs + Send + Sync + 'static + oak_vfs::WritableVfs> LanguageService for JsonLanguageService<V> {
+impl<V: Vfs + Send + Sync + 'static + oak_vfs::DocumentSession> LanguageService for JsonLanguageService<V> {
     type Lang = JsonLanguage;
     type Vfs = V;
     fn vfs(&self) -> &Self::Vfs {
@@ -92,7 +92,7 @@ impl<V: Vfs + Send + Sync + 'static + oak_vfs::WritableVfs> LanguageService for 
         R: Send,
         F: FnOnce(RedNode<'_, Self::Lang>) -> R + Send,
     {
-        let source = self.vfs().get_source(uri);
+        let source = self.vfs().request_source(uri);
         async move {
             let source = source?;
             let language = JsonLanguage::default();
@@ -109,7 +109,7 @@ impl<V: Vfs + Send + Sync + 'static + oak_vfs::WritableVfs> LanguageService for 
         async move {
             let name = self
                 .with_root(&uri, |root| {
-                    let source = self.vfs().get_source(&uri)?;
+                    let source = self.vfs().request_source(&uri)?;
                     let leaf = root.leaf_at_offset(range.start)?;
                     let text = source.get_text_in(leaf.span.clone());
                     Some(text.trim_matches('"').to_string())
@@ -126,7 +126,7 @@ impl<V: Vfs + Send + Sync + 'static + oak_vfs::WritableVfs> LanguageService for 
                 if let Some(defs) = self
                     .with_root(&file_uri, |file_root| {
                         let mut defs = Vec::new();
-                        if let Some(file_source) = self.vfs().get_source(&file_uri) {
+                        if let Some(file_source) = self.vfs().request_source(&file_uri) {
                             self.collect_definitions(&file_root, &name, &file_source, &file_uri, &mut defs);
                         }
                         defs
@@ -144,7 +144,7 @@ impl<V: Vfs + Send + Sync + 'static + oak_vfs::WritableVfs> LanguageService for 
         async move {
             let name = self
                 .with_root(&uri, |root| {
-                    let source = self.vfs().get_source(&uri)?;
+                    let source = self.vfs().request_source(&uri)?;
                     let leaf = root.leaf_at_offset(range.start)?;
                     let text = source.get_text_in(leaf.span.clone());
                     Some(text.trim_matches('"').to_string())
@@ -161,7 +161,7 @@ impl<V: Vfs + Send + Sync + 'static + oak_vfs::WritableVfs> LanguageService for 
                 if let Some(refs) = self
                     .with_root(&file_uri, |file_root| {
                         let mut refs = Vec::new();
-                        if let Some(file_source) = self.vfs().get_source(&file_uri) {
+                        if let Some(file_source) = self.vfs().request_source(&file_uri) {
                             self.collect_definitions(&file_root, &name, &file_source, &file_uri, &mut refs);
                         }
                         refs
@@ -184,7 +184,7 @@ impl<V: Vfs + Send + Sync + 'static + oak_vfs::WritableVfs> LanguageService for 
             let mut changes = std::collections::HashMap::new();
             for r in refs {
                 // Ensure new name is quoted if the original was quoted
-                let Some(source) = self.vfs().get_source(&r.uri)
+                let Some(source) = self.vfs().request_source(&r.uri)
                 else {
                     continue;
                 };

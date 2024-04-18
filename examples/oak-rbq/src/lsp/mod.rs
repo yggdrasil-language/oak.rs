@@ -73,7 +73,7 @@ impl<V: Vfs> RbqLanguageService<V> {
         Self { vfs, workspace: oak_lsp::workspace::WorkspaceManager::default(), hover_provider: RbqHoverProvider, folding_provider: RbqFoldingProvider, semantic_tokens_provider: RbqSemanticTokensProvider, caches: DashMap::new() }
     }
 }
-impl<V: Vfs + Send + Sync + 'static + oak_vfs::WritableVfs> LanguageService for RbqLanguageService<V> {
+impl<V: Vfs + Send + Sync + 'static + oak_vfs::DocumentSession> LanguageService for RbqLanguageService<V> {
     type Lang = RbqLanguage;
     type Vfs = V;
     fn vfs(&self) -> &Self::Vfs {
@@ -87,7 +87,7 @@ impl<V: Vfs + Send + Sync + 'static + oak_vfs::WritableVfs> LanguageService for 
         R: Send,
         F: FnOnce(RedNode<'_, Self::Lang>) -> R + Send,
     {
-        let source = self.vfs().get_source(uri);
+        let source = self.vfs().request_source(uri);
         async move {
             let source = source?;
             let language = RbqLanguage::default();
@@ -102,7 +102,7 @@ impl<V: Vfs + Send + Sync + 'static + oak_vfs::WritableVfs> LanguageService for 
     fn folding_ranges(&self, uri: &str) -> impl Future<Output = Vec<oak_lsp::FoldingRange>> + Send + '_ {
         let uri = uri.to_string();
         async move {
-            let source = self.vfs().get_source(&uri).unwrap(); // Handle error properly in real impl
+            let source = self.vfs().request_source(&uri).unwrap(); // Handle error properly in real impl
             let parser = crate::parser::RbqParser::new(&crate::language::RbqLanguage {});
             let mut cache = oak_core::parser::ParseSession::default();
             let output = parser.parse(&source, &[], &mut cache);
@@ -117,7 +117,7 @@ impl<V: Vfs + Send + Sync + 'static + oak_vfs::WritableVfs> LanguageService for 
     fn semantic_tokens<'a>(&'a self, uri: &'a str) -> impl Future<Output = Option<oak_lsp::SemanticTokens>> + Send + 'a {
         let uri = uri.to_string();
         async move {
-            let source = self.vfs().get_source(&uri)?;
+            let source = self.vfs().request_source(&uri)?;
             let line_map = self.vfs().line_map(&uri)?;
             let parser = crate::parser::RbqParser::new(&crate::language::RbqLanguage {});
             let mut cache = oak_core::parser::ParseSession::default();

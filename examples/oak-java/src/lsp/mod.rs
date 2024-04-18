@@ -20,7 +20,7 @@ impl<V: Vfs> JavaLanguageService<V> {
         Self { vfs, workspace: oak_lsp::workspace::WorkspaceManager::default() }
     }
 }
-impl<V: Vfs + Send + Sync + 'static + oak_vfs::WritableVfs> LanguageService for JavaLanguageService<V> {
+impl<V: Vfs + Send + Sync + 'static + oak_vfs::DocumentSession> LanguageService for JavaLanguageService<V> {
     type Lang = JavaLanguage;
     type Vfs = V;
     fn vfs(&self) -> &Self::Vfs {
@@ -34,7 +34,7 @@ impl<V: Vfs + Send + Sync + 'static + oak_vfs::WritableVfs> LanguageService for 
         R: Send,
         F: FnOnce(RedNode<'_, Self::Lang>) -> R + Send,
     {
-        let source = self.vfs().get_source(uri);
+        let source = self.vfs().request_source(uri);
         async move {
             let source = source?;
             let language = JavaLanguage::default();

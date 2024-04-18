@@ -17,7 +17,7 @@ impl<V: Vfs> CobolLanguageService<V> {
         Self { vfs, workspace: oak_lsp::workspace::WorkspaceManager::new() }
     }
 }
-impl<V: Vfs + Send + Sync + 'static + oak_vfs::WritableVfs> LanguageService for CobolLanguageService<V> {
+impl<V: Vfs + Send + Sync + 'static + oak_vfs::DocumentSession> LanguageService for CobolLanguageService<V> {
     type Lang = CobolLanguage;
     type Vfs = V;
     fn vfs(&self) -> &Self::Vfs {

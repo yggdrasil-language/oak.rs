@@ -3,7 +3,7 @@ use oak_mcp::McpServer;
 use oak_vfs::Vfs;
 
 /// Serves the glob pattern MCP service.
-pub async fn serve_glob_mcp<V: Vfs + Send + Sync + 'static + oak_vfs::WritableVfs>(vfs: V) -> Result<(), Box<dyn std::error::Error + Send + Sync>>
+pub async fn serve_glob_mcp<V: Vfs + Send + Sync + 'static + oak_vfs::DocumentSession>(vfs: V) -> Result<(), Box<dyn std::error::Error + Send + Sync>>
 where
     crate::lsp::GlobLanguageService<V>: LanguageService,
 {

@@ -26,7 +26,7 @@ impl<V: Vfs> LessLanguageService<V> {
     }
 }
 #[cfg(feature = "lsp")]
-impl<V: Vfs + Send + Sync + 'static + oak_vfs::WritableVfs> LanguageService for LessLanguageService<V> {
+impl<V: Vfs + Send + Sync + 'static + oak_vfs::DocumentSession> LanguageService for LessLanguageService<V> {
     type Lang = LessLanguage;
     type Vfs = V;
     fn vfs(&self) -> &Self::Vfs {
