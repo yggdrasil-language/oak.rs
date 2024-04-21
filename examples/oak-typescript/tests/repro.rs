@@ -39,6 +39,27 @@ fn repro_vmz_script_fragments() {
 }
 
 #[test]
+fn repro_assertions_inside_subscripts() {
+    let lang = TypeScriptLanguage::standard();
+    for source in [
+        "const translated = english[ticket.id as keyof typeof english];",
+        "const x = arr[i as number];",
+        "const x = map[key as string];",
+        "const x = list[(index as unknown) as number];",
+        "const x = arr[i as number].toFixed(2);",
+        "const value = input as Record<string, unknown>;",
+        "const value = input as Array<Array<string>>;",
+        "const value = input as A & B;",
+        "const less = input as number < 3;",
+    ] {
+        let mut cache = ParseSession::<TypeScriptLanguage>::new(32);
+        let result = TypeScriptBuilder::new(&lang).build(&SourceText::new(source), &[], &mut cache);
+        assert!(result.result.is_ok(), "{source}");
+        assert!(result.diagnostics.is_empty(), "{source}: {:#?}", result.diagnostics);
+    }
+}
+
+#[test]
 fn repro_vmz_formatter_fragments() {
     let options = FormatOptions::default();
     for source in [

@@ -315,11 +315,7 @@ impl<'config> TypeScriptParser<'config> {
             As => {
                 let cp = state.checkpoint_before(left);
                 self.expect(state, As).ok();
-                // Simple type handling: skip next identifier or basic type
-                self.skip_trivia(state);
-                if state.at(IdentifierName.into()) {
-                    self.expect(state, IdentifierName).ok();
-                }
+                self.parse_assertion_type(state);
                 Some(state.finish_at(cp, crate::parser::element_type::TypeScriptElementType::AsExpression.into()))
             }
             Arrow => {

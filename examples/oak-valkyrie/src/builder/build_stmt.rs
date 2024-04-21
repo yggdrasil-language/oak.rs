@@ -226,7 +226,9 @@ impl<'config> ValkyrieBuilder<'config> {
             match child {
                 RedTree::Leaf(t) => match t.kind {
                     ValkyrieTokenType::Whitespace | ValkyrieTokenType::Newline | ValkyrieTokenType::LineComment | ValkyrieTokenType::BlockComment => continue,
-                    ValkyrieTokenType::Identifier => {
+                    // 方法名可以是关键字（`micro get(…)` / `micro set(…)`）；`micro` 自身不参与命名。
+                    ValkyrieTokenType::Keyword(ValkyrieKeywords::Micro) => continue,
+                    ValkyrieTokenType::Identifier | ValkyrieTokenType::Keyword(_) => {
                         if name.name.is_empty() {
                             name.name = crate::builder::identifier_text(source, t.span);
                             name.span = t.span;
