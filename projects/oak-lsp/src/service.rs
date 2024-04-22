@@ -15,7 +15,7 @@ use oak_resolver::ModuleResolver;
 use oak_semantic_tokens::SemanticTokensProvider;
 use oak_symbols::SymbolProvider;
 use oak_core::source::{DocumentSnapshot, LineMap};
-use oak_vfs::{DocumentSession, Vfs};
+use oak_core::vfs::{DocumentSession, Vfs};
 use std::future::Future;
 
 /// A trait that defines the capabilities and behavior of a language-specific service.

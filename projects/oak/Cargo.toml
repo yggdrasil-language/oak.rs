@@ -11,14 +11,13 @@ categories = ["parsing", "development-tools"]
 keywords = ["parser", "combinator", "lsp", "ide", "multi-language"]
 
 [dependencies]
-oak-core = { workspace = true }
+oak-core = { workspace = true, features = ["vfs", "vfs-disk"] }
 oak-lsp = { workspace = true }
 oak-folding = { workspace = true }
 oak-hover = { workspace = true }
 oak-navigation = { workspace = true }
 oak-semantic-tokens = { workspace = true }
 oak-structural-view = { workspace = true }
-oak-vfs = { workspace = true }
 oak-symbols = { workspace = true }
 
 serde = { workspace = true, optional = true }

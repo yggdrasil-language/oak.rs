@@ -17,8 +17,7 @@ serde_json = { workspace = true, optional = true }
 futures = { workspace = true }
 dashmap = { workspace = true }
 url = { workspace = true }
-oak-core = { workspace = true }
-oak-vfs = { workspace = true, features = ["serde"] }
+oak-core = { workspace = true, features = ["serde", "vfs", "vfs-disk"] }
 oak-symbols = { workspace = true }
 oak-navigation = { workspace = true }
 oak-resolver = { workspace = true }
@@ -32,4 +31,4 @@ serde_json = { workspace = true }
 
 [features]
 default = [ "serde"]
-serde = ["dep:serde", "dep:serde_json", "oak-core/serde", "oak-vfs/serde", "oak-navigation/serde", "oak-hover/serde", "oak-semantic-tokens/serde", "oak-structural-view/serde", "oak-folding/serde"]
+serde = ["dep:serde", "dep:serde_json", "oak-core/serde", "oak-navigation/serde", "oak-hover/serde", "oak-semantic-tokens/serde", "oak-structural-view/serde", "oak-folding/serde"]

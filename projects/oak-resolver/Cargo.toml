@@ -9,7 +9,6 @@ repository = "https://github.com/yggdrasil-language/oak.rs/tree/master/projects/
 
 [dependencies]
 oak-core = { workspace = true }
-oak-vfs = { workspace = true }
 oak-symbols = { workspace = true }
 serde = { workspace = true, optional = true }
 dashmap = { workspace = true }
