@@ -18,6 +18,7 @@ smallvec = { workspace = true }
 twox-hash.workspace = true
 boost-diagnostic = { workspace = true, optional = true, default-features = false, features = ["std", "serde"] }
 boost-log = { workspace = true, optional = true }
+boost-fs = { workspace = true, optional = true }
 
 [dev-dependencies]
 serde_json = { workspace = true }
@@ -29,6 +30,8 @@ default = []
 serde = ["dep:serde"]
 diagnostic = ["dep:boost-diagnostic", "serde"]
 logger = ["diagnostic", "boost-diagnostic/log", "dep:boost-log"]
+vfs = ["dep:boost-fs"]
+vfs-disk = ["vfs"]
 
 [[test]]
 name = "diagnostic_unified"
@@ -37,6 +40,14 @@ required-features = ["diagnostic"]
 [[test]]
 name = "diagnostic_logger"
 required-features = ["logger"]
+
+[[test]]
+name = "vfs_session"
+required-features = ["vfs"]
+
+[[test]]
+name = "vfs_watch"
+required-features = ["vfs-disk"]
 
 [package.metadata.docs.rs]
 all-features = true
