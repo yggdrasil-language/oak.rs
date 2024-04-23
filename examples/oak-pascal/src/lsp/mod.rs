@@ -10,7 +10,7 @@ use oak_hover::HoverProvider;
 #[cfg(feature = "lsp")]
 use oak_lsp::{service::LanguageService, types::Hover};
 #[cfg(feature = "lsp")]
-use oak_vfs::Vfs;
+use oak_lsp::Vfs;
 /// Hover provider implementation for Pascal.
 #[cfg(feature = "lsp")]
 pub struct PascalHoverProvider;
@@ -44,7 +44,7 @@ impl<V: Vfs> PascalLanguageService<V> {
         Self { vfs, workspace: oak_lsp::workspace::WorkspaceManager::default(), hover_provider: PascalHoverProvider }
     }
 }
-impl<V: Vfs + Send + Sync + 'static + oak_vfs::DocumentSession> LanguageService for PascalLanguageService<V> {
+impl<V: Vfs + Send + Sync + 'static + oak_lsp::DocumentSession> LanguageService for PascalLanguageService<V> {
     type Lang = PascalLanguage;
     type Vfs = V;
     fn vfs(&self) -> &Self::Vfs {

@@ -6,7 +6,7 @@ pub mod highlighter;
 use {
     oak_hover::{Hover as ProviderHover, HoverProvider},
     oak_lsp::{service::LanguageService, types::Hover as LspHover},
-    oak_vfs::Vfs,
+    oak_lsp::Vfs,
     std::future::Future,
 };
 #[cfg(feature = "oak-pretty-print")]
@@ -40,7 +40,7 @@ impl<V: Vfs> ScalaLanguageService<V> {
         Self { vfs, workspace: oak_lsp::workspace::WorkspaceManager::default(), hover_provider: ScalaHoverProvider }
     }
 }
-impl<V: Vfs + Send + Sync + 'static + oak_vfs::DocumentSession> LanguageService for ScalaLanguageService<V> {
+impl<V: Vfs + Send + Sync + 'static + oak_lsp::DocumentSession> LanguageService for ScalaLanguageService<V> {
     type Lang = ScalaLanguage;
     type Vfs = V;
     fn vfs(&self) -> &Self::Vfs {

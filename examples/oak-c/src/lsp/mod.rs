@@ -3,7 +3,7 @@ use crate::language::CLanguage;
 use core::range::Range;
 use oak_core::tree::RedNode;
 #[cfg(feature = "lsp")]
-use {futures::Future, oak_lsp::service::LanguageService, oak_lsp::types::Hover as LspHover, oak_vfs::Vfs};
+use {futures::Future, oak_lsp::service::LanguageService, oak_lsp::types::Hover as LspHover, oak_lsp::Vfs};
 /// C language LSP service implementation.
 #[cfg(feature = "lsp")]
 pub struct CLanguageService<V: Vfs> {
@@ -16,7 +16,7 @@ impl<V: Vfs> CLanguageService<V> {
         Self { vfs, workspace: oak_lsp::workspace::WorkspaceManager::new() }
     }
 }
-impl<V: Vfs + Send + Sync + 'static + oak_vfs::DocumentSession> LanguageService for CLanguageService<V> {
+impl<V: Vfs + Send + Sync + 'static + oak_lsp::DocumentSession> LanguageService for CLanguageService<V> {
     type Lang = CLanguage;
     type Vfs = V;
     fn vfs(&self) -> &Self::Vfs {

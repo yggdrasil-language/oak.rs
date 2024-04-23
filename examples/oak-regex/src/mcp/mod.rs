@@ -1,6 +1,6 @@
 #![doc = include_str!("readme.md")]
 use crate::lsp::RegexLanguageService;
-use oak_vfs::MemoryVfs;
+use oak_lsp::MemoryVfs;
 
 /// Start an MCP server for Regex semantics (Stdio).
 pub async fn serve_regex_mcp(vfs: MemoryVfs) {

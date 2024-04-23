@@ -3,7 +3,7 @@ use crate::language::CmdLanguage;
 use core::range::Range;
 use oak_core::tree::RedNode;
 #[cfg(feature = "lsp")]
-use {futures::Future, oak_lsp::service::LanguageService, oak_lsp::types::Hover as LspHover, oak_vfs::Vfs};
+use {futures::Future, oak_lsp::service::LanguageService, oak_lsp::types::Hover as LspHover, oak_lsp::Vfs};
 
 #[cfg(feature = "lsp")]
 /// Language service for the Windows Command (CMD) language.
@@ -21,7 +21,7 @@ impl<V: Vfs> CmdLanguageService<V> {
 }
 
 #[cfg(feature = "lsp")]
-impl<V: Vfs + Send + Sync + 'static + oak_vfs::DocumentSession> LanguageService for CmdLanguageService<V> {
+impl<V: Vfs + Send + Sync + 'static + oak_lsp::DocumentSession> LanguageService for CmdLanguageService<V> {
     type Lang = CmdLanguage;
     type Vfs = V;
 

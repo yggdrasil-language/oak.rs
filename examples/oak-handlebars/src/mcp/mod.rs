@@ -1,6 +1,6 @@
 #![doc = include_str!("readme.md")]
 use crate::lsp::HandlebarsLanguageService;
-use oak_vfs::MemoryVfs;
+use oak_lsp::MemoryVfs;
 
 /// Starts an MCP server for Handlebars semantics (Stdio).
 #[cfg(feature = "io-std")]

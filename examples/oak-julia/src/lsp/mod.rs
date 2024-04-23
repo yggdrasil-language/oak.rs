@@ -4,7 +4,7 @@ pub mod highlighter;
 
 use crate::JuliaLanguage;
 #[cfg(feature = "lsp")]
-use {futures::Future, oak_core::tree::RedNode, oak_lsp::service::LanguageService, oak_vfs::Vfs};
+use {futures::Future, oak_core::tree::RedNode, oak_lsp::service::LanguageService, oak_lsp::Vfs};
 /// Language service implementation for Julia.
 ///
 /// Provides IDE features such as diagnostics and workspace management
@@ -20,7 +20,7 @@ impl<V: Vfs> JuliaLanguageService<V> {
         Self { vfs, workspace: oak_lsp::workspace::WorkspaceManager::default() }
     }
 }
-impl<V: Vfs + Send + Sync + 'static + oak_vfs::DocumentSession> LanguageService for JuliaLanguageService<V> {
+impl<V: Vfs + Send + Sync + 'static + oak_lsp::DocumentSession> LanguageService for JuliaLanguageService<V> {
     type Lang = JuliaLanguage;
     type Vfs = V;
     fn vfs(&self) -> &Self::Vfs {

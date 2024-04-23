@@ -10,7 +10,7 @@ use {
     futures::Future,
     oak_hover::{Hover, HoverProvider},
     oak_lsp::service::LanguageService,
-    oak_vfs::Vfs,
+    oak_lsp::Vfs,
 };
 /// Hover provider implementation for Coq.
 #[cfg(feature = "lsp")]
@@ -42,7 +42,7 @@ impl<V: Vfs> CoqLanguageService<V> {
         Self { vfs, workspace: oak_lsp::workspace::WorkspaceManager::default(), hover_provider: CoqHoverProvider }
     }
 }
-impl<V: Vfs + Send + Sync + 'static + oak_vfs::DocumentSession> LanguageService for CoqLanguageService<V> {
+impl<V: Vfs + Send + Sync + 'static + oak_lsp::DocumentSession> LanguageService for CoqLanguageService<V> {
     type Lang = CoqLanguage;
     type Vfs = V;
     fn vfs(&self) -> &Self::Vfs {

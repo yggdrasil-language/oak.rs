@@ -1,6 +1,6 @@
 #![doc = include_str!("readme.md")]
 use crate::lsp::KotlinLanguageService;
-use oak_vfs::MemoryVfs;
+use oak_lsp::MemoryVfs;
 
 /// Start an MCP server for Kotlin semantics (Stdio).
 pub async fn serve_kotlin_mcp(_vfs: MemoryVfs) {

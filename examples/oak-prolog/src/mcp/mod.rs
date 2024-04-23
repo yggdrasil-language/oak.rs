@@ -1,6 +1,6 @@
 #![doc = include_str!("readme.md")]
 use crate::lsp::PrologLanguageService;
-use oak_vfs::MemoryVfs;
+use oak_lsp::MemoryVfs;
 
 pub async fn serve_prolog_mcp(vfs: MemoryVfs) {
     let service = PrologLanguageService::new(vfs);

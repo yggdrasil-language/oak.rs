@@ -5,7 +5,7 @@ pub mod highlighter;
 #[cfg(feature = "lsp")]
 use {
     oak_lsp::{service::LanguageService, workspace::WorkspaceManager},
-    oak_vfs::MemoryVfs,
+    oak_lsp::MemoryVfs,
 };
 #[cfg(feature = "oak-pretty-print")]
 pub mod formatter;

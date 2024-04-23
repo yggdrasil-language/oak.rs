@@ -7,7 +7,7 @@ use {
     futures::Future,
     oak_hover::{Hover, HoverProvider},
     oak_lsp::service::LanguageService,
-    oak_vfs::Vfs,
+    oak_lsp::Vfs,
 };
 #[cfg(feature = "oak-pretty-print")]
 pub mod formatter;
@@ -73,7 +73,7 @@ impl<V: Vfs> RbqLanguageService<V> {
         Self { vfs, workspace: oak_lsp::workspace::WorkspaceManager::default(), hover_provider: RbqHoverProvider, folding_provider: RbqFoldingProvider, semantic_tokens_provider: RbqSemanticTokensProvider, caches: DashMap::new() }
     }
 }
-impl<V: Vfs + Send + Sync + 'static + oak_vfs::DocumentSession> LanguageService for RbqLanguageService<V> {
+impl<V: Vfs + Send + Sync + 'static + oak_lsp::DocumentSession> LanguageService for RbqLanguageService<V> {
     type Lang = RbqLanguage;
     type Vfs = V;
     fn vfs(&self) -> &Self::Vfs {

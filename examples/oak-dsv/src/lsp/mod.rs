@@ -3,7 +3,7 @@ use crate::{Dsv, language::DsvLanguage};
 use core::range::Range;
 use oak_core::tree::RedNode;
 #[cfg(feature = "lsp")]
-use {futures::Future, oak_lsp::service::LanguageService, oak_lsp::types::Hover as LspHover, oak_vfs::Vfs};
+use {futures::Future, oak_lsp::service::LanguageService, oak_lsp::types::Hover as LspHover, oak_lsp::Vfs};
 #[cfg(feature = "lsp")]
 /// Language service implementation for DSV.
 pub struct DsvLanguageService<const LANG: DsvLanguage, V: Vfs> {
@@ -18,7 +18,7 @@ impl<const LANG: DsvLanguage, V: Vfs> DsvLanguageService<LANG, V> {
         Self { vfs, workspace: oak_lsp::workspace::WorkspaceManager::new() }
     }
 }
-impl<const LANG: DsvLanguage, V: Vfs + Send + Sync + 'static + oak_vfs::DocumentSession> LanguageService for DsvLanguageService<LANG, V> {
+impl<const LANG: DsvLanguage, V: Vfs + Send + Sync + 'static + oak_lsp::DocumentSession> LanguageService for DsvLanguageService<LANG, V> {
     type Lang = Dsv<LANG>;
     type Vfs = V;
     fn vfs(&self) -> &Self::Vfs {

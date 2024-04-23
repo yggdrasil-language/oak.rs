@@ -11,7 +11,7 @@ use {
     futures::Future,
     oak_hover::{Hover, HoverProvider},
     oak_lsp::service::LanguageService,
-    oak_vfs::Vfs,
+    oak_lsp::Vfs,
 };
 /// MCP module.
 /// Hover provider implementation for HTML.
@@ -45,7 +45,7 @@ impl<V: Vfs> HtmlLanguageService<V> {
     }
 }
 #[cfg(feature = "lsp")]
-impl<V: Vfs + Send + Sync + 'static + oak_vfs::DocumentSession> LanguageService for HtmlLanguageService<V> {
+impl<V: Vfs + Send + Sync + 'static + oak_lsp::DocumentSession> LanguageService for HtmlLanguageService<V> {
     type Lang = HtmlLanguage;
     type Vfs = V;
     fn vfs(&self) -> &Self::Vfs {

@@ -7,7 +7,7 @@ use {
     futures::Future,
     oak_hover::{Hover, HoverProvider},
     oak_lsp::service::LanguageService,
-    oak_vfs::Vfs,
+    oak_lsp::Vfs,
 };
 #[cfg(feature = "oak-pretty-print")]
 pub mod formatter;
@@ -48,7 +48,7 @@ impl<V: Vfs> AplLanguageService<V> {
     }
 }
 #[cfg(feature = "lsp")]
-impl<V: Vfs + Send + Sync + 'static + oak_vfs::DocumentSession> LanguageService for AplLanguageService<V> {
+impl<V: Vfs + Send + Sync + 'static + oak_lsp::DocumentSession> LanguageService for AplLanguageService<V> {
     type Lang = AplLanguage;
     type Vfs = V;
     fn vfs(&self) -> &Self::Vfs {

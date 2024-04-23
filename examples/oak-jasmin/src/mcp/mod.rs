@@ -1,6 +1,6 @@
 #![doc = include_str!("readme.md")]
 use crate::lsp::JasminLanguageService;
-use oak_vfs::MemoryVfs;
+use oak_lsp::MemoryVfs;
 
 /// Starts the Jasmin MCP server.
 pub async fn serve_jasmin_mcp(vfs: MemoryVfs) {

@@ -12,7 +12,7 @@ use {
     futures::Future,
     oak_hover::{Hover, HoverProvider},
     oak_lsp::service::LanguageService,
-    oak_vfs::Vfs,
+    oak_lsp::Vfs,
 };
 
 /// Raku hover provider implementation.
@@ -50,7 +50,7 @@ impl<V: Vfs> RakuLanguageService<V> {
 }
 
 #[cfg(feature = "lsp")]
-impl<V: Vfs + Send + Sync + 'static + oak_vfs::DocumentSession> LanguageService for RakuLanguageService<V> {
+impl<V: Vfs + Send + Sync + 'static + oak_lsp::DocumentSession> LanguageService for RakuLanguageService<V> {
     type Lang = RakuLanguage;
     type Vfs = V;
 

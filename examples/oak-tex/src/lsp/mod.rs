@@ -6,7 +6,7 @@ pub mod highlighter;
 use {
     futures::Future,
     oak_lsp::{service::LanguageService, workspace::WorkspaceManager},
-    oak_vfs::{MemoryVfs, Vfs},
+    oak_lsp::{MemoryVfs, Vfs},
 };
 #[cfg(feature = "oak-pretty-print")]
 pub mod formatter;

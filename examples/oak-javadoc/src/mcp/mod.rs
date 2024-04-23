@@ -1,7 +1,7 @@
 #![doc = include_str!("readme.md")]
 #[cfg(feature = "lsp")]
 use crate::lsp::JavadocLanguageService;
-use oak_vfs::MemoryVfs;
+use oak_lsp::MemoryVfs;
 
 /// Starts the MCP server (Stdio) for Javadoc semantics.
 #[cfg(feature = "mcp")]

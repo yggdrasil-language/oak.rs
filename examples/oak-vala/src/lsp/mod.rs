@@ -3,7 +3,7 @@
 pub mod highlighter;
 
 #[cfg(feature = "lsp")]
-use {oak_lsp::LanguageService, oak_vfs::MemoryVfs};
+use {oak_lsp::LanguageService, oak_lsp::MemoryVfs};
 #[cfg(feature = "oak-pretty-print")]
 pub mod formatter;
 use crate::language::ValaLanguage;

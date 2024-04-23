@@ -1,6 +1,6 @@
 #![doc = include_str!("readme.md")]
 use crate::lsp::SmalltalkLanguageService;
-use oak_vfs::MemoryVfs;
+use oak_lsp::MemoryVfs;
 
 /// Start an MCP server for Smalltalk semantics (Stdio).
 pub async fn serve_smalltalk_mcp(vfs: MemoryVfs) {

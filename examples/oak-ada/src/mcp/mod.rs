@@ -1,6 +1,6 @@
 #![doc = include_str!("readme.md")]
 use crate::lsp::AdaLanguageService;
-use oak_vfs::MemoryVfs;
+use oak_lsp::MemoryVfs;
 
 /// Starts MCP service for Ada language
 pub async fn serve_ada_mcp(vfs: MemoryVfs) {

@@ -7,7 +7,7 @@ use {
     futures::Future,
     oak_core::tree::RedNode,
     oak_lsp::LanguageService,
-    oak_vfs::{MemoryVfs, Vfs},
+    oak_lsp::{MemoryVfs, Vfs},
 };
 #[cfg(feature = "oak-pretty-print")]
 pub mod formatter;

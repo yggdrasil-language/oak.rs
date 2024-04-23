@@ -1,6 +1,6 @@
 #![doc = include_str!("readme.md")]
 use crate::lsp::RbqLanguageService;
-use oak_vfs::MemoryVfs;
+use oak_lsp::MemoryVfs;
 
 /// Serves RBQ MCP service.
 pub async fn serve_rbq_mcp(vfs: MemoryVfs) {

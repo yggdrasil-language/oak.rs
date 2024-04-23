@@ -6,7 +6,7 @@ use crate::language::JasminLanguage;
 use core::range::Range;
 use oak_core::tree::RedNode;
 #[cfg(feature = "lsp")]
-use {futures::Future, oak_lsp::service::LanguageService, oak_vfs::Vfs};
+use {futures::Future, oak_lsp::service::LanguageService, oak_lsp::Vfs};
 #[cfg(feature = "lsp")]
 /// Jasmin language service implementation.
 pub struct JasminLanguageService<V: Vfs> {
@@ -21,7 +21,7 @@ impl<V: Vfs> JasminLanguageService<V> {
     }
 }
 #[cfg(feature = "lsp")]
-impl<V: Vfs + Send + Sync + 'static + oak_vfs::DocumentSession> LanguageService for JasminLanguageService<V> {
+impl<V: Vfs + Send + Sync + 'static + oak_lsp::DocumentSession> LanguageService for JasminLanguageService<V> {
     type Lang = JasminLanguage;
     type Vfs = V;
     fn vfs(&self) -> &Self::Vfs {

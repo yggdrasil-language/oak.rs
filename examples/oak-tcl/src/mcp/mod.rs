@@ -1,6 +1,6 @@
 #![doc = include_str!("readme.md")]
 use crate::lsp::TclLanguageService;
-use oak_vfs::MemoryVfs;
+use oak_lsp::MemoryVfs;
 
 /// Starts the MCP server (Stdio) for Tcl semantics.
 pub async fn serve_tcl_mcp(vfs: MemoryVfs) {

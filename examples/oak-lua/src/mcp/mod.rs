@@ -1,6 +1,6 @@
 #![doc = include_str!("readme.md")]
 use crate::lsp::LuaLanguageService;
-use oak_vfs::MemoryVfs;
+use oak_lsp::MemoryVfs;
 
 /// Starts the MCP server for Lua semantics (Stdio).
 #[cfg(feature = "mcp")]

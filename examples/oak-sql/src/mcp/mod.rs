@@ -1,6 +1,6 @@
 #![doc = include_str!("readme.md")]
 use crate::lsp::SqlLanguageService;
-use oak_vfs::MemoryVfs;
+use oak_lsp::MemoryVfs;
 
 /// Starts an MCP (Model Context Protocol) server for SQL.
 pub async fn serve_sql_mcp(vfs: MemoryVfs) {

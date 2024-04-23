@@ -9,7 +9,7 @@ use oak_core::tree::RedNode;
 use {
     oak_hover::{Hover, HoverProvider},
     oak_lsp::service::LanguageService,
-    oak_vfs::Vfs,
+    oak_lsp::Vfs,
     std::future::Future,
 };
 /// Hover provider implementation for Prolog.
@@ -40,7 +40,7 @@ impl<V: Vfs> PrologLanguageService<V> {
         Self { vfs, workspace: oak_lsp::workspace::WorkspaceManager::default(), hover_provider: PrologHoverProvider }
     }
 }
-impl<V: Vfs + Send + Sync + 'static + oak_vfs::DocumentSession> LanguageService for PrologLanguageService<V> {
+impl<V: Vfs + Send + Sync + 'static + oak_lsp::DocumentSession> LanguageService for PrologLanguageService<V> {
     type Lang = PrologLanguage;
     type Vfs = V;
     fn vfs(&self) -> &Self::Vfs {

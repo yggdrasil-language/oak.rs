@@ -10,7 +10,7 @@ use oak_hover::{Hover as ProviderHover, HoverProvider};
 #[cfg(feature = "lsp")]
 use oak_lsp::{service::LanguageService, types::Hover as LspHover};
 #[cfg(feature = "lsp")]
-use oak_vfs::Vfs;
+use oak_lsp::Vfs;
 /// Hover provider implementation for Org-mode.
 #[cfg(feature = "lsp")]
 pub struct OrgModeHoverProvider;
@@ -40,7 +40,7 @@ impl<V: Vfs> OrgModeLanguageService<V> {
         Self { vfs, workspace: oak_lsp::workspace::WorkspaceManager::default(), hover_provider: OrgModeHoverProvider }
     }
 }
-impl<V: Vfs + Send + Sync + 'static + oak_vfs::DocumentSession> LanguageService for OrgModeLanguageService<V> {
+impl<V: Vfs + Send + Sync + 'static + oak_lsp::DocumentSession> LanguageService for OrgModeLanguageService<V> {
     type Lang = OrgModeLanguage;
     type Vfs = V;
     fn vfs(&self) -> &Self::Vfs {

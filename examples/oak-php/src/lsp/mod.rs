@@ -10,7 +10,7 @@ use {
     futures::Future,
     oak_hover::{Hover as HoverInfo, HoverProvider},
     oak_lsp::{service::LanguageService, types::Hover},
-    oak_vfs::{Vfs, DocumentSession},
+    oak_lsp::{Vfs, DocumentSession},
 };
 /// Hover provider implementation for PHP.
 #[cfg(feature = "lsp")]

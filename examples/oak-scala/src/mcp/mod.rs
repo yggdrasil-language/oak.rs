@@ -1,6 +1,6 @@
 #![doc = include_str!("readme.md")]
 use crate::lsp::ScalaLanguageService;
-use oak_vfs::MemoryVfs;
+use oak_lsp::MemoryVfs;
 
 /// Start an MCP server for Scala semantics (Stdio).
 pub async fn serve_scala_mcp(vfs: MemoryVfs) {

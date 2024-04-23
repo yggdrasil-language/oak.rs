@@ -13,7 +13,7 @@ use {
     futures::Future,
     oak_hover::{Hover, HoverProvider},
     oak_lsp::service::LanguageService,
-    oak_vfs::Vfs,
+    oak_lsp::Vfs,
 };
 
 #[cfg(feature = "lsp")]
@@ -55,7 +55,7 @@ impl<V: Vfs> ActionScriptLanguageService<V> {
 }
 
 #[cfg(feature = "lsp")]
-impl<V: Vfs + Send + Sync + 'static + oak_vfs::DocumentSession> LanguageService for ActionScriptLanguageService<V> {
+impl<V: Vfs + Send + Sync + 'static + oak_lsp::DocumentSession> LanguageService for ActionScriptLanguageService<V> {
     type Lang = ActionScriptLanguage;
     type Vfs = V;
 

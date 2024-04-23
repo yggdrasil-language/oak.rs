@@ -1,6 +1,6 @@
 #![doc = include_str!("readme.md")]
 use crate::lsp::RakuLanguageService;
-use oak_vfs::MemoryVfs;
+use oak_lsp::MemoryVfs;
 
 /// Starts an MCP server (Stdio) for Raku semantics.
 pub async fn serve_raku_mcp(vfs: MemoryVfs) {

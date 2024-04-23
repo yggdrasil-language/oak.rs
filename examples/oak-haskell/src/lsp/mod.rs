@@ -10,7 +10,7 @@ use {
     futures::Future,
     oak_hover::{Hover, HoverProvider},
     oak_lsp::service::LanguageService,
-    oak_vfs::Vfs,
+    oak_lsp::Vfs,
 };
 /// Hover provider implementation for Haskell.
 #[cfg(feature = "lsp")]
@@ -45,7 +45,7 @@ impl<V: Vfs> HaskellLanguageService<V> {
         Self { vfs, workspace: oak_lsp::workspace::WorkspaceManager::default(), hover_provider: HaskellHoverProvider }
     }
 }
-impl<V: Vfs + Send + Sync + 'static + oak_vfs::DocumentSession> LanguageService for HaskellLanguageService<V> {
+impl<V: Vfs + Send + Sync + 'static + oak_lsp::DocumentSession> LanguageService for HaskellLanguageService<V> {
     type Lang = HaskellLanguage;
     type Vfs = V;
     fn vfs(&self) -> &Self::Vfs {

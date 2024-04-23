@@ -9,7 +9,7 @@ use oak_core::tree::RedNode;
 use {
     oak_hover::HoverProvider,
     oak_lsp::{service::LanguageService, types::Hover},
-    oak_vfs::Vfs,
+    oak_lsp::Vfs,
     std::future::Future,
 };
 /// Hover provider implementation for MSIL.
@@ -44,7 +44,7 @@ impl<V: Vfs> MsilLanguageService<V> {
     }
 }
 #[cfg(feature = "lsp")]
-impl<V: Vfs + Send + Sync + 'static + oak_vfs::DocumentSession> LanguageService for MsilLanguageService<V> {
+impl<V: Vfs + Send + Sync + 'static + oak_lsp::DocumentSession> LanguageService for MsilLanguageService<V> {
     type Lang = MsilLanguage;
     type Vfs = V;
     fn vfs(&self) -> &Self::Vfs {

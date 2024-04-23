@@ -1,6 +1,6 @@
 #![doc = include_str!("readme.md")]
 use crate::lsp::SwiftLanguageService;
-use oak_vfs::MemoryVfs;
+use oak_lsp::MemoryVfs;
 
 pub async fn serve_swift_mcp(vfs: MemoryVfs) {
     let service = SwiftLanguageService::new(vfs);

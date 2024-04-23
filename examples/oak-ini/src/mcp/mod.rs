@@ -1,6 +1,6 @@
 #![doc = include_str!("readme.md")]
 use crate::lsp::IniLanguageService;
-use oak_vfs::MemoryVfs;
+use oak_lsp::MemoryVfs;
 
 /// Starts the INI MCP server.
 ///

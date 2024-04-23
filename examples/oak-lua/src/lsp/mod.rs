@@ -10,7 +10,7 @@ use {
     futures::Future,
     oak_hover::{Hover, HoverProvider},
     oak_lsp::service::LanguageService,
-    oak_vfs::Vfs,
+    oak_lsp::Vfs,
 };
 /// Hover provider implementation for Lua.
 #[cfg(feature = "lsp")]
@@ -44,7 +44,7 @@ impl<V: Vfs> LuaLanguageService<V> {
     }
 }
 #[cfg(feature = "lsp")]
-impl<V: Vfs + Send + Sync + 'static + oak_vfs::DocumentSession> LanguageService for LuaLanguageService<V> {
+impl<V: Vfs + Send + Sync + 'static + oak_lsp::DocumentSession> LanguageService for LuaLanguageService<V> {
     type Lang = LuaLanguage;
     type Vfs = V;
     fn vfs(&self) -> &Self::Vfs {

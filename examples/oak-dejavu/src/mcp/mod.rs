@@ -1,6 +1,6 @@
 #![doc = include_str!("readme.md")]
 use crate::lsp::DejavuLanguageService;
-use oak_vfs::MemoryVfs;
+use oak_lsp::MemoryVfs;
 
 /// Starts Dejavu MCP service
 pub async fn serve_dejavu_mcp(vfs: MemoryVfs) {

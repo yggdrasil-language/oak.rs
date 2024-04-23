@@ -8,7 +8,7 @@ use oak_core::{Range, tree::RedNode};
 use {
     oak_hover::HoverProvider,
     oak_lsp::{service::LanguageService, types::Hover},
-    oak_vfs::Vfs,
+    oak_lsp::Vfs,
     std::future::Future,
 };
 /// Hover provider implementation for Nginx.
@@ -40,7 +40,7 @@ impl<V: Vfs> NginxLanguageService<V> {
         Self { vfs, workspace: oak_lsp::workspace::WorkspaceManager::default(), hover_provider: NginxHoverProvider }
     }
 }
-impl<V: Vfs + Send + Sync + 'static + oak_vfs::DocumentSession> LanguageService for NginxLanguageService<V> {
+impl<V: Vfs + Send + Sync + 'static + oak_lsp::DocumentSession> LanguageService for NginxLanguageService<V> {
     type Lang = NginxLanguage;
     type Vfs = V;
     fn vfs(&self) -> &Self::Vfs {

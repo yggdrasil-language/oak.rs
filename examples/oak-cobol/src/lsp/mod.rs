@@ -3,7 +3,7 @@ use crate::language::CobolLanguage;
 use core::range::Range;
 use oak_core::tree::RedNode;
 #[cfg(feature = "lsp")]
-use {futures::Future, oak_lsp::service::LanguageService, oak_lsp::types::Hover as LspHover, oak_vfs::Vfs};
+use {futures::Future, oak_lsp::service::LanguageService, oak_lsp::types::Hover as LspHover, oak_lsp::Vfs};
 #[cfg(feature = "lsp")]
 /// A language service for the COBOL language.
 pub struct CobolLanguageService<V: Vfs> {
@@ -17,7 +17,7 @@ impl<V: Vfs> CobolLanguageService<V> {
         Self { vfs, workspace: oak_lsp::workspace::WorkspaceManager::new() }
     }
 }
-impl<V: Vfs + Send + Sync + 'static + oak_vfs::DocumentSession> LanguageService for CobolLanguageService<V> {
+impl<V: Vfs + Send + Sync + 'static + oak_lsp::DocumentSession> LanguageService for CobolLanguageService<V> {
     type Lang = CobolLanguage;
     type Vfs = V;
     fn vfs(&self) -> &Self::Vfs {

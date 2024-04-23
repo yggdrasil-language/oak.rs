@@ -1,6 +1,6 @@
 #![doc = include_str!("readme.md")]
 use crate::lsp::TexLanguageService;
-use oak_vfs::MemoryVfs;
+use oak_lsp::MemoryVfs;
 
 /// Starts the TeX MCP server
 pub async fn serve_tex_mcp(vfs: MemoryVfs) {

@@ -1,6 +1,6 @@
 #![doc = include_str!("readme.md")]
 use crate::lsp::KokaLanguageService;
-use oak_vfs::MemoryVfs;
+use oak_lsp::MemoryVfs;
 
 /// Start an MCP server for Koka semantics (Stdio).
 pub async fn serve_koka_mcp(_vfs: MemoryVfs) {

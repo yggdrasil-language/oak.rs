@@ -10,7 +10,7 @@ use core::range::Range;
 use oak_core::tree::RedNode;
 
 #[cfg(feature = "lsp")]
-use {futures::Future, oak_lsp::service::LanguageService, oak_lsp::types::Hover as LspHover, oak_vfs::Vfs};
+use {futures::Future, oak_lsp::service::LanguageService, oak_lsp::types::Hover as LspHover, oak_lsp::Vfs};
 
 #[cfg(feature = "lsp")]
 pub struct ValkyrieLanguageService<V: Vfs> {
@@ -26,7 +26,7 @@ impl<V: Vfs> ValkyrieLanguageService<V> {
 }
 
 #[cfg(feature = "lsp")]
-impl<V: Vfs + Send + Sync + 'static + oak_vfs::DocumentSession> LanguageService for ValkyrieLanguageService<V> {
+impl<V: Vfs + Send + Sync + 'static + oak_lsp::DocumentSession> LanguageService for ValkyrieLanguageService<V> {
     type Lang = ValkyrieLanguage;
     type Vfs = V;
     fn vfs(&self) -> &Self::Vfs {

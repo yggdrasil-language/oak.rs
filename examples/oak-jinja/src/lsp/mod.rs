@@ -6,7 +6,7 @@
 pub mod highlighter;
 
 #[cfg(feature = "lsp")]
-use {oak_core::tree::RedNode, oak_lsp::LanguageService, oak_vfs::MemoryVfs, std::future::Future};
+use {oak_core::tree::RedNode, oak_lsp::LanguageService, oak_lsp::MemoryVfs, std::future::Future};
 
 #[cfg(feature = "oak-pretty-print")]
 pub mod formatter;

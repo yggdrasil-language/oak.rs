@@ -10,7 +10,7 @@ use {
     oak_core::tree::RedNode,
     oak_hover::{Hover, HoverProvider},
     oak_lsp::service::LanguageService,
-    oak_vfs::Vfs,
+    oak_lsp::Vfs,
 };
 
 #[cfg(feature = "oak-pretty-print")]
@@ -44,7 +44,7 @@ impl<V: Vfs> SqlLanguageService<V> {
     }
 }
 #[cfg(feature = "lsp")]
-impl<V: Vfs + Send + Sync + 'static + oak_vfs::DocumentSession> LanguageService for SqlLanguageService<V> {
+impl<V: Vfs + Send + Sync + 'static + oak_lsp::DocumentSession> LanguageService for SqlLanguageService<V> {
     type Lang = SqlLanguage;
     type Vfs = V;
     fn vfs(&self) -> &Self::Vfs {
