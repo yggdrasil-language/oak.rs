@@ -28,11 +28,8 @@ chrono = { workspace = true }
 criterion = { version = "0.8.2" }
 # toml = { version = "1.0.4" } # replaced by oak-toml
 toml_edit = { version = "0.25.4" }
-markdown = { version = "1.0.0" }
-pulldown-cmark = { version = "0.13.1" }
 simd-json = { version = "0.17.0" }
 json = { version = "0.12.4" }
-html5ever = { version = "0.38.0" }
 cssparser = { version = "0.36.0" }
 serde_yaml = { version = "0.9.34" }
 syn = { workspace = true }
@@ -53,14 +50,6 @@ harness = false
 
 [[bench]]
 name = "compare_toml"
-harness = false
-
-[[bench]]
-name = "compare_markdown"
-harness = false
-
-[[bench]]
-name = "compare_html"
 harness = false
 
 [[bench]]
