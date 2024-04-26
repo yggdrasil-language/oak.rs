@@ -61,7 +61,7 @@ impl<'config> HtmlParser<'config> {
         if state.eat(TagSelfClose) {
             // Self-closing tag
         }
-        else if state.eat(TagClose) {
+        else if state.eat(TagClose) && !is_void_element(&tag_name) {
             loop {
                 if !state.not_at_end() {
                     break;
@@ -95,6 +95,11 @@ impl<'config> HtmlParser<'config> {
             _ => None,
         }
     }
+}
+
+/// HTML void elements never take children, with or without a trailing slash.
+fn is_void_element(tag_name: &str) -> bool {
+    matches!(tag_name, "area" | "base" | "br" | "col" | "embed" | "hr" | "img" | "input" | "link" | "meta" | "param" | "source" | "track" | "wbr")
 }
 
 impl<'config> Parser<HtmlLanguage> for HtmlParser<'config> {
