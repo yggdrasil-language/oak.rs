@@ -1,4 +1,4 @@
-# Copy to `config.toml` (gitignored) and replace `<your-path>` with your local absolute path.
+# Copy to `config.toml` (git ignored) and replace `<your-path>` with your local absolute path.
 # Committed `Cargo.toml` pins rust-boost via git `rev`, not `Cargo.lock`.
 
 [registries.crates-io]
@@ -12,3 +12,4 @@ boost-source = { path = "<your-path>/rust-boost/projects/boost-source" }
 boost-terminal = { path = "<your-path>/rust-boost/projects/boost-terminal" }
 boost-console = { path = "<your-path>/rust-boost/projects/boost-console" }
 boost-random = { path = "<your-path>/rust-boost/projects/boost-random" }
+boost-benchmark = { path = "<your-path>/rust-boost/projects/boost-benchmark" }
