@@ -308,7 +308,11 @@ impl<'config> TypeScriptParser<'config> {
             LeftBracket => {
                 let cp = state.checkpoint_before(left);
                 self.expect(state, LeftBracket).ok();
-                PrattParser::parse(state, 0, self);
+                // Empty index (`T[]` array type reached through the expression path) has no
+                // expression to parse; parsing it would consume `]` as a primary Error node.
+                if !self.at(state, RightBracket) {
+                    PrattParser::parse(state, 0, self);
+                }
                 self.expect(state, RightBracket).ok();
                 Some(state.finish_at(cp, crate::parser::element_type::TypeScriptElementType::MemberExpression.into()))
             }
