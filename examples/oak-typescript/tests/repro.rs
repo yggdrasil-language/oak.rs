@@ -60,6 +60,24 @@ fn repro_assertions_inside_subscripts() {
 }
 
 #[test]
+fn repro_array_type_positions() {
+    let lang = TypeScriptLanguage::standard();
+    for source in [
+        "interface P { a: string[]; }",
+        "interface P { vendors: VendorId[]; tags: string[] }",
+        "const o = { a: string[] };",
+        "const o = { a: [] };",
+        "type T = { a: X[] };",
+        "const grid: string[][] = [];",
+    ] {
+        let mut cache = ParseSession::<TypeScriptLanguage>::new(32);
+        let result = TypeScriptBuilder::new(&lang).build(&SourceText::new(source), &[], &mut cache);
+        assert!(result.result.is_ok(), "{source}");
+        assert!(result.diagnostics.is_empty(), "{source}: {:#?}", result.diagnostics);
+    }
+}
+
+#[test]
 fn repro_vmz_formatter_fragments() {
     let options = FormatOptions::default();
     for source in [
