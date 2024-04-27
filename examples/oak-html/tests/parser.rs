@@ -58,6 +58,36 @@ fn parse_li_with_nested_anchor_and_list() {
 }
 
 #[test]
+fn void_elements_do_not_swallow_following_siblings() {
+    const SOURCE: &str = r#"<p><img src="a.png"><span>b</span></p><div>tail</div>"#;
+    let language = HtmlLanguage::default();
+    let source = SourceText::new(SOURCE);
+    let mut cache = ParseSession::<HtmlLanguage>::default();
+    let parsed = HtmlParser::new(&language).parse(&source, &[], &mut cache);
+    let green = parsed.result.expect("parse html");
+    let root = RedNode::new(&green, 0);
+    let mut element_tags = Vec::new();
+    fn walk(node: RedNode<'_, HtmlLanguage>, source: &SourceText, out: &mut Vec<String>) {
+        if node.element_type() == HtmlElementType::Element {
+            out.push(node.text(source).to_string());
+        }
+        for child in node.children() {
+            if let RedTree::Node(child_node) = child {
+                walk(child_node, source, out);
+            }
+        }
+    }
+    for child in root.children() {
+        if let RedTree::Node(child_node) = child {
+            walk(child_node, &source, &mut element_tags);
+        }
+    }
+    assert_eq!(element_tags.iter().filter(|tag| tag.starts_with(r#"<img src="a.png">"#)).count(), 1, "{element_tags:?}");
+    assert_eq!(element_tags.iter().filter(|tag| tag.starts_with("<span")).count(), 1, "{element_tags:?}");
+    assert_eq!(element_tags.iter().filter(|tag| tag.starts_with("<div")).count(), 1, "{element_tags:?}");
+}
+
+#[test]
 fn parse_nested_nav_green_structure() {
     const SOURCE: &str = r#"<nav epub:type="toc">
 <ol>
