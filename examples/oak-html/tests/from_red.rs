@@ -185,6 +185,51 @@ fn builder_lowers_nested_nav_anchor_text() {
     assert_eq!(labels, vec!["Part One", "Chapter 1"]);
 }
 #[test]
+fn builder_decodes_character_references_into_text() {
+    const SOURCE: &str = r#"<title>Case &amp; Title &#8212; &#x1F600;</title>"#;
+    let language = HtmlLanguage::default();
+    let source = SourceText::new(SOURCE);
+    let mut cache = ParseSession::<HtmlLanguage>::default();
+    let document = HtmlBuilder::new(language).build(&source, &[], &mut cache).result.expect("build html ast");
+    let HtmlNode::Element(title) = &document.nodes[0]
+    else {
+        panic!("expected title element");
+    };
+    let text = title
+        .children
+        .iter()
+        .filter_map(|child| match child {
+            HtmlNode::Text(text) => Some(text.content.as_str()),
+            _ => None,
+        })
+        .collect::<Vec<_>>()
+        .join("");
+    assert_eq!(text, "Case & Title \u{2014} \u{1F600}");
+}
+
+#[test]
+fn builder_keeps_whitespace_at_text_boundaries() {
+    const SOURCE: &str = r#"<p>hello <b>world</b> again</p>"#;
+    let language = HtmlLanguage::default();
+    let source = SourceText::new(SOURCE);
+    let mut cache = ParseSession::<HtmlLanguage>::default();
+    let document = HtmlBuilder::new(language).build(&source, &[], &mut cache).result.expect("build html ast");
+    let HtmlNode::Element(paragraph) = &document.nodes[0]
+    else {
+        panic!("expected paragraph element");
+    };
+    let texts = paragraph
+        .children
+        .iter()
+        .filter_map(|child| match child {
+            HtmlNode::Text(text) => Some(text.content.as_str()),
+            _ => None,
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(texts, vec!["hello ", " ", "again"]);
+}
+
+#[test]
 fn lexes_text_content_outside_tags() {
     use oak_core::{Lexer, Source, SourceText, parser::session::ParseSession};
     const SOURCE: &str = r#"<a href="part.xhtml">Part One</a>"#;
