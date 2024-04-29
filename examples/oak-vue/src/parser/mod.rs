@@ -433,7 +433,19 @@ impl<'config> VueParser<'config> {
 
     /// Consume an unquoted attribute value as raw text (Vue `parseAttributeValue`).
     fn bump_unquoted_attr_value<'a, S: Source + ?Sized>(state: &mut State<'a, S>) {
-        while state.not_at_end() && !state.at(VueTokenType::Gt) && !state.at(VueTokenType::SlashGt) && !state.at(VueTokenType::Whitespace) {
+        // `bump` skips trivia, so a `Whitespace` token never shows up as the current
+        // token. Detect the end of the value through byte adjacency instead: Vue ends
+        // an unquoted value at the first whitespace or the tag terminator.
+        let mut previous_end: Option<usize> = None;
+        while state.not_at_end() && !state.at(VueTokenType::Gt) && !state.at(VueTokenType::SlashGt) {
+            let Some(token) = state.current()
+            else {
+                break;
+            };
+            if previous_end.is_some_and(|end| token.span.start != end) {
+                break;
+            }
+            previous_end = Some(token.span.end);
             state.bump();
         }
     }
