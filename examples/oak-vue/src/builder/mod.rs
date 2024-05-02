@@ -144,6 +144,12 @@ impl VueBuilder {
                                     GreenTree::Node(attr_node) if attr_node.kind == VueElementType::Attribute || attr_node.kind == VueElementType::Directive => {
                                         attributes.push(self.build_attribute(attr_node, sub_offset, source)?);
                                     }
+                                    // Trivia after `>` is pushed while finishing the tag, so a
+                                    // leading comment arrives here. Vue keeps it as a child.
+                                    GreenTree::Leaf(t) if t.kind == VueTokenType::Comment => {
+                                        let content = source.get_text_in(Range { start: sub_offset, end: sub_offset + t.length as usize });
+                                        children.push(VueNode::Comment(comment_body(&content)));
+                                    }
                                     _ => {}
                                 }
                                 sub_offset += sub_child.len() as usize;
@@ -156,10 +162,7 @@ impl VueBuilder {
                             children.push(VueNode::Interpolation(self.build_interpolation(n, current_offset, source)?));
                         }
                         VueElementType::TextNode => {
-                            let content = source.get_text_in(Range { start: current_offset, end: current_offset + n.byte_length as usize });
-                            if !content.trim().is_empty() {
-                                children.push(VueNode::Text(VueText { span: Range { start: current_offset, end: current_offset + n.byte_length as usize } }));
-                            }
+                            push_text_children(&mut children, n, current_offset, source);
                         }
                         _ => {}
                     }
@@ -172,6 +175,12 @@ impl VueBuilder {
                             if !content.trim().is_empty() {
                                 children.push(VueNode::Text(VueText { span: Range { start: current_offset, end: current_offset + t.length as usize } }));
                             }
+                        }
+                        // The lexer treats comments as trivia, so they arrive as leaves here.
+                        // Vue keeps them as children, which drives `v-html` / `v-text` errors.
+                        VueTokenType::Comment => {
+                            let content = source.get_text_in(Range { start: current_offset, end: current_offset + t.length as usize });
+                            children.push(VueNode::Comment(comment_body(&content)));
                         }
                         _ => {}
                     }
@@ -354,5 +363,52 @@ impl Builder<VueLanguage> for VueBuilder {
         let result = parse_output.result.and_then(|green_tree| self.build_root(green_tree, &source));
 
         OakDiagnostics { result, diagnostics }
+    }
+}
+
+/// Strips the `<!--` / `-->` delimiters from a comment node's source text.
+fn comment_body(raw: &str) -> String {
+    raw.strip_prefix("<!--").and_then(|body| body.strip_suffix("-->")).unwrap_or(raw).to_string()
+}
+
+/// Splits a `TextNode` into `Text` and `Comment` children.
+///
+/// The lexer treats comments as trivia, so a comment between two text runs is a leaf inside the
+/// `TextNode`. Vue drops the comment markers from the text, so the text runs are emitted
+/// separately instead of one span that would include `<!-- ... -->`.
+fn push_text_children<'a>(children: &mut Vec<VueNode>, node: &GreenNode<'a, VueLanguage>, offset: usize, source: &SourceText) {
+    let mut run_start = offset;
+    let mut run_len = 0usize;
+    let mut cursor = offset;
+
+    for child in node.children {
+        match child {
+            GreenTree::Leaf(leaf) if leaf.kind == VueTokenType::Comment => {
+                push_text_run(children, run_start, run_len, source);
+                let content = source.get_text_in(Range { start: cursor, end: cursor + leaf.length as usize });
+                children.push(VueNode::Comment(comment_body(&content)));
+                run_len = 0;
+                run_start = cursor + leaf.length as usize;
+            }
+            GreenTree::Leaf(leaf) => {
+                if run_len == 0 {
+                    run_start = cursor;
+                }
+                run_len += leaf.length as usize;
+            }
+            GreenTree::Node(_) => {}
+        }
+        cursor += child.len() as usize;
+    }
+    push_text_run(children, run_start, run_len, source);
+}
+
+fn push_text_run(children: &mut Vec<VueNode>, start: usize, len: usize, source: &SourceText) {
+    if len == 0 {
+        return;
+    }
+    let content = source.get_text_in(Range { start, end: start + len });
+    if !content.trim().is_empty() {
+        children.push(VueNode::Text(VueText { span: Range { start, end: start + len } }));
     }
 }
