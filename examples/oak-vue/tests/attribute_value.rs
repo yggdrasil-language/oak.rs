@@ -47,3 +47,10 @@ fn quoted_attributes_stay_separate() {
     assert_eq!(first_element_attr_count(r#"<template><p title="a" title="b">x</p></template>"#), 2);
     assert_eq!(first_element_attr_count("<template><p title=a id=b>x</p></template>"), 2);
 }
+
+#[test]
+fn slash_inside_a_start_tag_is_illegal() {
+    // Vue reports `Illegal '/' in tags`; only `/>` may close a start tag.
+    assert_ne!(build(r#"<template><p a/b="c">x</p></template>"#), 0);
+    assert_ne!(build("<template><p a/b>x</p></template>"), 0);
+}

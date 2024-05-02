@@ -237,6 +237,12 @@ impl<'config> VueParser<'config> {
                 state.bump();
                 continue;
             }
+            // Vue's tokenizer rejects `/` inside a start tag (only `/>` closes it).
+            if state.at(VueTokenType::Slash) {
+                let _ = state.syntax_error("illegal `/` in tags".to_string());
+                state.bump();
+                continue;
+            }
             let before = state.checkpoint().0;
             self.parse_attribute(state);
             // Unknown / unconsumed tokens must not spin forever allocating green nodes.
