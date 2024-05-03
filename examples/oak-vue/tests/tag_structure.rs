@@ -53,3 +53,34 @@ fn an_element_without_an_end_tag_is_an_error() {
     assert_ne!(build("<template><div>x"), 0);
     assert_ne!(build("<template><div>"), 0);
 }
+
+#[test]
+fn an_attribute_name_cannot_start_with_a_quote_or_equals() {
+    // Vue reports `X_INVALID_ATTRIBUTE_NAME` / `X_ATTRIBUTE_NAME_CANNOT_START_WITH_EQUAL`.
+    assert_ne!(build(r#"<template><div "x"></div></template>"#), 0);
+    assert_ne!(build("<template><div 'x'></div></template>"), 0);
+    assert_ne!(build(r#"<template><div a"b"></div></template>"#), 0);
+    assert_ne!(build("<template><div =x></div></template>"), 0);
+}
+
+#[test]
+fn a_quoted_directive_argument_still_parses() {
+    // Vue's tokenizer keeps `:"x"` and `v-bind:"x"` legal, so the name rule above must
+    // not apply to directive prefixes.
+    assert_eq!(build(r#"<template><div :"x"></div></template>"#), 0);
+    assert_eq!(build(r#"<template><div v-bind:"x"></div></template>"#), 0);
+}
+
+#[test]
+fn an_unquoted_value_cannot_contain_a_backtick() {
+    // The lexer hands a backtick back inside a text token, so check it explicitly.
+    assert_ne!(build("<template><div a=b`c></div></template>"), 0);
+}
+
+#[test]
+fn a_void_element_close_tag_is_ignored() {
+    // Browsers drop `</img>` and Vue reports no diagnostic for it.
+    assert_eq!(build("<img></img>"), 0);
+    assert_eq!(build("<br></br>"), 0);
+    assert_eq!(build("<input></input>"), 0);
+}
