@@ -38,6 +38,7 @@ impl<'config> Parser<VueLanguage> for VueParser<'config> {
         parse_with_lexer(&lexer, text, edits, cache, |state| {
             let cp = state.checkpoint();
             while state.not_at_end() {
+                let before = state.checkpoint().0;
                 if state.at(VueTokenType::TemplateStart) {
                     self.parse_special_block(state, VueTokenType::TemplateStart, "template", true);
                 }
@@ -49,6 +50,11 @@ impl<'config> Parser<VueLanguage> for VueParser<'config> {
                 }
                 else {
                     self.parse_node(state);
+                }
+                // Every root-level token must make progress: a parser branch that returns
+                // without consuming would otherwise spin forever on the same token.
+                if state.checkpoint().0 == before && state.not_at_end() {
+                    state.bump();
                 }
             }
             Ok(state.finish_at(cp, crate::parser::element_type::VueElementType::Root))
@@ -161,9 +167,18 @@ impl<'config> VueParser<'config> {
             state.push_child(node);
         }
         else if state.at(VueTokenType::LtSlash) {
-            // This is a closing tag at a position where we expect a node.
-            // We should NOT consume it as text. The caller (parse_element) will handle it.
-            return;
+            // A closing tag with no open element (`</div>` at root). Vue reports
+            // `X_INVALID_END_TAG` and keeps parsing, so consume the tag to make progress.
+            let _ = state.syntax_error("invalid end tag".to_string());
+            let cp = state.checkpoint();
+            state.expect(VueTokenType::LtSlash).ok();
+            if Self::bump_attr_name(state).is_none() {
+                state.bump();
+            }
+            state.expect(VueTokenType::Gt).ok();
+            let node = state.finish_at(cp, crate::parser::element_type::VueElementType::CloseTag);
+            state.sink.restore(cp.1);
+            state.push_child(node);
         }
         else {
             let cp = state.checkpoint();
@@ -243,6 +258,12 @@ impl<'config> VueParser<'config> {
                 state.bump();
                 continue;
             }
+            // A `<` inside a start tag means the tag was never closed: Vue reports
+            // `X_UNEXPECTED_EOF_IN_TAG` instead of swallowing the next tag as attributes.
+            if state.at(VueTokenType::Lt) || state.at(VueTokenType::LtSlash) {
+                let _ = state.syntax_error("unexpected `<` in tag".to_string());
+                break;
+            }
             let before = state.checkpoint().0;
             self.parse_attribute(state);
             // Unknown / unconsumed tokens must not spin forever allocating green nodes.
@@ -291,6 +312,10 @@ impl<'config> VueParser<'config> {
                 let close_node = state.finish_at(close_cp, crate::parser::element_type::VueElementType::CloseTag);
                 state.sink.restore(close_cp.1);
                 state.push_child(close_node);
+            }
+            // Vue reports `X_MISSING_END_TAG` when the element runs into EOF.
+            else {
+                let _ = state.syntax_error(format!("element is missing end tag: `<{tag_name}>`"));
             }
         }
 
@@ -363,6 +388,16 @@ impl<'config> VueParser<'config> {
                 Self::bump_unquoted_attr_value(state);
             }
             state.finish_at(val_cp, crate::parser::element_type::VueElementType::AttributeValue);
+        }
+        // `a==b` / `a>=b`: a compound `=` token cannot start an attribute value in Vue.
+        else if state.at(VueTokenType::EqEq)
+            || state.at(VueTokenType::EqEqEq)
+            || state.at(VueTokenType::Arrow)
+            || state.at(VueTokenType::GtEq)
+            || state.at(VueTokenType::LtEq)
+            || state.at(VueTokenType::NotEq)
+        {
+            let _ = state.syntax_error("unexpected `=` in attribute".to_string());
         }
 
         let kind = if is_directive { crate::parser::element_type::VueElementType::Directive } else { crate::parser::element_type::VueElementType::Attribute };
@@ -442,6 +477,11 @@ impl<'config> VueParser<'config> {
         // `bump` skips trivia, so a `Whitespace` token never shows up as the current
         // token. Detect the end of the value through byte adjacency instead: Vue ends
         // an unquoted value at the first whitespace or the tag terminator.
+        // A quoted value is one lexer token; consume it whole.
+        if state.at(VueTokenType::StringLiteral) {
+            state.bump();
+            return;
+        }
         let mut previous_end: Option<usize> = None;
         while state.not_at_end() && !state.at(VueTokenType::Gt) && !state.at(VueTokenType::SlashGt) {
             let Some(token) = state.current()
@@ -449,6 +489,17 @@ impl<'config> VueParser<'config> {
                 break;
             };
             if previous_end.is_some_and(|end| token.span.start != end) {
+                break;
+            }
+            // Vue's tokenizer ends an unquoted value at `"`, `'`, `<` and `=`, and reports
+            // `X_UNEXPECTED_...` for the stray character instead of folding it into the value.
+            if state.at(VueTokenType::StringLiteral)
+                || state.at(VueTokenType::Eq)
+                || state.at(VueTokenType::Lt)
+            {
+                let _ = state.syntax_error(
+                    "unquoted attribute value cannot contain quotes, `<` or `=`".to_string(),
+                );
                 break;
             }
             previous_end = Some(token.span.end);
