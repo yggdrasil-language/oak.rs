@@ -169,11 +169,19 @@ impl<'config> VueParser<'config> {
         else if state.at(VueTokenType::LtSlash) {
             // A closing tag with no open element (`</div>` at root). Vue reports
             // `X_INVALID_END_TAG` and keeps parsing, so consume the tag to make progress.
-            let _ = state.syntax_error("invalid end tag".to_string());
             let cp = state.checkpoint();
             state.expect(VueTokenType::LtSlash).ok();
-            if Self::bump_attr_name(state).is_none() {
-                state.bump();
+            let close_name = match Self::bump_attr_name(state) {
+                Some(name) => name,
+                None => {
+                    state.bump();
+                    String::new()
+                }
+            };
+            // Browsers drop a close tag for a void element (`</img>`, `</br>`) and Vue
+            // accepts it without a diagnostic, so do not report an invalid end tag there.
+            if !is_html_void_tag(&close_name) {
+                let _ = state.syntax_error("invalid end tag".to_string());
             }
             state.expect(VueTokenType::Gt).ok();
             let node = state.finish_at(cp, crate::parser::element_type::VueElementType::CloseTag);
@@ -361,11 +369,28 @@ impl<'config> VueParser<'config> {
         let adjacent_colon = state.at(VueTokenType::Colon) && name_end == state.current().map(|token| token.span.start);
         if !is_directive && adjacent_colon {
             is_directive = true;
-            directive_name = attribute_name.unwrap_or_default();
+            directive_name = attribute_name.as_deref().unwrap_or_default().to_string();
         }
 
         if is_directive && (adjacent_colon || state.at(VueTokenType::LeftBracket)) {
             self.parse_optional_directive_arg(state);
+        }
+
+        // Vue keeps `:"x"` / `v-bind:"x"` legal: the quoted token becomes the argument.
+        if is_directive && state.at(VueTokenType::StringLiteral) {
+            state.bump();
+        }
+        // Vue reports `X_INVALID_ATTRIBUTE_NAME` when a quote reaches an attribute-name
+        // position. Directive names keep Vue's looser tokenizer behaviour (`:"x"` parses),
+        // so only plain attributes fail here.
+        if !is_directive && state.at(VueTokenType::StringLiteral) {
+            let _ = state.syntax_error("attribute name cannot contain quotes".to_string());
+            state.bump();
+        }
+        // A bare `=` cannot start an attribute name (`<div =x>`).
+        if !is_directive && attribute_name.is_none() && state.at(VueTokenType::Eq) {
+            let _ = state.syntax_error("attribute name cannot start with `=`".to_string());
+            state.bump();
         }
 
         while state.at(VueTokenType::Dot) {
@@ -390,13 +415,7 @@ impl<'config> VueParser<'config> {
             state.finish_at(val_cp, crate::parser::element_type::VueElementType::AttributeValue);
         }
         // `a==b` / `a>=b`: a compound `=` token cannot start an attribute value in Vue.
-        else if state.at(VueTokenType::EqEq)
-            || state.at(VueTokenType::EqEqEq)
-            || state.at(VueTokenType::Arrow)
-            || state.at(VueTokenType::GtEq)
-            || state.at(VueTokenType::LtEq)
-            || state.at(VueTokenType::NotEq)
-        {
+        else if state.at(VueTokenType::EqEq) || state.at(VueTokenType::EqEqEq) || state.at(VueTokenType::Arrow) || state.at(VueTokenType::GtEq) || state.at(VueTokenType::LtEq) || state.at(VueTokenType::NotEq) {
             let _ = state.syntax_error("unexpected `=` in attribute".to_string());
         }
 
@@ -491,15 +510,12 @@ impl<'config> VueParser<'config> {
             if previous_end.is_some_and(|end| token.span.start != end) {
                 break;
             }
-            // Vue's tokenizer ends an unquoted value at `"`, `'`, `<` and `=`, and reports
-            // `X_UNEXPECTED_...` for the stray character instead of folding it into the value.
-            if state.at(VueTokenType::StringLiteral)
-                || state.at(VueTokenType::Eq)
-                || state.at(VueTokenType::Lt)
-            {
-                let _ = state.syntax_error(
-                    "unquoted attribute value cannot contain quotes, `<` or `=`".to_string(),
-                );
+            // Vue's tokenizer ends an unquoted value at `"`, `'`, `` ` ``, `<` and `=`, and
+            // reports `X_UNEXPECTED_...` for the stray character instead of folding it into
+            // the value.
+            let stray_backtick = state.at(VueTokenType::Text) && state.peek_text().is_some_and(|text| text.contains('`'));
+            if stray_backtick || state.at(VueTokenType::StringLiteral) || state.at(VueTokenType::Eq) || state.at(VueTokenType::Lt) {
+                let _ = state.syntax_error("unquoted attribute value cannot contain quotes, backticks, `<` or `=`".to_string());
                 break;
             }
             previous_end = Some(token.span.end);
