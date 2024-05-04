@@ -87,7 +87,12 @@ fn needs_space(left: &str, right: &str) -> bool {
         || (left == "{" && right == "}")
         || (left == "?" && right == ":")
         || (left == "/" && right.chars().next().is_some_and(|ch| ch.is_ascii_alphabetic()))
-        || (left == "!" && right != "=")
+        // `!` is postfix non-null assertion — binds tight to following delimiters
+        // and member access, but keeps its space before any other operator. The
+        // lexer coalesces `!=` / `!==`, so when right starts with `!` (a lone `!`
+        // or another inequality like `!==`), both tokens exist independently and
+        // must be separated: `a! !== b`, not `a!!== b`.
+        || (left == "!" && matches!(right, "." | "?." | "," | ";" | ")" | "]" | "}"))
         || left == "~"
         || matches!(right, "++" | "--")
     {
