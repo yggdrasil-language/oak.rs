@@ -198,7 +198,7 @@ pub(crate) fn format_source(source: &str, options: &FormatOptions) -> Result<Str
         if right_text == "(" && is_reserved_word(left_text) {
             let previous = index.checked_sub(1).and_then(|previous| significant.get(previous)).and_then(|token| source.get(token.span.clone()));
             let property = matches!(previous, Some("." | "?."));
-            let member = matches!(left_text, "if" | "for" | "while" | "switch" | "catch" | "with") && matches!(previous, Some("," | "static" | "async" | "get" | "set" | "*"));
+            let member = matches!(previous, Some("," | "static" | "async" | "get" | "set" | "*"));
             if property || member {
                 constraint = oak_formatter::GapConstraint::NoSpace;
             }
@@ -310,18 +310,18 @@ fn looks_like_type_arguments(significant: &[&oak_core::Token<TypeScriptTokenType
             "<" => depth += 1,
             ">" if depth == 0 && delimiters == 0 => {
                 let after = significant.iter().skip_while(|candidate| candidate.span.start <= token.span.start).find_map(|candidate| source.get(candidate.span.clone()));
-                return after.is_none_or(|next| matches!(next, "=" | "," | ";" | ")" | "]" | "[" | "}" | "." | "(" | "{" | ">" | "|" | "&" | "=>" | "?" | ":"));
+                return after.is_none_or(|next| next.is_empty() || matches!(next, "=" | "," | ";" | ")" | "]" | "[" | "}" | "." | "(" | "{" | ">" | "|" | "&" | "=>" | "?" | ":"));
             }
             ">" if depth == 0 => return false,
             ">" => depth -= 1,
             ">>>" if depth <= 2 && delimiters == 0 => {
                 let after = significant.iter().skip_while(|candidate| candidate.span.start <= token.span.start).find_map(|candidate| source.get(candidate.span.clone()));
-                return after.is_none_or(|next| matches!(next, "=" | "," | ";" | ")" | "]" | "[" | "}" | "." | "(" | "{" | "|" | "&" | "=>" | "?" | ":"));
+                return after.is_none_or(|next| next.is_empty() || matches!(next, "=" | "," | ";" | ")" | "]" | "[" | "}" | "." | "(" | "{" | "|" | "&" | "=>" | "?" | ":"));
             }
             ">>>" => depth -= 3,
             ">>" if depth <= 2 && delimiters == 0 => {
                 let after = significant.iter().skip_while(|candidate| candidate.span.start <= token.span.start).find_map(|candidate| source.get(candidate.span.clone()));
-                return after.is_none_or(|next| matches!(next, "=" | "," | ";" | ")" | "]" | "[" | "}" | "." | "(" | "{" | "|" | "&" | "=>" | "?" | ":"));
+                return after.is_none_or(|next| next.is_empty() || matches!(next, "=" | "," | ";" | ")" | "]" | "[" | "}" | "." | "(" | "{" | "|" | "&" | "=>" | "?" | ":"));
             }
             ">>" => depth -= 2,
             ";" | "?" | ":" if depth == 0 && delimiters == 0 => return false,
