@@ -111,7 +111,7 @@ pub(crate) fn format_source(source: &str, options: &FormatOptions) -> Result<Str
                     .get(index.wrapping_sub(1))
                     .and_then(|token| source.get(token.span.clone()))
                     .is_some_and(|text| matches!(text, "++" | "--") || text.chars().last().is_some_and(|ch| ch.is_ascii_alphanumeric() || matches!(ch, '_' | '$' | ')' | ']')));
-            if !right_text.is_empty() && comparison && right_text != "/" {
+            if !right_text.is_empty() && comparison && right_text != "/" && !matches!(right_text, ";" | "," | ")" | "]" | "." | "?") {
                 constraint = oak_formatter::GapConstraint::RequiredSpace;
             }
             if generic_angle && left_text == ">" && right_text == "{" {
@@ -307,6 +307,9 @@ fn looks_like_type_arguments(significant: &[&oak_core::Token<TypeScriptTokenType
         match text {
             "{" | "(" | "[" => delimiters += 1,
             "}" | ")" | "]" if delimiters > 0 => delimiters -= 1,
+            // JSX self-close or tag close: `<br />` / `</div>` — has a standalone `/`
+            // that isn't a division operator (never follows an operand in type context).
+            "/" => return false,
             "<" => depth += 1,
             ">" if depth == 0 && delimiters == 0 => {
                 let after = significant.iter().skip_while(|candidate| candidate.span.start <= token.span.start).find_map(|candidate| source.get(candidate.span.clone()));
