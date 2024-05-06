@@ -177,12 +177,10 @@ pub(crate) fn format_source(source: &str, options: &FormatOptions) -> Result<Str
                 constraint = oak_formatter::GapConstraint::NoSpace;
             }
         }
-        // `++`/`--` bind to an operand on their left as postfix operators and
-        // take a space before the operand they prefix.
-        if matches!(right_text, "++" | "--") {
-            let binds_left = left_text.chars().last().is_some_and(|ch| ch.is_ascii_alphanumeric() || matches!(ch, '_' | '$' | ')' | ']')) && !is_reserved_word(left_text);
-            constraint = if binds_left { oak_formatter::GapConstraint::NoSpace } else { oak_formatter::GapConstraint::RequiredSpace };
-        }
+        // `++`/`--` spacing is fully handled by `needs_space`: a prefix `++`
+        // after an operand word keeps its space (`x + ++i`), prefix after a
+        // bracket or operator stays tight (`[++i]`, `= ++i`), and postfix
+        // binds to its operand (`i++`). No extra override needed here.
         if (left_text == "async" && right_text == "(")
             || (matches!(left_text, "const" | "let" | "var") && right_text == "[")
             || (left_text == "]" && right_text == "of")
