@@ -78,6 +78,94 @@ fn repro_array_type_positions() {
 }
 
 #[test]
+fn repro_function_body_stays_outside_return_type() {
+    let lang = TypeScriptLanguage::standard();
+    let tail = "const STATIC_VENDORS: VendorId[] = ['cloudflare-pages', 'github-pages', 'vercel', 'netlify', 'tencent-edgeone'];\n";
+    for head in [
+        "function f(): string { return 'x'; }\n",
+        "function f(x: string): string { return x; }\n",
+        "function f(): void { g(); }\n",
+        "export function f(): string { return 'x'; }\n",
+        "function templ(template: string, vars: Record<string, string>): string {\n    return template.replace(/\\{\\{(\\w+)\\}\\}/g, (_m, key: string) => vars[key] || '');\n}\n",
+        "function f(): { a: string } { return { a: 'x' }; }\n",
+        "function f(): Array<{ a: string }> { return []; }\n",
+    ] {
+        let source = format!("{head}{tail}");
+        let mut cache = ParseSession::<TypeScriptLanguage>::new(32);
+        let result = TypeScriptBuilder::new(&lang).build(&SourceText::new(source.as_str()), &[], &mut cache);
+        assert!(result.result.is_ok(), "{head}");
+        assert!(result.diagnostics.is_empty(), "{head}: {:#?}", result.diagnostics);
+        assert_eq!(result.result.expect("root").statements.len(), 2, "{head}");
+    }
+}
+
+#[test]
+fn repro_return_type_keeps_body_statements() {
+    let lang = TypeScriptLanguage::standard();
+    let source = "function f(): string { return 'x'; }";
+    let mut cache = ParseSession::<TypeScriptLanguage>::new(32);
+    let result = TypeScriptBuilder::new(&lang).build(&SourceText::new(source), &[], &mut cache);
+    let root = result.result.expect("root");
+    let Some(Statement::FunctionDeclaration(func)) = root.statements.first() else {
+        panic!("expected function declaration, got {:?}", root.statements);
+    };
+    assert_eq!(func.body.len(), 1, "function body parsed as statements");
+}
+
+#[test]
+fn repro_typed_string_array_literal() {
+    let lang = TypeScriptLanguage::standard();
+    for source in [
+        "const A: VendorId[] = ['a', 'b'];",
+        "const A: VendorId[] = [];",
+        "const A = ['a', 'b'];",
+        "const A: string[] = ['a-b'];",
+        "const A = ['tencent-edgeone'];",
+        "const A: VendorId[] = ['cloudflare-pages', 'github-pages', 'vercel', 'netlify', 'tencent-edgeone'];",
+    ] {
+        let mut cache = ParseSession::<TypeScriptLanguage>::new(32);
+        let result = TypeScriptBuilder::new(&lang).build(&SourceText::new(source), &[], &mut cache);
+        println!("{source} => {:?}", result.diagnostics);
+        assert!(result.result.is_ok(), "{source}");
+        assert!(result.diagnostics.is_empty(), "{source}: {:#?}", result.diagnostics);
+    }
+}
+
+#[test]
+fn repro_type_only_import_and_export() {
+    let lang = TypeScriptLanguage::standard();
+    for source in [
+        "import { a, type B, type C } from './x.ts';",
+        "import { a } from './x.ts';\nimport type { B, C } from './x.ts';",
+        "export type { B };",
+        "export type { B, C };",
+    ] {
+        let mut cache = ParseSession::<TypeScriptLanguage>::new(32);
+        let result = TypeScriptBuilder::new(&lang).build(&SourceText::new(source), &[], &mut cache);
+        println!("{source} => {:?}", result.diagnostics);
+        assert!(result.result.is_ok(), "{source}");
+        assert!(result.diagnostics.is_empty(), "{source}: {:#?}", result.diagnostics);
+    }
+}
+
+#[test]
+fn repro_regex_replace_with_typed_arrow() {
+    let lang = TypeScriptLanguage::standard();
+    for source in [
+        r#"function templ(template: string): string { return template.replace(/\{\{(\w+)\}\}/g, "x"); }"#,
+        r#"function templ(template: string, vars: Record<string, string>): string { return template.replace(/\{\{(\w+)\}\}/g, (_m, key: string) => vars[key] ?? ""); }"#,
+        r#"const out = s.replace(/\{\{(\w+)\}\}/g, (_m, key: string) => vars[key] ?? "");"#,
+        r#"const out = s.replace(/\{\{(\w+)\}\}/g, (_m, key) => vars[key] ?? "");"#,
+        r#"const out = s.replace(/\{\{(\w+)\}\}/g, (_m, key: string) => vars[key] || "");"#,
+    ] {
+        let mut cache = ParseSession::<TypeScriptLanguage>::new(32);
+        let result = TypeScriptBuilder::new(&lang).build(&SourceText::new(source), &[], &mut cache);
+        assert!(result.result.is_ok(), "{source}");
+        assert!(result.diagnostics.is_empty(), "{source}: {:#?}", result.diagnostics);
+    }
+}
+
+#[test]
 fn repro_vmz_formatter_fragments() {
     let options = FormatOptions::default();
     for source in [
