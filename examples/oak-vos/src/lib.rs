@@ -1,5 +1,4 @@
 #![doc = include_str!("readme.md")]
-#![feature(new_range_api)]
 #![warn(missing_docs)]
 #![doc(html_logo_url = "https://raw.githubusercontent.com/yggdrasil-language/oaks/refs/heads/dev/documents/logo.svg")]
 #![doc(html_favicon_url = "https://raw.githubusercontent.com/yggdrasil-language/oaks/refs/heads/dev/documents/logo.svg")]
