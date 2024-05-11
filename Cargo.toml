@@ -22,9 +22,9 @@ repository = "https://github.com/yggdrasil-language/oak.rs"
 [workspace.dependencies]
 # Boost dependencies
 # Overlaid by local path `.cargo/config.toml` (git ignored).
-boost-diagnostic = { path = "../rust-boost/projects/boost-diagnostic", default-features = false, features = ["std", "serde"] }
-boost-log = { path = "../rust-boost/projects/boost-log" }
-boost-fs = { path = "../rust-boost/projects/boost-fs" }
+boost-diagnostic = { git = "https://github.com/oovm/rust-boost", rev = "9aa52745d6eae2d7748c76e4e3e6555e1f6e4b86", default-features = false, features = ["std", "serde"] }
+boost-log = { git = "https://github.com/oovm/rust-boost", rev = "9aa52745d6eae2d7748c76e4e3e6555e1f6e4b86" }
+boost-fs = { git = "https://github.com/oovm/rust-boost", rev = "9aa52745d6eae2d7748c76e4e3e6555e1f6e4b86" }
 
 # Internal project dependencies
 oak-core = { path = "projects/oak-core", version = "0.0.12" }
