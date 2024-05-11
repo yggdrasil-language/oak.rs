@@ -219,6 +219,63 @@ impl<'config> TypeScriptParser<'config> {
         state.finish_at(cp, crate::parser::element_type::TypeScriptElementType::BlockStatement);
         Ok(())
     }
+
+    /// Skip a balanced `<...>` type parameter or type argument list.
+    ///
+    /// Generic declarations (`function f<T>`, `class Box<T>`, `interface A<T>`)
+    /// and generic arrows (`<T>(x: T) => x`) place this list between the name
+    /// and the rest of the declaration, so it is consumed as one node.
+    pub(crate) fn parse_type_parameters<'a, S: Source + ?Sized>(&self, state: &mut State<'a, S>) -> Result<(), OakError> {
+        use crate::{lexer::token_type::TypeScriptTokenType::*, parser::element_type::TypeScriptElementType};
+        if !self.at(state, Less) {
+            return Ok(());
+        }
+        let cp = state.checkpoint();
+        let mut angles = 0usize;
+        let mut depth = 0usize;
+        while state.not_at_end() {
+            let Some(kind) = self.peek_kind(state)
+            else {
+                break;
+            };
+            match kind {
+                Less => angles += 1,
+                Greater => angles = angles.saturating_sub(1),
+                RightShift => angles = angles.saturating_sub(2),
+                LeftParen | LeftBracket | LeftBrace => depth += 1,
+                RightParen | RightBracket | RightBrace => depth = depth.saturating_sub(1),
+                _ => {}
+            }
+            state.bump();
+            if angles == 0 && depth == 0 {
+                break;
+            }
+        }
+        state.finish_at(cp, TypeScriptElementType::TypeParameter);
+        Ok(())
+    }
+
+    /// Skip a type reference used by `extends` and `implements` clauses.
+    ///
+    /// Covers dotted names and type arguments (`Foo`, `Foo.Bar`, `Foo<T>`) so
+    /// the clause scanners never stop inside a generic argument list.
+    pub(crate) fn parse_type_reference<'a, S: Source + ?Sized>(&self, state: &mut State<'a, S>) -> Result<(), OakError> {
+        use crate::{lexer::token_type::TypeScriptTokenType::*, parser::element_type::TypeScriptElementType};
+        let cp = state.checkpoint();
+        if self.at(state, IdentifierName) {
+            state.bump();
+        }
+        loop {
+            self.skip_trivia(state);
+            if !self.eat(state, Dot) {
+                break;
+            }
+            self.expect(state, IdentifierName).ok();
+        }
+        self.parse_type_parameters(state)?;
+        state.finish_at(cp, TypeScriptElementType::TypeReference);
+        Ok(())
+    }
 }
 
 /// Token kinds after which a type operand (object type literal, tuple, ...) may start.

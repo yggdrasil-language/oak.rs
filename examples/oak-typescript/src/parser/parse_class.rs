@@ -17,12 +17,13 @@ impl<'config> TypeScriptParser<'config> {
         self.eat(state, Abstract);
         self.expect(state, Class).ok();
         self.expect(state, IdentifierName).ok();
+        self.parse_type_parameters(state)?;
         if self.eat(state, Extends) {
-            self.expect(state, IdentifierName).ok();
+            self.parse_type_reference(state)?;
         }
         if self.eat(state, Implements) {
-            while state.not_at_end() && !self.at(state, LeftBrace) {
-                self.expect(state, IdentifierName).ok();
+            loop {
+                self.parse_type_reference(state)?;
                 if !self.eat(state, Comma) {
                     break;
                 }

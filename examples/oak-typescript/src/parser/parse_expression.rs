@@ -98,6 +98,29 @@ impl<'config> TypeScriptParser<'config> {
                 }
             }
             Some(Less) if self.config.jsx => self.parse_jsx_element(state),
+            Some(Less) => {
+                // Generic arrow function: `<T>(x: T) => x` / `<T extends object>() => {}`.
+                let params_cp = state.checkpoint();
+                self.parse_type_parameters(state).ok();
+                if !self.at(state, LeftParen) {
+                    state.restore(params_cp);
+                    state.bump();
+                    return state.finish_at(cp, crate::parser::element_type::TypeScriptElementType::Error);
+                }
+                self.parse_parameters(state).ok();
+                if self.eat(state, Colon) {
+                    self.parse_return_type_annotation(state).ok();
+                }
+                if self.eat(state, Arrow) {
+                    self.parse_statement(state).ok();
+                    state.finish_at(cp, crate::parser::element_type::TypeScriptElementType::ArrowFunction)
+                }
+                else {
+                    state.restore(params_cp);
+                    state.bump();
+                    state.finish_at(cp, crate::parser::element_type::TypeScriptElementType::Error)
+                }
+            }
             Some(LeftBracket) => {
                 state.bump();
                 while state.not_at_end() && !self.at(state, RightBracket) {

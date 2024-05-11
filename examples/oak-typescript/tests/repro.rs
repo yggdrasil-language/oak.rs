@@ -113,6 +113,30 @@ fn repro_return_type_keeps_body_statements() {
 }
 
 #[test]
+fn repro_generic_declarations_keep_their_clauses() {
+    // VMZ parses plain TypeScript, so `<T>` before `(` is a generic arrow and
+    // never a JSX element.
+    let lang = TypeScriptLanguage { jsx: false, ..TypeScriptLanguage::standard() };
+    for source in [
+        "function f<T>(x: T): T { return x; }",
+        "function f<T extends Record<string, unknown>>(x: T): T { return x; }",
+        "class Box<T> extends Base<T> implements C<T> { value!: T; }",
+        "class A implements B<C>, D {}",
+        "interface A<T> extends B<T> { value: T }",
+        "type Box<T extends object = {}> = { value: T };",
+        "type Fn = <T>(x: T) => T;",
+        "const g = <T>(x: T): T => x;",
+        "const g = <T extends object>(x: T): T => x;",
+        "const v = a < b && c > d;",
+    ] {
+        let mut cache = ParseSession::<TypeScriptLanguage>::new(32);
+        let result = TypeScriptBuilder::new(&lang).build(&SourceText::new(source), &[], &mut cache);
+        assert!(result.result.is_ok(), "{source}");
+        assert!(result.diagnostics.is_empty(), "{source}: {:#?}", result.diagnostics);
+    }
+}
+
+#[test]
 fn repro_typed_string_array_literal() {
     let lang = TypeScriptLanguage::standard();
     for source in [
