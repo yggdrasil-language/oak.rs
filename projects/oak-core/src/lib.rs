@@ -4,7 +4,7 @@
 #![feature(core_intrinsics)] // Used for `likely`/`unlikely` hints in performance-critical paths
 #![feature(checked_type_aliases)] // Allows more flexible type aliases for complex generic AST structures
 #![feature(portable_simd)] // Enables SIMD acceleration for high-performance lexing and parsing
-#![warn(missing_docs)]
+#![deny(missing_docs)]
 #![doc(html_logo_url = "https://raw.githubusercontent.com/ygg-lang/oaks/refs/heads/dev/documents/logo.svg")]
 #![doc(html_favicon_url = "https://raw.githubusercontent.com/ygg-lang/oaks/refs/heads/dev/documents/logo.svg")]
 // #![feature(nonnull_slice_from_raw_parts)] // Essential for creating raw slices in `SyntaxArena` without null checks
