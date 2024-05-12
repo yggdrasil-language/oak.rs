@@ -94,7 +94,11 @@ fn needs_space(left: &str, right: &str) -> bool {
         // must be separated: `a! !== b`, not `a!!== b`.
         || (left == "!" && matches!(right, "." | "?." | "," | ";" | ")" | "]" | "}"))
         || left == "~"
-        || matches!(right, "++" | "--")
+        // Postfix `++`/`--` bind tight to their operand on the left. Prefix
+        // increments must stay separated from the preceding operator or
+        // keyword (`x = ++i`, `return ++n`); the operand on the left is the
+        // distinguishing cue.
+        || (matches!(right, "++" | "--") && left.chars().last().is_some_and(|ch| ch.is_ascii_alphanumeric() || matches!(ch, '_' | '$' | ')' | ']')))
     {
         return false;
     }
