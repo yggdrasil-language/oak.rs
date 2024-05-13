@@ -1,13 +1,9 @@
 #![doc = include_str!("readme.md")]
 #![allow(incomplete_features)]
 #![allow(internal_features)] // Allow using internal features like `core_intrinsics`
-#![feature(allocator_api)] // Required for custom arena allocation and manual memory management
 #![feature(core_intrinsics)] // Used for `likely`/`unlikely` hints in performance-critical paths
 #![feature(checked_type_aliases)] // Allows more flexible type aliases for complex generic AST structures
-#![feature(new_range_api)] // Uses the modernized `core::range` API for precise source tracking
 #![feature(portable_simd)] // Enables SIMD acceleration for high-performance lexing and parsing
-#![feature(slice_ptr_get)] // Provides ergonomic access to raw pointers within slices
-#![feature(trusted_len)] // Optimizes iterator performance by trusting length hints in core structures
 #![warn(missing_docs)]
 #![doc(html_logo_url = "https://raw.githubusercontent.com/ygg-lang/oaks/refs/heads/dev/documents/logo.svg")]
 #![doc(html_favicon_url = "https://raw.githubusercontent.com/ygg-lang/oaks/refs/heads/dev/documents/logo.svg")]
