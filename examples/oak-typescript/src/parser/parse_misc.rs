@@ -159,14 +159,28 @@ impl<'config> TypeScriptParser<'config> {
         let mut braces = 0usize;
         let mut angles = 0usize;
         let mut consumed = false;
+        let mut last_kind = None;
 
         while state.not_at_end() {
             let Some(kind) = self.peek_kind(state)
             else {
                 break;
             };
-            if consumed && parens == 0 && brackets == 0 && braces == 0 && angles == 0 && (matches!(kind, Comma | Semicolon | RightParen | RightBrace | Equal) || (stop_at_arrow && matches!(kind, Arrow))) {
+            let top = parens == 0 && brackets == 0 && braces == 0 && angles == 0;
+            if consumed && top && matches!(kind, Comma | Semicolon | RightParen | RightBrace | Equal) {
                 break;
+            }
+            if consumed && top && stop_at_arrow {
+                if matches!(kind, Arrow) {
+                    break;
+                }
+                // A return type ends where the function body starts. `{` may also
+                // open an object type literal, so it only ends the annotation when
+                // the previous token already completed a type operand
+                // (`: Foo {`, `: Foo[] {`, `: Array<Foo> {`).
+                if matches!(kind, LeftBrace) && !type_operand_may_start(last_kind) {
+                    break;
+                }
             }
             match kind {
                 LeftParen => parens += 1,
@@ -181,6 +195,7 @@ impl<'config> TypeScriptParser<'config> {
             }
             state.bump();
             consumed = true;
+            last_kind = Some(kind);
         }
 
         if consumed {
@@ -204,6 +219,12 @@ impl<'config> TypeScriptParser<'config> {
         state.finish_at(cp, crate::parser::element_type::TypeScriptElementType::BlockStatement);
         Ok(())
     }
+}
+
+/// Token kinds after which a type operand (object type literal, tuple, ...) may start.
+fn type_operand_may_start(previous: Option<TypeScriptTokenType>) -> bool {
+    use TypeScriptTokenType::*;
+    matches!(previous, Some(Colon | Pipe | Ampersand | Less | Comma | Question | Readonly | New | Infer))
 }
 
 /// Token kinds that end a type at the top level of an `as` assertion.
