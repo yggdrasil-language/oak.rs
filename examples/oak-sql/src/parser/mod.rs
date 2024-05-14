@@ -129,11 +129,25 @@ impl<'config> Pratt<SqlLanguage> for SqlParser<'config> {
             return Some(state.finish_at(cp, SqlElementType::FunctionCall));
         }
 
+        // `IS [NOT] NULL` — the optional `NOT` is consumed here so the CST keeps the
+        // negation next to the operator instead of swallowing the following range.
+        if kind == Is {
+            if min_precedence > 2 {
+                return None;
+            }
+            let cp = state.checkpoint_before(left);
+            state.expect(Is).ok();
+            state.eat(Not);
+            PrattParser::parse(state, 3, self);
+            return Some(state.finish_at(cp, SqlElementType::Expression));
+        }
+
         let (prec, assoc) = match kind {
             Or => (1, Associativity::Left),
-            And => (2, Associativity::Left),
-            Equal | NotEqual | Less | Greater | LessEqual | GreaterEqual | Like | In | Between | Is => (3, Associativity::Left),
-            Concat => (4, Associativity::Left),
+            Between | In => (2, Associativity::Left),
+            And => (3, Associativity::Left),
+            Equal | NotEqual | Less | Greater | LessEqual | GreaterEqual | Like => (4, Associativity::Left),
+            Concat => (5, Associativity::Left),
             Plus | Minus => (10, Associativity::Left),
             Star | Slash | Percent => (11, Associativity::Left),
             DoubleColon => (15, Associativity::Left),

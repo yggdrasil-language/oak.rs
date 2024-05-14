@@ -783,6 +783,7 @@ impl<'config> SqlBuilder<'config> {
             SqlTokenType::Minus => Some(BinaryOperator::Minus),
             SqlTokenType::Star => Some(BinaryOperator::Star),
             SqlTokenType::Slash => Some(BinaryOperator::Slash),
+            SqlTokenType::Percent => Some(BinaryOperator::Percent),
             SqlTokenType::Equal => Some(BinaryOperator::Equal),
             SqlTokenType::NotEqual => Some(BinaryOperator::NotEqual),
             SqlTokenType::Less => Some(BinaryOperator::Less),
@@ -791,6 +792,7 @@ impl<'config> SqlBuilder<'config> {
             SqlTokenType::GreaterEqual => Some(BinaryOperator::GreaterEqual),
             SqlTokenType::And => Some(BinaryOperator::And),
             SqlTokenType::Or => Some(BinaryOperator::Or),
+            SqlTokenType::Like => Some(BinaryOperator::Like),
             _ => None,
         }
     }
