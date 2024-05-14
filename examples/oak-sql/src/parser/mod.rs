@@ -204,11 +204,17 @@ impl<'config> SqlParser<'config> {
             state.finish_at(cp, SqlElementType::SetNamesStatement);
             return Ok(());
         }
+        // `SET [GLOBAL|SESSION|LOCAL] <name> = <expression>` is how a driver applies
+        // character set, time zone, `sql_mode` and similar connection settings.
+        let scoped = state.peek_kind() == Some(Identifier_) && state.peek_text().is_some_and(|text| crate::ast::SessionScope::from_word(&text).is_some());
+        if scoped {
+            state.bump();
+        }
         state.expect(Identifier_).ok();
         state.expect(Equal).ok();
         PrattParser::parse(state, 0, self);
         state.eat(Semicolon);
-        state.finish_at(cp, SqlElementType::Expression);
+        state.finish_at(cp, SqlElementType::SetVariableStatement);
         Ok(())
     }
 
@@ -265,7 +271,14 @@ impl<'config> SqlParser<'config> {
         use crate::lexer::SqlTokenType::*;
         let cp = state.checkpoint();
         state.expect(Show).ok();
+        let scoped = state.peek_kind() == Some(Identifier_) && state.peek_text().is_some_and(|text| crate::ast::SessionScope::from_word(&text).is_some());
+        if scoped {
+            state.bump();
+        }
         state.expect(Identifier_).ok();
+        if state.eat(Like) {
+            state.expect(StringLiteral).ok();
+        }
         state.eat(Semicolon);
         state.finish_at(cp, SqlElementType::ShowStatement);
         Ok(())

@@ -105,6 +105,9 @@ impl<'config> SqlBuilder<'config> {
                     SqlElementType::AlterStatement => self.build_alter_statement(n, source).map(SqlStatement::Alter),
                     SqlElementType::TransactionStatement => self.build_transaction_statement(n).map(SqlStatement::Transaction),
                     SqlElementType::SetNamesStatement => self.build_set_names_statement(n, source).map(SqlStatement::SetNames),
+                    SqlElementType::SetVariableStatement => self.build_set_variable_statement(n, source).map(SqlStatement::SetVariable),
+                    SqlElementType::ShowStatement => self.build_show_statement(n, source).map(SqlStatement::Show),
+                    SqlElementType::PragmaStatement => self.build_pragma_statement(n, source).map(SqlStatement::Pragma),
                     _ => continue,
                 };
 
@@ -644,6 +647,64 @@ impl<'config> SqlBuilder<'config> {
         Ok(SetNamesStatement { character_set, collation, span: node.span() })
     }
 
+    fn build_set_variable_statement<'a>(&self, node: RedNode<'a, SqlLanguage>, source: &SourceText) -> Result<SetVariableStatement, OakError> {
+        let mut words = Vec::new();
+        let mut value = None;
+        for child in node.children() {
+            match child {
+                RedTree::Leaf(token) if token.kind == SqlTokenType::Identifier_ => {
+                    words.push(self.get_text(token.span.clone(), source));
+                }
+                RedTree::Node(n) if is_session_value_node(&n) => value = Some(self.build_expression(n, source)?),
+                _ => {}
+            }
+        }
+        let (scope, name) = split_session_scope(words, "SET")?;
+        let value = value.ok_or_else(|| OakError::custom_error("SET requires an assigned value"))?;
+        Ok(SetVariableStatement { scope, name, value, span: node.span() })
+    }
+
+    fn build_show_statement<'a>(&self, node: RedNode<'a, SqlLanguage>, source: &SourceText) -> Result<ShowStatement, OakError> {
+        let mut words = Vec::new();
+        let mut like = None;
+        for child in node.children() {
+            match child {
+                RedTree::Leaf(token) => match token.kind {
+                    SqlTokenType::Identifier_ => words.push(self.get_text(token.span.clone(), source)),
+                    SqlTokenType::StringLiteral => {
+                        let text = self.get_text(token.span.clone(), source);
+                        like = Some(Arc::from(text.trim().trim_matches(|c| c == '\'' || c == '"')));
+                    }
+                    _ => {}
+                },
+                _ => {}
+            }
+        }
+        let (scope, target) = split_session_scope(words, "SHOW")?;
+        Ok(ShowStatement { scope, target, like, span: node.span() })
+    }
+
+    fn build_pragma_statement<'a>(&self, node: RedNode<'a, SqlLanguage>, source: &SourceText) -> Result<PragmaStatement, OakError> {
+        let mut name = None;
+        let mut value = None;
+        for child in node.children() {
+            match child {
+                RedTree::Leaf(token) if token.kind == SqlTokenType::Identifier_ && name.is_none() => {
+                    name = Some(self.get_text(token.span.clone(), source));
+                }
+                RedTree::Node(n) if name.is_some() && is_session_value_node(&n) => {
+                    value = Some(self.build_expression(n, source)?);
+                }
+                _ => {}
+            }
+        }
+        Ok(PragmaStatement {
+            name: name.ok_or_else(|| OakError::custom_error("PRAGMA requires a name"))?,
+            value,
+            span: node.span(),
+        })
+    }
+
     fn build_identifier<'a>(&self, node: RedNode<'a, SqlLanguage>, source: &SourceText) -> Result<Identifier, OakError> {
         // Trivia is attached to the preceding token, so a node ending at an
         // identifier carries its trailing whitespace in the span.
@@ -817,7 +878,32 @@ impl<'config> SqlBuilder<'config> {
             SqlElementType::AlterStatement => Ok(SqlStatement::Alter(self.build_alter_statement(node, source)?)),
             SqlElementType::TransactionStatement => Ok(SqlStatement::Transaction(self.build_transaction_statement(node)?)),
             SqlElementType::SetNamesStatement => Ok(SqlStatement::SetNames(self.build_set_names_statement(node, source)?)),
+            SqlElementType::SetVariableStatement => Ok(SqlStatement::SetVariable(self.build_set_variable_statement(node, source)?)),
+            SqlElementType::ShowStatement => Ok(SqlStatement::Show(self.build_show_statement(node, source)?)),
+            SqlElementType::PragmaStatement => Ok(SqlStatement::Pragma(self.build_pragma_statement(node, source)?)),
             _ => Err(OakError::custom_error("Unknown statement type")),
         }
     }
+}
+
+/// Splits identifier words collected from a session statement into an optional
+/// scope prefix and the target word.
+fn split_session_scope(words: Vec<Arc<str>>, keyword: &str) -> Result<(Option<SessionScope>, Arc<str>), OakError> {
+    match words.as_slice() {
+        [name] => Ok((None, name.clone())),
+        [scope, name] => {
+            let scope = SessionScope::from_word(scope).ok_or_else(|| OakError::custom_error(format!("{keyword} scope must be GLOBAL, SESSION, or LOCAL")))?;
+            Ok((Some(scope), name.clone()))
+        }
+        _ => Err(OakError::custom_error(format!("{keyword} requires a target word"))),
+    }
+}
+
+/// True when a CST node can carry the right-hand value of `SET` and `PRAGMA`.
+///
+/// Literals and compound expressions arrive as `Expression`, a bare word such
+/// as `WAL` arrives as `Identifier`, and a call such as `SET x = NOW()` arrives
+/// as `FunctionCall`.
+fn is_session_value_node(node: &RedNode<'_, SqlLanguage>) -> bool {
+    matches!(node.green.kind, SqlElementType::Expression | SqlElementType::Identifier | SqlElementType::FunctionCall)
 }

@@ -34,6 +34,31 @@ impl AsDocument for SqlStatement {
                     doc!("SET NAMES ", it.character_set.as_ref())
                 }
             }
+            SqlStatement::SetVariable(it) => {
+                let mut d = Document::text("SET ");
+                if let Some(scope) = it.scope {
+                    d = doc!(d, scope.as_str(), " ");
+                }
+                doc!(d, it.name.as_ref(), " = ", it.value.as_document(&()))
+            }
+            SqlStatement::Show(it) => {
+                let mut d = Document::text("SHOW ");
+                if let Some(scope) = it.scope {
+                    d = doc!(d, scope.as_str(), " ");
+                }
+                d = doc!(d, it.target.as_ref());
+                if let Some(pattern) = &it.like {
+                    d = doc!(d, " LIKE '", pattern.as_ref(), "'");
+                }
+                d
+            }
+            SqlStatement::Pragma(it) => {
+                let mut d = doc!("PRAGMA ", it.name.as_ref());
+                if let Some(value) = &it.value {
+                    d = doc!(d, " = ", value.as_document(&()));
+                }
+                d
+            }
             SqlStatement::Error { .. } => nil,
             SqlStatement::Unknown { .. } => nil,
         }
