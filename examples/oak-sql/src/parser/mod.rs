@@ -6,7 +6,7 @@ use oak_core::{
     GreenNode, OakError, Parser, ParserState, TextEdit, TokenType,
     parser::{
         ParseCache, ParseOutput, parse_with_lexer,
-        pratt::{Associativity, Pratt, PrattParser, binary},
+        pratt::{Associativity, Pratt, PrattParser, binary, unary},
     },
     source::Source,
 };
@@ -44,6 +44,14 @@ impl<'config> Pratt<SqlLanguage> for SqlParser<'config> {
         match state.peek_kind() {
             Some(Identifier_) => {
                 state.bump();
+                // Qualified column names (`table.column`) are merged into one
+                // `Identifier` node so the AST keeps the original spelling. The
+                // merge only happens when `Dot` is directly followed by another
+                // identifier, so other uses of `.` stay untouched.
+                while state.peek_kind() == Some(Dot) && state.peek_kind_at(1) == Some(Identifier_) {
+                    state.bump(); // Dot
+                    state.bump(); // Identifier_
+                }
                 state.finish_at(cp, SqlElementType::Identifier)
             }
             Some(LeftBracket) => {
@@ -63,7 +71,12 @@ impl<'config> Pratt<SqlLanguage> for SqlParser<'config> {
             }
             Some(LeftParen) => {
                 state.bump();
-                PrattParser::parse(state, 0, self);
+                while state.not_at_end() && state.peek_kind() != Some(RightParen) {
+                    PrattParser::parse(state, 0, self);
+                    if !state.eat(Comma) {
+                        break;
+                    }
+                }
                 state.expect(RightParen).ok();
                 state.finish_at(cp, SqlElementType::Expression)
             }
@@ -75,12 +88,46 @@ impl<'config> Pratt<SqlLanguage> for SqlParser<'config> {
     }
 
     fn prefix<'a, S: Source + ?Sized>(&self, state: &mut State<'a, S>) -> &'a GreenNode<'a, SqlLanguage> {
-        self.primary(state)
+        use crate::lexer::SqlTokenType::*;
+        // Unary signs bind tighter than multiplication and division, hence the
+        // precedence of 12. Without this branch `SELECT -3` cannot form an
+        // `Expression` node and `a > -1` misreads `-` as a binary minus.
+        match state.peek_kind() {
+            Some(kind @ (Minus | Plus)) => unary(state, kind, 12, SqlElementType::Expression, |s, p| PrattParser::parse(s, p, self)),
+            _ => self.primary(state),
+        }
     }
 
     fn infix<'a, S: Source + ?Sized>(&self, state: &mut State<'a, S>, left: &'a GreenNode<'a, SqlLanguage>, min_precedence: u8) -> Option<&'a GreenNode<'a, SqlLanguage>> {
         use crate::lexer::SqlTokenType::*;
         let kind = state.peek_kind()?;
+
+        // Function call postfix: `Identifier '(' args? ')'`.
+        if kind == LeftParen && left.kind() == SqlElementType::Identifier {
+            let cp = state.checkpoint_before(left);
+            state.expect(LeftParen).ok();
+            let mut first = true;
+            while state.not_at_end() && state.peek_kind() != Some(RightParen) {
+                if first {
+                    // `COUNT(*)` — the bare Star stays a leaf under the call.
+                    if state.peek_kind() == Some(Star) {
+                        state.bump();
+                        first = false;
+                        if !state.eat(Comma) {
+                            break;
+                        }
+                        continue;
+                    }
+                    first = false;
+                }
+                PrattParser::parse(state, 0, self);
+                if !state.eat(Comma) {
+                    break;
+                }
+            }
+            state.expect(RightParen).ok();
+            return Some(state.finish_at(cp, SqlElementType::FunctionCall));
+        }
 
         let (prec, assoc) = match kind {
             Or => (1, Associativity::Left),

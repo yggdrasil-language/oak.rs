@@ -15,16 +15,20 @@ impl<'config> SqlBuilder<'config> {
     fn build_expression_with_precedence<'a>(&self, node: RedNode<'a, SqlLanguage>, source: &SourceText, min_precedence: u8) -> Result<Expression, OakError> {
         let children = node.children().collect::<Vec<_>>();
 
-        // Handle parentheses
+        // Handle parentheses — only unwrap when there is a single inner expression.
+        // Multiple comma-separated expressions (e.g. IN lists `(1,2,3)`) must fall
+        // through to build_primary_expression which detects LeftParen + expr_children > 1
+        // and routes to build_vector.
         if children.len() >= 3 {
             if let (RedTree::Leaf(l), RedTree::Leaf(r)) = (&children[0], &children[children.len() - 1]) {
                 if l.kind == SqlTokenType::LeftParen && r.kind == SqlTokenType::RightParen {
-                    // This is a parenthesized expression.
-                    // We need to find the inner expression node.
-                    for child in &children[1..children.len() - 1] {
-                        if let RedTree::Node(n) = child {
-                            if n.green.kind == SqlElementType::Expression {
-                                return self.build_expression_with_precedence(n.clone(), source, 0);
+                    let expr_count = children[1..children.len() - 1].iter().filter(|c| matches!(c, RedTree::Node(n) if n.green.kind == SqlElementType::Expression)).count();
+                    if expr_count == 1 {
+                        for child in &children[1..children.len() - 1] {
+                            if let RedTree::Node(n) = child {
+                                if n.green.kind == SqlElementType::Expression {
+                                    return self.build_expression_with_precedence(n.clone(), source, 0);
+                                }
                             }
                         }
                     }
@@ -32,14 +36,40 @@ impl<'config> SqlBuilder<'config> {
             }
         }
 
+        // Prefix unary operators (`-3`, `+1`) keep the sign as a leading leaf, so it
+        // must be consumed before the primary expression. Otherwise the binary scan
+        // would treat it as a minus without a left operand.
+        let mut prefix_end = 0usize;
+        let mut prefix_start: Option<usize> = None;
+        let mut negate = false;
+        while prefix_end < children.len() {
+            match &children[prefix_end] {
+                RedTree::Leaf(leaf) if leaf.kind == SqlTokenType::Whitespace => prefix_end += 1,
+                RedTree::Leaf(leaf) if matches!(leaf.kind, SqlTokenType::Minus | SqlTokenType::Plus) => {
+                    if leaf.kind == SqlTokenType::Minus {
+                        negate = !negate;
+                    }
+                    prefix_start.get_or_insert(leaf.span.start);
+                    prefix_end += 1;
+                }
+                _ => break,
+            }
+        }
+
         let mut left = self.build_primary_expression(node.clone(), source)?;
+        if let Some(start) = prefix_start {
+            if negate {
+                let end = left.span().end;
+                left = Expression::Unary { op: UnaryOperator::Minus, expr: Box::new(left), span: Range { start, end } };
+            }
+        }
 
         // Precedence climbing
         // This is tricky because the CST might already be structured or flat.
         // If it's flat, we iterate through children.
         // If it's already structured (e.g. nested Expression nodes), we might need to handle it differently.
 
-        let mut i = 0;
+        let mut i = prefix_end;
         while i < children.len() {
             let child = &children[i];
             if let RedTree::Leaf(op_token) = child {
@@ -135,10 +165,27 @@ impl<'config> SqlBuilder<'config> {
     }
 
     fn build_primary_expression<'a>(&self, node: RedNode<'a, SqlLanguage>, source: &SourceText) -> Result<Expression, OakError> {
+        // Dispatch on node kind first — FunctionCall nodes have Identifier children
+        // that the child loop below would otherwise pick up as the primary.
+        if node.green.kind == SqlElementType::FunctionCall {
+            return self.build_function_call(node, source);
+        }
+        // Identifier nodes may span several leaves (`table.column` is merged into one
+        // node), so reading the first leaf would silently truncate qualified names.
+        if node.green.kind == SqlElementType::Identifier {
+            return Ok(Expression::Identifier(self.build_identifier(node, source)?));
+        }
+
+        // A LeftParen with multiple comma-separated children is a Vector, a single
+        // Expression child is a plain grouped expression.
+        let expr_children = node.children().filter(|c| matches!(c, RedTree::Node(n) if n.green.kind == SqlElementType::Expression)).count();
         for child in node.children() {
             match child {
                 RedTree::Leaf(t) => {
                     if t.kind == SqlTokenType::LeftBracket {
+                        return self.build_vector(node.clone(), source);
+                    }
+                    if t.kind == SqlTokenType::LeftParen && expr_children > 1 {
                         return self.build_vector(node.clone(), source);
                     }
                     if let Ok(expr) = self.build_primary_expression_from_leaf(&t, source) {
@@ -180,6 +227,7 @@ impl<'config> SqlBuilder<'config> {
             }
             SqlTokenType::True | SqlTokenType::False => Ok(Expression::Literal(Literal::Boolean(t.kind == SqlTokenType::True, t.span.clone()))),
             SqlTokenType::Null => Ok(Expression::Literal(Literal::Null(t.span.clone()))),
+            SqlTokenType::Identifier_ => Ok(Expression::Identifier(Identifier { name: self.get_text(t.span.clone(), source), span: t.span.clone() })),
             _ => Err(OakError::custom_error("Not a primary expression leaf")),
         }
     }
@@ -224,7 +272,14 @@ impl<'config> SqlBuilder<'config> {
             match child {
                 RedTree::Node(n) => {
                     if n.green.kind == SqlElementType::Identifier {
-                        name = Some(self.build_identifier(n, source)?);
+                        // The first Identifier child is the function name. Later ones
+                        // come from bare identifier arguments such as `COUNT(age)`.
+                        if name.is_none() {
+                            name = Some(self.build_identifier(n, source)?);
+                        }
+                        else {
+                            args.push(Expression::Identifier(self.build_identifier(n, source)?));
+                        }
                     }
                     else if n.green.kind == SqlElementType::Expression {
                         args.push(self.build_expression(n, source)?);
