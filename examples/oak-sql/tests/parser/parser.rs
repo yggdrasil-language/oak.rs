@@ -234,6 +234,23 @@ fn test_sql_builder_qualified_columns_and_function_calls() {
     };
     assert_eq!(name.name.as_ref(), "LOWER");
     assert!(matches!(args.as_slice(), [Expression::Identifier(identifier)] if identifier.name.as_ref() == "name"));
+
+    // Aggregate names are callable identifiers, not reserved keyword tokens.
+    // `MAX` used to be lexed as its own keyword, which made `MAX(age)` fall into
+    // an error node instead of a function call.
+    let mut session = ParseSession::<SqlLanguage>::default();
+    let result = builder.build(&SourceText::new("SELECT MAX(age) FROM users;"), &[], &mut session);
+    let root = result.result.unwrap_or_else(|error| panic!("MAX(age): {error:?} {:?}", result.diagnostics));
+    let SqlStatement::Select(select) = &root.statements[0]
+    else {
+        panic!("Expected Select statement");
+    };
+    let SelectItem::Expression { expr: Expression::FunctionCall { name, args, .. }, .. } = &select.items[0]
+    else {
+        panic!("Expected function call select item, got {:?}", select.items[0]);
+    };
+    assert_eq!(name.name.as_ref(), "MAX");
+    assert!(matches!(args.as_slice(), [Expression::Identifier(identifier)] if identifier.name.as_ref() == "age"));
 }
 
 #[test]

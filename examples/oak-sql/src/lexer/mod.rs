@@ -444,7 +444,6 @@ impl<'config> SqlLexer<'config> {
             "STRICT" => SqlTokenType::Strict,
             "WITHOUT" => SqlTokenType::Without,
             "ROWID" => SqlTokenType::Rowid,
-            "MAX" => SqlTokenType::Max,
             "EXPLAIN" => SqlTokenType::Explain,
             "PRAGMA" => SqlTokenType::Pragma,
             "SHOW" => SqlTokenType::Show,
