@@ -55,11 +55,13 @@ impl<'config> TypstLexer<'config> {
                 continue;
             }
 
-            if self.lex_number_literal(state) {
+            // 行首标记必须先于数字字面量识别，否则 `1. ` 会被拆成 NumericLiteral 与 Dot，
+            // 永远无法产生 EnumItem。
+            if self.lex_markup(state) {
                 continue;
             }
 
-            if self.lex_markup(state) {
+            if self.lex_number_literal(state) {
                 continue;
             }
 

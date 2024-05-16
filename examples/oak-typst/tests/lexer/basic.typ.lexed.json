@@ -1,7 +1,19 @@
 {
     "success": true,
-    "count": 565,
+    "count": 701,
     "tokens": [
+        {
+            "kind": "Newline",
+            "text": "\n",
+            "start": 33,
+            "end": 34
+        },
+        {
+            "kind": "Newline",
+            "text": "\n",
+            "start": 34,
+            "end": 35
+        },
         {
             "kind": "Hash",
             "text": "#",
@@ -27,6 +39,12 @@
             "end": 45
         },
         {
+            "kind": "Newline",
+            "text": "\n",
+            "start": 45,
+            "end": 46
+        },
+        {
             "kind": "Identifier",
             "text": "paper",
             "start": 50,
@@ -49,6 +67,12 @@
             "text": ",",
             "start": 61,
             "end": 62
+        },
+        {
+            "kind": "Newline",
+            "text": "\n",
+            "start": 62,
+            "end": 63
         },
         {
             "kind": "Identifier",
@@ -135,6 +159,12 @@
             "end": 92
         },
         {
+            "kind": "Newline",
+            "text": "\n",
+            "start": 92,
+            "end": 93
+        },
+        {
             "kind": "Identifier",
             "text": "numbering",
             "start": 97,
@@ -159,6 +189,12 @@
             "end": 112
         },
         {
+            "kind": "Newline",
+            "text": "\n",
+            "start": 112,
+            "end": 113
+        },
+        {
             "kind": "Identifier",
             "text": "header",
             "start": 117,
@@ -175,6 +211,12 @@
             "text": "[",
             "start": 125,
             "end": 126
+        },
+        {
+            "kind": "Newline",
+            "text": "\n",
+            "start": 126,
+            "end": 127
         },
         {
             "kind": "Hash",
@@ -219,6 +261,12 @@
             "end": 149
         },
         {
+            "kind": "Newline",
+            "text": "\n",
+            "start": 149,
+            "end": 150
+        },
+        {
             "kind": "Hash",
             "text": "#",
             "start": 158,
@@ -247,6 +295,12 @@
             "text": ")",
             "start": 190,
             "end": 191
+        },
+        {
+            "kind": "Newline",
+            "text": "\n",
+            "start": 191,
+            "end": 192
         },
         {
             "kind": "Hash",
@@ -283,6 +337,12 @@
             "text": ")",
             "start": 206,
             "end": 207
+        },
+        {
+            "kind": "Newline",
+            "text": "\n",
+            "start": 207,
+            "end": 208
         },
         {
             "kind": "Identifier",
@@ -345,16 +405,40 @@
             "end": 245
         },
         {
+            "kind": "Newline",
+            "text": "\n",
+            "start": 245,
+            "end": 246
+        },
+        {
             "kind": "RightBracket",
             "text": "]",
             "start": 250,
             "end": 251
         },
         {
+            "kind": "Newline",
+            "text": "\n",
+            "start": 251,
+            "end": 252
+        },
+        {
             "kind": "RightParen",
             "text": ")",
             "start": 252,
             "end": 253
+        },
+        {
+            "kind": "Newline",
+            "text": "\n",
+            "start": 253,
+            "end": 254
+        },
+        {
+            "kind": "Newline",
+            "text": "\n",
+            "start": 254,
+            "end": 255
         },
         {
             "kind": "Hash",
@@ -381,6 +465,12 @@
             "end": 265
         },
         {
+            "kind": "Newline",
+            "text": "\n",
+            "start": 265,
+            "end": 266
+        },
+        {
             "kind": "Identifier",
             "text": "font",
             "start": 270,
@@ -403,6 +493,12 @@
             "text": ",",
             "start": 297,
             "end": 298
+        },
+        {
+            "kind": "Newline",
+            "text": "\n",
+            "start": 298,
+            "end": 299
         },
         {
             "kind": "Identifier",
@@ -435,6 +531,12 @@
             "end": 314
         },
         {
+            "kind": "Newline",
+            "text": "\n",
+            "start": 314,
+            "end": 315
+        },
+        {
             "kind": "Identifier",
             "text": "lang",
             "start": 319,
@@ -453,10 +555,28 @@
             "end": 329
         },
         {
+            "kind": "Newline",
+            "text": "\n",
+            "start": 329,
+            "end": 330
+        },
+        {
             "kind": "RightParen",
             "text": ")",
             "start": 330,
             "end": 331
+        },
+        {
+            "kind": "Newline",
+            "text": "\n",
+            "start": 331,
+            "end": 332
+        },
+        {
+            "kind": "Newline",
+            "text": "\n",
+            "start": 332,
+            "end": 333
         },
         {
             "kind": "Hash",
@@ -489,6 +609,18 @@
             "end": 362
         },
         {
+            "kind": "Newline",
+            "text": "\n",
+            "start": 362,
+            "end": 363
+        },
+        {
+            "kind": "Newline",
+            "text": "\n",
+            "start": 363,
+            "end": 364
+        },
+        {
             "kind": "Heading",
             "text": "=",
             "start": 364,
@@ -499,6 +631,12 @@
             "text": "Introduction",
             "start": 366,
             "end": 378
+        },
+        {
+            "kind": "Newline",
+            "text": "\n",
+            "start": 378,
+            "end": 379
         },
         {
             "kind": "Identifier",
@@ -553,6 +691,12 @@
             "text": ".",
             "start": 423,
             "end": 424
+        },
+        {
+            "kind": "Newline",
+            "text": "\n",
+            "start": 424,
+            "end": 425
         },
         {
             "kind": "Identifier",
@@ -657,6 +801,12 @@
             "end": 476
         },
         {
+            "kind": "Newline",
+            "text": "\n",
+            "start": 476,
+            "end": 477
+        },
+        {
             "kind": "Identifier",
             "text": "Escaped",
             "start": 477,
@@ -699,6 +849,18 @@
             "end": 503
         },
         {
+            "kind": "Newline",
+            "text": "\n",
+            "start": 503,
+            "end": 504
+        },
+        {
+            "kind": "Newline",
+            "text": "\n",
+            "start": 504,
+            "end": 505
+        },
+        {
             "kind": "Heading",
             "text": "==",
             "start": 505,
@@ -715,6 +877,12 @@
             "text": "Mode",
             "start": 513,
             "end": 517
+        },
+        {
+            "kind": "Newline",
+            "text": "\n",
+            "start": 517,
+            "end": 518
         },
         {
             "kind": "Identifier",
@@ -777,6 +945,12 @@
             "end": 542
         },
         {
+            "kind": "Newline",
+            "text": "\n",
+            "start": 542,
+            "end": 543
+        },
+        {
             "kind": "Identifier",
             "text": "Display",
             "start": 543,
@@ -795,10 +969,22 @@
             "end": 556
         },
         {
+            "kind": "Newline",
+            "text": "\n",
+            "start": 556,
+            "end": 557
+        },
+        {
             "kind": "Dollar",
             "text": "$",
             "start": 557,
             "end": 558
+        },
+        {
+            "kind": "Newline",
+            "text": "\n",
+            "start": 558,
+            "end": 559
         },
         {
             "kind": "Identifier",
@@ -921,10 +1107,28 @@
             "end": 591
         },
         {
+            "kind": "Newline",
+            "text": "\n",
+            "start": 591,
+            "end": 592
+        },
+        {
             "kind": "Dollar",
             "text": "$",
             "start": 592,
             "end": 593
+        },
+        {
+            "kind": "Newline",
+            "text": "\n",
+            "start": 593,
+            "end": 594
+        },
+        {
+            "kind": "Newline",
+            "text": "\n",
+            "start": 594,
+            "end": 595
         },
         {
             "kind": "Identifier",
@@ -945,10 +1149,22 @@
             "end": 608
         },
         {
+            "kind": "Newline",
+            "text": "\n",
+            "start": 608,
+            "end": 609
+        },
+        {
             "kind": "Dollar",
             "text": "$",
             "start": 609,
             "end": 610
+        },
+        {
+            "kind": "Newline",
+            "text": "\n",
+            "start": 610,
+            "end": 611
         },
         {
             "kind": "Identifier",
@@ -1029,6 +1245,12 @@
             "end": 653
         },
         {
+            "kind": "Newline",
+            "text": "\n",
+            "start": 653,
+            "end": 654
+        },
+        {
             "kind": "Identifier",
             "text": "mat",
             "start": 658,
@@ -1089,6 +1311,12 @@
             "end": 673
         },
         {
+            "kind": "Newline",
+            "text": "\n",
+            "start": 673,
+            "end": 674
+        },
+        {
             "kind": "Identifier",
             "text": "vec",
             "start": 678,
@@ -1125,6 +1353,12 @@
             "end": 687
         },
         {
+            "kind": "Newline",
+            "text": "\n",
+            "start": 687,
+            "end": 688
+        },
+        {
             "kind": "Identifier",
             "text": "cases",
             "start": 692,
@@ -1135,6 +1369,12 @@
             "text": "(",
             "start": 697,
             "end": 698
+        },
+        {
+            "kind": "Newline",
+            "text": "\n",
+            "start": 698,
+            "end": 699
         },
         {
             "kind": "NumericLiteral",
@@ -1173,6 +1413,12 @@
             "end": 720
         },
         {
+            "kind": "Newline",
+            "text": "\n",
+            "start": 720,
+            "end": 721
+        },
+        {
             "kind": "NumericLiteral",
             "text": "0",
             "start": 729,
@@ -1185,10 +1431,22 @@
             "end": 742
         },
         {
+            "kind": "Newline",
+            "text": "\n",
+            "start": 742,
+            "end": 743
+        },
+        {
             "kind": "RightParen",
             "text": ")",
             "start": 747,
             "end": 748
+        },
+        {
+            "kind": "Newline",
+            "text": "\n",
+            "start": 748,
+            "end": 749
         },
         {
             "kind": "Identifier",
@@ -1269,10 +1527,28 @@
             "end": 780
         },
         {
+            "kind": "Newline",
+            "text": "\n",
+            "start": 780,
+            "end": 781
+        },
+        {
             "kind": "Dollar",
             "text": "$",
             "start": 781,
             "end": 782
+        },
+        {
+            "kind": "Newline",
+            "text": "\n",
+            "start": 782,
+            "end": 783
+        },
+        {
+            "kind": "Newline",
+            "text": "\n",
+            "start": 783,
+            "end": 784
         },
         {
             "kind": "Heading",
@@ -1299,6 +1575,12 @@
             "end": 809
         },
         {
+            "kind": "Newline",
+            "text": "\n",
+            "start": 809,
+            "end": 810
+        },
+        {
             "kind": "ListItem",
             "text": "-",
             "start": 810,
@@ -1321,6 +1603,12 @@
             "text": "1",
             "start": 827,
             "end": 828
+        },
+        {
+            "kind": "Newline",
+            "text": "\n",
+            "start": 828,
+            "end": 829
         },
         {
             "kind": "ListItem",
@@ -1347,6 +1635,12 @@
             "end": 847
         },
         {
+            "kind": "Newline",
+            "text": "\n",
+            "start": 847,
+            "end": 848
+        },
+        {
             "kind": "Minus",
             "text": "-",
             "start": 852,
@@ -1365,6 +1659,12 @@
             "end": 865
         },
         {
+            "kind": "Newline",
+            "text": "\n",
+            "start": 865,
+            "end": 866
+        },
+        {
             "kind": "Minus",
             "text": "-",
             "start": 874,
@@ -1381,6 +1681,18 @@
             "text": "nested",
             "start": 883,
             "end": 889
+        },
+        {
+            "kind": "Newline",
+            "text": "\n",
+            "start": 889,
+            "end": 890
+        },
+        {
+            "kind": "Newline",
+            "text": "\n",
+            "start": 890,
+            "end": 891
         },
         {
             "kind": "ListItem",
@@ -1407,6 +1719,12 @@
             "end": 907
         },
         {
+            "kind": "Newline",
+            "text": "\n",
+            "start": 907,
+            "end": 908
+        },
+        {
             "kind": "ListItem",
             "text": "+",
             "start": 908,
@@ -1431,6 +1749,12 @@
             "end": 924
         },
         {
+            "kind": "Newline",
+            "text": "\n",
+            "start": 924,
+            "end": 925
+        },
+        {
             "kind": "Plus",
             "text": "+",
             "start": 929,
@@ -1447,6 +1771,18 @@
             "text": "ordered",
             "start": 938,
             "end": 945
+        },
+        {
+            "kind": "Newline",
+            "text": "\n",
+            "start": 945,
+            "end": 946
+        },
+        {
+            "kind": "Newline",
+            "text": "\n",
+            "start": 946,
+            "end": 947
         },
         {
             "kind": "Slash",
@@ -1483,6 +1819,12 @@
             "text": "1",
             "start": 968,
             "end": 969
+        },
+        {
+            "kind": "Newline",
+            "text": "\n",
+            "start": 969,
+            "end": 970
         },
         {
             "kind": "Slash",
@@ -1545,6 +1887,12 @@
             "end": 1014
         },
         {
+            "kind": "Newline",
+            "text": "\n",
+            "start": 1014,
+            "end": 1015
+        },
+        {
             "kind": "Identifier",
             "text": "spans",
             "start": 1017,
@@ -1569,6 +1917,18 @@
             "end": 1038
         },
         {
+            "kind": "Newline",
+            "text": "\n",
+            "start": 1038,
+            "end": 1039
+        },
+        {
+            "kind": "Newline",
+            "text": "\n",
+            "start": 1039,
+            "end": 1040
+        },
+        {
             "kind": "Heading",
             "text": "==",
             "start": 1040,
@@ -1591,6 +1951,12 @@
             "text": "Scripting",
             "start": 1057,
             "end": 1066
+        },
+        {
+            "kind": "Newline",
+            "text": "\n",
+            "start": 1066,
+            "end": 1067
         },
         {
             "kind": "Hash",
@@ -1653,6 +2019,12 @@
             "end": 1085
         },
         {
+            "kind": "Newline",
+            "text": "\n",
+            "start": 1085,
+            "end": 1086
+        },
+        {
             "kind": "Identifier",
             "text": "x",
             "start": 1090,
@@ -1671,10 +2043,28 @@
             "end": 1095
         },
         {
+            "kind": "Newline",
+            "text": "\n",
+            "start": 1095,
+            "end": 1096
+        },
+        {
             "kind": "RightBrace",
             "text": "}",
             "start": 1096,
             "end": 1097
+        },
+        {
+            "kind": "Newline",
+            "text": "\n",
+            "start": 1097,
+            "end": 1098
+        },
+        {
+            "kind": "Newline",
+            "text": "\n",
+            "start": 1098,
+            "end": 1099
         },
         {
             "kind": "Identifier",
@@ -1767,6 +2157,18 @@
             "end": 1132
         },
         {
+            "kind": "Newline",
+            "text": "\n",
+            "start": 1132,
+            "end": 1133
+        },
+        {
+            "kind": "Newline",
+            "text": "\n",
+            "start": 1133,
+            "end": 1134
+        },
+        {
             "kind": "Hash",
             "text": "#",
             "start": 1134,
@@ -1857,6 +2259,12 @@
             "end": 1163
         },
         {
+            "kind": "Newline",
+            "text": "\n",
+            "start": 1163,
+            "end": 1164
+        },
+        {
             "kind": "Hash",
             "text": "#",
             "start": 1164,
@@ -1893,6 +2301,12 @@
             "end": 1182
         },
         {
+            "kind": "Newline",
+            "text": "\n",
+            "start": 1182,
+            "end": 1183
+        },
+        {
             "kind": "Minus",
             "text": "-",
             "start": 1187,
@@ -1923,10 +2337,28 @@
             "end": 1198
         },
         {
+            "kind": "Newline",
+            "text": "\n",
+            "start": 1198,
+            "end": 1199
+        },
+        {
             "kind": "RightBracket",
             "text": "]",
             "start": 1199,
             "end": 1200
+        },
+        {
+            "kind": "Newline",
+            "text": "\n",
+            "start": 1200,
+            "end": 1201
+        },
+        {
+            "kind": "Newline",
+            "text": "\n",
+            "start": 1201,
+            "end": 1202
         },
         {
             "kind": "Hash",
@@ -2007,6 +2439,12 @@
             "end": 1243
         },
         {
+            "kind": "Newline",
+            "text": "\n",
+            "start": 1243,
+            "end": 1244
+        },
+        {
             "kind": "Hash",
             "text": "#",
             "start": 1244,
@@ -2065,6 +2503,18 @@
             "text": "version",
             "start": 1272,
             "end": 1279
+        },
+        {
+            "kind": "Newline",
+            "text": "\n",
+            "start": 1279,
+            "end": 1280
+        },
+        {
+            "kind": "Newline",
+            "text": "\n",
+            "start": 1280,
+            "end": 1281
         },
         {
             "kind": "Hash",
@@ -2127,6 +2577,12 @@
             "end": 1303
         },
         {
+            "kind": "Newline",
+            "text": "\n",
+            "start": 1303,
+            "end": 1304
+        },
+        {
             "kind": "Identifier",
             "text": "The",
             "start": 1308,
@@ -2163,6 +2619,12 @@
             "end": 1330
         },
         {
+            "kind": "Newline",
+            "text": "\n",
+            "start": 1330,
+            "end": 1331
+        },
+        {
             "kind": "RightBracket",
             "text": "]",
             "start": 1331,
@@ -2179,6 +2641,12 @@
             "text": "[",
             "start": 1338,
             "end": 1339
+        },
+        {
+            "kind": "Newline",
+            "text": "\n",
+            "start": 1339,
+            "end": 1340
         },
         {
             "kind": "Identifier",
@@ -2211,10 +2679,28 @@
             "end": 1362
         },
         {
+            "kind": "Newline",
+            "text": "\n",
+            "start": 1362,
+            "end": 1363
+        },
+        {
             "kind": "RightBracket",
             "text": "]",
             "start": 1363,
             "end": 1364
+        },
+        {
+            "kind": "Newline",
+            "text": "\n",
+            "start": 1364,
+            "end": 1365
+        },
+        {
+            "kind": "Newline",
+            "text": "\n",
+            "start": 1365,
+            "end": 1366
         },
         {
             "kind": "Hash",
@@ -2265,6 +2751,12 @@
             "end": 1388
         },
         {
+            "kind": "Newline",
+            "text": "\n",
+            "start": 1388,
+            "end": 1389
+        },
+        {
             "kind": "Hash",
             "text": "#",
             "start": 1393,
@@ -2311,6 +2803,12 @@
             "text": ")",
             "start": 1413,
             "end": 1414
+        },
+        {
+            "kind": "Newline",
+            "text": "\n",
+            "start": 1414,
+            "end": 1415
         },
         {
             "kind": "Hash",
@@ -2367,6 +2865,12 @@
             "end": 1438
         },
         {
+            "kind": "Newline",
+            "text": "\n",
+            "start": 1438,
+            "end": 1439
+        },
+        {
             "kind": "Hash",
             "text": "#",
             "start": 1447,
@@ -2379,16 +2883,40 @@
             "end": 1450
         },
         {
+            "kind": "Newline",
+            "text": "\n",
+            "start": 1450,
+            "end": 1451
+        },
+        {
             "kind": "RightBracket",
             "text": "]",
             "start": 1455,
             "end": 1456
         },
         {
+            "kind": "Newline",
+            "text": "\n",
+            "start": 1456,
+            "end": 1457
+        },
+        {
             "kind": "RightBracket",
             "text": "]",
             "start": 1457,
             "end": 1458
+        },
+        {
+            "kind": "Newline",
+            "text": "\n",
+            "start": 1458,
+            "end": 1459
+        },
+        {
+            "kind": "Newline",
+            "text": "\n",
+            "start": 1459,
+            "end": 1460
         },
         {
             "kind": "Heading",
@@ -2415,6 +2943,12 @@
             "end": 1481
         },
         {
+            "kind": "Newline",
+            "text": "\n",
+            "start": 1481,
+            "end": 1482
+        },
+        {
             "kind": "Hash",
             "text": "#",
             "start": 1482,
@@ -2431,6 +2965,12 @@
             "text": "(",
             "start": 1489,
             "end": 1490
+        },
+        {
+            "kind": "Newline",
+            "text": "\n",
+            "start": 1490,
+            "end": 1491
         },
         {
             "kind": "Identifier",
@@ -2493,6 +3033,12 @@
             "end": 1525
         },
         {
+            "kind": "Newline",
+            "text": "\n",
+            "start": 1525,
+            "end": 1526
+        },
+        {
             "kind": "Identifier",
             "text": "caption",
             "start": 1530,
@@ -2541,10 +3087,28 @@
             "end": 1554
         },
         {
+            "kind": "Newline",
+            "text": "\n",
+            "start": 1554,
+            "end": 1555
+        },
+        {
             "kind": "RightParen",
             "text": ")",
             "start": 1555,
             "end": 1556
+        },
+        {
+            "kind": "Newline",
+            "text": "\n",
+            "start": 1556,
+            "end": 1557
+        },
+        {
+            "kind": "Newline",
+            "text": "\n",
+            "start": 1557,
+            "end": 1558
         },
         {
             "kind": "Heading",
@@ -2557,6 +3121,12 @@
             "text": "References",
             "start": 1561,
             "end": 1571
+        },
+        {
+            "kind": "Newline",
+            "text": "\n",
+            "start": 1571,
+            "end": 1572
         },
         {
             "kind": "Identifier",
@@ -2601,6 +3171,12 @@
             "end": 1600
         },
         {
+            "kind": "Newline",
+            "text": "\n",
+            "start": 1600,
+            "end": 1601
+        },
+        {
             "kind": "Identifier",
             "text": "See",
             "start": 1601,
@@ -2637,6 +3213,18 @@
             "end": 1619
         },
         {
+            "kind": "Newline",
+            "text": "\n",
+            "start": 1619,
+            "end": 1620
+        },
+        {
+            "kind": "Newline",
+            "text": "\n",
+            "start": 1620,
+            "end": 1621
+        },
+        {
             "kind": "Heading",
             "text": "==",
             "start": 1621,
@@ -2653,6 +3241,12 @@
             "text": "Blocks",
             "start": 1629,
             "end": 1635
+        },
+        {
+            "kind": "Newline",
+            "text": "\n",
+            "start": 1635,
+            "end": 1636
         },
         {
             "kind": "Backtick",
@@ -2677,6 +3271,12 @@
             "text": "rust",
             "start": 1639,
             "end": 1643
+        },
+        {
+            "kind": "Newline",
+            "text": "\n",
+            "start": 1643,
+            "end": 1644
         },
         {
             "kind": "Identifier",
@@ -2707,6 +3307,12 @@
             "text": "{",
             "start": 1654,
             "end": 1655
+        },
+        {
+            "kind": "Newline",
+            "text": "\n",
+            "start": 1655,
+            "end": 1656
         },
         {
             "kind": "Identifier",
@@ -2745,10 +3351,22 @@
             "end": 1700
         },
         {
+            "kind": "Newline",
+            "text": "\n",
+            "start": 1700,
+            "end": 1701
+        },
+        {
             "kind": "RightBrace",
             "text": "}",
             "start": 1701,
             "end": 1702
+        },
+        {
+            "kind": "Newline",
+            "text": "\n",
+            "start": 1702,
+            "end": 1703
         },
         {
             "kind": "Backtick",
@@ -2767,6 +3385,18 @@
             "text": "`",
             "start": 1705,
             "end": 1706
+        },
+        {
+            "kind": "Newline",
+            "text": "\n",
+            "start": 1706,
+            "end": 1707
+        },
+        {
+            "kind": "Newline",
+            "text": "\n",
+            "start": 1707,
+            "end": 1708
         },
         {
             "kind": "Backtick",
@@ -2791,6 +3421,12 @@
             "text": "python",
             "start": 1711,
             "end": 1717
+        },
+        {
+            "kind": "Newline",
+            "text": "\n",
+            "start": 1717,
+            "end": 1718
         },
         {
             "kind": "Identifier",
@@ -2823,6 +3459,12 @@
             "end": 1730
         },
         {
+            "kind": "Newline",
+            "text": "\n",
+            "start": 1730,
+            "end": 1731
+        },
+        {
             "kind": "Identifier",
             "text": "print",
             "start": 1735,
@@ -2847,6 +3489,12 @@
             "end": 1761
         },
         {
+            "kind": "Newline",
+            "text": "\n",
+            "start": 1761,
+            "end": 1762
+        },
+        {
             "kind": "Backtick",
             "text": "`",
             "start": 1762,
@@ -2865,6 +3513,18 @@
             "end": 1765
         },
         {
+            "kind": "Newline",
+            "text": "\n",
+            "start": 1765,
+            "end": 1766
+        },
+        {
+            "kind": "Newline",
+            "text": "\n",
+            "start": 1766,
+            "end": 1767
+        },
+        {
             "kind": "Heading",
             "text": "==",
             "start": 1767,
@@ -2877,6 +3537,30 @@
             "end": 1778
         },
         {
+            "kind": "Newline",
+            "text": "\n",
+            "start": 1778,
+            "end": 1779
+        },
+        {
+            "kind": "Newline",
+            "text": "\n",
+            "start": 1801,
+            "end": 1802
+        },
+        {
+            "kind": "Newline",
+            "text": "\n",
+            "start": 1874,
+            "end": 1875
+        },
+        {
+            "kind": "Newline",
+            "text": "\n",
+            "start": 1875,
+            "end": 1876
+        },
+        {
             "kind": "Heading",
             "text": "==",
             "start": 1876,
@@ -2887,6 +3571,12 @@
             "text": "Labels",
             "start": 1879,
             "end": 1885
+        },
+        {
+            "kind": "Newline",
+            "text": "\n",
+            "start": 1885,
+            "end": 1886
         },
         {
             "kind": "Less",
@@ -2905,6 +3595,12 @@
             "text": ">",
             "start": 1892,
             "end": 1893
+        },
+        {
+            "kind": "Newline",
+            "text": "\n",
+            "start": 1893,
+            "end": 1894
         },
         {
             "kind": "Less",
@@ -2937,6 +3633,18 @@
             "end": 1908
         },
         {
+            "kind": "Newline",
+            "text": "\n",
+            "start": 1908,
+            "end": 1909
+        },
+        {
+            "kind": "Newline",
+            "text": "\n",
+            "start": 1909,
+            "end": 1910
+        },
+        {
             "kind": "Heading",
             "text": "==",
             "start": 1910,
@@ -2953,6 +3661,12 @@
             "text": "Operations",
             "start": 1920,
             "end": 1930
+        },
+        {
+            "kind": "Newline",
+            "text": "\n",
+            "start": 1930,
+            "end": 1931
         },
         {
             "kind": "Hash",
@@ -2983,6 +3697,12 @@
             "text": "\"World\"",
             "start": 1943,
             "end": 1950
+        },
+        {
+            "kind": "Newline",
+            "text": "\n",
+            "start": 1950,
+            "end": 1951
         },
         {
             "kind": "Hash",
@@ -3021,6 +3741,18 @@
             "end": 1969
         },
         {
+            "kind": "Newline",
+            "text": "\n",
+            "start": 1969,
+            "end": 1970
+        },
+        {
+            "kind": "Newline",
+            "text": "\n",
+            "start": 1970,
+            "end": 1971
+        },
+        {
             "kind": "Heading",
             "text": "==",
             "start": 1971,
@@ -3037,6 +3769,12 @@
             "text": "Text",
             "start": 1978,
             "end": 1982
+        },
+        {
+            "kind": "Newline",
+            "text": "\n",
+            "start": 1982,
+            "end": 1983
         },
         {
             "kind": "Backtick",
@@ -3063,6 +3801,12 @@
             "end": 1993
         },
         {
+            "kind": "Newline",
+            "text": "\n",
+            "start": 1993,
+            "end": 1994
+        },
+        {
             "kind": "Backtick",
             "text": "`",
             "start": 1994,
@@ -3079,6 +3823,12 @@
             "text": "`",
             "start": 1996,
             "end": 1997
+        },
+        {
+            "kind": "Newline",
+            "text": "\n",
+            "start": 1997,
+            "end": 1998
         },
         {
             "kind": "Identifier",
@@ -3099,6 +3849,12 @@
             "end": 2012
         },
         {
+            "kind": "Newline",
+            "text": "\n",
+            "start": 2012,
+            "end": 2013
+        },
+        {
             "kind": "Backtick",
             "text": "`",
             "start": 2013,
@@ -3117,6 +3873,18 @@
             "end": 2016
         },
         {
+            "kind": "Newline",
+            "text": "\n",
+            "start": 2016,
+            "end": 2017
+        },
+        {
+            "kind": "Newline",
+            "text": "\n",
+            "start": 2017,
+            "end": 2018
+        },
+        {
             "kind": "Heading",
             "text": "==",
             "start": 2018,
@@ -3127,6 +3895,12 @@
             "text": "Shapes",
             "start": 2021,
             "end": 2027
+        },
+        {
+            "kind": "Newline",
+            "text": "\n",
+            "start": 2027,
+            "end": 2028
         },
         {
             "kind": "Hash",
@@ -3231,6 +4005,12 @@
             "end": 2072
         },
         {
+            "kind": "Newline",
+            "text": "\n",
+            "start": 2072,
+            "end": 2073
+        },
+        {
             "kind": "Hash",
             "text": "#",
             "start": 2073,
@@ -3277,6 +4057,12 @@
             "text": ")",
             "start": 2093,
             "end": 2094
+        },
+        {
+            "kind": "Newline",
+            "text": "\n",
+            "start": 2094,
+            "end": 2095
         },
         {
             "kind": "Hash",
@@ -3327,6 +4113,18 @@
             "end": 2114
         },
         {
+            "kind": "Newline",
+            "text": "\n",
+            "start": 2114,
+            "end": 2115
+        },
+        {
+            "kind": "Newline",
+            "text": "\n",
+            "start": 2115,
+            "end": 2116
+        },
+        {
             "kind": "Heading",
             "text": "==",
             "start": 2116,
@@ -3337,6 +4135,12 @@
             "text": "Imports",
             "start": 2119,
             "end": 2126
+        },
+        {
+            "kind": "Newline",
+            "text": "\n",
+            "start": 2126,
+            "end": 2127
         },
         {
             "kind": "Hash",
@@ -3369,6 +4173,12 @@
             "end": 2149
         },
         {
+            "kind": "Newline",
+            "text": "\n",
+            "start": 2149,
+            "end": 2150
+        },
+        {
             "kind": "Hash",
             "text": "#",
             "start": 2150,
@@ -3385,6 +4195,12 @@
             "text": "\"chapter1.typ\"",
             "start": 2159,
             "end": 2173
+        },
+        {
+            "kind": "Newline",
+            "text": "\n",
+            "start": 2173,
+            "end": 2174
         },
         {
             "kind": "Eof",
