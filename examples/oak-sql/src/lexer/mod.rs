@@ -92,6 +92,9 @@ impl<'config> SqlLexer<'config> {
                     'a'..='z' | 'A'..='Z' | '_' => {
                         self.lex_identifier_or_keyword(state);
                     }
+                    '@' => {
+                        self.lex_system_variable(state);
+                    }
                     '<' | '>' | '!' | '=' | '+' | '*' | '%' => {
                         self.lex_operators(state);
                     }
@@ -192,6 +195,35 @@ impl<'config> SqlLexer<'config> {
         }
 
         state.add_token(SqlTokenType::StringLiteral, start, state.get_position());
+        true
+    }
+
+    /// Scans a MySQL `@@[GLOBAL|SESSION|LOCAL.]name` system variable reference.
+    ///
+    /// The whole reference including the `@@` sigil becomes a single
+    /// [`SqlTokenType::Identifier_`] token so the parser and builder keep it as
+    /// one identifier. Consumers decide what the prefix means, the SQL frontend
+    /// does not resolve variables. A lone `@` (a MySQL user variable) stays an
+    /// error token because no supported dialect gives it meaning here.
+    fn lex_system_variable<'a, S: Source + ?Sized>(&self, state: &mut State<'a, S>) -> bool {
+        let start = state.get_position();
+        if !state.starts_with("@@") {
+            state.advance(1);
+            state.add_token(SqlTokenType::Error, start, state.get_position());
+            return true;
+        }
+        state.advance(2);
+        let name_start = state.get_position();
+        while let Some(ch) = state.peek() {
+            if ch.is_alphanumeric() || ch == '_' || ch == '$' || ch == '.' {
+                state.advance(ch.len_utf8());
+            }
+            else {
+                break;
+            }
+        }
+        let kind = if state.get_position() > name_start { SqlTokenType::Identifier_ } else { SqlTokenType::Error };
+        state.add_token(kind, start, state.get_position());
         true
     }
 
@@ -405,6 +437,10 @@ impl<'config> SqlLexer<'config> {
             "NOTHING" => SqlTokenType::Nothing,
             "RETURNING" => SqlTokenType::Returning,
             "ILIKE" => SqlTokenType::Ilike,
+            "LIKE" => SqlTokenType::Like,
+            "BETWEEN" => SqlTokenType::Between,
+            "IN" => SqlTokenType::In,
+            "IS" => SqlTokenType::Is,
             "STRICT" => SqlTokenType::Strict,
             "WITHOUT" => SqlTokenType::Without,
             "ROWID" => SqlTokenType::Rowid,
