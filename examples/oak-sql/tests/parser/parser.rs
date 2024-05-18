@@ -286,6 +286,120 @@ fn test_sql_builder_prefix_unary_signs() {
     assert!(matches!(right.as_ref(), Expression::Unary { op: UnaryOperator::Minus, .. }));
 }
 
+/// Before the fix `WHERE NOT (a = 1)` parsed `NOT` as a lone `ErrorNode`, so the
+/// builder saw no `Expression` child and left `SelectStatement.expr` as `None`.
+/// That silently dropped the predicate instead of rejecting it.
+#[test]
+fn test_sql_builder_prefix_not() {
+    let Expression::Unary { op: UnaryOperator::Not, expr, .. } = build_where("SELECT * FROM t WHERE NOT (a = 1);")
+    else {
+        panic!("Expected NOT predicate");
+    };
+    assert!(matches!(expr.as_ref(), Expression::Binary { op: BinaryOperator::Equal, .. }));
+
+    // `NOT` binds tighter than `AND` and looser than comparisons: `NOT a = 1`
+    // must be `NOT (a = 1)`, never `(NOT a) = 1`.
+    let Expression::Unary { op: UnaryOperator::Not, expr, .. } = build_where("SELECT * FROM t WHERE NOT a = 1;")
+    else {
+        panic!("Expected NOT around a comparison");
+    };
+    assert!(matches!(expr.as_ref(), Expression::Binary { op: BinaryOperator::Equal, .. }));
+
+    let Expression::Unary { op: UnaryOperator::Not, expr, .. } = build_where("SELECT * FROM t WHERE NOT NOT a = 1;")
+    else {
+        panic!("Expected nested NOT");
+    };
+    assert!(matches!(expr.as_ref(), Expression::Unary { op: UnaryOperator::Not, .. }));
+
+    // `IS` binds tighter than `NOT`, so the negation is around `flag IS NULL`.
+    let Expression::Unary { op: UnaryOperator::Not, expr, .. } = build_where("SELECT * FROM t WHERE NOT flag IS NULL;")
+    else {
+        panic!("Expected NOT around IS NULL");
+    };
+    assert!(matches!(expr.as_ref(), Expression::Binary { op: BinaryOperator::Equal, right, .. } if matches!(right.as_ref(), Expression::Literal(Literal::Null(_)))));
+
+    let (_, source) = build_statement("SELECT * FROM t WHERE NOT (a = 1);");
+    assert_eq!(source, "SELECT*FROM t WHERE NOT a=1;");
+}
+
+#[test]
+fn test_sql_builder_not_precedence_with_and_or() {
+    // `AND` binds tighter than `OR` and both bind looser than `NOT`.
+    let Expression::Binary { op: BinaryOperator::And, left, right, .. } = build_where("SELECT * FROM t WHERE NOT a = 1 AND b = 2;")
+    else {
+        panic!("Expected AND at the root");
+    };
+    assert!(matches!(left.as_ref(), Expression::Unary { op: UnaryOperator::Not, .. }));
+    assert!(matches!(right.as_ref(), Expression::Binary { op: BinaryOperator::Equal, .. }));
+
+    let Expression::Binary { op: BinaryOperator::Or, left, right, .. } = build_where("SELECT * FROM t WHERE a = 1 OR NOT b = 2;")
+    else {
+        panic!("Expected OR at the root");
+    };
+    assert!(matches!(left.as_ref(), Expression::Binary { op: BinaryOperator::Equal, .. }));
+    assert!(matches!(right.as_ref(), Expression::Unary { op: UnaryOperator::Not, .. }));
+
+    let Expression::Binary { op: BinaryOperator::Or, left, .. } = build_where("SELECT * FROM t WHERE NOT a = 1 OR b = 2;")
+    else {
+        panic!("Expected OR at the root");
+    };
+    assert!(matches!(left.as_ref(), Expression::Unary { op: UnaryOperator::Not, .. }));
+}
+
+#[test]
+fn test_sql_builder_negated_predicates() {
+    let Expression::InList { list, negated: true, .. } = build_where("SELECT * FROM t WHERE a NOT IN (1, 2);")
+    else {
+        panic!("Expected negated IN list");
+    };
+    assert_eq!(list.len(), 2);
+
+    let Expression::Unary { op: UnaryOperator::Not, expr, .. } = build_where("SELECT * FROM t WHERE NOT a IN (1, 2);")
+    else {
+        panic!("Expected NOT around IN");
+    };
+    assert!(matches!(expr.as_ref(), Expression::InList { negated: false, .. }));
+
+    let Expression::Between { negated: true, low, high, .. } = build_where("SELECT * FROM t WHERE a NOT BETWEEN 1 AND 2;")
+    else {
+        panic!("Expected negated BETWEEN");
+    };
+    assert!(matches!(low.as_ref(), Expression::Literal(Literal::Number(value, _)) if value.as_ref() == "1"));
+    assert!(matches!(high.as_ref(), Expression::Literal(Literal::Number(value, _)) if value.as_ref() == "2"));
+
+    let Expression::Unary { op: UnaryOperator::Not, expr, .. } = build_where("SELECT * FROM t WHERE name NOT LIKE 'a%';")
+    else {
+        panic!("Expected NOT LIKE");
+    };
+    assert!(matches!(expr.as_ref(), Expression::Binary { op: BinaryOperator::Like, .. }));
+
+    let Expression::Binary { op: BinaryOperator::NotEqual, right, .. } = build_where("SELECT * FROM t WHERE a IS NOT TRUE;")
+    else {
+        panic!("Expected IS NOT TRUE");
+    };
+    assert!(matches!(right.as_ref(), Expression::Literal(Literal::Boolean(true, _))));
+
+    let (_, source) = build_statement("SELECT * FROM t WHERE a NOT IN (1, 2);");
+    assert_eq!(source, "SELECT*FROM t WHERE a NOT IN(1,2);");
+}
+
+#[test]
+fn test_sql_builder_unsupported_predicate_is_reported() {
+    let config = SqlLanguage::default();
+    let builder = SqlBuilder::new(&config);
+    // An unsupported predicate must surface as an error. Before the fix it became
+    // `SelectStatement.expr == None`, which downstream read as "match every row".
+    let mut session = ParseSession::<SqlLanguage>::default();
+    let result = builder.build(&SourceText::new("SELECT * FROM t WHERE EXISTS (SELECT 1);"), &[], &mut session);
+    assert!(result.result.is_err(), "Unsupported predicate must not become `None`: {:?}", result.result);
+
+    // A trailing unsupported token must abort parsing instead of keeping only the
+    // first half of the predicate.
+    let mut session = ParseSession::<SqlLanguage>::default();
+    let result = builder.build(&SourceText::new("SELECT * FROM t WHERE a = 1 XOR b = 2;"), &[], &mut session);
+    assert!(result.result.is_err(), "Partially parsed WHERE must not be accepted: {:?}", result.result);
+}
+
 #[test]
 fn test_sql_builder_insert() {
     let config = SqlLanguage::default();

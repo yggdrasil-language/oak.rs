@@ -36,12 +36,13 @@ impl<'config> SqlBuilder<'config> {
             }
         }
 
-        // Prefix unary operators (`-3`, `+1`) keep the sign as a leading leaf, so it
-        // must be consumed before the primary expression. Otherwise the binary scan
-        // would treat it as a minus without a left operand.
+        // Prefix unary operators (`-3`, `+1`, `NOT flag`) keep the operator as a
+        // leading leaf, so it must be consumed before the primary expression.
+        // Otherwise the binary scan would treat it as a minus without a left operand.
         let mut prefix_end = 0usize;
         let mut prefix_start: Option<usize> = None;
         let mut negate = false;
+        let mut logical_not = false;
         while prefix_end < children.len() {
             match &children[prefix_end] {
                 RedTree::Leaf(leaf) if leaf.kind == SqlTokenType::Whitespace => prefix_end += 1,
@@ -49,6 +50,11 @@ impl<'config> SqlBuilder<'config> {
                     if leaf.kind == SqlTokenType::Minus {
                         negate = !negate;
                     }
+                    prefix_start.get_or_insert(leaf.span.start);
+                    prefix_end += 1;
+                }
+                RedTree::Leaf(leaf) if leaf.kind == SqlTokenType::Not => {
+                    logical_not = !logical_not;
                     prefix_start.get_or_insert(leaf.span.start);
                     prefix_end += 1;
                 }
@@ -62,6 +68,10 @@ impl<'config> SqlBuilder<'config> {
                 let end = left.span().end;
                 left = Expression::Unary { op: UnaryOperator::Minus, expr: Box::new(left), span: Range { start, end } };
             }
+            if logical_not {
+                let end = left.span().end;
+                left = Expression::Unary { op: UnaryOperator::Not, expr: Box::new(left), span: Range { start, end } };
+            }
         }
 
         // Precedence climbing
@@ -70,32 +80,52 @@ impl<'config> SqlBuilder<'config> {
         // If it's already structured (e.g. nested Expression nodes), we might need to handle it differently.
 
         let mut i = prefix_end;
+        // A `NOT` leaf that precedes `IN`, `BETWEEN` or `LIKE` belongs to the
+        // operator. The Pratt parser keeps it as a sibling of the operator, so the
+        // builder has to carry the flag until the operator branch consumes it.
+        let mut negated_operator = false;
         while i < children.len() {
             let child = &children[i];
             if let RedTree::Leaf(op_token) = child {
                 let kind = op_token.kind;
                 match kind {
+                    SqlTokenType::Not => {
+                        negated_operator = true;
+                    }
                     // === BETWEEN low AND high ===
                     SqlTokenType::Between => {
-                        let precedence = 2;
+                        let precedence = 5;
                         if precedence >= min_precedence {
                             i += 1;
                             while matches!(children.get(i), Some(RedTree::Leaf(leaf)) if leaf.kind == SqlTokenType::Whitespace) {
                                 i += 1;
                             }
-                            if let Some(RedTree::Node(n)) = children.get(i) {
-                                // The Pratt parser folds `low AND high` into one right operand.
-                                if let Expression::Binary { left: low, op: BinaryOperator::And, right: high, .. } = self.build_expression_with_precedence(n.clone(), source, 0)? {
-                                    let span = Range { start: left.span().start, end: high.span().end };
-                                    left = Expression::Between { expr: Box::new(left), low, high, negated: false, span };
-                                    continue;
+                            if let Some(RedTree::Node(low_node)) = children.get(i) {
+                                let low = self.build_expression_with_precedence(low_node.clone(), source, 6)?;
+                                i += 1;
+                                while matches!(children.get(i), Some(RedTree::Leaf(leaf)) if leaf.kind == SqlTokenType::Whitespace) {
+                                    i += 1;
+                                }
+                                let has_and = matches!(children.get(i), Some(RedTree::Leaf(leaf)) if leaf.kind == SqlTokenType::And);
+                                if has_and {
+                                    i += 1;
+                                    while matches!(children.get(i), Some(RedTree::Leaf(leaf)) if leaf.kind == SqlTokenType::Whitespace) {
+                                        i += 1;
+                                    }
+                                    if let Some(RedTree::Node(high_node)) = children.get(i) {
+                                        let high = Box::new(self.build_expression_with_precedence(high_node.clone(), source, 6)?);
+                                        let span = Range { start: left.span().start, end: high.span().end };
+                                        left = Expression::Between { expr: Box::new(left), low: Box::new(low), high, negated: negated_operator, span };
+                                        negated_operator = false;
+                                        continue;
+                                    }
                                 }
                             }
                         }
                     }
                     // === IS [NOT] NULL ===
                     SqlTokenType::Is => {
-                        let precedence = 2;
+                        let precedence = 5;
                         if precedence >= min_precedence {
                             i += 1;
                             let mut negated = false;
@@ -120,29 +150,19 @@ impl<'config> SqlBuilder<'config> {
                     }
                     // === IN (list) / IN (subquery) ===
                     SqlTokenType::In => {
-                        let precedence = 2;
+                        let precedence = 5;
                         if precedence >= min_precedence {
                             i += 1;
                             while matches!(children.get(i), Some(RedTree::Leaf(leaf)) if leaf.kind == SqlTokenType::Whitespace) {
                                 i += 1;
                             }
                             if let Some(RedTree::Node(n)) = children.get(i) {
-                                let right = self.build_expression_with_precedence(n.clone(), source, 0)?;
-                                let span = Range { start: left.span().start, end: right.span().end };
-                                let built = match right {
-                                    Expression::Vector { elements, .. } => {
-                                        left = Expression::InList { expr: Box::new(left), list: elements, negated: false, span };
-                                        true
-                                    }
-                                    Expression::Subquery { query, .. } => {
-                                        left = Expression::InSubquery { expr: Box::new(left), query, negated: false, span };
-                                        true
-                                    }
-                                    _ => false,
-                                };
-                                if built {
-                                    continue;
-                                }
+                                let span = Range { start: left.span().start, end: n.span().end };
+                                let mut list = Vec::new();
+                                self.collect_expressions(n.clone(), source, &mut list)?;
+                                left = Expression::InList { expr: Box::new(left), list, negated: negated_operator, span };
+                                negated_operator = false;
+                                continue;
                             }
                         }
                     }
@@ -173,7 +193,15 @@ impl<'config> SqlBuilder<'config> {
 
                                 if let Some(right) = next_operand {
                                     let span = Range { start: left.span().start, end: right.span().end };
-                                    left = Expression::Binary { left: Box::new(left), op, right: Box::new(right), span };
+                                    let binary = Expression::Binary { left: Box::new(left), op, right: Box::new(right), span };
+                                    left = if negated_operator && op == BinaryOperator::Like {
+                                        let span = binary.span().clone();
+                                        Expression::Unary { op: UnaryOperator::Not, expr: Box::new(binary), span }
+                                    }
+                                    else {
+                                        binary
+                                    };
+                                    negated_operator = false;
                                     continue;
                                 }
                             }
@@ -279,10 +307,10 @@ impl<'config> SqlBuilder<'config> {
     fn get_precedence(&self, kind: SqlTokenType) -> u8 {
         match kind {
             SqlTokenType::Or => 1,
-            SqlTokenType::Between | SqlTokenType::In | SqlTokenType::Is => 2,
-            SqlTokenType::And => 3,
+            SqlTokenType::And => 2,
             SqlTokenType::Equal | SqlTokenType::NotEqual | SqlTokenType::Less | SqlTokenType::Greater | SqlTokenType::LessEqual | SqlTokenType::GreaterEqual | SqlTokenType::Like => 4,
-            SqlTokenType::Concat => 5,
+            SqlTokenType::Between | SqlTokenType::In | SqlTokenType::Is => 5,
+            SqlTokenType::Concat => 6,
             SqlTokenType::Plus | SqlTokenType::Minus => 10,
             SqlTokenType::Star | SqlTokenType::Slash | SqlTokenType::Percent => 11,
             _ => 0,
