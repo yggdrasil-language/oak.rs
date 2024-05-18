@@ -12,6 +12,8 @@ pub enum SqlElementType {
     TransactionStatement,
     /// `SET NAMES` session statement.
     SetNamesStatement,
+    /// `SET <scope?> <name> = <value>` session statement.
+    SetVariableStatement,
     /// PRAGMA statement.
     PragmaStatement,
     /// SHOW statement.
@@ -94,6 +96,7 @@ impl ElementType for SqlElementType {
             | Self::ExplainStatement
             | Self::TransactionStatement
             | Self::SetNamesStatement
+            | Self::SetVariableStatement
             | Self::PragmaStatement
             | Self::ShowStatement => Statement,
             Self::JoinClause

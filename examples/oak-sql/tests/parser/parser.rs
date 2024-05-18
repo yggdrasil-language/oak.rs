@@ -1,4 +1,4 @@
-use oak_core::{ParseSession, SourceText, builder::Builder};
+use oak_core::{ParseSession, SourceText, builder::Builder, source::ToSource};
 use oak_sql::{SqlBuilder, SqlLanguage, ast::*};
 
 #[test]
@@ -50,6 +50,82 @@ fn test_sql_builder_session_statements() {
     };
     assert_eq!(statement.character_set.as_ref(), "utf8mb4");
     assert_eq!(statement.collation.as_deref(), Some("utf8mb4_bin"));
+}
+
+/// Builds `sql` and returns its single statement with the source it round-trips to.
+fn build_statement(sql: &str) -> (SqlStatement, String) {
+    let config = SqlLanguage::default();
+    let builder = SqlBuilder::new(&config);
+    let mut session = ParseSession::<SqlLanguage>::default();
+    let result = builder.build(&SourceText::new(sql), &[], &mut session);
+    let root = result.result.unwrap_or_else(|error| panic!("{sql}: {error:?} {:?}", result.diagnostics));
+    let statement = root.statements.into_iter().next().unwrap_or_else(|| panic!("Missing statement for {sql}"));
+    let source = SqlRoot { statements: vec![statement.clone()], span: root.span }.to_source_string();
+    (statement, source)
+}
+
+#[test]
+fn test_sql_builder_scoped_session_variables() {
+    let (statement, source) = build_statement("SET SESSION sql_mode = 'STRICT';");
+    let SqlStatement::SetVariable(statement) = &statement
+    else {
+        panic!("Expected SET statement, got {statement:?}");
+    };
+    assert_eq!(statement.scope, Some(SessionScope::Session));
+    assert_eq!(statement.name.as_ref(), "sql_mode");
+    assert!(matches!(&statement.value, Expression::Literal(Literal::String(value, _)) if value.as_ref() == "STRICT"));
+    assert_eq!(source, "SET SESSION sql_mode = 'STRICT';");
+
+    let (statement, source) = build_statement("SET autocommit = 0;");
+    let SqlStatement::SetVariable(statement) = &statement
+    else {
+        panic!("Expected SET statement, got {statement:?}");
+    };
+    assert_eq!(statement.scope, None);
+    assert_eq!(statement.name.as_ref(), "autocommit");
+    assert!(matches!(&statement.value, Expression::Literal(Literal::Number(value, _)) if value.as_ref() == "0"));
+    assert_eq!(source, "SET autocommit = 0;");
+}
+
+#[test]
+fn test_sql_builder_show_and_pragma() {
+    let (statement, source) = build_statement("SHOW GLOBAL VARIABLES LIKE 'max_%';");
+    let SqlStatement::Show(statement) = &statement
+    else {
+        panic!("Expected SHOW statement, got {statement:?}");
+    };
+    assert_eq!(statement.scope, Some(SessionScope::Global));
+    assert_eq!(statement.target.as_ref(), "VARIABLES");
+    assert_eq!(statement.like.as_deref(), Some("max_%"));
+    assert_eq!(source, "SHOW GLOBAL VARIABLES LIKE 'max_%';");
+
+    let (statement, source) = build_statement("SHOW STATUS;");
+    let SqlStatement::Show(statement) = &statement
+    else {
+        panic!("Expected SHOW statement, got {statement:?}");
+    };
+    assert_eq!(statement.scope, None);
+    assert_eq!(statement.target.as_ref(), "STATUS");
+    assert_eq!(statement.like, None);
+    assert_eq!(source, "SHOW STATUS;");
+
+    let (statement, source) = build_statement("PRAGMA journal_mode = WAL;");
+    let SqlStatement::Pragma(statement) = &statement
+    else {
+        panic!("Expected PRAGMA statement, got {statement:?}");
+    };
+    assert_eq!(statement.name.as_ref(), "journal_mode");
+    assert!(matches!(&statement.value, Some(Expression::Identifier(identifier)) if identifier.name.as_ref() == "WAL"));
+    assert_eq!(source, "PRAGMA journal_mode = WAL;");
+
+    let (statement, source) = build_statement("PRAGMA user_version;");
+    let SqlStatement::Pragma(statement) = &statement
+    else {
+        panic!("Expected PRAGMA statement, got {statement:?}");
+    };
+    assert_eq!(statement.name.as_ref(), "user_version");
+    assert!(statement.value.is_none());
+    assert_eq!(source, "PRAGMA user_version;");
 }
 
 /// Builds `sql` and returns the `WHERE` expression of its single SELECT statement.
