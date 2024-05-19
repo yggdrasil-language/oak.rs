@@ -182,7 +182,7 @@ impl<'config> SqlBuilder<'config> {
                     _ => {}
                 },
                 RedTree::Node(n) => match n.green.kind {
-                    SqlElementType::Expression => expr = Some(self.build_expression(n, source)?),
+                    SqlElementType::Expression | SqlElementType::FunctionCall => expr = Some(self.build_expression(n, source)?),
                     SqlElementType::Identifier => {
                         if expr.is_none() {
                             expr = Some(Expression::Identifier(self.build_identifier(n, source)?));
@@ -645,7 +645,12 @@ impl<'config> SqlBuilder<'config> {
     }
 
     fn build_identifier<'a>(&self, node: RedNode<'a, SqlLanguage>, source: &SourceText) -> Result<Identifier, OakError> {
-        Ok(Identifier { name: self.get_text(node.span(), source), span: node.span() })
+        // Trivia is attached to the preceding token, so a node ending at an
+        // identifier carries its trailing whitespace in the span.
+        let text = self.get_text(node.span(), source);
+        let trimmed = text.trim();
+        let name = if trimmed.len() == text.len() { text } else { Arc::from(trimmed) };
+        Ok(Identifier { name, span: node.span() })
     }
 
     fn build_join_clause<'a>(&self, node: RedNode<'a, SqlLanguage>, source: &SourceText) -> Result<JoinClause, OakError> {
@@ -704,7 +709,7 @@ impl<'config> SqlBuilder<'config> {
         for child in node.children() {
             match child {
                 RedTree::Node(n) => {
-                    if n.green.kind == SqlElementType::Expression {
+                    if matches!(n.green.kind, SqlElementType::Expression | SqlElementType::Identifier | SqlElementType::FunctionCall) {
                         if let Some((expr, span)) = current_expr.take() {
                             items.push(OrderByItem { expr, direction: OrderDirection::Asc, span });
                         }
