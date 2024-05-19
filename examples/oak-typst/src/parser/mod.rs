@@ -73,8 +73,8 @@ impl<'config> TypstParser<'config> {
                     }
                 }
                 else {
-                    // Just a simple #cmd without arguments
-                    while state.not_at_end() && !matches!(state.peek_kind(), Some(TypstTokenType::Newline) | Some(TypstTokenType::Whitespace)) {
+                    // 没有参数列表的简单 `#cmd`，停在行尾；空白仍是 trivia，不会出现在 peek_kind 中
+                    while state.not_at_end() && state.peek_kind() != Some(TypstTokenType::Newline) {
                         state.bump()
                     }
                 }
