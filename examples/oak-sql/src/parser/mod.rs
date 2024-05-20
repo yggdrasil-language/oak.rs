@@ -188,18 +188,24 @@ impl<'config> Pratt<SqlLanguage> for SqlParser<'config> {
             state.expect(In).ok();
             let inner_cp = state.checkpoint();
             state.expect(LeftParen).ok();
-            while state.not_at_end() && state.peek_kind() != Some(RightParen) {
-                if state.peek_kind() == Some(Select) {
-                    // Subqueries inside `IN` are handled by a later step.
-                    break;
+            let is_subquery = state.peek_kind() == Some(Select);
+            if is_subquery {
+                if let Err(error) = self.parse_select(state) {
+                    // `infix` cannot return an error, so keep the diagnostic with the
+                    // parse state instead of silently continuing with a partial query.
+                    state.errors.push(error);
                 }
-                PrattParser::parse(state, 0, self);
-                if !state.eat(Comma) {
-                    break;
+            }
+            else {
+                while state.not_at_end() && state.peek_kind() != Some(RightParen) {
+                    PrattParser::parse(state, 0, self);
+                    if !state.eat(Comma) {
+                        break;
+                    }
                 }
             }
             state.expect(RightParen).ok();
-            state.finish_at(inner_cp, SqlElementType::Expression);
+            state.finish_at(inner_cp, if is_subquery { SqlElementType::Subquery } else { SqlElementType::Expression });
             return Some(state.finish_at(cp, SqlElementType::Expression));
         }
 

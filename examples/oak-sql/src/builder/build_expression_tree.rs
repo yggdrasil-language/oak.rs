@@ -158,9 +158,17 @@ impl<'config> SqlBuilder<'config> {
                             }
                             if let Some(RedTree::Node(n)) = children.get(i) {
                                 let span = Range { start: left.span().start, end: n.span().end };
-                                let mut list = Vec::new();
-                                self.collect_expressions(n.clone(), source, &mut list)?;
-                                left = Expression::InList { expr: Box::new(left), list, negated: negated_operator, span };
+                                if n.green.kind == SqlElementType::Subquery {
+                                    let Expression::Subquery { query, .. } = self.build_subquery(n.clone(), source)? else {
+                                        return Err(OakError::custom_error("IN expected a subquery"));
+                                    };
+                                    left = Expression::InSubquery { expr: Box::new(left), query, negated: negated_operator, span };
+                                }
+                                else {
+                                    let mut list = Vec::new();
+                                    self.collect_expressions(n.clone(), source, &mut list)?;
+                                    left = Expression::InList { expr: Box::new(left), list, negated: negated_operator, span };
+                                }
                                 negated_operator = false;
                                 continue;
                             }

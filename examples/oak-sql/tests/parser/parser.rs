@@ -400,6 +400,33 @@ fn test_sql_builder_negated_predicates() {
 }
 
 #[test]
+fn test_sql_builder_in_subquery() {
+    let Expression::InSubquery { query, negated: false, expr, .. } = build_where("SELECT * FROM t WHERE a IN (SELECT b FROM u);")
+    else {
+        panic!("Expected IN subquery");
+    };
+    assert!(matches!(expr.as_ref(), Expression::Identifier(identifier) if identifier.name.as_ref() == "a"));
+    assert_eq!(query.from.as_ref().map(|table| table.name.name.as_ref()), Some("u"));
+    assert!(matches!(&query.items[0], SelectItem::Expression { expr: Expression::Identifier(identifier), .. } if identifier.name.as_ref() == "b"));
+
+    let Expression::InSubquery { negated: true, .. } = build_where("SELECT * FROM t WHERE a NOT IN (SELECT b FROM u);")
+    else {
+        panic!("Expected negated IN subquery");
+    };
+
+    let (_, source) = build_statement("SELECT * FROM t WHERE a IN (SELECT b FROM u);");
+    assert_eq!(source, "SELECT*FROM t WHERE a IN(SELECT b FROM u);");
+
+    // A mixed list is not valid SQL and must be rejected rather than silently
+    // keeping only the first element.
+    let config = SqlLanguage::default();
+    let builder = SqlBuilder::new(&config);
+    let mut session = ParseSession::<SqlLanguage>::default();
+    let result = builder.build(&SourceText::new("SELECT * FROM t WHERE a IN (1, SELECT b FROM u);"), &[], &mut session);
+    assert!(result.result.is_err(), "Mixed IN list must not be accepted: {:?}", result.result);
+}
+
+#[test]
 fn test_sql_builder_unsupported_predicate_is_reported() {
     let config = SqlLanguage::default();
     let builder = SqlBuilder::new(&config);
