@@ -80,7 +80,6 @@ impl oak_core::TokenType for SqlTokenType {
             | Self::Sum
             | Self::Avg
             | Self::Min
-            | Self::Max
             | Self::Explain
             | Self::Vector
             | Self::View
@@ -320,8 +319,6 @@ pub enum SqlTokenType {
     Avg,
     /// `MIN` keyword.
     Min,
-    /// `MAX` keyword.
-    Max,
     /// `EXPLAIN` keyword.
     Explain,
     /// `PRAGMA` keyword.
