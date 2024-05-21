@@ -8,7 +8,9 @@ impl TokenType for TypstTokenType {
     const END_OF_STREAM: Self = Self::Eof;
 
     fn is_ignored(&self) -> bool {
-        matches!(self, Self::Whitespace | Self::Newline | Self::LineComment | Self::BlockComment)
+        // Typst 是行导向的标记语言，换行决定标题、列表项与段落边界，
+        // 因此 `Newline` 必须保留给解析器，不能与空白、注释一起作为 trivia 跳过。
+        matches!(self, Self::Whitespace | Self::LineComment | Self::BlockComment)
     }
 
     fn role(&self) -> Self::Role {
