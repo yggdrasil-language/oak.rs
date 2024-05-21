@@ -92,8 +92,13 @@ impl<'config> Pratt<SqlLanguage> for SqlParser<'config> {
         // Unary signs bind tighter than multiplication and division, hence the
         // precedence of 12. Without this branch `SELECT -3` cannot form an
         // `Expression` node and `a > -1` misreads `-` as a binary minus.
+        //
+        // `NOT` sits between `AND` and the comparison/predicate level: parsing
+        // its operand at precedence 3 makes `NOT a = 1` read as `NOT (a = 1)`
+        // while `NOT a = 1 AND b = 2` keeps `AND` outside the negation.
         match state.peek_kind() {
             Some(kind @ (Minus | Plus)) => unary(state, kind, 12, SqlElementType::Expression, |s, p| PrattParser::parse(s, p, self)),
+            Some(Not) => unary(state, Not, 3, SqlElementType::Expression, |s, p| PrattParser::parse(s, p, self)),
             _ => self.primary(state),
         }
     }
@@ -102,8 +107,14 @@ impl<'config> Pratt<SqlLanguage> for SqlParser<'config> {
         use crate::lexer::SqlTokenType::*;
         let kind = state.peek_kind()?;
 
+        // `NOT IN`, `NOT BETWEEN` and `NOT LIKE` are infix forms: the `NOT` belongs
+        // to the operator rather than to a prefix expression. Detect it without
+        // consuming anything so a rejected precedence check leaves the state intact.
+        let negated_operator = kind == Not && matches!(state.peek_non_trivia_kind_at(1), Some(In | Between | Like));
+        let operator = if negated_operator { state.peek_non_trivia_kind_at(1)? } else { kind };
+
         // Function call postfix: `Identifier '(' args? ')'`.
-        if kind == LeftParen && left.kind() == SqlElementType::Identifier {
+        if operator == LeftParen && left.kind() == SqlElementType::Identifier {
             let cp = state.checkpoint_before(left);
             state.expect(LeftParen).ok();
             let mut first = true;
@@ -131,23 +142,72 @@ impl<'config> Pratt<SqlLanguage> for SqlParser<'config> {
 
         // `IS [NOT] NULL` — the optional `NOT` is consumed here so the CST keeps the
         // negation next to the operator instead of swallowing the following range.
-        if kind == Is {
-            if min_precedence > 2 {
+        if operator == Is {
+            if min_precedence > 5 {
                 return None;
             }
             let cp = state.checkpoint_before(left);
             state.expect(Is).ok();
             state.eat(Not);
-            PrattParser::parse(state, 3, self);
+            PrattParser::parse(state, 6, self);
             return Some(state.finish_at(cp, SqlElementType::Expression));
         }
 
-        let (prec, assoc) = match kind {
+        // `BETWEEN low AND high` consumes its own `AND` at a precedence above the
+        // logical connectives, so the folded `AND` never escapes into `low`.
+        if operator == Between {
+            if min_precedence > 5 {
+                return None;
+            }
+            let cp = state.checkpoint_before(left);
+            if negated_operator {
+                state.bump();
+            }
+            state.expect(Between).ok();
+            PrattParser::parse(state, 6, self);
+            state.expect(And).ok();
+            PrattParser::parse(state, 6, self);
+            return Some(state.finish_at(cp, SqlElementType::Expression));
+        }
+
+        // `IN (expr, ...)` and, later, `IN (SELECT ...)`. The parenthesized payload
+        // becomes a child node so the builder never mistakes a single element for
+        // the whole predicate.
+        if operator == In {
+            if min_precedence > 5 {
+                return None;
+            }
+            let paren_offset = if negated_operator { 2 } else { 1 };
+            if state.peek_non_trivia_kind_at(paren_offset) != Some(LeftParen) {
+                return None;
+            }
+            let cp = state.checkpoint_before(left);
+            if negated_operator {
+                state.bump();
+            }
+            state.expect(In).ok();
+            let inner_cp = state.checkpoint();
+            state.expect(LeftParen).ok();
+            while state.not_at_end() && state.peek_kind() != Some(RightParen) {
+                if state.peek_kind() == Some(Select) {
+                    // Subqueries inside `IN` are handled by a later step.
+                    break;
+                }
+                PrattParser::parse(state, 0, self);
+                if !state.eat(Comma) {
+                    break;
+                }
+            }
+            state.expect(RightParen).ok();
+            state.finish_at(inner_cp, SqlElementType::Expression);
+            return Some(state.finish_at(cp, SqlElementType::Expression));
+        }
+
+        let (prec, assoc) = match operator {
             Or => (1, Associativity::Left),
-            Between | In => (2, Associativity::Left),
-            And => (3, Associativity::Left),
+            And => (2, Associativity::Left),
             Equal | NotEqual | Less | Greater | LessEqual | GreaterEqual | Like => (4, Associativity::Left),
-            Concat => (5, Associativity::Left),
+            Concat => (6, Associativity::Left),
             Plus | Minus => (10, Associativity::Left),
             Star | Slash | Percent => (11, Associativity::Left),
             DoubleColon => (15, Associativity::Left),
@@ -158,8 +218,11 @@ impl<'config> Pratt<SqlLanguage> for SqlParser<'config> {
             return None;
         }
 
+        if negated_operator {
+            state.bump();
+        }
         let expr_kind = SqlElementType::Expression;
-        Some(binary(state, left, kind, prec, assoc, expr_kind, |s, p| PrattParser::parse(s, p, self)))
+        Some(binary(state, left, operator, prec, assoc, expr_kind, |s, p| PrattParser::parse(s, p, self)))
     }
 }
 
@@ -284,6 +347,14 @@ impl<'config> SqlParser<'config> {
         Ok(())
     }
 
+    /// Tokens that may legitimately follow a `WHERE` predicate. Anything else means
+    /// the predicate was only partially parsed, which must surface as an error
+    /// instead of silently accepting the truncated expression as the whole filter.
+    fn is_where_terminator(kind: Option<crate::lexer::SqlTokenType>) -> bool {
+        use crate::lexer::SqlTokenType::*;
+        matches!(kind, None | Some(Group | Having | Order | Limit | Offset | Semicolon | Eof | RightParen | Returning))
+    }
+
     fn parse_select<'a, S: Source + ?Sized>(&self, state: &mut State<'a, S>) -> Result<(), OakError> {
         use crate::lexer::SqlTokenType::*;
         let cp = state.checkpoint();
@@ -345,6 +416,9 @@ impl<'config> SqlParser<'config> {
 
         if state.eat(Where) {
             PrattParser::parse(state, 0, self);
+            if !Self::is_where_terminator(state.peek_kind()) {
+                return Err(OakError::custom_error("unsupported token in WHERE predicate"));
+            }
         }
 
         if state.eat(Group) {
@@ -548,6 +622,9 @@ impl<'config> SqlParser<'config> {
 
         if state.eat(Where) {
             PrattParser::parse(state, 0, self);
+            if !Self::is_where_terminator(state.peek_kind()) {
+                return Err(OakError::custom_error("unsupported token in WHERE predicate"));
+            }
         }
 
         self.parse_returning_clause(state);
@@ -569,6 +646,9 @@ impl<'config> SqlParser<'config> {
 
         if state.eat(Where) {
             PrattParser::parse(state, 0, self);
+            if !Self::is_where_terminator(state.peek_kind()) {
+                return Err(OakError::custom_error("unsupported token in WHERE predicate"));
+            }
         }
 
         state.eat(Semicolon);
