@@ -83,6 +83,32 @@ pub enum Expression {
         #[cfg_attr(feature = "serde", serde(with = "oak_core::serde_range"))]
         span: Range<usize>,
     },
+    /// An `IS [NOT] NULL` predicate.
+    ///
+    /// This is a three-valued predicate, not a comparison. `NULL = NULL` evaluates
+    /// to `NULL` while `NULL IS NULL` evaluates to `TRUE`, so representing it as a
+    /// binary comparison would lose the distinction.
+    IsNull {
+        /// The expression being tested.
+        expr: Box<Expression>,
+        /// Whether the predicate is negated (IS NOT NULL).
+        negated: bool,
+        /// The span of the predicate.
+        #[cfg_attr(feature = "serde", serde(with = "oak_core::serde_range"))]
+        span: Range<usize>,
+    },
+    /// An `IS [NOT] TRUE` or `IS [NOT] FALSE` predicate.
+    IsTruth {
+        /// The expression being tested.
+        expr: Box<Expression>,
+        /// The boolean value the expression is tested against.
+        value: bool,
+        /// Whether the predicate is negated (IS NOT TRUE / IS NOT FALSE).
+        negated: bool,
+        /// The span of the predicate.
+        #[cfg_attr(feature = "serde", serde(with = "oak_core::serde_range"))]
+        span: Range<usize>,
+    },
     /// A subquery expression.
     Subquery {
         /// The subquery SELECT statement.
@@ -125,6 +151,8 @@ impl Expression {
             Expression::FunctionCall { span, .. } => span.clone(),
             Expression::InList { span, .. } => span.clone(),
             Expression::Between { span, .. } => span.clone(),
+            Expression::IsNull { span, .. } => span.clone(),
+            Expression::IsTruth { span, .. } => span.clone(),
             Expression::Subquery { span, .. } => span.clone(),
             Expression::InSubquery { span, .. } => span.clone(),
             Expression::Vector { span, .. } => span.clone(),
@@ -194,6 +222,22 @@ impl ToSource for Expression {
                 buffer.push("AND");
                 high.to_source(buffer);
             }
+            Expression::IsNull { expr, negated, .. } => {
+                to_source_is_operand(expr, buffer);
+                buffer.push(" IS");
+                if *negated {
+                    buffer.push("NOT");
+                }
+                buffer.push("NULL");
+            }
+            Expression::IsTruth { expr, value, negated, .. } => {
+                to_source_is_operand(expr, buffer);
+                buffer.push(" IS");
+                if *negated {
+                    buffer.push("NOT");
+                }
+                buffer.push(if *value { "TRUE" } else { "FALSE" });
+            }
             Expression::Subquery { query, .. } => {
                 buffer.push("(");
                 query.to_source(buffer);
@@ -215,6 +259,44 @@ impl ToSource for Expression {
                 buffer.push(" */");
             }
         }
+    }
+}
+
+/// Returns whether `expr` must stay parenthesized when it is the left operand of
+/// an `IS` predicate.
+///
+/// `IS` binds tighter than the logical connectives, `NOT`, `LIKE` and the
+/// comparison operators, so printing those without parentheses would reparse the
+/// predicate against a smaller operand.
+pub(crate) fn needs_is_operand_parentheses(expr: &Expression) -> bool {
+    match expr {
+        Expression::Unary { op: UnaryOperator::Not, .. } => true,
+        Expression::Binary { op, .. } => matches!(
+            op,
+            BinaryOperator::Or
+                | BinaryOperator::And
+                | BinaryOperator::Equal
+                | BinaryOperator::NotEqual
+                | BinaryOperator::Less
+                | BinaryOperator::Greater
+                | BinaryOperator::LessEqual
+                | BinaryOperator::GreaterEqual
+                | BinaryOperator::Like
+        ),
+        _ => false,
+    }
+}
+
+/// Writes the left operand of an `IS` predicate, adding parentheses when the
+/// operand would otherwise reparse at a lower precedence.
+fn to_source_is_operand(expr: &Expression, buffer: &mut SourceBuffer) {
+    if needs_is_operand_parentheses(expr) {
+        buffer.push("(");
+        expr.to_source(buffer);
+        buffer.push(")");
+    }
+    else {
+        expr.to_source(buffer);
     }
 }
 
