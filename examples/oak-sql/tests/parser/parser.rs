@@ -219,7 +219,23 @@ fn test_sql_builder_qualified_columns_and_function_calls() {
         panic!("Expected function call select item, got {:?}", select.items[0]);
     };
     assert_eq!(name.name.as_ref(), "COUNT");
-    assert!(args.is_empty(), "COUNT(*) must not invent an argument: {args:?}");
+    assert!(matches!(args.as_slice(), [Expression::Wildcard { .. }]), "COUNT(*) must keep its wildcard argument: {args:?}");
+
+    let (_, source) = build_statement("SELECT COUNT(*) FROM users;");
+    assert_eq!(source, "SELECT COUNT(*)FROM users;");
+
+    // A genuinely empty argument list stays empty and must not be confused with
+    // the wildcard form.
+    let (statement, _) = build_statement("SELECT COUNT() FROM users;");
+    let SqlStatement::Select(select) = &statement
+    else {
+        panic!("Expected Select statement");
+    };
+    let SelectItem::Expression { expr: Expression::FunctionCall { args, .. }, .. } = &select.items[0]
+    else {
+        panic!("Expected function call select item, got {:?}", select.items[0]);
+    };
+    assert!(args.is_empty(), "COUNT() must stay argument-free: {args:?}");
 
     let mut session = ParseSession::<SqlLanguage>::default();
     let result = builder.build(&SourceText::new("SELECT LOWER(name) FROM users;"), &[], &mut session);
