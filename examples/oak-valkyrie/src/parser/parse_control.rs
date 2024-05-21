@@ -202,9 +202,28 @@ pub(crate) fn parse_match_arm<S: oak_core::Source + ?Sized>(state: &mut State<'_
     Ok(())
 }
 
+/// 解析带标签的循环：`'label: loop/while/for …`。
+pub(crate) fn parse_labeled_loop_expression<S: oak_core::Source + ?Sized>(state: &mut State<'_, S>) -> Result<(), oak_core::OakError> {
+    let cp = state.sink.checkpoint();
+    state.bump();
+    if state.at(ValkyrieTokenType::Colon) {
+        state.bump();
+    }
+    match state.current().map(|token| &token.kind) {
+        Some(ValkyrieTokenType::Keyword(ValkyrieKeywords::Loop)) => parse_loop_expression_with(state, cp),
+        Some(ValkyrieTokenType::Keyword(ValkyrieKeywords::While)) => parse_while_expression_with(state, cp),
+        Some(ValkyrieTokenType::Keyword(ValkyrieKeywords::For)) => parse_for_expression_with(state, cp),
+        _ => Err(state.source.syntax_error("标签只能标注 loop / while / for".into(), state.current_offset())),
+    }
+}
+
 /// 解析 loop 表达式
 pub(crate) fn parse_loop_expression<S: oak_core::Source + ?Sized>(state: &mut State<'_, S>) -> Result<(), oak_core::OakError> {
     let cp = state.sink.checkpoint();
+    parse_loop_expression_with(state, cp)
+}
+
+fn parse_loop_expression_with<S: oak_core::Source + ?Sized>(state: &mut State<'_, S>, cp: usize) -> Result<(), oak_core::OakError> {
     state.bump();
     if (state.at(ValkyrieTokenType::Identifier) || state.at(ValkyrieTokenType::Underscore)) && state.peek_non_trivia_kind_at(1) == Some(ValkyrieTokenType::Keyword(ValkyrieKeywords::In)) {
         parse_pattern(state)?;
@@ -229,6 +248,10 @@ pub(crate) fn parse_loop_expression<S: oak_core::Source + ?Sized>(state: &mut St
 /// 解析 while 表达式
 pub(crate) fn parse_while_expression<S: oak_core::Source + ?Sized>(state: &mut State<'_, S>) -> Result<(), oak_core::OakError> {
     let cp = state.sink.checkpoint();
+    parse_while_expression_with(state, cp)
+}
+
+fn parse_while_expression_with<S: oak_core::Source + ?Sized>(state: &mut State<'_, S>, cp: usize) -> Result<(), oak_core::OakError> {
     state.bump();
     crate::parser::parse_expressions::parse_condition_expression(state)?;
     parse_block_expression(state)?;
@@ -239,6 +262,10 @@ pub(crate) fn parse_while_expression<S: oak_core::Source + ?Sized>(state: &mut S
 /// 解析 for 表达式
 pub(crate) fn parse_for_expression<S: oak_core::Source + ?Sized>(state: &mut State<'_, S>) -> Result<(), oak_core::OakError> {
     let cp = state.sink.checkpoint();
+    parse_for_expression_with(state, cp)
+}
+
+fn parse_for_expression_with<S: oak_core::Source + ?Sized>(state: &mut State<'_, S>, cp: usize) -> Result<(), oak_core::OakError> {
     state.bump();
     parse_pattern(state)?;
     if state.at(ValkyrieTokenType::Keyword(ValkyrieKeywords::In)) {

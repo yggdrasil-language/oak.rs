@@ -53,6 +53,7 @@ impl crate::lexer::ValkyrieLexer<'_> {
             }
 
             let matched = self.lex_string_literal(state)
+                || self.lex_label(state)
                 || self.lex_char_literal(state)
                 || self.lex_number_literal(state)
                 || self.lex_backtick_identifier(state)
@@ -173,6 +174,37 @@ impl crate::lexer::ValkyrieLexer<'_> {
         }
 
         self.lex_symmetric_string(state, '"', ValkyrieTokenType::StringLiteral)
+    }
+
+    /// `'outer` 循环标签；`'a'` 仍按字符字面量处理。
+    fn lex_label<S: Source + ?Sized>(&self, state: &mut State<'_, S>) -> bool {
+        if state.current() != Some('\'') {
+            return false;
+        }
+        let start = state.get_position();
+        state.advance('\''.len_utf8());
+        let mut chars = 0usize;
+        if let Some(ch) = state.current()
+            && (ch == '_' || is_xid_start(ch))
+        {
+            state.advance(ch.len_utf8());
+            chars += 1;
+            while let Some(next) = state.current() {
+                if !is_xid_continue(next) {
+                    break;
+                }
+                state.advance(next.len_utf8());
+                chars += 1;
+            }
+        }
+        let end = state.get_position();
+        // 单字符且紧跟闭合引号时保留给字符字面量。
+        if chars == 0 || (chars == 1 && state.current() == Some('\'')) {
+            state.set_position(start);
+            return false;
+        }
+        state.add_token(ValkyrieTokenType::Label, start, end);
+        true
     }
 
     fn lex_char_literal<S: Source + ?Sized>(&self, state: &mut State<'_, S>) -> bool {
