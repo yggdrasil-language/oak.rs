@@ -25,15 +25,18 @@ pub enum MermaidElementType {
     /// Lexing or parsing error.
     Error,
 
+    /// End of stream.
+    ///
+    /// 与 [`crate::lexer::token_type::MermaidTokenType::Eof`] 保持 u8 对齐，
+    /// 因此 `From<MermaidTokenType>` 可以直接按位转换。
+    Eof,
+
     /// Root node of the diagram.
     Root,
     /// Node in the diagram.
     Node,
     /// Edge between nodes.
     Edge,
-
-    /// End of stream.
-    Eof,
 }
 
 #[cfg(feature = "serde")]
