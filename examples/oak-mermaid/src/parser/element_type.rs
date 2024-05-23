@@ -37,6 +37,8 @@ pub enum MermaidElementType {
     Node,
     /// Edge between nodes.
     Edge,
+    /// `subgraph ... end` block.
+    Subgraph,
 }
 
 #[cfg(feature = "serde")]
@@ -68,7 +70,7 @@ impl MermaidElementType {
 
     /// Returns `true` if this element type represents a composite element.
     pub fn is_element(&self) -> bool {
-        matches!(self, Self::Root | Self::Node | Self::Edge)
+        matches!(self, Self::Root | Self::Node | Self::Edge | Self::Subgraph)
     }
 }
 

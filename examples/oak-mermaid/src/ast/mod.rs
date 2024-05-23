@@ -57,6 +57,20 @@ pub enum FlowElement {
         /// The style of the edge.
         style: EdgeStyle,
     },
+    /// A `subgraph ... end` block.
+    Subgraph(Subgraph),
+}
+
+/// A Mermaid subgraph block.
+#[derive(Clone, Debug, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct Subgraph {
+    /// The explicit id from `subgraph id[title]`, if the block declares one.
+    pub id: Option<String>,
+    /// The human-readable title of the block.
+    pub title: String,
+    /// Nodes, edges, and nested subgraphs written inside the block, in source order.
+    pub elements: Vec<FlowElement>,
 }
 
 /// Shapes of nodes in a flowchart.
@@ -237,40 +251,60 @@ impl std::fmt::Display for Flowchart {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         writeln!(f, "graph {}", self.orientation)?;
         for element in &self.elements {
-            match element {
-                FlowElement::Node { id, text, shape } => {
-                    let (open, close) = match shape {
-                        NodeShape::Box => ("[", "]"),
-                        NodeShape::Round => ("(", ")"),
-                        NodeShape::Stadium => ("([", "])"),
-                        NodeShape::Subroutine => ("[[", "]]"),
-                        NodeShape::Cylinder => ("[(", ")]"),
-                        NodeShape::Circle => ("((", "))"),
-                        NodeShape::Rhombus => ("{", "}"),
-                    };
-                    if let Some(t) = text {
-                        writeln!(f, "    {}{}{}{}", id, open, t, close)?;
-                    }
-                    else {
-                        writeln!(f, "    {}", id)?;
-                    }
-                }
-                FlowElement::Edge { from, to, text, style } => {
-                    let s = match style {
-                        EdgeStyle::Arrow => "-->",
-                        EdgeStyle::Line => "---",
-                        EdgeStyle::DottedArrow => "-.->",
-                        EdgeStyle::ThickArrow => "==>",
-                    };
-                    if let Some(t) = text {
-                        writeln!(f, "    {} {}|{}| {}", from, s, t, to)?;
-                    }
-                    else {
-                        writeln!(f, "    {} {} {}", from, s, to)?;
-                    }
-                }
-            }
+            write_flow_element(f, element)?;
         }
         Ok(())
     }
+}
+
+impl std::fmt::Display for Subgraph {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match &self.id {
+            Some(id) => writeln!(f, "    subgraph {}[{}]", id, self.title)?,
+            None => writeln!(f, "    subgraph {}", self.title)?,
+        }
+        for element in &self.elements {
+            write_flow_element(f, element)?;
+        }
+        writeln!(f, "    end")
+    }
+}
+
+/// Writes one flowchart element in Mermaid syntax.
+fn write_flow_element(f: &mut std::fmt::Formatter<'_>, element: &FlowElement) -> std::fmt::Result {
+    match element {
+        FlowElement::Node { id, text, shape } => {
+            let (open, close) = match shape {
+                NodeShape::Box => ("[", "]"),
+                NodeShape::Round => ("(", ")"),
+                NodeShape::Stadium => ("([", "])"),
+                NodeShape::Subroutine => ("[[", "]]"),
+                NodeShape::Cylinder => ("[(", ")]"),
+                NodeShape::Circle => ("((", "))"),
+                NodeShape::Rhombus => ("{", "}"),
+            };
+            if let Some(t) = text {
+                writeln!(f, "    {}{}{}{}", id, open, t, close)?;
+            }
+            else {
+                writeln!(f, "    {}", id)?;
+            }
+        }
+        FlowElement::Edge { from, to, text, style } => {
+            let s = match style {
+                EdgeStyle::Arrow => "-->",
+                EdgeStyle::Line => "---",
+                EdgeStyle::DottedArrow => "-.->",
+                EdgeStyle::ThickArrow => "==>",
+            };
+            if let Some(t) = text {
+                writeln!(f, "    {} {}|{}| {}", from, s, t, to)?;
+            }
+            else {
+                writeln!(f, "    {} {} {}", from, s, to)?;
+            }
+        }
+        FlowElement::Subgraph(subgraph) => write!(f, "{}", subgraph)?,
+    }
+    Ok(())
 }
