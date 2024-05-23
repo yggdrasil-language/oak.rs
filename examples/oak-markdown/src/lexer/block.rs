@@ -56,8 +56,30 @@ impl<'config> MarkdownLexer<'config> {
     pub fn lex_code_block<S: Source + ?Sized>(&self, state: &mut State<S>) -> bool {
         let start_pos = state.get_position();
 
-        if start_pos > 0 {
-            if let Some(prev_char) = state.source().get_char_at(start_pos - 1) {
+        // CommonMark allows a fenced code block to be indented by up to three
+        // spaces, so walk back over the leading indentation instead of
+        // requiring the previous byte to be a newline.
+        let mut line_start = start_pos;
+        let mut indent = 0;
+        while indent < 4 {
+            if line_start == 0 {
+                break;
+            }
+            if state.source().get_char_at(line_start - 1) == Some(' ') {
+                line_start -= 1;
+                indent += 1;
+            }
+            else {
+                break;
+            }
+        }
+
+        if indent >= 4 {
+            return false;
+        }
+
+        if line_start > 0 {
+            if let Some(prev_char) = state.source().get_char_at(line_start - 1) {
                 if prev_char != '\n' && prev_char != '\r' {
                     return false;
                 }
