@@ -66,6 +66,7 @@ impl std::fmt::Display for PlantUmlRoot {
                         oak_uml::model::RelationKind::Association => "-->",
                         oak_uml::model::RelationKind::Composition => "*--",
                         oak_uml::model::RelationKind::Aggregation => "o--",
+                        oak_uml::model::RelationKind::Dependency => "..>",
                     };
                     if let Some(label) = &r.label {
                         writeln!(f, "{} {} {} : {}", r.source, arrow, r.target, label)?;

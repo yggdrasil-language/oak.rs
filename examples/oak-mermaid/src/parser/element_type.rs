@@ -39,6 +39,20 @@ pub enum MermaidElementType {
     Edge,
     /// `subgraph ... end` block.
     Subgraph,
+    /// `sequenceDiagram` block.
+    SequenceDiagram,
+    /// Participant or actor declaration in a sequence diagram.
+    Participant,
+    /// Message exchanged between sequence diagram participants.
+    Message,
+    /// `classDiagram` block.
+    ClassDiagram,
+    /// `class ... { ... }` declaration.
+    ClassDeclaration,
+    /// A property or method line inside a class body.
+    ClassMember,
+    /// A relation between two classes.
+    Relation,
 }
 
 #[cfg(feature = "serde")]
@@ -70,7 +84,7 @@ impl MermaidElementType {
 
     /// Returns `true` if this element type represents a composite element.
     pub fn is_element(&self) -> bool {
-        matches!(self, Self::Root | Self::Node | Self::Edge | Self::Subgraph)
+        matches!(self, Self::Root | Self::Node | Self::Edge | Self::Subgraph | Self::SequenceDiagram | Self::Participant | Self::Message | Self::ClassDiagram | Self::ClassDeclaration | Self::ClassMember | Self::Relation)
     }
 }
 

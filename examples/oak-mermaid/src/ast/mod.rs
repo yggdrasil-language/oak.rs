@@ -18,9 +18,9 @@ pub enum MermaidDiagram {
     /// A flowchart.
     Flowchart(Flowchart),
     /// A sequence diagram.
-    Sequence(Sequence),
+    Sequence(SequenceDiagram),
     /// A class diagram.
-    ClassDiagram(ClassDiagram),
+    Class(ClassDiagram),
 }
 
 /// Represents a Mermaid flowchart.
@@ -110,11 +110,33 @@ pub enum EdgeStyle {
 /// Represents a Mermaid sequence diagram.
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct Sequence {
-    /// The participants in the sequence diagram.
-    pub participants: Vec<String>,
+pub struct SequenceDiagram {
+    /// The participants declared in the sequence diagram, in source order.
+    pub participants: Vec<Participant>,
     /// The messages exchanged between participants.
     pub messages: Vec<Message>,
+}
+
+/// A participant or actor declared in a sequence diagram.
+#[derive(Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct Participant {
+    /// The identifier used by messages.
+    pub id: String,
+    /// The optional display name from `participant A as Alice`.
+    pub display: Option<String>,
+    /// Whether the declaration used `participant` or `actor`.
+    pub kind: ParticipantKind,
+}
+
+/// The keyword used to declare a sequence diagram participant.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub enum ParticipantKind {
+    /// `participant`.
+    Participant,
+    /// `actor`.
+    Actor,
 }
 
 /// A message in a sequence diagram.
@@ -164,11 +186,18 @@ impl std::fmt::Display for MermaidRoot {
     }
 }
 
-impl std::fmt::Display for Sequence {
+impl std::fmt::Display for SequenceDiagram {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         writeln!(f, "sequenceDiagram")?;
         for p in &self.participants {
-            writeln!(f, "    participant {}", p)?;
+            let keyword = match p.kind {
+                ParticipantKind::Participant => "participant",
+                ParticipantKind::Actor => "actor",
+            };
+            match &p.display {
+                Some(display) => writeln!(f, "    {} {} as {}", keyword, p.id, display)?,
+                None => writeln!(f, "    {} {}", keyword, p.id)?,
+            }
         }
         for m in &self.messages {
             let a = match m.arrow {
@@ -202,6 +231,7 @@ impl std::fmt::Display for ClassDiagram {
                 oak_uml::model::RelationKind::Association => "-->",
                 oak_uml::model::RelationKind::Composition => "*--",
                 oak_uml::model::RelationKind::Aggregation => "o--",
+                oak_uml::model::RelationKind::Dependency => "..>",
             };
             if let Some(label) = &rel.label {
                 writeln!(f, "    {} {} {}: {}", rel.source, arrow, rel.target, label)?;
@@ -242,7 +272,7 @@ impl std::fmt::Display for MermaidDiagram {
         match self {
             MermaidDiagram::Flowchart(d) => write!(f, "{}", d),
             MermaidDiagram::Sequence(d) => write!(f, "{}", d),
-            MermaidDiagram::ClassDiagram(d) => write!(f, "{}", d),
+            MermaidDiagram::Class(d) => write!(f, "{}", d),
         }
     }
 }
