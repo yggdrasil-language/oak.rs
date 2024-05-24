@@ -152,6 +152,9 @@ impl<'config> SqlBuilder<'config> {
                             left = match &right {
                                 Expression::Literal(Literal::Null(_)) => Expression::IsNull { expr, negated, span },
                                 Expression::Literal(Literal::Boolean(value, _)) => Expression::IsTruth { expr, value: *value, negated, span },
+                                // `IS UNKNOWN` is not lowered yet, and folding it into a
+                                // comparison would silently change three-valued logic.
+                                Expression::Identifier(identifier) if identifier.name.eq_ignore_ascii_case("UNKNOWN") => return Err(OakError::custom_error("`IS UNKNOWN` is not supported")),
                                 _ => return Err(OakError::custom_error("`IS` requires `NULL`, `TRUE`, or `FALSE`")),
                             };
                             continue;

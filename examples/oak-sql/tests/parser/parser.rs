@@ -186,6 +186,24 @@ fn test_sql_builder_predicates() {
     assert!(matches!(left.as_ref(), Expression::Binary { op: BinaryOperator::Percent, .. }));
 }
 
+/// Builds `sql` and returns why it was rejected: the fatal error, the rejected
+/// statement, or the diagnostics collected while parsing.
+fn rejection_reason(sql: &str) -> String {
+    let config = SqlLanguage::default();
+    let builder = SqlBuilder::new(&config);
+    let mut session = ParseSession::<SqlLanguage>::default();
+    let result = builder.build(&SourceText::new(sql), &[], &mut session);
+    let mut reasons = result.diagnostics.iter().map(|diagnostic| diagnostic.to_string()).collect::<Vec<_>>();
+    match result.result {
+        Err(error) => reasons.push(error.to_string()),
+        Ok(root) => reasons.extend(root.statements.iter().filter_map(|statement| match statement {
+            SqlStatement::Error { message, .. } => Some(message.to_string()),
+            _ => None,
+        })),
+    }
+    reasons.join("\n")
+}
+
 #[test]
 fn test_sql_builder_is_null_and_truth_predicates() {
     // `IS NULL` and `IS TRUE` are three-valued predicates, not comparisons.
@@ -260,6 +278,25 @@ fn test_sql_builder_null_comparison_stays_binary() {
 
     let (_, source) = build_statement("SELECT * FROM t WHERE name = NULL;");
     assert_eq!(source, "SELECT*FROM t WHERE name=NULL;");
+}
+
+#[test]
+fn test_sql_builder_unsupported_is_predicates_are_reported() {
+    // `IS UNKNOWN` is a three-valued predicate without an AST node yet. It must be
+    // rejected instead of silently folding into `= UNKNOWN`.
+    let reason = rejection_reason("SELECT * FROM t WHERE a IS UNKNOWN;");
+    assert!(reason.contains("`IS UNKNOWN` is not supported"), "unexpected rejection: {reason}");
+
+    // `IS [NOT] DISTINCT FROM` is a null-safe comparison. A partial `IS` must
+    // never survive as a usable predicate.
+    for sql in ["SELECT * FROM t WHERE a IS DISTINCT FROM b;", "SELECT * FROM t WHERE a IS NOT DISTINCT FROM b;"] {
+        let reason = rejection_reason(sql);
+        assert!(reason.contains("`IS DISTINCT FROM` is not supported"), "{sql}: {reason}");
+    }
+
+    // A bare `IS` with no operand must not silently disappear either.
+    let reason = rejection_reason("SELECT * FROM t WHERE a IS;");
+    assert!(!reason.is_empty(), "`IS` without an operand must be reported");
 }
 
 #[test]
