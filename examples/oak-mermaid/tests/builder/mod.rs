@@ -271,3 +271,33 @@ fn test_class_diagram_ast() {
     assert_eq!(class.relations[2].kind, oak_uml::model::RelationKind::Dependency);
     assert_eq!(class.relations[2].label, None);
 }
+
+#[test]
+fn test_tolerant_parsing_keeps_following_content() {
+    let root = build_root("classDiagram\n    class Broken {\n        +int field\nsequenceDiagram\n    participant A\n    A->>B: still parsed\n    this line has no arrow\n    B-->>A: done\n");
+    assert_eq!(root.diagrams.len(), 2, "unclosed class body must not swallow the next diagram");
+
+    let class = class_diagram(&root, 0);
+    assert_eq!(class.classes.len(), 1);
+    assert_eq!(class.classes[0].name, "Broken");
+    assert_eq!(class.classes[0].members.len(), 1);
+    assert_eq!(class.classes[0].members[0].name, "+int field");
+
+    let sequence = sequence(&root, 1);
+    assert_eq!(sequence.participants.len(), 1);
+    assert_eq!(sequence.messages.len(), 2, "unknown sequence line must be skipped without swallowing later messages");
+    assert_eq!(sequence.messages[0].text, "still parsed");
+    assert_eq!(sequence.messages[1].text, "done");
+}
+
+#[test]
+fn test_unterminated_class_body_still_builds() {
+    let root = build_root("classDiagram\n    class Open {\n        +int value\n");
+    assert_eq!(root.diagrams.len(), 1);
+
+    let class = class_diagram(&root, 0);
+    assert_eq!(class.classes.len(), 1);
+    assert_eq!(class.classes[0].name, "Open");
+    assert_eq!(class.classes[0].members.len(), 1);
+    assert_eq!(class.classes[0].members[0].name, "+int value");
+}
