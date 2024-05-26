@@ -9,6 +9,12 @@ use std::sync::Arc;
 pub enum Expression {
     /// An identifier expression.
     Identifier(Identifier),
+    /// A wildcard argument such as the `*` in `COUNT(*)`.
+    Wildcard {
+        /// The span of the wildcard token.
+        #[cfg_attr(feature = "serde", serde(with = "oak_core::serde_range"))]
+        span: Range<usize>,
+    },
     /// A literal value expression.
     Literal(Literal),
     /// A binary operation expression.
@@ -112,6 +118,7 @@ impl Expression {
     pub fn span(&self) -> Range<usize> {
         match self {
             Expression::Identifier(id) => id.span.clone(),
+            Expression::Wildcard { span } => span.clone(),
             Expression::Literal(lit) => lit.span().clone(),
             Expression::Binary { span, .. } => span.clone(),
             Expression::Unary { span, .. } => span.clone(),
@@ -130,6 +137,7 @@ impl ToSource for Expression {
     fn to_source(&self, buffer: &mut SourceBuffer) {
         match self {
             Expression::Identifier(id) => id.to_source(buffer),
+            Expression::Wildcard { .. } => buffer.push("*"),
             Expression::Literal(lit) => lit.to_source(buffer),
             Expression::Binary { left, op, right, .. } => {
                 left.to_source(buffer);

@@ -139,6 +139,7 @@ impl AsDocument for Expression {
     fn as_document(&self, _config: &Self::Config) -> Document<'_> {
         match self {
             Expression::Identifier(it) => it.as_document(&()),
+            Expression::Wildcard { .. } => Document::text("*"),
             Expression::Literal(it) => it.as_document(&()),
             Expression::Binary { left, op, right, .. } => {
                 doc!(left.as_document(&()), soft_space, op.as_document(&()), soft_space, right.as_document(&()))
