@@ -143,6 +143,9 @@ impl<'config> TypeScriptParser<'config> {
                         state.finish_at(pcp, crate::parser::element_type::TypeScriptElementType::SpreadElement);
                     }
                     else {
+                        // Reserved words are valid property names, so they belong to the
+                        // member instead of being reported as an unexpected token.
+                        let reserved_name = state.peek_text().is_some_and(|text| TypeScriptTokenType::from_keyword(&text).is_some());
                         match self.peek_kind(state) {
                             Some(IdentifierName) => {
                                 self.expect(state, IdentifierName).ok();
@@ -154,6 +157,9 @@ impl<'config> TypeScriptParser<'config> {
                                 state.bump();
                                 PrattParser::parse(state, 0, self);
                                 self.expect(state, RightBracket).ok();
+                            }
+                            Some(_) if reserved_name => {
+                                state.bump();
                             }
                             _ => {
                                 state.bump();
