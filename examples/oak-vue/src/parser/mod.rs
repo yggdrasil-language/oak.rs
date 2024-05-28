@@ -108,9 +108,7 @@ impl<'config> VueParser<'config> {
         }
 
         state.expect(VueTokenType::Gt).ok();
-        let tag_node = state.finish_at(tag_cp, crate::parser::element_type::VueElementType::Tag);
-        state.sink.restore(tag_cp.1);
-        state.push_child(tag_node);
+        state.finish_at(tag_cp, crate::parser::element_type::VueElementType::Tag);
 
         if tag_name == "script" {
             self.parse_program(state);
@@ -147,9 +145,7 @@ impl<'config> VueParser<'config> {
                 let _ = Self::bump_attr_name(state);
             }
             state.expect(VueTokenType::Gt).ok();
-            let close_node = state.finish_at(close_cp, crate::parser::element_type::VueElementType::CloseTag);
-            state.sink.restore(close_cp.1);
-            state.push_child(close_node);
+            state.finish_at(close_cp, crate::parser::element_type::VueElementType::CloseTag);
         }
 
         let block_kind = match tag_name {
@@ -157,9 +153,7 @@ impl<'config> VueParser<'config> {
             "script" => crate::parser::element_type::VueElementType::Program,
             _ => crate::parser::element_type::VueElementType::Element,
         };
-        let node = state.finish_at(cp, block_kind);
-        state.sink.restore(cp.1);
-        state.push_child(node);
+        state.finish_at(cp, block_kind);
     }
 
     fn parse_node<'a, S: Source + ?Sized>(&self, state: &mut State<'a, S>) {
@@ -172,9 +166,7 @@ impl<'config> VueParser<'config> {
         else if state.at(VueTokenType::Comment) {
             let cp = state.checkpoint();
             state.bump();
-            let node = state.finish_at(cp, crate::parser::element_type::VueElementType::CommentNode);
-            state.sink.restore(cp.1);
-            state.push_child(node);
+            state.finish_at(cp, crate::parser::element_type::VueElementType::CommentNode);
         }
         else if state.at(VueTokenType::LtSlash) {
             // A closing tag with no open element (`</div>` at root). Vue reports
@@ -194,9 +186,7 @@ impl<'config> VueParser<'config> {
                 let _ = state.syntax_error("invalid end tag".to_string());
             }
             state.expect(VueTokenType::Gt).ok();
-            let node = state.finish_at(cp, crate::parser::element_type::VueElementType::CloseTag);
-            state.sink.restore(cp.1);
-            state.push_child(node);
+            state.finish_at(cp, crate::parser::element_type::VueElementType::CloseTag);
         }
         else {
             let cp = state.checkpoint();
@@ -211,9 +201,7 @@ impl<'config> VueParser<'config> {
             {
                 state.bump();
             }
-            let node = state.finish_at(cp, crate::parser::element_type::VueElementType::TextNode);
-            state.sink.restore(cp.1);
-            state.push_child(node);
+            state.finish_at(cp, crate::parser::element_type::VueElementType::TextNode);
         }
     }
 
@@ -253,9 +241,7 @@ impl<'config> VueParser<'config> {
                 state.bump();
             }
             state.expect(VueTokenType::Gt).ok();
-            let node = state.finish_at(cp, crate::parser::element_type::VueElementType::Element);
-            state.sink.restore(cp.1);
-            state.push_child(node);
+            state.finish_at(cp, crate::parser::element_type::VueElementType::Element);
             return;
         }
 
@@ -299,9 +285,7 @@ impl<'config> VueParser<'config> {
             state.expect(VueTokenType::Gt).ok();
         }
 
-        let tag_node = state.finish_at(tag_cp, crate::parser::element_type::VueElementType::Tag);
-        state.sink.restore(tag_cp.1);
-        state.push_child(tag_node);
+        state.finish_at(tag_cp, crate::parser::element_type::VueElementType::Tag);
 
         if !is_self_closing && !is_html_void_tag(&tag_name) {
             // Only the matching `</name>` closes this element. Any other close tag is handled
@@ -337,9 +321,7 @@ impl<'config> VueParser<'config> {
                 if !tag_name.is_empty() && !close_name.is_empty() && !tag_name.eq_ignore_ascii_case(&close_name) {
                     let _ = state.syntax_error(format!("mismatched closing tag: expected `</{tag_name}>`, found `</{close_name}>`"));
                 }
-                let close_node = state.finish_at(close_cp, crate::parser::element_type::VueElementType::CloseTag);
-                state.sink.restore(close_cp.1);
-                state.push_child(close_node);
+                state.finish_at(close_cp, crate::parser::element_type::VueElementType::CloseTag);
             }
             // Vue reports `X_MISSING_END_TAG` when the element runs into EOF.
             else {
@@ -347,9 +329,7 @@ impl<'config> VueParser<'config> {
             }
         }
 
-        let node = state.finish_at(cp, crate::parser::element_type::VueElementType::Element);
-        state.sink.restore(cp.1);
-        state.push_child(node);
+        state.finish_at(cp, crate::parser::element_type::VueElementType::Element);
     }
 
     fn parse_attribute<'a, S: Source + ?Sized>(&self, state: &mut State<'a, S>) {
@@ -486,16 +466,12 @@ impl<'config> VueParser<'config> {
                 state.bump();
             }
             state.expect(VueTokenType::RightBracket).ok();
-            let node = state.finish_at(arg_cp, crate::parser::element_type::VueElementType::Identifier);
-            state.sink.restore(arg_cp.1);
-            state.push_child(node);
+            state.finish_at(arg_cp, crate::parser::element_type::VueElementType::Identifier);
         }
         else if state.at(VueTokenType::Identifier) || Self::bump_attr_name_is_keyword(state.peek_kind()) {
             let arg_cp = state.checkpoint();
             state.bump();
-            let node = state.finish_at(arg_cp, crate::parser::element_type::VueElementType::Identifier);
-            state.sink.restore(arg_cp.1);
-            state.push_child(node);
+            state.finish_at(arg_cp, crate::parser::element_type::VueElementType::Identifier);
         }
     }
 
