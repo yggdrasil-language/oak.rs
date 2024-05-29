@@ -572,8 +572,7 @@ impl<'config> VueParser<'config> {
         self.skip_whitespace(state);
 
         // Parse the right side (expression)
-        let expr = self.parse_expression(state);
-        state.push_child(expr);
+        self.parse_expression(state);
 
         let element_kind = match kind {
             VueTokenType::ForInExpr => crate::parser::element_type::VueElementType::ForInExpr,
@@ -587,8 +586,7 @@ impl<'config> VueParser<'config> {
         let cp = state.checkpoint();
         state.expect(VueTokenType::InterpolationStart).ok();
         self.skip_whitespace(state);
-        let expr = self.parse_expression(state);
-        state.push_child(expr);
+        self.parse_expression(state);
         self.skip_whitespace(state);
         state.expect(VueTokenType::InterpolationEnd).ok();
         state.finish_at(cp, crate::parser::element_type::VueElementType::Interpolation);
@@ -614,11 +612,10 @@ impl<'config> Pratt<VueLanguage> for VueParser<'config> {
         use VueTokenType::*;
         let cp = state.checkpoint();
         self.skip_whitespace(state);
-        let node = if state.at(LeftParen) {
+        if state.at(LeftParen) {
             state.expect(LeftParen).ok();
             if !state.at(RightParen) {
-                let inner = PrattParser::parse(state, 0, self);
-                state.push_child(inner);
+                PrattParser::parse(state, 0, self);
             }
             state.expect(RightParen).ok();
             state.finish_at(cp, crate::parser::element_type::VueElementType::Expression)
@@ -631,8 +628,7 @@ impl<'config> Pratt<VueLanguage> for VueParser<'config> {
                     state.bump();
                     if state.at(Colon) {
                         state.bump();
-                        let value = PrattParser::parse(state, 0, self);
-                        state.push_child(value);
+                        PrattParser::parse(state, 0, self);
                     }
                     state.finish_at(property_cp, crate::parser::element_type::VueElementType::ObjectProperty);
                 }
@@ -665,10 +661,7 @@ impl<'config> Pratt<VueLanguage> for VueParser<'config> {
         else {
             state.bump();
             state.finish_at(cp, crate::parser::element_type::VueElementType::Error)
-        };
-
-        state.sink.restore(cp.1);
-        node
+        }
     }
 
     fn prefix<'a, S: Source + ?Sized>(&self, state: &mut State<'a, S>) -> &'a GreenNode<'a, VueLanguage> {
@@ -686,11 +679,8 @@ impl<'config> Pratt<VueLanguage> for VueParser<'config> {
         match kind {
             Bang | Minus => {
                 state.restore(start_cp);
-                let cp = state.checkpoint();
                 self.skip_whitespace(state);
-                let node = unary(state, kind.into(), 90, UnaryExpr.into(), |s, p| PrattParser::parse(s, p, self));
-                state.sink.restore(cp.1);
-                node
+                unary(state, kind.into(), 90, UnaryExpr.into(), |s, p| PrattParser::parse(s, p, self))
             }
             _ => {
                 state.restore(start_cp);
@@ -734,22 +724,17 @@ impl<'config> Pratt<VueLanguage> for VueParser<'config> {
             return None;
         }
 
-        // Re-position left and whitespace:
-        // 1. Restore to before whitespace
+        // `left` already sits in the sink at its source position, so wrap from the node
+        // itself instead of re-pushing a detached copy.
         state.restore(start_cp);
-        // 2. Take checkpoint for the new infix node
-        let op_cp = state.checkpoint();
-        // 3. Push left as the first child
-        state.push_child(left);
-        // 4. Re-skip whitespace so it becomes a child after left
+        let op_cp = state.checkpoint_before(left);
         self.skip_whitespace(state);
 
         let node = match kind {
             Arrow => {
                 state.expect(Arrow).ok();
                 self.skip_whitespace(state);
-                let body = PrattParser::parse(state, 0, self);
-                state.push_child(body);
+                PrattParser::parse(state, 0, self);
                 state.finish_at(op_cp, crate::parser::element_type::VueElementType::ArrowFunction)
             }
             Dot => {
@@ -761,8 +746,7 @@ impl<'config> Pratt<VueLanguage> for VueParser<'config> {
             LeftBracket => {
                 state.expect(LeftBracket).ok();
                 self.skip_whitespace(state);
-                let inner = PrattParser::parse(state, 0, self);
-                state.push_child(inner);
+                PrattParser::parse(state, 0, self);
                 self.skip_whitespace(state);
                 state.expect(RightBracket).ok();
                 state.finish_at(op_cp, crate::parser::element_type::VueElementType::MemberExpr)
@@ -773,8 +757,7 @@ impl<'config> Pratt<VueLanguage> for VueParser<'config> {
                 if !state.at(RightParen) {
                     loop {
                         let before = state.checkpoint().0;
-                        let arg = PrattParser::parse(state, 0, self);
-                        state.push_child(arg);
+                        PrattParser::parse(state, 0, self);
                         if state.checkpoint().0 == before {
                             state.finish_at(state.checkpoint(), crate::parser::element_type::VueElementType::Error);
                             break;
@@ -799,13 +782,11 @@ impl<'config> Pratt<VueLanguage> for VueParser<'config> {
                     Associativity::None => prec + 1,
                 };
                 self.skip_whitespace(state);
-                let then_expr = PrattParser::parse(state, 0, self);
-                state.push_child(then_expr);
+                PrattParser::parse(state, 0, self);
                 self.skip_whitespace(state);
                 state.expect(Colon).ok();
                 self.skip_whitespace(state);
-                let else_expr = PrattParser::parse(state, next_prec, self);
-                state.push_child(else_expr);
+                PrattParser::parse(state, next_prec, self);
                 state.finish_at(op_cp, crate::parser::element_type::VueElementType::ConditionalExpr)
             }
             _ => {
@@ -815,18 +796,12 @@ impl<'config> Pratt<VueLanguage> for VueParser<'config> {
                     Associativity::Right => prec,
                     Associativity::None => prec + 1,
                 };
-                let right = {
-                    self.skip_whitespace(state);
-                    PrattParser::parse(state, next_prec, self)
-                };
-                state.push_child(right);
+                self.skip_whitespace(state);
+                PrattParser::parse(state, next_prec, self);
                 state.finish_at(op_cp, crate::parser::element_type::VueElementType::BinaryExpr)
             }
         };
 
-        state.sink.restore(op_cp.1);
-
-        state.sink.restore(op_cp.1);
         Some(node)
     }
 }
