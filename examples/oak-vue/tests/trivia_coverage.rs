@@ -87,3 +87,35 @@ fn root_covers_a_multi_element_template_document() {
         .expect("template start tag");
     assert_eq!(covered(template_tag, 0), "<template>".len());
 }
+
+#[test]
+fn text_node_span_keeps_the_whitespace_before_an_interpolation() {
+    // Whitespace is trivia for structural nodes, but for text it is content: consumers
+    // drop whitespace-only text nodes, so a lost trailing space would render `count:1`.
+    let source = SourceText::new(r#"<template><button @click="x">count: {{ count }}</button></template>"#);
+    let language = VueLanguage::default();
+    let parser = VueParser::new(&language);
+    let mut session = ParseSession::default();
+    assert!(parser.parse(&source, &[], &mut session).result.is_ok());
+
+    let mut session = ParseSession::default();
+    let built = VueBuilder::new().build(&source, &[], &mut session).result.unwrap();
+    let VueNode::Element(button) = &built.blocks[0].children[0]
+    else {
+        panic!("expected button")
+    };
+    let VueNode::Text(text) = &button.children[0]
+    else {
+        panic!("expected text")
+    };
+    assert_eq!(source.get_text_in(text.span.clone()), "count: ");
+    assert!(matches!(&button.children[1], VueNode::Interpolation(_)));
+
+    // Structural nodes still end at their last token.
+    let VueAttribute::Directive(click) = &button.attributes[0]
+    else {
+        panic!("expected click directive")
+    };
+    assert_eq!(source.get_text_in(click.span.clone()), r#"@click="x""#);
+    assert_eq!(source.get_text_in(button.span.clone()), r#"<button @click="x">count: {{ count }}</button>"#);
+}

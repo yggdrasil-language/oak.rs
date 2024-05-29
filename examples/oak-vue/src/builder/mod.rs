@@ -48,7 +48,7 @@ impl VueBuilder {
         let mut attributes = Vec::new();
         let mut children = Vec::new();
         let mut current_offset = offset;
-        for child in node.children {
+        for (index, child) in node.children.iter().enumerate() {
             match child {
                 GreenTree::Node(n) => {
                     match n.kind {
@@ -76,9 +76,10 @@ impl VueBuilder {
                             children.push(VueNode::Interpolation(self.build_interpolation(n, current_offset, source)?));
                         }
                         VueElementType::TextNode => {
-                            let content = source.get_text_in(Range { start: current_offset, end: current_offset + n.byte_length as usize });
+                            let end = current_offset + n.byte_length as usize + trailing_whitespace_len(node, index);
+                            let content = source.get_text_in(Range { start: current_offset, end });
                             if !content.trim().is_empty() {
-                                children.push(VueNode::Text(VueText { span: Range { start: current_offset, end: current_offset + n.byte_length as usize } }));
+                                children.push(VueNode::Text(VueText { span: Range { start: current_offset, end } }));
                             }
                         }
                         _ => {}
@@ -123,7 +124,7 @@ impl VueBuilder {
         let mut children = Vec::new();
         let mut current_offset = offset;
 
-        for child in node.children {
+        for (index, child) in node.children.iter().enumerate() {
             match child {
                 GreenTree::Node(n) => {
                     match n.kind {
@@ -162,7 +163,7 @@ impl VueBuilder {
                             children.push(VueNode::Interpolation(self.build_interpolation(n, current_offset, source)?));
                         }
                         VueElementType::TextNode => {
-                            push_text_children(&mut children, n, current_offset, source);
+                            push_text_children(&mut children, n, current_offset, source, trailing_whitespace_len(node, index));
                         }
                         _ => {}
                     }
@@ -371,12 +372,20 @@ fn comment_body(raw: &str) -> String {
     raw.strip_prefix("<!--").and_then(|body| body.strip_suffix("-->")).unwrap_or(raw).to_string()
 }
 
+/// Bytes of whitespace that `finish_node` moved out of `node` as trailing siblings.
+///
+/// Trivia is kept out of structural nodes, but a text run keeps it as content, so the
+/// builder has to reabsorb it when computing text spans.
+fn trailing_whitespace_len(node: &GreenNode<'_, VueLanguage>, index: usize) -> usize {
+    node.children[index + 1..].iter().take_while(|child| matches!(child, GreenTree::Leaf(leaf) if leaf.kind == VueTokenType::Whitespace)).map(|child| child.len() as usize).sum()
+}
+
 /// Splits a `TextNode` into `Text` and `Comment` children.
 ///
 /// The lexer treats comments as trivia, so a comment between two text runs is a leaf inside the
 /// `TextNode`. Vue drops the comment markers from the text, so the text runs are emitted
 /// separately instead of one span that would include `<!-- ... -->`.
-fn push_text_children<'a>(children: &mut Vec<VueNode>, node: &GreenNode<'a, VueLanguage>, offset: usize, source: &SourceText) {
+fn push_text_children<'a>(children: &mut Vec<VueNode>, node: &GreenNode<'a, VueLanguage>, offset: usize, source: &SourceText, trailing: usize) {
     let mut run_start = offset;
     let mut run_len = 0usize;
     let mut cursor = offset;
@@ -400,7 +409,7 @@ fn push_text_children<'a>(children: &mut Vec<VueNode>, node: &GreenNode<'a, VueL
         }
         cursor += child.len() as usize;
     }
-    push_text_run(children, run_start, run_len, source);
+    push_text_run(children, run_start, run_len + trailing, source);
 }
 
 fn push_text_run(children: &mut Vec<VueNode>, start: usize, len: usize, source: &SourceText) {
