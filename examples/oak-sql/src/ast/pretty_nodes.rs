@@ -156,6 +156,12 @@ impl AsDocument for Expression {
             Expression::Between { expr, low, high, negated, .. } => {
                 doc!(expr.as_document(&()), if *negated { doc!(soft_space, "NOT") } else { nil }, soft_space, "BETWEEN", soft_space, low.as_document(&()), soft_space, "AND", soft_space, high.as_document(&()))
             }
+            Expression::IsNull { expr, negated, .. } => {
+                doc!(is_operand_document(expr), soft_space, "IS", if *negated { doc!(soft_space, "NOT") } else { nil }, soft_space, "NULL")
+            }
+            Expression::IsTruth { expr, value, negated, .. } => {
+                doc!(is_operand_document(expr), soft_space, "IS", if *negated { doc!(soft_space, "NOT") } else { nil }, soft_space, if *value { "TRUE" } else { "FALSE" })
+            }
             Expression::Subquery { query, .. } => {
                 doc!("(", query.as_document(&()), ")")
             }
@@ -167,6 +173,18 @@ impl AsDocument for Expression {
                 doc!("[", Document::join(elements.iter().map(|it| it.as_document(&())), doc!(",", soft_space)), "]")
             }
         }
+    }
+}
+
+/// Writes the left operand of an `IS` predicate, keeping parentheses when the
+/// operand would otherwise reparse at a lower precedence.
+#[cfg(feature = "oak-pretty-print")]
+fn is_operand_document(expr: &Expression) -> Document<'_> {
+    if crate::ast::expression_nodes::needs_is_operand_parentheses(expr) {
+        doc!("(", expr.as_document(&()), ")")
+    }
+    else {
+        expr.as_document(&())
     }
 }
 
