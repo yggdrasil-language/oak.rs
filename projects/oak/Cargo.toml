@@ -24,6 +24,14 @@ serde = { workspace = true, optional = true }
 
 [dev-dependencies]
 oak-testing = { workspace = true }
+oak-css = { workspace = true }
+oak-javascript = { workspace = true }
+oak-json = { workspace = true }
+oak-python = { workspace = true }
+oak-rust = { workspace = true }
+oak-sql = { workspace = true }
+oak-toml = { workspace = true }
+oak-yaml = { workspace = true }
 chrono = { workspace = true }
 criterion = { version = "0.8.2" }
 # toml = { version = "1.0.4" } # replaced by oak-toml

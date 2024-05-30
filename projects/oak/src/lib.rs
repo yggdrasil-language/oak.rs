@@ -22,8 +22,3 @@ pub use oak_semantic_tokens::{SemanticToken, SemanticTokensProvider};
 pub use oak_structural_view::{StructureItem, StructureProvider};
 /// Re-export of the symbol information provider.
 pub use oak_symbols::{SymbolInformation, SymbolProvider};
-
-mod languages;
-
-/// Re-export of language-specific implementations.
-pub use languages::*;
