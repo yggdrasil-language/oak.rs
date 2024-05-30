@@ -221,4 +221,6 @@ pub enum RelationKind {
     Composition,
     /// Weak ownership relationship (has-a).
     Aggregation,
+    /// A dependency relationship between elements.
+    Dependency,
 }

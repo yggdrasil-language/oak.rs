@@ -10,6 +10,26 @@ use oak_core::{
 };
 use std::collections::HashMap;
 
+/// sequence diagram 中可识别的消息箭头，较长的箭头排在前面。
+const MESSAGE_ARROWS: &[(&str, MessageArrow)] = &[("-->>", MessageArrow::DottedArrow), ("->>", MessageArrow::SolidArrow), ("-->", MessageArrow::Dotted), ("->", MessageArrow::Solid)];
+
+/// class diagram 中可识别的关系箭头，较长的箭头排在前面。
+const RELATION_ARROWS: &[(&str, oak_uml::model::RelationKind)] = &[
+    ("<|--", oak_uml::model::RelationKind::Inheritance),
+    ("--|>", oak_uml::model::RelationKind::Inheritance),
+    ("..|>", oak_uml::model::RelationKind::Inheritance),
+    ("|>..", oak_uml::model::RelationKind::Inheritance),
+    ("*--", oak_uml::model::RelationKind::Composition),
+    ("--*", oak_uml::model::RelationKind::Composition),
+    ("o--", oak_uml::model::RelationKind::Aggregation),
+    ("--o", oak_uml::model::RelationKind::Aggregation),
+    ("..>", oak_uml::model::RelationKind::Dependency),
+    ("<..", oak_uml::model::RelationKind::Dependency),
+    ("-->", oak_uml::model::RelationKind::Association),
+    ("<--", oak_uml::model::RelationKind::Association),
+    ("..", oak_uml::model::RelationKind::Dependency),
+];
+
 /// A builder for Mermaid Abstract Syntax Trees.
 #[derive(Clone)]
 pub struct MermaidBuilder<'config> {
@@ -33,6 +53,12 @@ impl<'config> MermaidBuilder<'config> {
                 GreenTree::Node(node) => {
                     if node.kind == MermaidElementType::Graph {
                         diagrams.push(MermaidDiagram::Flowchart(self.build_flowchart(node, source, &mut offset)));
+                    }
+                    else if node.kind == MermaidElementType::SequenceDiagram {
+                        diagrams.push(MermaidDiagram::Sequence(self.build_sequence(node, source, &mut offset)));
+                    }
+                    else if node.kind == MermaidElementType::ClassDiagram {
+                        diagrams.push(MermaidDiagram::Class(self.build_class(node, source, &mut offset)));
                     }
                     else {
                         offset += node.byte_length as usize;
@@ -102,6 +128,202 @@ impl<'config> MermaidBuilder<'config> {
         Subgraph { id, title, elements }
     }
 
+    /// 把一个 `SequenceDiagram` 段落转换成 [`SequenceDiagram`]。
+    fn build_sequence(&self, node: &GreenNode<MermaidLanguage>, source: &SourceText, offset: &mut usize) -> SequenceDiagram {
+        let end = *offset + node.byte_length as usize;
+        let mut participants = Vec::new();
+        let mut messages = Vec::new();
+
+        for child in node.children {
+            match child {
+                GreenTree::Leaf(leaf) => {
+                    *offset += leaf.length as usize;
+                }
+                GreenTree::Node(child) => match child.kind {
+                    MermaidElementType::Participant => {
+                        let text = Self::node_text(child, source, offset);
+                        if let Some(participant) = Self::parse_participant(&text) {
+                            participants.push(participant);
+                        }
+                    }
+                    MermaidElementType::Message => {
+                        let text = Self::node_text(child, source, offset);
+                        if let Some(message) = Self::parse_message(&text) {
+                            messages.push(message);
+                        }
+                    }
+                    _ => *offset += child.byte_length as usize,
+                },
+            }
+        }
+
+        debug_assert_eq!(*offset, end);
+        SequenceDiagram { participants, messages }
+    }
+
+    /// 从一行 participant 声明中还原 id、显示名与关键字。
+    fn parse_participant(text: &str) -> Option<Participant> {
+        let text = text.trim();
+        let (kind, rest) = if let Some(rest) = Self::strip_keyword(text, "participant") {
+            (ParticipantKind::Participant, rest)
+        }
+        else if let Some(rest) = Self::strip_keyword(text, "actor") {
+            (ParticipantKind::Actor, rest)
+        }
+        else {
+            return None;
+        };
+
+        let rest = rest.trim();
+        let (id, display) = match rest.split_once(" as ") {
+            Some((id, display)) => (id.trim(), Some(display.trim()).filter(|display| !display.is_empty()).map(str::to_string)),
+            None => (rest, None),
+        };
+        if id.is_empty() {
+            return None;
+        }
+        Some(Participant { id: id.to_string(), display, kind })
+    }
+
+    /// 从一行消息中还原发送方、接收方、箭头与文本。
+    fn parse_message(text: &str) -> Option<Message> {
+        let text = text.trim();
+        let (head, body) = match text.split_once(':') {
+            Some((head, body)) => (head, body.trim()),
+            None => (text, ""),
+        };
+
+        let (index, arrow, kind) = Self::find_arrow(head, MESSAGE_ARROWS)?;
+        let from = head[..index].trim();
+        let to = head[index + arrow.len()..].trim();
+        if from.is_empty() || to.is_empty() {
+            return None;
+        }
+        Some(Message { from: from.to_string(), to: to.to_string(), text: body.to_string(), arrow: kind })
+    }
+
+    /// 把一个 `ClassDiagram` 段落转换成 [`ClassDiagram`]。
+    fn build_class(&self, node: &GreenNode<MermaidLanguage>, source: &SourceText, offset: &mut usize) -> ClassDiagram {
+        let end = *offset + node.byte_length as usize;
+        let mut classes = Vec::new();
+        let mut relations = Vec::new();
+
+        for child in node.children {
+            match child {
+                GreenTree::Leaf(leaf) => {
+                    *offset += leaf.length as usize;
+                }
+                GreenTree::Node(child) => match child.kind {
+                    MermaidElementType::ClassDeclaration => {
+                        if let Some(class) = self.build_class_declaration(child, source, offset) {
+                            classes.push(class);
+                        }
+                    }
+                    MermaidElementType::Relation => {
+                        let text = Self::node_text(child, source, offset);
+                        if let Some(relation) = Self::parse_relation(&text) {
+                            relations.push(relation);
+                        }
+                    }
+                    _ => *offset += child.byte_length as usize,
+                },
+            }
+        }
+
+        debug_assert_eq!(*offset, end);
+        ClassDiagram { classes, relations }
+    }
+
+    /// 把一个 `ClassDeclaration` 段落转换成 [`oak_uml::model::Class`]。
+    fn build_class_declaration(&self, node: &GreenNode<MermaidLanguage>, source: &SourceText, offset: &mut usize) -> Option<oak_uml::model::Class> {
+        let end = *offset + node.byte_length as usize;
+        let mut header = String::new();
+        let mut in_header = true;
+        let mut members = Vec::new();
+
+        for child in node.children {
+            match child {
+                GreenTree::Leaf(leaf) => {
+                    let text = Self::leaf_text(*leaf, source, offset);
+                    if in_header {
+                        if leaf.kind == MermaidTokenType::Newline {
+                            in_header = false;
+                        }
+                        else {
+                            header.push_str(&text);
+                        }
+                    }
+                }
+                GreenTree::Node(child) => match child.kind {
+                    MermaidElementType::ClassMember => {
+                        let text = Self::node_text(child, source, offset);
+                        if let Some(member) = Self::parse_member(&text) {
+                            members.push(member);
+                        }
+                    }
+                    _ => *offset += child.byte_length as usize,
+                },
+            }
+        }
+
+        debug_assert_eq!(*offset, end);
+        let name = Self::class_name(&header)?;
+        Some(oak_uml::model::Class { name, members })
+    }
+
+    /// 从 `class Foo` / `class Foo {` 头部还原类名。
+    fn class_name(header: &str) -> Option<String> {
+        let rest = Self::strip_keyword(header.trim(), "class")?;
+        let rest = rest.trim();
+        let rest = rest.strip_suffix('{').unwrap_or(rest).trim();
+        let name = rest.split(":::").next().unwrap_or(rest).trim();
+        (!name.is_empty()).then(|| name.to_string())
+    }
+
+    /// 从一行成员声明中还原成员；带 `(` 的行视为方法。
+    fn parse_member(text: &str) -> Option<oak_uml::model::Member> {
+        let name = text.trim().trim_end_matches(';').trim();
+        if name.is_empty() {
+            return None;
+        }
+        if name.contains('(') { Some(oak_uml::model::Member::new_method(name)) } else { Some(oak_uml::model::Member::new_field(name)) }
+    }
+
+    /// 从一行关系中还原源、目标、关系类型与可选标签。
+    fn parse_relation(text: &str) -> Option<oak_uml::model::Relation> {
+        let text = text.trim();
+        let (head, label) = match text.split_once(':') {
+            Some((head, label)) => (head.trim(), Some(label.trim()).filter(|label| !label.is_empty()).map(str::to_string)),
+            None => (text, None),
+        };
+
+        let (index, arrow, kind) = Self::find_arrow(head, RELATION_ARROWS)?;
+        let source = head[..index].trim();
+        let target = head[index + arrow.len()..].trim();
+        if source.is_empty() || target.is_empty() {
+            return None;
+        }
+        Some(oak_uml::model::Relation { source: source.to_string(), target: target.to_string(), kind, label })
+    }
+
+    /// 在文本中定位最靠左的箭头；同一位置优先匹配列表靠前的较长箭头。
+    fn find_arrow<'a, T: Clone>(text: &str, arrows: &'a [(&'a str, T)]) -> Option<(usize, &'a str, T)> {
+        for (index, _) in text.char_indices() {
+            for (arrow, kind) in arrows {
+                if text[index..].starts_with(arrow) {
+                    return Some((index, arrow, kind.clone()));
+                }
+            }
+        }
+        None
+    }
+
+    /// 去掉关键字前缀，并确保后面跟着空白或字符串结束。
+    fn strip_keyword<'a>(text: &'a str, keyword: &str) -> Option<&'a str> {
+        let rest = text.strip_prefix(keyword)?;
+        if rest.is_empty() || rest.starts_with(char::is_whitespace) { Some(rest) } else { None }
+    }
+
     /// 把一个子节点追加到元素列表。
     fn append_element(&self, node: &GreenNode<MermaidLanguage>, source: &SourceText, offset: &mut usize, elements: &mut Vec<FlowElement>, node_index: &mut HashMap<String, usize>) {
         match node.kind {
@@ -162,6 +384,11 @@ impl<'config> MermaidBuilder<'config> {
         let mut tokens = Vec::new();
         Self::collect_tokens_into(node, source, offset, &mut tokens);
         tokens
+    }
+
+    /// 还原一个节点的原始行文本（保留 token 之间的空白）。
+    fn node_text(node: &GreenNode<MermaidLanguage>, source: &SourceText, offset: &mut usize) -> String {
+        Self::collect_tokens(node, source, offset).into_iter().map(|(_, text)| text).collect()
     }
 
     fn collect_tokens_into(node: &GreenNode<MermaidLanguage>, source: &SourceText, offset: &mut usize, tokens: &mut Vec<(MermaidTokenType, String)>) {
