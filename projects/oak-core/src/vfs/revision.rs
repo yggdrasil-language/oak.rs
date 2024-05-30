@@ -1,6 +1,10 @@
-use std::collections::HashMap;
-use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::RwLock;
+use std::{
+    collections::HashMap,
+    sync::{
+        RwLock,
+        atomic::{AtomicU64, Ordering},
+    },
+};
 
 use crate::{Arc, source::SnapshotRevision};
 

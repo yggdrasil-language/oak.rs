@@ -6,7 +6,7 @@ use oak_core::tree::RedNode;
 pub mod highlighter;
 
 #[cfg(feature = "lsp")]
-use {oak_lsp::service::LanguageService, oak_lsp::Vfs, std::future::Future};
+use {oak_lsp::Vfs, oak_lsp::service::LanguageService, std::future::Future};
 /// MCP module.
 /// Formatter module.
 #[cfg(feature = "lsp")]

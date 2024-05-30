@@ -39,4 +39,3 @@ impl DocumentSnapshot {
         self.revision
     }
 }
-

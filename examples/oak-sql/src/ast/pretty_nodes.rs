@@ -180,12 +180,7 @@ impl AsDocument for Expression {
 /// operand would otherwise reparse at a lower precedence.
 #[cfg(feature = "oak-pretty-print")]
 fn is_operand_document(expr: &Expression) -> Document<'_> {
-    if crate::ast::expression_nodes::needs_is_operand_parentheses(expr) {
-        doc!("(", expr.as_document(&()), ")")
-    }
-    else {
-        expr.as_document(&())
-    }
+    if crate::ast::expression_nodes::needs_is_operand_parentheses(expr) { doc!("(", expr.as_document(&()), ")") } else { expr.as_document(&()) }
 }
 
 #[cfg(feature = "oak-pretty-print")]

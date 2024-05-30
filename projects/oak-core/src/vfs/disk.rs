@@ -1,9 +1,9 @@
-use boost_fs::vfs::LayeredFs;
+use super::{DocumentSession, FileMetadata, FileType, RevisionTracker, Vfs, WritableVfs};
 use crate::{
     Arc,
     source::{DocumentSnapshot, SourceId, SourceText},
 };
-use super::{DocumentSession, FileMetadata, FileType, RevisionTracker, Vfs, WritableVfs};
+use boost_fs::vfs::LayeredFs;
 use std::{collections::HashMap, path::PathBuf, sync::RwLock};
 
 /// A virtual file system that reads from disk through [`boost_fs::vfs::LayeredFs`].
@@ -21,13 +21,7 @@ pub struct DiskVfs {
 impl DiskVfs {
     /// Creates a new DiskVfs instance with the given root path.
     pub fn new(root_path: PathBuf) -> Self {
-        Self {
-            fs: LayeredFs::new(root_path.clone()),
-            revisions: RevisionTracker::new(),
-            uri_to_id: RwLock::new(HashMap::new()),
-            id_to_uri: RwLock::new(HashMap::new()),
-            root_path,
-        }
+        Self { fs: LayeredFs::new(root_path.clone()), revisions: RevisionTracker::new(), uri_to_id: RwLock::new(HashMap::new()), id_to_uri: RwLock::new(HashMap::new()), root_path }
     }
 
     /// Returns the underlying layered filesystem for overlay updates.
@@ -59,12 +53,7 @@ impl DiskVfs {
 
     /// Converts a physical file path to a URI.
     fn path_to_uri(&self, path: PathBuf) -> Arc<str> {
-        let uri = if path.is_absolute() {
-            path.to_string_lossy().to_string()
-        }
-        else {
-            path.strip_prefix(&self.root_path).unwrap_or(&path).to_string_lossy().to_string()
-        };
+        let uri = if path.is_absolute() { path.to_string_lossy().to_string() } else { path.strip_prefix(&self.root_path).unwrap_or(&path).to_string_lossy().to_string() };
         Arc::from(uri.as_str())
     }
 }

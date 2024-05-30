@@ -4,7 +4,7 @@ pub mod highlighter;
 
 use crate::JuliaLanguage;
 #[cfg(feature = "lsp")]
-use {futures::Future, oak_core::tree::RedNode, oak_lsp::service::LanguageService, oak_lsp::Vfs};
+use {futures::Future, oak_core::tree::RedNode, oak_lsp::Vfs, oak_lsp::service::LanguageService};
 /// Language service implementation for Julia.
 ///
 /// Provides IDE features such as diagnostics and workspace management

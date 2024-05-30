@@ -1,7 +1,7 @@
 #![doc = include_str!("readme.md")]
 use crate::lsp::YamlLanguageService;
-use oak_mcp::McpServer;
 use oak_lsp::MemoryVfs;
+use oak_mcp::McpServer;
 
 /// Start an MCP server for YAML semantics (Stdio).
 #[cfg(feature = "mcp")]

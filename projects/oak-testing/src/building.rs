@@ -15,12 +15,12 @@ use serde::Serialize;
 #[cfg(feature = "serde")]
 use serde_json::Value as JsonValueNode;
 
+use boost_fs::walk::{ErrorPolicy, Walker};
 use std::{
     fmt::Debug,
     path::{Path, PathBuf},
     time::Duration,
 };
-use boost_fs::walk::{ErrorPolicy, Walker};
 
 /// A concurrent builder testing utility that can run tests against multiple files with timeout support.
 ///

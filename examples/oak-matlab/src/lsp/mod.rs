@@ -6,7 +6,7 @@ use crate::{MatlabLanguage, parser::element_type::MatlabElementType};
 use core::range::Range;
 use oak_core::tree::RedNode;
 #[cfg(feature = "lsp")]
-use {oak_hover::HoverProvider, oak_lsp::service::LanguageService, oak_lsp::Vfs, std::future::Future};
+use {oak_hover::HoverProvider, oak_lsp::Vfs, oak_lsp::service::LanguageService, std::future::Future};
 /// Hover provider implementation for MATLAB.
 #[cfg(feature = "lsp")]
 pub struct MatlabHoverProvider;

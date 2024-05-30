@@ -1,7 +1,7 @@
 #![doc = include_str!("readme.md")]
 use crate::lsp::TwigLanguageService;
-use oak_mcp::McpServer;
 use oak_lsp::MemoryVfs;
+use oak_mcp::McpServer;
 
 /// Starts the Twig MCP service
 pub async fn serve_twig_mcp(vfs: MemoryVfs) {

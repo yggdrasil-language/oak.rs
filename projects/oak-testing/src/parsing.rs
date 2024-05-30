@@ -12,12 +12,12 @@ use crate::json_from_path;
 #[cfg(feature = "serde")]
 use serde::Serialize;
 
+use boost_fs::walk::{ErrorPolicy, Walker};
 use std::{
     fmt::Debug,
     path::{Path, PathBuf},
     time::Duration,
 };
-use boost_fs::walk::{ErrorPolicy, Walker};
 
 /// A concurrent parser testing utility that can run tests against multiple files with timeout support.
 ///

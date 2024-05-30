@@ -8,9 +8,9 @@ use oak_core::{Range, parser::session::ParseSession, tree::RedNode};
 #[cfg(feature = "lsp")]
 use oak_hover::HoverProvider;
 #[cfg(feature = "lsp")]
-use oak_lsp::service::LanguageService;
-#[cfg(feature = "lsp")]
 use oak_lsp::Vfs;
+#[cfg(feature = "lsp")]
+use oak_lsp::service::LanguageService;
 use std::{future::Future, sync::Arc};
 /// Hover provider implementation for Nim.
 #[cfg(feature = "lsp")]

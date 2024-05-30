@@ -9,8 +9,8 @@ use oak_core::tree::RedNode;
 use {
     futures::Future,
     oak_hover::{Hover, HoverProvider},
-    oak_lsp::service::LanguageService,
     oak_lsp::Vfs,
+    oak_lsp::service::LanguageService,
 };
 #[cfg(feature = "lsp")]
 /// INI hover provider.

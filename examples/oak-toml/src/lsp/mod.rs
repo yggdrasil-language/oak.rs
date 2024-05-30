@@ -5,8 +5,8 @@ pub mod highlighter;
 #[cfg(feature = "lsp")]
 use {
     oak_hover::{Hover as ProviderHover, HoverProvider},
-    oak_lsp::{service::LanguageService, types::Hover as LspHover},
     oak_lsp::Vfs,
+    oak_lsp::{service::LanguageService, types::Hover as LspHover},
 };
 
 #[cfg(feature = "oak-pretty-print")]

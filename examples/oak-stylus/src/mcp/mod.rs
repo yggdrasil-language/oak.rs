@@ -1,7 +1,7 @@
 #![doc = include_str!("readme.md")]
 use crate::lsp::StylusLanguageService;
-use oak_mcp::McpServer;
 use oak_lsp::Vfs;
+use oak_mcp::McpServer;
 
 pub async fn serve_stylus_mcp<V: Vfs + Send + Sync + 'static + oak_lsp::DocumentSession>(vfs: V) {
     let service = StylusLanguageService::new(vfs);

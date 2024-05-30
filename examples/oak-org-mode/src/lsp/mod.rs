@@ -8,9 +8,9 @@ use oak_core::tree::RedNode;
 #[cfg(feature = "lsp")]
 use oak_hover::{Hover as ProviderHover, HoverProvider};
 #[cfg(feature = "lsp")]
-use oak_lsp::{service::LanguageService, types::Hover as LspHover};
-#[cfg(feature = "lsp")]
 use oak_lsp::Vfs;
+#[cfg(feature = "lsp")]
+use oak_lsp::{service::LanguageService, types::Hover as LspHover};
 /// Hover provider implementation for Org-mode.
 #[cfg(feature = "lsp")]
 pub struct OrgModeHoverProvider;

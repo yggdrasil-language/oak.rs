@@ -7,7 +7,7 @@ pub mod highlighter;
 use crate::language::JavadocLanguage;
 use oak_core::tree::RedNode;
 #[cfg(feature = "lsp")]
-use {oak_lsp::service::LanguageService, oak_lsp::Vfs, std::future::Future};
+use {oak_lsp::Vfs, oak_lsp::service::LanguageService, std::future::Future};
 /// Javadoc language service implementation.
 #[cfg(feature = "lsp")]
 pub struct JavadocLanguageService<V: Vfs> {

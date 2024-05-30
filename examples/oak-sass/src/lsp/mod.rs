@@ -6,8 +6,8 @@ pub mod highlighter;
 use {
     futures::Future,
     oak_hover::{Hover as ProviderHover, HoverProvider},
-    oak_lsp::{service::LanguageService, types::Hover as LspHover},
     oak_lsp::Vfs,
+    oak_lsp::{service::LanguageService, types::Hover as LspHover},
 };
 #[cfg(feature = "oak-pretty-print")]
 pub mod formatter;

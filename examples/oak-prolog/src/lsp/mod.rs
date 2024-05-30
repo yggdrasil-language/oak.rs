@@ -8,8 +8,8 @@ use oak_core::tree::RedNode;
 #[cfg(feature = "lsp")]
 use {
     oak_hover::{Hover, HoverProvider},
-    oak_lsp::service::LanguageService,
     oak_lsp::Vfs,
+    oak_lsp::service::LanguageService,
     std::future::Future,
 };
 /// Hover provider implementation for Prolog.

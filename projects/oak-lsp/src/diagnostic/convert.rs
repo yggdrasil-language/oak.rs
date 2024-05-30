@@ -15,25 +15,12 @@ pub trait SourceResolver {
 }
 
 /// Convert every diagnostic in a set into protocol structured diagnostics.
-pub fn structured_set_to_protocol(
-    set: &DiagnosticSet,
-    provider: &impl SourceProvider,
-    resolver: &impl SourceResolver,
-    uri_for: &impl Fn(&SourceID) -> Option<Arc<str>>,
-) -> Result<Vec<StructuredDiagnostic>, DiagnosticError> {
-    set.diagnostics()
-        .iter()
-        .map(|diagnostic| structured_to_protocol(diagnostic, provider, resolver, uri_for))
-        .collect()
+pub fn structured_set_to_protocol(set: &DiagnosticSet, provider: &impl SourceProvider, resolver: &impl SourceResolver, uri_for: &impl Fn(&SourceID) -> Option<Arc<str>>) -> Result<Vec<StructuredDiagnostic>, DiagnosticError> {
+    set.diagnostics().iter().map(|diagnostic| structured_to_protocol(diagnostic, provider, resolver, uri_for)).collect()
 }
 
 /// Convert a structured diagnostic into a protocol structured diagnostic.
-pub fn structured_to_protocol(
-    diagnostic: &Diagnostic,
-    provider: &impl SourceProvider,
-    resolver: &impl SourceResolver,
-    uri_for: &impl Fn(&SourceID) -> Option<Arc<str>>,
-) -> Result<StructuredDiagnostic, DiagnosticError> {
+pub fn structured_to_protocol(diagnostic: &Diagnostic, provider: &impl SourceProvider, resolver: &impl SourceResolver, uri_for: &impl Fn(&SourceID) -> Option<Arc<str>>) -> Result<StructuredDiagnostic, DiagnosticError> {
     let mut range = TextRange::empty();
     let mut has_range = false;
     let mut related_information = Vec::new();
@@ -73,12 +60,7 @@ pub fn structured_to_protocol(
     })
 }
 
-fn label_text_location(
-    provider: &impl SourceProvider,
-    resolver: &impl SourceResolver,
-    uri_for: &impl Fn(&SourceID) -> Option<Arc<str>>,
-    label: &DiagnosticLabel,
-) -> Result<Option<TextLocation>, DiagnosticError> {
+fn label_text_location(provider: &impl SourceProvider, resolver: &impl SourceResolver, uri_for: &impl Fn(&SourceID) -> Option<Arc<str>>, label: &DiagnosticLabel) -> Result<Option<TextLocation>, DiagnosticError> {
     match label.location() {
         DiagnosticLocation::Text { source, range } | DiagnosticLocation::Virtual { source, range } => {
             let file = resolver.resolve(source).ok_or_else(|| DiagnosticError::UnknownSource { wire_id: source.wire_id() })?;
@@ -109,8 +91,7 @@ fn location_summary(location: &DiagnosticLocation, message: &Message) -> String 
             format!("{}:{} [{}, {})", source.id(), address_space.id(), range.start(), range.end())
         }
         DiagnosticLocation::Member { container, member, range, precision, .. } => {
-            let path =
-                member.segments().iter().map(|segment| format!("{}/{}", segment.kind(), segment.name())).collect::<Vec<_>>().join(" -> ");
+            let path = member.segments().iter().map(|segment| format!("{}/{}", segment.kind(), segment.name())).collect::<Vec<_>>().join(" -> ");
             let range = range.map(|range: ByteRange| format!(" [{}, {})", range.start(), range.end())).unwrap_or_default();
             format!("{}::{path}{range} ({precision:?})", container.id())
         }
@@ -128,8 +109,5 @@ fn location_summary(location: &DiagnosticLocation, message: &Message) -> String 
 }
 
 fn message_only_related(message: String) -> DiagnosticRelatedInformation {
-    DiagnosticRelatedInformation {
-        location: TextLocation { uri: Arc::from("file:///unknown"), range: TextRange::empty() },
-        message,
-    }
+    DiagnosticRelatedInformation { location: TextLocation { uri: Arc::from("file:///unknown"), range: TextRange::empty() }, message }
 }
