@@ -54,27 +54,99 @@ impl<'config> MermaidBuilder<'config> {
         for child in graph.children {
             match child {
                 GreenTree::Leaf(leaf) => {
+                    let kind = leaf.kind;
                     let text = Self::leaf_text(*leaf, source, offset);
-                    if leaf.kind == MermaidTokenType::Direction {
+                    if kind == MermaidTokenType::Direction {
                         orientation = text;
                     }
                 }
-                GreenTree::Node(node) => match node.kind {
-                    MermaidElementType::Node => {
-                        let tokens = Self::collect_tokens(node, source, offset);
-                        Self::append_node(&tokens, &mut elements, &mut node_index);
-                    }
-                    MermaidElementType::Edge => {
-                        let tokens = Self::collect_tokens(node, source, offset);
-                        Self::append_edges(&tokens, &mut elements, &mut node_index);
-                    }
-                    _ => *offset += node.byte_length as usize,
-                },
+                GreenTree::Node(node) => self.append_element(node, source, offset, &mut elements, &mut node_index),
             }
         }
 
         debug_assert_eq!(*offset, end);
         Flowchart { orientation, elements }
+    }
+
+    /// 把一个 `Subgraph` 段落转换成 [`Subgraph`]。
+    ///
+    /// 头部行的 token（`subgraph` 关键字与标题）只收集到第一个换行，
+    /// 块内元素按 flowchart 规则递归构建。
+    fn build_subgraph(&self, node: &GreenNode<MermaidLanguage>, source: &SourceText, offset: &mut usize) -> Subgraph {
+        let end = *offset + node.byte_length as usize;
+        let mut header: Vec<String> = Vec::new();
+        let mut in_header = true;
+        let mut elements: Vec<FlowElement> = Vec::new();
+        let mut node_index: HashMap<String, usize> = HashMap::new();
+
+        for child in node.children {
+            match child {
+                GreenTree::Leaf(leaf) => {
+                    let kind = leaf.kind;
+                    let text = Self::leaf_text(*leaf, source, offset);
+                    if in_header {
+                        if kind == MermaidTokenType::Newline {
+                            in_header = false;
+                        }
+                        else if !Self::is_trivia(kind) && kind != MermaidTokenType::Eof {
+                            header.push(text);
+                        }
+                    }
+                }
+                GreenTree::Node(child) => self.append_element(child, source, offset, &mut elements, &mut node_index),
+            }
+        }
+
+        debug_assert_eq!(*offset, end);
+        let (id, title) = Self::subgraph_header(&header);
+        Subgraph { id, title, elements }
+    }
+
+    /// 把一个子节点追加到元素列表。
+    fn append_element(&self, node: &GreenNode<MermaidLanguage>, source: &SourceText, offset: &mut usize, elements: &mut Vec<FlowElement>, node_index: &mut HashMap<String, usize>) {
+        match node.kind {
+            MermaidElementType::Node => {
+                let tokens = Self::collect_tokens(node, source, offset);
+                Self::append_node(&tokens, elements, node_index);
+            }
+            MermaidElementType::Edge => {
+                let tokens = Self::collect_tokens(node, source, offset);
+                Self::append_edges(&tokens, elements, node_index);
+            }
+            MermaidElementType::Subgraph => {
+                let subgraph = self.build_subgraph(node, source, offset);
+                elements.push(FlowElement::Subgraph(subgraph));
+            }
+            _ => *offset += node.byte_length as usize,
+        }
+    }
+
+    /// 从头部 token 解析子图 id 与标题。
+    ///
+    /// 支持 `subgraph title` 与 `subgraph id[title]` 两种写法。
+    fn subgraph_header(header: &[String]) -> (Option<String>, String) {
+        let mut tokens = header.iter().skip(1);
+        let Some(first) = tokens.next()
+        else {
+            return (None, String::new());
+        };
+        let rest: Vec<&str> = tokens.map(String::as_str).collect();
+        if rest.is_empty() {
+            let title = Self::strip_brackets(first);
+            return (None, title);
+        }
+        (Some(first.clone()), Self::strip_brackets(&rest.join(" ")))
+    }
+
+    /// 去掉标题两侧的 `[..]` 或引号。
+    fn strip_brackets(text: &str) -> String {
+        let text = text.trim();
+        for (open, close) in [("[", "]"), ("\"", "\"")] {
+            if let Some(inner) = text.strip_prefix(open).and_then(|rest| rest.strip_suffix(close)) {
+                return inner.trim().to_string();
+            }
+        }
+        text.to_string()
     }
 
     /// 读取一个 leaf 的文本，并把游标推进到下一个 token。

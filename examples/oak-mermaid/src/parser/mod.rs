@@ -15,7 +15,9 @@ use oak_core::{
 pub(crate) type State<'a, S> = ParserState<'a, MermaidLanguage, S>;
 
 /// `subgraph`、`direction`、样式声明等当前不支持、需要整行跳过的语句。
-const SKIPPED_KEYWORDS: &[&str] = &["subgraph", "end", "direction", "style", "classDef", "class", "linkStyle", "click", "accTitle", "accDescr"];
+///
+/// `subgraph` 与 `end` 由 [`MermaidParser::parse_subgraph`] 处理，不在此列表中。
+const SKIPPED_KEYWORDS: &[&str] = &["direction", "style", "classDef", "class", "linkStyle", "click", "accTitle", "accDescr"];
 
 /// 其他 Mermaid 图表头。遇到它们时结束当前 flowchart 段落，避免把
 /// 序列图/类图的内容误当成 flowchart 节点。
@@ -87,7 +89,13 @@ impl<'a> MermaidParser<'a> {
             if Self::starts_with_keyword(state, DIAGRAM_HEADERS) {
                 break;
             }
-            if Self::starts_with_keyword(state, SKIPPED_KEYWORDS) {
+            if Self::starts_with_keyword(state, &["subgraph"]) {
+                if !self.parse_subgraph(state) {
+                    self.skip_line(state);
+                }
+                continue;
+            }
+            if Self::starts_with_keyword(state, SKIPPED_KEYWORDS) || Self::starts_with_keyword(state, &["end"]) {
                 self.skip_line(state);
                 continue;
             }
@@ -105,6 +113,59 @@ impl<'a> MermaidParser<'a> {
         }
 
         state.finish_at(checkpoint, MermaidElementType::Graph);
+    }
+
+    /// 解析 `subgraph ... end` 块，支持嵌套。
+    ///
+    /// 头部行（`subgraph title` 或 `subgraph id[title]`）整行跳过，块内每一行
+    /// 按 flowchart 规则解析，遇到 `end` 结束。未闭合的块在段落末尾结束。
+    fn parse_subgraph<'s, S: Source + ?Sized>(&self, state: &mut State<'s, S>) -> bool {
+        let checkpoint = state.checkpoint();
+        state.bump(); // `subgraph`
+        self.skip_line(state);
+
+        while state.not_at_end() {
+            if state.at(MermaidTokenType::Eof) {
+                break;
+            }
+            if state.at(MermaidTokenType::Newline) {
+                state.bump();
+                continue;
+            }
+            if state.at(MermaidTokenType::Graph) || Self::starts_with_keyword(state, DIAGRAM_HEADERS) {
+                break;
+            }
+            if Self::starts_with_keyword(state, &["end"]) {
+                state.bump();
+                self.skip_line(state);
+                state.finish_at(checkpoint, MermaidElementType::Subgraph);
+                return true;
+            }
+            if Self::starts_with_keyword(state, &["subgraph"]) {
+                if !self.parse_subgraph(state) {
+                    self.skip_line(state);
+                }
+                continue;
+            }
+            if Self::starts_with_keyword(state, SKIPPED_KEYWORDS) {
+                self.skip_line(state);
+                continue;
+            }
+
+            let line_checkpoint = state.checkpoint();
+            if self.parse_line(state) {
+                if state.at(MermaidTokenType::Newline) {
+                    state.bump();
+                }
+            }
+            else {
+                state.restore(line_checkpoint);
+                self.skip_line(state);
+            }
+        }
+
+        state.finish_at(checkpoint, MermaidElementType::Subgraph);
+        true
     }
 
     /// 解析一行 flowchart 语句，产出 `Node` 或 `Edge` 元素。
