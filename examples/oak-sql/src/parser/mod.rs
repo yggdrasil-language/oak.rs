@@ -149,6 +149,13 @@ impl<'config> Pratt<SqlLanguage> for SqlParser<'config> {
             let cp = state.checkpoint_before(left);
             state.expect(Is).ok();
             state.eat(Not);
+            // `IS [NOT] DISTINCT FROM` is a null-safe comparison with its own
+            // semantics. It must not be accepted as a partial `IS` predicate, so
+            // report it next to the offending token instead of failing later with
+            // an unrelated "unsupported token in WHERE predicate" message.
+            if state.peek_kind() == Some(Distinct) {
+                state.errors.push(OakError::custom_error("`IS DISTINCT FROM` is not supported"));
+            }
             PrattParser::parse(state, 6, self);
             return Some(state.finish_at(cp, SqlElementType::Expression));
         }
