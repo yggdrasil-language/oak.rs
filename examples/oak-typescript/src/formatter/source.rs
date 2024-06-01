@@ -29,6 +29,11 @@ pub(crate) fn format_source(source: &str, options: &FormatOptions) -> Result<Str
     }
     let significant: Vec<_> = tokens.iter().filter(|token| !is_layout(token.kind)).collect();
     validate_delimiters(source, &significant)?;
+    // A `?` is either a postfix optional marker (`name?: T`, `name?()`), which
+    // binds to the name, or the ternary operator, which separates. Decide once
+    // per token so the gap before, the gap after, and the return-type colon all
+    // agree.
+    let optional_marker: Vec<bool> = (0..significant.len()).map(|index| is_optional_marker(&significant, index, source)).collect();
     let mut gaps = Vec::new();
     for (index, pair) in significant.windows(2).enumerate() {
         let left = &pair[0];
@@ -53,12 +58,14 @@ pub(crate) fn format_source(source: &str, options: &FormatOptions) -> Result<Str
         if right_text.starts_with(['\'', '"', '`']) && significant.get(index.wrapping_sub(1)).and_then(|token| source.get(token.span.clone())) == Some("=") && is_jsx_attribute_gap(&significant, index, source) {
             constraint = oak_formatter::GapConstraint::NoSpace;
         }
-        // `?` is ambiguous in a token pair. In `name?: Type` it binds to the
-        // property name, while in `condition ? value : fallback` it is a
-        // ternary operator. Use the next CST token to disambiguate it.
+        // `?` is ambiguous in a token pair. In `name?: Type` and `name?()` it
+        // binds to the member or parameter name, while in
+        // `condition ? value : fallback` it is a ternary operator.
         if right_text == "?" {
-            let next = significant.get(index + 2).and_then(|token| source.get(token.span.clone()));
-            constraint = if next == Some(":") { oak_formatter::GapConstraint::NoSpace } else { oak_formatter::GapConstraint::RequiredSpace };
+            constraint = if optional_marker[index + 1] { oak_formatter::GapConstraint::NoSpace } else { oak_formatter::GapConstraint::RequiredSpace };
+        }
+        if left_text == "?" && matches!(right_text, "(" | "<") && optional_marker[index] {
+            constraint = oak_formatter::GapConstraint::NoSpace;
         }
         if right_text == ":" {
             let mut ternary = false;
@@ -67,9 +74,9 @@ pub(crate) fn format_source(source: &str, options: &FormatOptions) -> Result<Str
                     ")" | "]" | "}" => 1,
                     _ => 0,
                 };
-                for token in significant[..index].iter().rev().take(64) {
+                for (position, token) in significant[..index].iter().enumerate().rev().take(64) {
                     match source.get(token.span.clone()) {
-                        Some("?") if token.kind == TypeScriptTokenType::Question && nesting == 0 => {
+                        Some("?") if token.kind == TypeScriptTokenType::Question && nesting == 0 && !optional_marker[position] => {
                             ternary = true;
                             break;
                         }
@@ -189,15 +196,14 @@ pub(crate) fn format_source(source: &str, options: &FormatOptions) -> Result<Str
             constraint = oak_formatter::GapConstraint::RequiredSpace;
         }
         // A reserved word used as a property or member name is not a keyword, so
-        // `obj.catch(arg)` and `static catch(arg)` must not gain a space before
-        // the parameter list. Only contexts that cannot also be a keyword are
-        // treated as member position. `{` and `;` are excluded because
-        // `function f() { if (a) {} }` and `a(); if (b) {}` share them.
+        // `obj.catch(arg)` and `class A { delete(arg) { … } }` must not gain a
+        // space before the parameter list. Property position is decided by the
+        // preceding `.`/`?.`, member position by the enclosing declaration body
+        // (`class`, `interface`, type literal and object literal members).
         if right_text == "(" && is_reserved_word(left_text) {
             let previous = index.checked_sub(1).and_then(|previous| significant.get(previous)).and_then(|token| source.get(token.span.clone()));
             let property = matches!(previous, Some("." | "?."));
-            let member = matches!(previous, Some("," | "static" | "async" | "get" | "set" | "*"));
-            if property || member {
+            if property || is_member_name_position(&significant, index, source) {
                 constraint = oak_formatter::GapConstraint::NoSpace;
             }
         }
@@ -262,6 +268,81 @@ pub(crate) fn format_source(source: &str, options: &FormatOptions) -> Result<Str
 }
 fn is_reserved_word(text: &str) -> bool {
     matches!(text, "if" | "for" | "while" | "switch" | "catch" | "with" | "function" | "return" | "throw" | "new" | "typeof" | "void" | "delete" | "await" | "yield" | "as" | "in" | "instanceof")
+}
+/// A postfix `?` marks an optional property, parameter or method. `name?: T`
+/// is unambiguous, while `name?(` and `name?<` are only optional markers when
+/// the name starts a declaration member, not a ternary operand.
+fn is_optional_marker(significant: &[&oak_core::Token<TypeScriptTokenType>], index: usize, source: &str) -> bool {
+    if significant.get(index).and_then(|token| token_text(token, source)) != Some("?") {
+        return false;
+    }
+    match significant.get(index + 1).and_then(|token| token_text(token, source)) {
+        Some(":") => true,
+        Some("(" | "<") => index.checked_sub(1).is_some_and(|name| is_member_name_position(significant, name, source)),
+        _ => false,
+    }
+}
+/// Decide whether the token at `index` is a class, interface, type literal or
+/// object literal member name. Member modifiers are skipped first, then the
+/// preceding separator must sit inside a declaration body rather than a
+/// statement block, so `delete (obj.key)` and `return (value)` keep their space.
+fn is_member_name_position(significant: &[&oak_core::Token<TypeScriptTokenType>], index: usize, source: &str) -> bool {
+    let mut cursor = index;
+    let mut modifier = false;
+    while let Some(previous) = cursor.checked_sub(1) {
+        let Some(text) = significant.get(previous).and_then(|token| token_text(token, source))
+        else {
+            return false;
+        };
+        if matches!(text, "static" | "public" | "private" | "protected" | "readonly" | "abstract" | "override" | "declare" | "accessor" | "async" | "get" | "set" | "*") {
+            cursor = previous;
+            modifier = true;
+            continue;
+        }
+        return match text {
+            "{" => brace_opens_member_body(significant, previous, source),
+            ";" | "," | "}" => enclosing_brace_opens_member_body(significant, previous, source),
+            _ => false,
+        };
+    }
+    // A snippet may start at the member modifier (`async delete(k) { … }`),
+    // which is still member position even without the enclosing body.
+    modifier
+}
+/// Find the innermost unmatched `{` before `from` and classify it.
+fn enclosing_brace_opens_member_body(significant: &[&oak_core::Token<TypeScriptTokenType>], from: usize, source: &str) -> bool {
+    let mut nesting = 0usize;
+    for index in (0..=from).rev() {
+        match significant.get(index).and_then(|token| token_text(token, source)) {
+            Some("}") => nesting += 1,
+            Some("{") if nesting == 0 => return brace_opens_member_body(significant, index, source),
+            Some("{") => nesting -= 1,
+            _ => {}
+        }
+    }
+    false
+}
+/// A `{` opens a member body when its header is a class, interface, enum, type
+/// literal or object literal. Function bodies, control-flow blocks and nested
+/// statement blocks are not member bodies.
+fn brace_opens_member_body(significant: &[&oak_core::Token<TypeScriptTokenType>], open: usize, source: &str) -> bool {
+    let mut cursor = open;
+    while let Some(previous) = cursor.checked_sub(1) {
+        let Some(text) = significant.get(previous).and_then(|token| token_text(token, source))
+        else {
+            return false;
+        };
+        match text {
+            "class" | "interface" | "enum" => return true,
+            "=" | "(" | "[" | "," | ":" | "return" => return true,
+            "function" | "if" | "for" | "while" | "switch" | "catch" | "with" | "try" | "else" | "do" | "finally" | "=>" | "namespace" | "module" | "type" | ")" | "]" | "}" | "{" => return false,
+            _ => cursor = previous,
+        }
+    }
+    false
+}
+fn token_text<'a>(token: &oak_core::Token<TypeScriptTokenType>, source: &'a str) -> Option<&'a str> {
+    source.get(token.span.clone())
 }
 fn is_jsx_attribute_gap(significant: &[&oak_core::Token<TypeScriptTokenType>], index: usize, source: &str) -> bool {
     let mut nesting = 0usize;
