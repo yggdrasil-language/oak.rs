@@ -326,15 +326,25 @@ fn enclosing_brace_opens_member_body(significant: &[&oak_core::Token<TypeScriptT
 /// literal or object literal. Function bodies, control-flow blocks and nested
 /// statement blocks are not member bodies.
 fn brace_opens_member_body(significant: &[&oak_core::Token<TypeScriptTokenType>], open: usize, source: &str) -> bool {
+    let token = |index: usize| significant.get(index).and_then(|token| token_text(token, source));
+    // A brace directly after `:` is an object or type literal body, as in
+    // `type X = { … }`, `const o = { a: { … } }` and `function f(): { … }`.
+    if open.checked_sub(1).and_then(token) == Some(":") {
+        return true;
+    }
     let mut cursor = open;
     while let Some(previous) = cursor.checked_sub(1) {
-        let Some(text) = significant.get(previous).and_then(|token| token_text(token, source))
+        let Some(text) = token(previous)
         else {
             return false;
         };
         match text {
             "class" | "interface" | "enum" => return true,
-            "=" | "(" | "[" | "," | ":" | "return" => return true,
+            "=" | "(" | "[" | "," | "return" => return true,
+            // A `:` reached from the brace itself annotates the declaration, so
+            // the brace opens its body. When the colon follows a parameter list
+            // that annotation is a return type and the body is a function body.
+            ":" => return previous.checked_sub(1).and_then(token) != Some(")"),
             "function" | "if" | "for" | "while" | "switch" | "catch" | "with" | "try" | "else" | "do" | "finally" | "=>" | "namespace" | "module" | "type" | ")" | "]" | "}" | "{" => return false,
             _ => cursor = previous,
         }
