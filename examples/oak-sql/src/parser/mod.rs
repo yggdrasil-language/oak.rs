@@ -256,8 +256,13 @@ impl<'config> SqlParser<'config> {
             Some(Show) => self.parse_show(state)?,
             Some(Set) => self.parse_set(state)?,
             _ => {
+                // Every skipped token is pushed into the error node, so the tree
+                // still covers the whole source and later statements keep their
+                // absolute offsets.
                 let cp = state.checkpoint();
-                state.advance_until(Semicolon);
+                while state.not_at_end() && state.peek_kind() != Some(Semicolon) {
+                    state.bump();
+                }
                 state.eat(Semicolon);
                 state.finish_at(cp, SqlElementType::ErrorNode);
             }
@@ -855,8 +860,11 @@ impl<'config> Parser<SqlLanguage> for SqlParser<'config> {
         parse_with_lexer(&lexer, text, edits, cache, |state| {
             let cp = state.checkpoint();
             while state.not_at_end() {
+                // Leading trivia has to be recorded as leaves as well. Advancing
+                // without pushing it would shorten the tree, which shifts every
+                // later absolute offset away from the real source position.
                 if state.current().map(|t| t.kind.is_ignored()).unwrap_or(false) {
-                    state.advance();
+                    state.bump();
                     continue;
                 }
                 self.parse_statement(state)?

@@ -557,6 +557,46 @@ fn test_sql_builder_unsupported_predicate_is_reported() {
     assert!(result.result.is_err(), "Partially parsed WHERE must not be accepted: {:?}", result.result);
 }
 
+/// Every identifier span must slice exactly the identifier text, no matter how
+/// much leading trivia precedes it.
+#[test]
+fn test_sql_builder_identifier_spans_skip_leading_trivia() {
+    for sql in [
+        "SELECT id FROM users;",
+        "  SELECT id FROM users;",
+        "\n\n\tSELECT id FROM users;",
+        "/* note */ SELECT id FROM users;",
+        "  \n /* note */\n\tSELECT id FROM users;",
+        "\r\n\t-- note\n  SELECT id FROM users;",
+        "; SELECT id FROM users;",
+        "BROKEN; SELECT id FROM users;",
+    ] {
+        let config = SqlLanguage::default();
+        let builder = SqlBuilder::new(&config);
+        let mut session = ParseSession::<SqlLanguage>::default();
+        let result = builder.build(&SourceText::new(sql), &[], &mut session);
+        let root = result.result.unwrap_or_else(|error| panic!("{sql}: {error:?} {:?}", result.diagnostics));
+
+        let SqlStatement::Select(select) = &root.statements[0]
+        else {
+            panic!("Expected Select statement for {sql}, got {:?}", root.statements);
+        };
+        let SelectItem::Expression { expr, .. } = &select.items[0]
+        else {
+            panic!("Expected expression item for {sql}");
+        };
+        let Expression::Identifier(identifier) = expr
+        else {
+            panic!("Expected identifier item for {sql}, got {expr:?}");
+        };
+        assert_eq!(sql.get(identifier.span.start..identifier.span.end), Some("id"), "identifier span for {sql}");
+
+        let table = select.from.as_ref().unwrap_or_else(|| panic!("Missing table for {sql}"));
+        assert_eq!(sql.get(table.name.span.start..table.name.span.end), Some("users"), "table span for {sql}");
+        assert_eq!(sql.get(root.span.start..root.span.end), Some(sql), "root must cover the whole source for {sql}");
+    }
+}
+
 #[test]
 fn test_sql_builder_insert() {
     let config = SqlLanguage::default();
