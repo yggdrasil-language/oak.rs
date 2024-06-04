@@ -1,7 +1,7 @@
 use crate::{
     Language,
     errors::OakError,
-    language::TokenType,
+    language::{ElementType, TokenType},
     lexer::{LexOutput, Token, Tokens},
     memory::arena::SyntaxArena,
     source::Source,
@@ -135,26 +135,62 @@ impl<'a, L: Language> TreeSink<'a, L> {
     }
 
     /// Finishes a node starting from the given checkpoint and adds it as a child.
+    ///
+    /// Tokens skipped as trivia by [`State::advance`] are already in the sink when a
+    /// node finishes, so a node would otherwise keep the whitespace and comments
+    /// that follow its last token and report a span past that token's end. Those
+    /// trailing trivia stay in the sink as siblings of the node instead, which keeps
+    /// the source text lossless while the node covers only its own tokens. Root
+    /// nodes keep their trailing trivia because they span the whole source, and
+    /// other roots are completed by [`ParserState::finish`].
     pub fn finish_node(&mut self, checkpoint: usize, kind: L::ElementType) -> &'a GreenNode<'a, L> {
-        let children_count = self.children.len() - checkpoint;
-        if children_count == 0 {
-            // Fast path for empty nodes
-            let children_slice = &[];
-            let node = GreenNode::new(kind, children_slice);
-            let node_ref = self.arena.alloc(node);
-            self.children.truncate(checkpoint);
-            self.children.push(GreenTree::Node(node_ref));
-            return node_ref;
+        let end = if kind.is_root() {
+            self.children.len()
         }
+        else {
+            let mut end = self.children.len();
+            while end > checkpoint {
+                match &self.children[end - 1] {
+                    GreenTree::Leaf(leaf) if L::TokenType::is_ignored(&leaf.kind) => end -= 1,
+                    _ => break,
+                }
+            }
+            end
+        };
 
-        // Use alloc_slice_fill_iter instead of alloc_slice_copy to avoid intermediate copy
-        let children_iter = self.children[checkpoint..].iter().cloned();
-        let children_slice = self.arena.alloc_slice_fill_iter(children_count, children_iter);
+        let children_count = end - checkpoint;
+        let node = if children_count == 0 {
+            GreenNode::new(kind, &[])
+        }
+        else {
+            let children_iter = self.children[checkpoint..end].iter().cloned();
+            let children_slice = self.arena.alloc_slice_fill_iter(children_count, children_iter);
+            GreenNode::new(kind, children_slice)
+        };
+        let trailing: Vec<GreenTree<'a, L>> = self.children[end..].to_vec();
         self.children.truncate(checkpoint);
-        let node = GreenNode::new(kind, children_slice);
         let node_ref = self.arena.alloc(node);
         self.children.push(GreenTree::Node(node_ref));
+        self.children.extend(trailing);
         node_ref
+    }
+
+    /// Appends the trivia left after the root node to it so the root covers the whole source.
+    fn attach_trailing_trivia(&mut self, root: &'a GreenNode<'a, L>) -> &'a GreenNode<'a, L> {
+        let Some(GreenTree::Node(node)) = self.children.first()
+        else {
+            return root;
+        };
+        if !std::ptr::eq(*node, root) {
+            return root;
+        }
+        let trailing = &self.children[1..];
+        if trailing.is_empty() || !trailing.iter().all(|child| matches!(child, GreenTree::Leaf(leaf) if L::TokenType::is_ignored(&leaf.kind))) {
+            return root;
+        }
+        let children_iter = root.children.iter().copied().chain(trailing.iter().copied());
+        let children_slice = self.arena.alloc_slice_fill_iter(root.children.len() + trailing.len(), children_iter);
+        self.arena.alloc(GreenNode::new(root.kind, children_slice))
     }
 }
 
@@ -605,6 +641,9 @@ impl<'a, L: Language, S: Source + ?Sized> ParserState<'a, L, S> {
                                     self.sink.push_node(new_node);
                                     self.tokens.set_index(current_index + tokens_consumed);
                                     inc.cursor.step_over();
+                                    // A reused node does not own the trivia that follows it,
+                                    // so consume it here to keep the current token significant.
+                                    self.skip_trivia();
                                     return true;
                                 }
                                 else if total_length > node_len {
@@ -644,7 +683,8 @@ impl<'a, L: Language, S: Source + ?Sized> ParserState<'a, L, S> {
     }
 
     /// Finishes the parsing process and returns the final output.
-    pub fn finish(self, result: Result<&'a GreenNode<'a, L>, OakError>) -> crate::parser::ParseOutput<'a, L> {
+    pub fn finish(mut self, result: Result<&'a GreenNode<'a, L>, OakError>) -> crate::parser::ParseOutput<'a, L> {
+        let result = result.map(|root| self.sink.attach_trailing_trivia(root));
         crate::errors::OakDiagnostics { result, diagnostics: self.errors }
     }
 
