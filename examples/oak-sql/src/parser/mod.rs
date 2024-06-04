@@ -80,6 +80,14 @@ impl<'config> Pratt<SqlLanguage> for SqlParser<'config> {
                 state.expect(RightParen).ok();
                 state.finish_at(cp, SqlElementType::Expression)
             }
+            Some(Distinct) => {
+                // `DISTINCT` is only meaningful in the SELECT quantifier position,
+                // so any other occurrence is reported instead of parsed as a bare
+                // column reference.
+                state.errors.push(OakError::custom_error("`DISTINCT` is only allowed immediately after `SELECT`"));
+                state.bump();
+                state.finish_at(cp, SqlElementType::ErrorNode)
+            }
             _ => {
                 state.bump();
                 state.finish_at(cp, SqlElementType::ErrorNode)
@@ -256,6 +264,9 @@ impl<'config> SqlParser<'config> {
             Some(Show) => self.parse_show(state)?,
             Some(Set) => self.parse_set(state)?,
             _ => {
+                if state.peek_kind() == Some(Distinct) {
+                    state.errors.push(OakError::custom_error("`DISTINCT` is only allowed immediately after `SELECT`"));
+                }
                 // Every skipped token is pushed into the error node, so the tree
                 // still covers the whole source and later statements keep their
                 // absolute offsets.
@@ -373,12 +384,46 @@ impl<'config> SqlParser<'config> {
         matches!(kind, None | Some(Group | Having | Order | Limit | Offset | Semicolon | Eof | RightParen | Returning))
     }
 
+    /// Parses the explicit `ALL` / `DISTINCT` quantifier that may follow `SELECT`.
+    ///
+    /// The quantifier gets its own node so the AST never loses whether the query
+    /// asks for duplicate elimination (`DISTINCT`) or `DISTINCT ON` evaluation.
+    fn parse_select_quantifier<'a, S: Source + ?Sized>(&self, state: &mut State<'a, S>) {
+        use crate::lexer::SqlTokenType::*;
+        if !matches!(state.peek_kind(), Some(All | Distinct)) {
+            return;
+        }
+        let cp = state.checkpoint();
+        if state.eat(All) {
+            state.finish_at(cp, SqlElementType::SelectQuantifier);
+            return;
+        }
+        state.expect(Distinct).ok();
+        if state.eat(On) {
+            if !state.eat(LeftParen) {
+                state.errors.push(OakError::custom_error("`DISTINCT ON` requires a parenthesized expression list"));
+            }
+            else {
+                if state.peek_kind() == Some(RightParen) {
+                    state.errors.push(OakError::custom_error("`DISTINCT ON` requires at least one expression"));
+                }
+                while state.not_at_end() && state.peek_kind() != Some(RightParen) {
+                    PrattParser::parse(state, 0, self);
+                    if !state.eat(Comma) {
+                        break;
+                    }
+                }
+                state.expect(RightParen).ok();
+            }
+        }
+        state.finish_at(cp, SqlElementType::SelectQuantifier);
+    }
+
     fn parse_select<'a, S: Source + ?Sized>(&self, state: &mut State<'a, S>) -> Result<(), OakError> {
         use crate::lexer::SqlTokenType::*;
         let cp = state.checkpoint();
         state.expect(Select).ok();
-        state.eat(Distinct);
-        state.eat(All);
+        self.parse_select_quantifier(state);
 
         // Parse Select Items
         while state.not_at_end() && state.peek_kind() != Some(From) {

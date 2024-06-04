@@ -6,6 +6,8 @@ use oak_core::source::{SourceBuffer, ToSource};
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct SelectStatement {
+    /// The `ALL` or `DISTINCT` quantifier, when one was written explicitly.
+    pub quantifier: Option<SelectQuantifier>,
     /// The items to select (columns, expressions, or `*`).
     pub items: Vec<SelectItem>,
     /// The table to select from.
@@ -30,6 +32,9 @@ pub struct SelectStatement {
 impl ToSource for SelectStatement {
     fn to_source(&self, buffer: &mut SourceBuffer) {
         buffer.push("SELECT");
+        if let Some(quantifier) = &self.quantifier {
+            quantifier.to_source(buffer);
+        }
         for (i, item) in self.items.iter().enumerate() {
             if i > 0 {
                 buffer.push(",");
@@ -58,6 +63,53 @@ impl ToSource for SelectStatement {
         }
         if let Some(limit) = &self.limit {
             limit.to_source(buffer);
+        }
+    }
+}
+
+/// The explicitly written row quantifier of a `SELECT` statement.
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub enum SelectQuantifier {
+    /// `SELECT ALL`
+    All {
+        /// The span of the `ALL` token.
+        #[serde(with = "oak_core::serde_range")]
+        span: Range<usize>,
+    },
+    /// `SELECT DISTINCT`
+    Distinct {
+        /// The span of the `DISTINCT` token.
+        #[serde(with = "oak_core::serde_range")]
+        span: Range<usize>,
+    },
+    /// `SELECT DISTINCT ON (expr, ...)`
+    DistinctOn {
+        /// The expressions the distinctness is evaluated on.
+        expressions: Vec<Expression>,
+        /// The span of the whole quantifier.
+        #[serde(with = "oak_core::serde_range")]
+        span: Range<usize>,
+    },
+}
+
+impl ToSource for SelectQuantifier {
+    fn to_source(&self, buffer: &mut SourceBuffer) {
+        match self {
+            SelectQuantifier::All { .. } => buffer.push("ALL"),
+            SelectQuantifier::Distinct { .. } => buffer.push("DISTINCT"),
+            SelectQuantifier::DistinctOn { expressions, .. } => {
+                buffer.push("DISTINCT");
+                buffer.push("ON");
+                buffer.push("(");
+                for (i, expr) in expressions.iter().enumerate() {
+                    if i > 0 {
+                        buffer.push(",");
+                    }
+                    expr.to_source(buffer);
+                }
+                buffer.push(")");
+            }
         }
     }
 }
