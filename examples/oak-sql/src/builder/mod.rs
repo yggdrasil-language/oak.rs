@@ -855,29 +855,26 @@ impl<'config> SqlBuilder<'config> {
 
     fn build_order_by_clause<'a>(&self, node: RedNode<'a, SqlLanguage>, source: &SourceText) -> Result<OrderByClause, OakError> {
         let mut items = Vec::new();
-        let mut current_expr: Option<(Expression, Range<usize>)> = None;
+        let mut current: Option<OrderByItem> = None;
 
         for child in node.children() {
             match child {
                 RedTree::Node(n) => {
                     if matches!(n.green.kind, SqlElementType::Expression | SqlElementType::Identifier | SqlElementType::FunctionCall) {
-                        if let Some((expr, span)) = current_expr.take() {
-                            items.push(OrderByItem { expr, direction: OrderDirection::Asc, span });
+                        if let Some(item) = current.take() {
+                            items.push(item);
                         }
-                        current_expr = Some((self.build_expression(n.clone(), source)?, n.span()));
+                        current = Some(OrderByItem { expr: self.build_expression(n.clone(), source)?, direction: OrderDirection::Asc, nulls: None, span: n.span() });
                     }
                 }
                 RedTree::Leaf(t) => match t.kind {
-                    SqlTokenType::Asc => {
-                        if let Some((expr, span)) = current_expr.take() {
-                            let total_span = Range { start: span.start, end: t.span.end };
-                            items.push(OrderByItem { expr, direction: OrderDirection::Asc, span: total_span });
-                        }
-                    }
-                    SqlTokenType::Desc => {
-                        if let Some((expr, span)) = current_expr.take() {
-                            let total_span = Range { start: span.start, end: t.span.end };
-                            items.push(OrderByItem { expr, direction: OrderDirection::Desc, span: total_span });
+                    SqlTokenType::Asc => Self::set_order_direction(&mut current, OrderDirection::Asc, t.span.end),
+                    SqlTokenType::Desc => Self::set_order_direction(&mut current, OrderDirection::Desc, t.span.end),
+                    SqlTokenType::First => Self::set_nulls_order(&mut current, NullsOrder::First, t.span.end),
+                    SqlTokenType::Last => Self::set_nulls_order(&mut current, NullsOrder::Last, t.span.end),
+                    SqlTokenType::Comma => {
+                        if let Some(item) = current.take() {
+                            items.push(item);
                         }
                     }
                     _ => {}
@@ -885,11 +882,28 @@ impl<'config> SqlBuilder<'config> {
             }
         }
 
-        if let Some((expr, span)) = current_expr {
-            items.push(OrderByItem { expr, direction: OrderDirection::Asc, span });
+        if let Some(item) = current {
+            items.push(item);
+        }
+        if items.is_empty() {
+            return Err(OakError::custom_error("Missing item in ORDER BY clause"));
         }
 
         Ok(OrderByClause { items, span: node.span() })
+    }
+
+    fn set_order_direction(item: &mut Option<OrderByItem>, direction: OrderDirection, end: usize) {
+        if let Some(item) = item {
+            item.direction = direction;
+            item.span.end = end;
+        }
+    }
+
+    fn set_nulls_order(item: &mut Option<OrderByItem>, nulls: NullsOrder, end: usize) {
+        if let Some(item) = item {
+            item.nulls = Some(nulls);
+            item.span.end = end;
+        }
     }
 
     fn build_limit_clause<'a>(&self, node: RedNode<'a, SqlLanguage>, source: &SourceText) -> Result<LimitClause, OakError> {
