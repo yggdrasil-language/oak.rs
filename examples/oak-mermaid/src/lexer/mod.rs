@@ -12,9 +12,17 @@ type State<'s, S> = LexerState<'s, S, MermaidLanguage>;
 
 /// 按最长匹配顺序排列的箭头片段。
 ///
-/// `--` 是 `-->`、`---` 的前缀，必须放在最后；`-- text -->` 会被拆成
-/// 起始 `--` 与结束箭头两个 token，由 parser 负责合并。
-const ARROWS: &[&str] = &["-.->", "-->", "==>", "---", "--"];
+/// 包含 flowchart 箭头、sequence diagram 消息箭头与 class diagram 关系箭头。
+/// 较长的箭头必须排在前面，避免 `-->` 抢先匹配 `-->>`、`--` 抢先匹配 `-->`
+/// 之类的错误。`--` 同时也是 `-- text -->` 的起始片段，由 parser 负责合并。
+const ARROWS: &[&str] = &[
+    // 四字符箭头。
+    "-.->", "-->>", "<|--", "--|>", "..|>", "|>..", //
+    // 三字符箭头。
+    "->>", "-->", "--*", "--o", "<--", "..>", "<..", "*--", "o--", "==>", "---", //
+    // 两字符箭头。
+    "->", "--", "..", "<|", "|>",
+];
 
 /// 合法的 flowchart 方向。
 const DIRECTIONS: &[&str] = &["TD", "TB", "BT", "LR", "RL"];
@@ -158,11 +166,14 @@ impl<'config> MermaidLexer<'config> {
     ///
     /// 支持 `[..]`、`(..)`、`{..}`、`((..))`、`[[..]]`、`([..])`、`[(..)]`
     /// 与边标签 `|..|`。先匹配更长的开括号，匹配不到闭括号时再退回较短的
-    /// 形式，避免未闭合的括号吞掉整份源码。
+    /// 形式，避免未闭合的括号吞掉整份源码。标签只在当前行内查找闭括号，
+    /// 因此未闭合的 `{`（例如 class 声明）不会跨行吞掉后续语句。
     fn label_end<'s, S: Source + ?Sized>(&self, state: &mut State<'s, S>) -> Option<usize> {
         let start = state.get_position();
         let rest = state.rest();
-        let candidates: &[(&str, &str)] = match rest.chars().next()? {
+        let line_len = rest.find(['\r', '\n']).unwrap_or(rest.len());
+        let line = &rest[..line_len];
+        let candidates: &[(&str, &str)] = match line.chars().next()? {
             '[' => &[("[[", "]]"), ("[(", ")]"), ("[", "]")],
             '(' => &[("((", "))"), ("([", "])"), ("(", ")")],
             '{' => &[("{", "}")],
@@ -171,7 +182,7 @@ impl<'config> MermaidLexer<'config> {
         };
 
         for (open, close) in candidates {
-            let Some(body) = rest.strip_prefix(open)
+            let Some(body) = line.strip_prefix(open)
             else {
                 continue;
             };

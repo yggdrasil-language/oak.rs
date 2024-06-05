@@ -1,6 +1,6 @@
 {
     "success": true,
-    "count": 477,
+    "count": 641,
     "tokens": [
         {
             "kind": "Graph",
@@ -375,21 +375,9 @@
             "end": 292
         },
         {
-            "kind": "Error",
-            "text": "-",
+            "kind": "Arrow",
+            "text": "->>",
             "start": 292,
-            "end": 293
-        },
-        {
-            "kind": "Error",
-            "text": ">",
-            "start": 293,
-            "end": 294
-        },
-        {
-            "kind": "Error",
-            "text": ">",
-            "start": 294,
             "end": 295
         },
         {
@@ -477,21 +465,9 @@
             "end": 359
         },
         {
-            "kind": "Error",
-            "text": "-",
+            "kind": "Arrow",
+            "text": "->>",
             "start": 359,
-            "end": 360
-        },
-        {
-            "kind": "Error",
-            "text": ">",
-            "start": 360,
-            "end": 361
-        },
-        {
-            "kind": "Error",
-            "text": ">",
-            "start": 361,
             "end": 362
         },
         {
@@ -634,14 +610,8 @@
         },
         {
             "kind": "Arrow",
-            "text": "-->",
+            "text": "-->>",
             "start": 467,
-            "end": 470
-        },
-        {
-            "kind": "Error",
-            "text": ">",
-            "start": 470,
             "end": 471
         },
         {
@@ -681,21 +651,9 @@
             "end": 493
         },
         {
-            "kind": "Error",
-            "text": "-",
+            "kind": "Arrow",
+            "text": "->>",
             "start": 493,
-            "end": 494
-        },
-        {
-            "kind": "Error",
-            "text": ">",
-            "start": 494,
-            "end": 495
-        },
-        {
-            "kind": "Error",
-            "text": ">",
-            "start": 495,
             "end": 496
         },
         {
@@ -748,14 +706,8 @@
         },
         {
             "kind": "Arrow",
-            "text": "-->",
+            "text": "-->>",
             "start": 523,
-            "end": 526
-        },
-        {
-            "kind": "Error",
-            "text": ">",
-            "start": 526,
             "end": 527
         },
         {
@@ -831,21 +783,9 @@
             "end": 583
         },
         {
-            "kind": "Error",
-            "text": "-",
+            "kind": "Arrow",
+            "text": "->>",
             "start": 583,
-            "end": 584
-        },
-        {
-            "kind": "Error",
-            "text": ">",
-            "start": 584,
-            "end": 585
-        },
-        {
-            "kind": "Error",
-            "text": ">",
-            "start": 585,
             "end": 586
         },
         {
@@ -933,9 +873,117 @@
             "end": 643
         },
         {
-            "kind": "Label",
-            "text": "{\n        +int age\n        +String gender\n        +isMammal()\n        +mate()\n    }",
+            "kind": "Error",
+            "text": "{",
             "start": 644,
+            "end": 645
+        },
+        {
+            "kind": "Newline",
+            "text": "\n",
+            "start": 645,
+            "end": 646
+        },
+        {
+            "kind": "Error",
+            "text": "+",
+            "start": 654,
+            "end": 655
+        },
+        {
+            "kind": "Id",
+            "text": "int",
+            "start": 655,
+            "end": 658
+        },
+        {
+            "kind": "Id",
+            "text": "age",
+            "start": 659,
+            "end": 662
+        },
+        {
+            "kind": "Newline",
+            "text": "\n",
+            "start": 662,
+            "end": 663
+        },
+        {
+            "kind": "Error",
+            "text": "+",
+            "start": 671,
+            "end": 672
+        },
+        {
+            "kind": "Id",
+            "text": "String",
+            "start": 672,
+            "end": 678
+        },
+        {
+            "kind": "Id",
+            "text": "gender",
+            "start": 679,
+            "end": 685
+        },
+        {
+            "kind": "Newline",
+            "text": "\n",
+            "start": 685,
+            "end": 686
+        },
+        {
+            "kind": "Error",
+            "text": "+",
+            "start": 694,
+            "end": 695
+        },
+        {
+            "kind": "Id",
+            "text": "isMammal",
+            "start": 695,
+            "end": 703
+        },
+        {
+            "kind": "Label",
+            "text": "()",
+            "start": 703,
+            "end": 705
+        },
+        {
+            "kind": "Newline",
+            "text": "\n",
+            "start": 705,
+            "end": 706
+        },
+        {
+            "kind": "Error",
+            "text": "+",
+            "start": 714,
+            "end": 715
+        },
+        {
+            "kind": "Id",
+            "text": "mate",
+            "start": 715,
+            "end": 719
+        },
+        {
+            "kind": "Label",
+            "text": "()",
+            "start": 719,
+            "end": 721
+        },
+        {
+            "kind": "Newline",
+            "text": "\n",
+            "start": 721,
+            "end": 722
+        },
+        {
+            "kind": "Error",
+            "text": "}",
+            "start": 726,
             "end": 727
         },
         {
@@ -957,9 +1005,93 @@
             "end": 742
         },
         {
-            "kind": "Label",
-            "text": "{\n        +String beakColor\n        +swim()\n        +quack()\n    }",
+            "kind": "Error",
+            "text": "{",
             "start": 743,
+            "end": 744
+        },
+        {
+            "kind": "Newline",
+            "text": "\n",
+            "start": 744,
+            "end": 745
+        },
+        {
+            "kind": "Error",
+            "text": "+",
+            "start": 753,
+            "end": 754
+        },
+        {
+            "kind": "Id",
+            "text": "String",
+            "start": 754,
+            "end": 760
+        },
+        {
+            "kind": "Id",
+            "text": "beakColor",
+            "start": 761,
+            "end": 770
+        },
+        {
+            "kind": "Newline",
+            "text": "\n",
+            "start": 770,
+            "end": 771
+        },
+        {
+            "kind": "Error",
+            "text": "+",
+            "start": 779,
+            "end": 780
+        },
+        {
+            "kind": "Id",
+            "text": "swim",
+            "start": 780,
+            "end": 784
+        },
+        {
+            "kind": "Label",
+            "text": "()",
+            "start": 784,
+            "end": 786
+        },
+        {
+            "kind": "Newline",
+            "text": "\n",
+            "start": 786,
+            "end": 787
+        },
+        {
+            "kind": "Error",
+            "text": "+",
+            "start": 795,
+            "end": 796
+        },
+        {
+            "kind": "Id",
+            "text": "quack",
+            "start": 796,
+            "end": 801
+        },
+        {
+            "kind": "Label",
+            "text": "()",
+            "start": 801,
+            "end": 803
+        },
+        {
+            "kind": "Newline",
+            "text": "\n",
+            "start": 803,
+            "end": 804
+        },
+        {
+            "kind": "Error",
+            "text": "}",
+            "start": 808,
             "end": 809
         },
         {
@@ -981,9 +1113,69 @@
             "end": 824
         },
         {
-            "kind": "Label",
-            "text": "{\n        -int sizeInFeet\n        -canEat()\n    }",
+            "kind": "Error",
+            "text": "{",
             "start": 825,
+            "end": 826
+        },
+        {
+            "kind": "Newline",
+            "text": "\n",
+            "start": 826,
+            "end": 827
+        },
+        {
+            "kind": "Error",
+            "text": "-",
+            "start": 835,
+            "end": 836
+        },
+        {
+            "kind": "Id",
+            "text": "int",
+            "start": 836,
+            "end": 839
+        },
+        {
+            "kind": "Id",
+            "text": "sizeInFeet",
+            "start": 840,
+            "end": 850
+        },
+        {
+            "kind": "Newline",
+            "text": "\n",
+            "start": 850,
+            "end": 851
+        },
+        {
+            "kind": "Error",
+            "text": "-",
+            "start": 859,
+            "end": 860
+        },
+        {
+            "kind": "Id",
+            "text": "canEat",
+            "start": 860,
+            "end": 866
+        },
+        {
+            "kind": "Label",
+            "text": "()",
+            "start": 866,
+            "end": 868
+        },
+        {
+            "kind": "Newline",
+            "text": "\n",
+            "start": 868,
+            "end": 869
+        },
+        {
+            "kind": "Error",
+            "text": "}",
+            "start": 873,
             "end": 874
         },
         {
@@ -1005,9 +1197,69 @@
             "end": 890
         },
         {
-            "kind": "Label",
-            "text": "{\n        +bool is_wild\n        +run()\n    }",
+            "kind": "Error",
+            "text": "{",
             "start": 891,
+            "end": 892
+        },
+        {
+            "kind": "Newline",
+            "text": "\n",
+            "start": 892,
+            "end": 893
+        },
+        {
+            "kind": "Error",
+            "text": "+",
+            "start": 901,
+            "end": 902
+        },
+        {
+            "kind": "Id",
+            "text": "bool",
+            "start": 902,
+            "end": 906
+        },
+        {
+            "kind": "Id",
+            "text": "is_wild",
+            "start": 907,
+            "end": 914
+        },
+        {
+            "kind": "Newline",
+            "text": "\n",
+            "start": 914,
+            "end": 915
+        },
+        {
+            "kind": "Error",
+            "text": "+",
+            "start": 923,
+            "end": 924
+        },
+        {
+            "kind": "Id",
+            "text": "run",
+            "start": 924,
+            "end": 927
+        },
+        {
+            "kind": "Label",
+            "text": "()",
+            "start": 927,
+            "end": 929
+        },
+        {
+            "kind": "Newline",
+            "text": "\n",
+            "start": 929,
+            "end": 930
+        },
+        {
+            "kind": "Error",
+            "text": "}",
+            "start": 934,
             "end": 935
         },
         {
@@ -1023,21 +1275,33 @@
             "end": 946
         },
         {
-            "kind": "Error",
-            "text": "<",
+            "kind": "Arrow",
+            "text": "<|--",
             "start": 947,
-            "end": 948
+            "end": 951
         },
         {
-            "kind": "Label",
-            "text": "|-- Duck\n    Animal <|",
-            "start": 948,
-            "end": 970
+            "kind": "Id",
+            "text": "Duck",
+            "start": 952,
+            "end": 956
+        },
+        {
+            "kind": "Newline",
+            "text": "\n",
+            "start": 956,
+            "end": 957
+        },
+        {
+            "kind": "Id",
+            "text": "Animal",
+            "start": 961,
+            "end": 967
         },
         {
             "kind": "Arrow",
-            "text": "--",
-            "start": 970,
+            "text": "<|--",
+            "start": 968,
             "end": 972
         },
         {
@@ -1059,33 +1323,519 @@
             "end": 988
         },
         {
-            "kind": "Error",
-            "text": "<",
+            "kind": "Arrow",
+            "text": "<|--",
             "start": 989,
-            "end": 990
+            "end": 993
+        },
+        {
+            "kind": "Id",
+            "text": "Zebra",
+            "start": 994,
+            "end": 999
+        },
+        {
+            "kind": "Newline",
+            "text": "\n",
+            "start": 999,
+            "end": 1000
+        },
+        {
+            "kind": "Newline",
+            "text": "\n",
+            "start": 1004,
+            "end": 1005
+        },
+        {
+            "kind": "Id",
+            "text": "note",
+            "start": 1009,
+            "end": 1013
+        },
+        {
+            "kind": "Id",
+            "text": "for",
+            "start": 1014,
+            "end": 1017
+        },
+        {
+            "kind": "Id",
+            "text": "Duck",
+            "start": 1018,
+            "end": 1022
+        },
+        {
+            "kind": "Error",
+            "text": "\"",
+            "start": 1023,
+            "end": 1024
+        },
+        {
+            "kind": "Id",
+            "text": "This",
+            "start": 1024,
+            "end": 1028
+        },
+        {
+            "kind": "Id",
+            "text": "is",
+            "start": 1029,
+            "end": 1031
+        },
+        {
+            "kind": "Id",
+            "text": "a",
+            "start": 1032,
+            "end": 1033
+        },
+        {
+            "kind": "Id",
+            "text": "duck",
+            "start": 1034,
+            "end": 1038
+        },
+        {
+            "kind": "Error",
+            "text": "\"",
+            "start": 1038,
+            "end": 1039
+        },
+        {
+            "kind": "Newline",
+            "text": "\n",
+            "start": 1039,
+            "end": 1040
+        },
+        {
+            "kind": "Newline",
+            "text": "\n",
+            "start": 1040,
+            "end": 1041
+        },
+        {
+            "kind": "Id",
+            "text": "stateDiagram-v2",
+            "start": 1041,
+            "end": 1056
+        },
+        {
+            "kind": "Newline",
+            "text": "\n",
+            "start": 1056,
+            "end": 1057
         },
         {
             "kind": "Label",
-            "text": "|-- Zebra\n    \n    note for Duck \"This is a duck\"\n\nstateDiagram-v2\n    [*] --> Still\n    Still --> [*]\n    Still --> Moving\n    Moving --> Still\n    Moving --> Crash\n    Crash --> [*]\n    \n    state Moving {\n        [*] --> Accelerating\n        Accelerating --> Cruising\n        Cruising --> Decelerating\n        Decelerating --> Stop\n    }\n\nerDiagram\n    CUSTOMER |",
-            "start": 990,
-            "end": 1356
+            "text": "[*]",
+            "start": 1061,
+            "end": 1064
+        },
+        {
+            "kind": "Arrow",
+            "text": "-->",
+            "start": 1065,
+            "end": 1068
+        },
+        {
+            "kind": "Id",
+            "text": "Still",
+            "start": 1069,
+            "end": 1074
+        },
+        {
+            "kind": "Newline",
+            "text": "\n",
+            "start": 1074,
+            "end": 1075
+        },
+        {
+            "kind": "Id",
+            "text": "Still",
+            "start": 1079,
+            "end": 1084
+        },
+        {
+            "kind": "Arrow",
+            "text": "-->",
+            "start": 1085,
+            "end": 1088
         },
         {
             "kind": "Label",
-            "text": "|--o{ ORDER : places\n    ORDER |",
-            "start": 1356,
-            "end": 1388
+            "text": "[*]",
+            "start": 1089,
+            "end": 1092
+        },
+        {
+            "kind": "Newline",
+            "text": "\n",
+            "start": 1092,
+            "end": 1093
+        },
+        {
+            "kind": "Id",
+            "text": "Still",
+            "start": 1097,
+            "end": 1102
+        },
+        {
+            "kind": "Arrow",
+            "text": "-->",
+            "start": 1103,
+            "end": 1106
+        },
+        {
+            "kind": "Id",
+            "text": "Moving",
+            "start": 1107,
+            "end": 1113
+        },
+        {
+            "kind": "Newline",
+            "text": "\n",
+            "start": 1113,
+            "end": 1114
+        },
+        {
+            "kind": "Id",
+            "text": "Moving",
+            "start": 1118,
+            "end": 1124
+        },
+        {
+            "kind": "Arrow",
+            "text": "-->",
+            "start": 1125,
+            "end": 1128
+        },
+        {
+            "kind": "Id",
+            "text": "Still",
+            "start": 1129,
+            "end": 1134
+        },
+        {
+            "kind": "Newline",
+            "text": "\n",
+            "start": 1134,
+            "end": 1135
+        },
+        {
+            "kind": "Id",
+            "text": "Moving",
+            "start": 1139,
+            "end": 1145
+        },
+        {
+            "kind": "Arrow",
+            "text": "-->",
+            "start": 1146,
+            "end": 1149
+        },
+        {
+            "kind": "Id",
+            "text": "Crash",
+            "start": 1150,
+            "end": 1155
+        },
+        {
+            "kind": "Newline",
+            "text": "\n",
+            "start": 1155,
+            "end": 1156
+        },
+        {
+            "kind": "Id",
+            "text": "Crash",
+            "start": 1160,
+            "end": 1165
+        },
+        {
+            "kind": "Arrow",
+            "text": "-->",
+            "start": 1166,
+            "end": 1169
         },
         {
             "kind": "Label",
-            "text": "|--|",
-            "start": 1388,
+            "text": "[*]",
+            "start": 1170,
+            "end": 1173
+        },
+        {
+            "kind": "Newline",
+            "text": "\n",
+            "start": 1173,
+            "end": 1174
+        },
+        {
+            "kind": "Newline",
+            "text": "\n",
+            "start": 1178,
+            "end": 1179
+        },
+        {
+            "kind": "Id",
+            "text": "state",
+            "start": 1183,
+            "end": 1188
+        },
+        {
+            "kind": "Id",
+            "text": "Moving",
+            "start": 1189,
+            "end": 1195
+        },
+        {
+            "kind": "Error",
+            "text": "{",
+            "start": 1196,
+            "end": 1197
+        },
+        {
+            "kind": "Newline",
+            "text": "\n",
+            "start": 1197,
+            "end": 1198
+        },
+        {
+            "kind": "Label",
+            "text": "[*]",
+            "start": 1206,
+            "end": 1209
+        },
+        {
+            "kind": "Arrow",
+            "text": "-->",
+            "start": 1210,
+            "end": 1213
+        },
+        {
+            "kind": "Id",
+            "text": "Accelerating",
+            "start": 1214,
+            "end": 1226
+        },
+        {
+            "kind": "Newline",
+            "text": "\n",
+            "start": 1226,
+            "end": 1227
+        },
+        {
+            "kind": "Id",
+            "text": "Accelerating",
+            "start": 1235,
+            "end": 1247
+        },
+        {
+            "kind": "Arrow",
+            "text": "-->",
+            "start": 1248,
+            "end": 1251
+        },
+        {
+            "kind": "Id",
+            "text": "Cruising",
+            "start": 1252,
+            "end": 1260
+        },
+        {
+            "kind": "Newline",
+            "text": "\n",
+            "start": 1260,
+            "end": 1261
+        },
+        {
+            "kind": "Id",
+            "text": "Cruising",
+            "start": 1269,
+            "end": 1277
+        },
+        {
+            "kind": "Arrow",
+            "text": "-->",
+            "start": 1278,
+            "end": 1281
+        },
+        {
+            "kind": "Id",
+            "text": "Decelerating",
+            "start": 1282,
+            "end": 1294
+        },
+        {
+            "kind": "Newline",
+            "text": "\n",
+            "start": 1294,
+            "end": 1295
+        },
+        {
+            "kind": "Id",
+            "text": "Decelerating",
+            "start": 1303,
+            "end": 1315
+        },
+        {
+            "kind": "Arrow",
+            "text": "-->",
+            "start": 1316,
+            "end": 1319
+        },
+        {
+            "kind": "Id",
+            "text": "Stop",
+            "start": 1320,
+            "end": 1324
+        },
+        {
+            "kind": "Newline",
+            "text": "\n",
+            "start": 1324,
+            "end": 1325
+        },
+        {
+            "kind": "Error",
+            "text": "}",
+            "start": 1329,
+            "end": 1330
+        },
+        {
+            "kind": "Newline",
+            "text": "\n",
+            "start": 1330,
+            "end": 1331
+        },
+        {
+            "kind": "Newline",
+            "text": "\n",
+            "start": 1331,
+            "end": 1332
+        },
+        {
+            "kind": "Id",
+            "text": "erDiagram",
+            "start": 1332,
+            "end": 1341
+        },
+        {
+            "kind": "Newline",
+            "text": "\n",
+            "start": 1341,
+            "end": 1342
+        },
+        {
+            "kind": "Id",
+            "text": "CUSTOMER",
+            "start": 1346,
+            "end": 1354
+        },
+        {
+            "kind": "Label",
+            "text": "||",
+            "start": 1355,
+            "end": 1357
+        },
+        {
+            "kind": "Arrow",
+            "text": "--o",
+            "start": 1357,
+            "end": 1360
+        },
+        {
+            "kind": "Error",
+            "text": "{",
+            "start": 1360,
+            "end": 1361
+        },
+        {
+            "kind": "Id",
+            "text": "ORDER",
+            "start": 1362,
+            "end": 1367
+        },
+        {
+            "kind": "Error",
+            "text": ":",
+            "start": 1368,
+            "end": 1369
+        },
+        {
+            "kind": "Id",
+            "text": "places",
+            "start": 1370,
+            "end": 1376
+        },
+        {
+            "kind": "Newline",
+            "text": "\n",
+            "start": 1376,
+            "end": 1377
+        },
+        {
+            "kind": "Id",
+            "text": "ORDER",
+            "start": 1381,
+            "end": 1386
+        },
+        {
+            "kind": "Label",
+            "text": "||",
+            "start": 1387,
+            "end": 1389
+        },
+        {
+            "kind": "Arrow",
+            "text": "--",
+            "start": 1389,
+            "end": 1391
+        },
+        {
+            "kind": "Error",
+            "text": "|",
+            "start": 1391,
             "end": 1392
         },
         {
-            "kind": "Label",
-            "text": "{ LINE-ITEM : contains\n    CUSTOMER }",
+            "kind": "Error",
+            "text": "{",
             "start": 1392,
+            "end": 1393
+        },
+        {
+            "kind": "Id",
+            "text": "LINE-ITEM",
+            "start": 1394,
+            "end": 1403
+        },
+        {
+            "kind": "Error",
+            "text": ":",
+            "start": 1404,
+            "end": 1405
+        },
+        {
+            "kind": "Id",
+            "text": "contains",
+            "start": 1406,
+            "end": 1414
+        },
+        {
+            "kind": "Newline",
+            "text": "\n",
+            "start": 1414,
+            "end": 1415
+        },
+        {
+            "kind": "Id",
+            "text": "CUSTOMER",
+            "start": 1419,
+            "end": 1427
+        },
+        {
+            "kind": "Error",
+            "text": "}",
+            "start": 1428,
             "end": 1429
         },
         {
@@ -1095,9 +1845,93 @@
             "end": 1433
         },
         {
-            "kind": "Label",
-            "text": "{ DELIVERY-ADDRESS : uses\n    ORDER {\n        int order_number\n        string delivery_address\n    }",
+            "kind": "Error",
+            "text": "{",
             "start": 1433,
+            "end": 1434
+        },
+        {
+            "kind": "Id",
+            "text": "DELIVERY-ADDRESS",
+            "start": 1435,
+            "end": 1451
+        },
+        {
+            "kind": "Error",
+            "text": ":",
+            "start": 1452,
+            "end": 1453
+        },
+        {
+            "kind": "Id",
+            "text": "uses",
+            "start": 1454,
+            "end": 1458
+        },
+        {
+            "kind": "Newline",
+            "text": "\n",
+            "start": 1458,
+            "end": 1459
+        },
+        {
+            "kind": "Id",
+            "text": "ORDER",
+            "start": 1463,
+            "end": 1468
+        },
+        {
+            "kind": "Error",
+            "text": "{",
+            "start": 1469,
+            "end": 1470
+        },
+        {
+            "kind": "Newline",
+            "text": "\n",
+            "start": 1470,
+            "end": 1471
+        },
+        {
+            "kind": "Id",
+            "text": "int",
+            "start": 1479,
+            "end": 1482
+        },
+        {
+            "kind": "Id",
+            "text": "order_number",
+            "start": 1483,
+            "end": 1495
+        },
+        {
+            "kind": "Newline",
+            "text": "\n",
+            "start": 1495,
+            "end": 1496
+        },
+        {
+            "kind": "Id",
+            "text": "string",
+            "start": 1504,
+            "end": 1510
+        },
+        {
+            "kind": "Id",
+            "text": "delivery_address",
+            "start": 1511,
+            "end": 1527
+        },
+        {
+            "kind": "Newline",
+            "text": "\n",
+            "start": 1527,
+            "end": 1528
+        },
+        {
+            "kind": "Error",
+            "text": "}",
+            "start": 1532,
             "end": 1533
         },
         {
@@ -2769,9 +3603,129 @@
             "end": 2696
         },
         {
-            "kind": "Label",
-            "text": "{\n    id: 1\n    text: the test requirement\n    risk: high\n    verifymethod: test\n    }",
+            "kind": "Error",
+            "text": "{",
             "start": 2697,
+            "end": 2698
+        },
+        {
+            "kind": "Newline",
+            "text": "\n",
+            "start": 2698,
+            "end": 2699
+        },
+        {
+            "kind": "Id",
+            "text": "id",
+            "start": 2703,
+            "end": 2705
+        },
+        {
+            "kind": "Error",
+            "text": ":",
+            "start": 2705,
+            "end": 2706
+        },
+        {
+            "kind": "Error",
+            "text": "1",
+            "start": 2707,
+            "end": 2708
+        },
+        {
+            "kind": "Newline",
+            "text": "\n",
+            "start": 2708,
+            "end": 2709
+        },
+        {
+            "kind": "Id",
+            "text": "text",
+            "start": 2713,
+            "end": 2717
+        },
+        {
+            "kind": "Error",
+            "text": ":",
+            "start": 2717,
+            "end": 2718
+        },
+        {
+            "kind": "Id",
+            "text": "the",
+            "start": 2719,
+            "end": 2722
+        },
+        {
+            "kind": "Id",
+            "text": "test",
+            "start": 2723,
+            "end": 2727
+        },
+        {
+            "kind": "Id",
+            "text": "requirement",
+            "start": 2728,
+            "end": 2739
+        },
+        {
+            "kind": "Newline",
+            "text": "\n",
+            "start": 2739,
+            "end": 2740
+        },
+        {
+            "kind": "Id",
+            "text": "risk",
+            "start": 2744,
+            "end": 2748
+        },
+        {
+            "kind": "Error",
+            "text": ":",
+            "start": 2748,
+            "end": 2749
+        },
+        {
+            "kind": "Id",
+            "text": "high",
+            "start": 2750,
+            "end": 2754
+        },
+        {
+            "kind": "Newline",
+            "text": "\n",
+            "start": 2754,
+            "end": 2755
+        },
+        {
+            "kind": "Id",
+            "text": "verifymethod",
+            "start": 2759,
+            "end": 2771
+        },
+        {
+            "kind": "Error",
+            "text": ":",
+            "start": 2771,
+            "end": 2772
+        },
+        {
+            "kind": "Id",
+            "text": "test",
+            "start": 2773,
+            "end": 2777
+        },
+        {
+            "kind": "Newline",
+            "text": "\n",
+            "start": 2777,
+            "end": 2778
+        },
+        {
+            "kind": "Error",
+            "text": "}",
+            "start": 2782,
             "end": 2783
         },
         {
@@ -2799,9 +3753,45 @@
             "end": 2812
         },
         {
-            "kind": "Label",
-            "text": "{\n    type: simulation\n    }",
+            "kind": "Error",
+            "text": "{",
             "start": 2813,
+            "end": 2814
+        },
+        {
+            "kind": "Newline",
+            "text": "\n",
+            "start": 2814,
+            "end": 2815
+        },
+        {
+            "kind": "Id",
+            "text": "type",
+            "start": 2819,
+            "end": 2823
+        },
+        {
+            "kind": "Error",
+            "text": ":",
+            "start": 2823,
+            "end": 2824
+        },
+        {
+            "kind": "Id",
+            "text": "simulation",
+            "start": 2825,
+            "end": 2835
+        },
+        {
+            "kind": "Newline",
+            "text": "\n",
+            "start": 2835,
+            "end": 2836
+        },
+        {
+            "kind": "Error",
+            "text": "}",
+            "start": 2840,
             "end": 2841
         },
         {
@@ -2835,15 +3825,9 @@
             "end": 2874
         },
         {
-            "kind": "Error",
-            "text": "-",
+            "kind": "Arrow",
+            "text": "->",
             "start": 2875,
-            "end": 2876
-        },
-        {
-            "kind": "Error",
-            "text": ">",
-            "start": 2876,
             "end": 2877
         },
         {
