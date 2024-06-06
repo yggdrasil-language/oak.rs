@@ -282,42 +282,34 @@ impl<'config> TypeScriptBuilder<'config> {
                         if child_kind == TypeScriptElementType::PropertyAssignment {
                             let mut name = String::new();
                             let mut value = None;
+                            let mut after_colon = false;
                             let child_span = child_node.span();
 
                             for prop_child in child_node.children() {
-                                if let RedTree::Node(prop_node) = prop_child {
-                                    match prop_node.green.kind {
-                                        TypeScriptElementType::IdentifierName => {
-                                            if name.is_empty() {
-                                                name = source.get_text_in(prop_node.span().into()).trim().to_string();
-                                            }
-                                            else if value.is_none() {
-                                                value = self.build_expression(&prop_node, source)?;
+                                match prop_child {
+                                    RedTree::Leaf(key) => match key.kind {
+                                        TypeScriptTokenType::Colon => after_colon = true,
+                                        TypeScriptTokenType::LeftBracket | TypeScriptTokenType::RightBracket => {}
+                                        _ if key.kind.is_ignored() => {}
+                                        _ => {
+                                            if !after_colon && name.is_empty() {
+                                                let raw = source.get_text_in(key.span.into());
+                                                name = match key.kind {
+                                                    TypeScriptTokenType::StringLiteral => decode_string_literal_text(&raw).unwrap_or_else(|_| raw.trim_matches(['"', '\'']).to_string()),
+                                                    _ => raw.trim().to_string(),
+                                                };
                                             }
                                         }
-                                        _ => {
+                                    },
+                                    RedTree::Node(prop_node) => {
+                                        if after_colon {
                                             if value.is_none() {
                                                 value = self.build_expression(&prop_node, source)?;
                                             }
                                         }
-                                    }
-                                }
-                            }
-                            if name.is_empty() {
-                                for key_child in child_node.children() {
-                                    if let RedTree::Leaf(key) = key_child {
-                                        match key.kind {
-                                            TypeScriptTokenType::IdentifierName => {
-                                                name = source.get_text_in(key.span.into()).to_string();
-                                                break;
-                                            }
-                                            TypeScriptTokenType::StringLiteral => {
-                                                let raw = source.get_text_in(key.span.into());
-                                                name = decode_string_literal_text(&raw).unwrap_or_else(|_| raw.trim_matches(['"', '\'']).to_string());
-                                                break;
-                                            }
-                                            TypeScriptTokenType::Colon => break,
-                                            _ => {}
+                                        else if name.is_empty() {
+                                            // Computed key: `[expr]`.
+                                            name = source.get_text_in(prop_node.span().into()).trim().to_string();
                                         }
                                     }
                                 }
@@ -328,16 +320,18 @@ impl<'config> TypeScriptBuilder<'config> {
                         }
                         else if child_kind == TypeScriptElementType::ShorthandPropertyAssignment {
                             let mut name = String::new();
-                            let child_span = child_node.span();
+                            let mut key_span = child_node.span();
                             for prop_child in child_node.children() {
-                                if let RedTree::Node(prop_node) = prop_child {
-                                    if prop_node.green.kind == TypeScriptElementType::IdentifierName {
-                                        name = source.get_text_in(prop_node.span().into()).trim().to_string();
+                                if let RedTree::Leaf(key) = prop_child {
+                                    if !key.kind.is_ignored() {
+                                        name = source.get_text_in(key.span.into()).trim().to_string();
+                                        key_span = key.span;
+                                        break;
                                     }
                                 }
                             }
-                            let value = Expression::new(ExpressionKind::Identifier(name.clone()), child_span.into());
-                            properties.push(ObjectProperty::Property { name, value, shorthand: true, span: child_span.into() });
+                            let value = Expression::new(ExpressionKind::Identifier(name.clone()), key_span.into());
+                            properties.push(ObjectProperty::Property { name, value, shorthand: true, span: key_span.into() });
                         }
                         else if child_kind == TypeScriptElementType::SpreadElement {
                             for spread_child in child_node.children() {
