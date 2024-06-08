@@ -484,6 +484,39 @@ fn service_projects_unary_method() {
 }
 
 #[test]
+fn service_methods_without_return_type_project_none() {
+    let source = "service Identity {\n  create()\n  ping(user: User)\n}";
+    let root = parse(source).expect("Oak accepts methods without a return type");
+    let methods = &root.declarations[0].methods;
+    assert_eq!(methods.len(), 2);
+
+    assert_eq!(methods[0].name, "create");
+    assert!(methods[0].parameters.is_empty());
+    assert!(methods[0].return_type.is_none());
+    assert_eq!(methods[0].signature.as_ref().unwrap().text, "()");
+    assert_eq!(&source[methods[0].span.clone()], "create()");
+
+    assert_eq!(methods[1].name, "ping");
+    assert_eq!(methods[1].parameters.len(), 1);
+    assert_eq!(methods[1].parameters[0].name, "user");
+    assert_eq!(methods[1].parameters[0].type_syntax.text, "User");
+    assert!(methods[1].return_type.is_none());
+    assert_eq!(&source[methods[1].span.clone()], "ping(user: User)");
+}
+
+#[test]
+fn service_mixes_void_and_streaming_methods_in_order() {
+    let source = "service Feed {\n  touch(id: Id)\n  subscribe(topic: utf8) -> stream<Feed>\n  ping()\n}";
+    let root = parse(source).expect("Oak keeps mixed method forms in order");
+    let methods = &root.declarations[0].methods;
+    assert_eq!(methods.iter().map(|method| method.name.as_str()).collect::<Vec<_>>(), ["touch", "subscribe", "ping"]);
+    assert!(methods[0].return_type.is_none());
+    assert!(methods[1].return_type.as_ref().unwrap().stream);
+    assert!(methods[2].return_type.is_none());
+    assert_eq!(methods[2].span.end, methods[2].span.start + "ping()".len());
+}
+
+#[test]
 fn service_projects_multiple_methods_and_server_streams() {
     let source = "service FeedService {\n  list(limit: i64) -> [Feed]\n  subscribe(topic: utf8) -> stream<Feed>\n}";
     let root = parse(source).expect("Oak projects streaming methods");
@@ -570,7 +603,7 @@ fn service_methods_project_nested_generic_parameter_types() {
 fn service_body_syntax_errors_produce_diagnostics_without_panicking() {
     for source in [
         "service Broken {",
-        "service Broken { create(request: Request) Identity }",
+        "service Broken { create(request: Request) -> 42 }",
         "service Broken { create(request: Request) -> }",
         "service Broken { create(request Request) -> Response }",
         "service Broken { create(request: Request) -> stream<Request }",
@@ -581,22 +614,37 @@ fn service_body_syntax_errors_produce_diagnostics_without_panicking() {
     }
 }
 
-#[test]
-fn service_surface_round_trips_through_lossless_cst() {
-    fn append_text(node: &oak_vos::VosSyntaxNode, text: &mut String) {
-        for child in &node.children {
-            match child {
-                VosSyntaxElement::Node(inner) => append_text(inner, text),
-                VosSyntaxElement::Token(token) => text.push_str(&token.text),
-            }
+fn append_text(node: &oak_vos::VosSyntaxNode, text: &mut String) {
+    for child in &node.children {
+        match child {
+            VosSyntaxElement::Node(inner) => append_text(inner, text),
+            VosSyntaxElement::Token(token) => text.push_str(&token.text),
         }
     }
+}
+
+#[test]
+fn service_surface_round_trips_through_lossless_cst() {
     let source =
         "# service surface\n@route(\"/identity\")\nservice IdentityService {\n  # method\n  @authorize(\"admin\")\n  create(request: CreateRequest) -> Identity\n\n  subscribe(topic: utf8) -> stream<Feed>; # trailing\n}\n\ntable User { id: uuid, }\n";
     let root = parse(source).expect("Oak preserves the service surface");
     assert_eq!(root.declarations.len(), 2);
     assert_eq!(root.declarations[0].methods.len(), 2);
     assert_eq!(root.declarations[0].methods[1].return_type.as_ref().unwrap().type_syntax.text, "-> stream<Feed>");
+    let mut restored = String::new();
+    append_text(&root.syntax, &mut restored);
+    assert_eq!(restored, source);
+}
+
+#[test]
+fn service_surface_without_return_types_round_trips() {
+    let source = "# void methods\nservice Identity {\n  create()\n  ping(user: User) # no return\n  feed(limit: i64) -> stream<Feed>\n}\n";
+    let root = parse(source).expect("Oak preserves methods without a return type");
+    let methods = &root.declarations[0].methods;
+    assert_eq!(methods.len(), 3);
+    assert!(methods[0].return_type.is_none());
+    assert!(methods[1].return_type.is_none());
+    assert!(methods[2].return_type.as_ref().unwrap().stream);
     let mut restored = String::new();
     append_text(&root.syntax, &mut restored);
     assert_eq!(restored, source);

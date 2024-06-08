@@ -140,36 +140,34 @@ impl VosParser {
                 self.parse_parameters(state)?;
             }
             self.skip_trivia(state);
-            if state.peek_text().as_deref() != Some("-") {
-                state.record_unexpected_token("expected `->` before VOS method return type");
-                return Err(state.errors.last().cloned().expect("Oak records the syntax error"));
-            }
-            let return_checkpoint = state.checkpoint();
-            state.bump();
-            self.skip_trivia(state);
-            if state.peek_text().as_deref() != Some(">") {
-                state.record_unexpected_token("expected `>` in VOS return type arrow");
-                return Err(state.errors.last().cloned().expect("Oak records the syntax error"));
-            }
-            state.bump();
-            self.skip_trivia(state);
-            let type_checkpoint = state.checkpoint();
-            if state.at(VosTokenType::Stream) {
+            if state.peek_text().as_deref() == Some("-") {
+                let return_checkpoint = state.checkpoint();
                 state.bump();
                 self.skip_trivia(state);
-                state.expect(VosTokenType::Less)?;
+                if state.peek_text().as_deref() != Some(">") {
+                    state.record_unexpected_token("expected `>` in VOS return type arrow");
+                    return Err(state.errors.last().cloned().expect("Oak records the syntax error"));
+                }
+                state.bump();
                 self.skip_trivia(state);
-                let element_checkpoint = state.checkpoint();
-                self.parse_type(state, 0)?;
-                state.finish_at(element_checkpoint, VosElementType::TypeSyntax);
-                self.skip_trivia(state);
-                state.expect(VosTokenType::Greater)?;
+                let type_checkpoint = state.checkpoint();
+                if state.at(VosTokenType::Stream) {
+                    state.bump();
+                    self.skip_trivia(state);
+                    state.expect(VosTokenType::Less)?;
+                    self.skip_trivia(state);
+                    let element_checkpoint = state.checkpoint();
+                    self.parse_type(state, 0)?;
+                    state.finish_at(element_checkpoint, VosElementType::TypeSyntax);
+                    self.skip_trivia(state);
+                    state.expect(VosTokenType::Greater)?;
+                }
+                else {
+                    self.parse_type(state, 0)?;
+                    state.finish_at(type_checkpoint, VosElementType::TypeSyntax);
+                }
+                state.finish_at(return_checkpoint, VosElementType::ReturnType);
             }
-            else {
-                self.parse_type(state, 0)?;
-                state.finish_at(type_checkpoint, VosElementType::TypeSyntax);
-            }
-            state.finish_at(return_checkpoint, VosElementType::ReturnType);
             self.skip_trivia(state);
             if state.at(VosTokenType::Semicolon) || state.at(VosTokenType::Comma) {
                 state.bump();
