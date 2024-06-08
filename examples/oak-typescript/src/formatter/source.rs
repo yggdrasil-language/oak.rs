@@ -333,12 +333,22 @@ fn brace_opens_member_body(significant: &[&oak_core::Token<TypeScriptTokenType>]
         return true;
     }
     let mut cursor = open;
+    // Scanning back through a return type meets its type arguments first. A `>`
+    // opens one nested argument list, `>>` and `>>>` close several at once, and
+    // a `<` closes one. Commas inside those angles separate type arguments, so
+    // they cannot be object or type literal member separators.
+    let mut angles = 0usize;
     while let Some(previous) = cursor.checked_sub(1) {
         let Some(text) = token(previous)
         else {
             return false;
         };
         match text {
+            ">" => angles += 1,
+            ">>" => angles += 2,
+            ">>>" => angles += 3,
+            "<" if angles > 0 => angles -= 1,
+            "," if angles > 0 => {}
             "class" | "interface" | "enum" => return true,
             "=" | "(" | "[" | "," | "return" => return true,
             // A `:` reached from the brace itself annotates the declaration, so
@@ -346,8 +356,9 @@ fn brace_opens_member_body(significant: &[&oak_core::Token<TypeScriptTokenType>]
             // that annotation is a return type and the body is a function body.
             ":" => return previous.checked_sub(1).and_then(token) != Some(")"),
             "function" | "if" | "for" | "while" | "switch" | "catch" | "with" | "try" | "else" | "do" | "finally" | "=>" | "namespace" | "module" | "type" | ")" | "]" | "}" | "{" => return false,
-            _ => cursor = previous,
+            _ => {}
         }
+        cursor = previous;
     }
     false
 }
