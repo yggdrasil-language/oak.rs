@@ -26,10 +26,7 @@ fn lex(input: &str) -> Vec<(SqlTokenType, String)> {
 #[test]
 fn test_sql_system_variable_is_one_identifier() {
     let tokens = lex("SELECT @@session.sql_mode");
-    assert_eq!(
-        tokens,
-        vec![(SqlTokenType::Select, "SELECT".to_string()), (SqlTokenType::Identifier_, "@@session.sql_mode".to_string())]
-    );
+    assert_eq!(tokens, vec![(SqlTokenType::Select, "SELECT".to_string()), (SqlTokenType::Identifier_, "@@session.sql_mode".to_string())]);
 
     let tokens = lex("@@max_connections");
     assert_eq!(tokens, vec![(SqlTokenType::Identifier_, "@@max_connections".to_string())]);

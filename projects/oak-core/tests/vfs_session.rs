@@ -1,7 +1,10 @@
 use core::range::Range;
 
-use oak_core::{Arc, source::Source};
-use oak_core::vfs::{DocumentSession, MemoryVfs};
+use oak_core::{
+    Arc,
+    source::Source,
+    vfs::{DocumentSession, MemoryVfs},
+};
 
 #[test]
 fn document_session_bumps_revision_on_change() {

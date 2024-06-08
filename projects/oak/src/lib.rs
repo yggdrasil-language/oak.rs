@@ -4,6 +4,8 @@
 #![doc(html_logo_url = "https://raw.githubusercontent.com/ygg-lang/oaks/refs/heads/dev/documents/logo.svg")]
 #![doc(html_favicon_url = "https://raw.githubusercontent.com/ygg-lang/oaks/refs/heads/dev/documents/logo.svg")]
 
+/// Re-export of the Virtual File System.
+pub use oak_core::vfs::{FileMetadata, FileType, MemoryVfs, Vfs};
 /// Re-export of the core parsing and tree structures.
 pub use oak_core::*;
 /// Re-export of the folding range provider.
@@ -20,8 +22,6 @@ pub use oak_semantic_tokens::{SemanticToken, SemanticTokensProvider};
 pub use oak_structural_view::{StructureItem, StructureProvider};
 /// Re-export of the symbol information provider.
 pub use oak_symbols::{SymbolInformation, SymbolProvider};
-/// Re-export of the Virtual File System.
-pub use oak_core::vfs::{FileMetadata, FileType, MemoryVfs, Vfs};
 
 mod languages;
 

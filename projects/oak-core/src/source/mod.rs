@@ -9,8 +9,8 @@ mod buffer;
 mod cursor;
 mod line_map;
 mod rope;
-mod snapshot;
 mod simd;
+mod snapshot;
 mod streaming;
 mod text;
 
@@ -19,8 +19,8 @@ pub use self::{
     cursor::SourceCursor,
     line_map::LineMap,
     rope::{RopeBuffer, RopeSource},
-    snapshot::{DocumentSnapshot, SnapshotRevision},
     simd::SimdScanner,
+    snapshot::{DocumentSnapshot, SnapshotRevision},
     streaming::{ChunkedBuffer, ChunkedSource},
     text::SourceText,
 };

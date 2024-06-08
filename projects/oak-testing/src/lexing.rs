@@ -15,13 +15,13 @@ use crate::json_from_path;
 #[cfg(feature = "serde")]
 use serde::Serialize;
 
+use boost_fs::walk::{ErrorPolicy, Walker};
 use std::{
     path::{Path, PathBuf},
     sync::{Arc, Mutex},
     thread,
     time::{Duration, Instant},
 };
-use boost_fs::walk::{ErrorPolicy, Walker};
 
 /// A lexer testing utility that can run tests against multiple files.
 ///

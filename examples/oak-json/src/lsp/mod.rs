@@ -9,8 +9,8 @@ use oak_core::{TokenType, source::Source, tree::RedNode};
 use {
     futures::Future,
     oak_hover::{Hover, HoverProvider},
-    oak_lsp::service::LanguageService,
     oak_lsp::Vfs,
+    oak_lsp::service::LanguageService,
 };
 
 use crate::parser::element_type::JsonElementType;

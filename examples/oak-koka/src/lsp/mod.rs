@@ -5,8 +5,8 @@ pub mod highlighter;
 use crate::language::KokaLanguage;
 #[cfg(feature = "lsp")]
 use {
-    oak_lsp::{LanguageService, WorkspaceManager},
     oak_lsp::MemoryVfs,
+    oak_lsp::{LanguageService, WorkspaceManager},
 };
 #[cfg(feature = "lsp")]
 pub struct KokaLanguageService {

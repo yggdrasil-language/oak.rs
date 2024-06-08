@@ -3,7 +3,7 @@ use crate::language::BashLanguage;
 use core::range::Range;
 use oak_core::tree::RedNode;
 #[cfg(feature = "lsp")]
-use {futures::Future, oak_lsp::service::LanguageService, oak_lsp::types::Hover as LspHover, oak_lsp::Vfs};
+use {futures::Future, oak_lsp::Vfs, oak_lsp::service::LanguageService, oak_lsp::types::Hover as LspHover};
 #[cfg(feature = "lsp")]
 /// Language service for Bash.
 pub struct BashLanguageService<V: Vfs> {

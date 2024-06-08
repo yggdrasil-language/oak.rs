@@ -9,8 +9,8 @@ use oak_core::tree::RedNode;
 use {
     futures::Future,
     oak_hover::{Hover as HoverInfo, HoverProvider},
+    oak_lsp::{DocumentSession, Vfs},
     oak_lsp::{service::LanguageService, types::Hover},
-    oak_lsp::{Vfs, DocumentSession},
 };
 /// Hover provider implementation for PHP.
 #[cfg(feature = "lsp")]

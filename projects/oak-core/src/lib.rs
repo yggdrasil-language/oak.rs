@@ -30,11 +30,11 @@ pub mod serde_arc_str;
 pub mod serde_range;
 /// Source text management and location tracking.
 pub mod source;
+/// Tree structures for representing kind trees (green and red trees).
+pub mod tree;
 /// Virtual file system and document session for language services.
 #[cfg(feature = "vfs")]
 pub mod vfs;
-/// Tree structures for representing kind trees (green and red trees).
-pub mod tree;
 /// Tree traversal and transformation utilities.
 pub mod visitor;
 

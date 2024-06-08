@@ -5,8 +5,9 @@ use crate::{
 use core::range::Range;
 use oak_core::{
     language::{ElementRole, ElementType, Language},
-    source::Source,
+    source::{DocumentSnapshot, LineMap, Source},
     tree::RedNode,
+    vfs::{DocumentSession, Vfs},
 };
 use oak_folding::FoldingProvider;
 use oak_hover::HoverProvider;
@@ -14,8 +15,6 @@ use oak_navigation::{DefinitionProvider, ReferencesProvider};
 use oak_resolver::ModuleResolver;
 use oak_semantic_tokens::SemanticTokensProvider;
 use oak_symbols::SymbolProvider;
-use oak_core::source::{DocumentSnapshot, LineMap};
-use oak_core::vfs::{DocumentSession, Vfs};
 use std::future::Future;
 
 /// A trait that defines the capabilities and behavior of a language-specific service.

@@ -713,11 +713,7 @@ impl<'config> SqlBuilder<'config> {
                 _ => {}
             }
         }
-        Ok(PragmaStatement {
-            name: name.ok_or_else(|| OakError::custom_error("PRAGMA requires a name"))?,
-            value,
-            span: node.span(),
-        })
+        Ok(PragmaStatement { name: name.ok_or_else(|| OakError::custom_error("PRAGMA requires a name"))?, value, span: node.span() })
     }
 
     fn build_identifier<'a>(&self, node: RedNode<'a, SqlLanguage>, source: &SourceText) -> Result<Identifier, OakError> {

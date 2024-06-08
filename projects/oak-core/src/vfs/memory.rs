@@ -1,11 +1,11 @@
 use std::path::Path;
 
-use boost_fs::vfs::Overlay;
+use super::{DocumentSession, FileMetadata, FileType, RevisionTracker, Vfs, WritableVfs};
 use crate::{
     Arc,
     source::{DocumentSnapshot, SourceId, SourceText},
 };
-use super::{DocumentSession, FileMetadata, FileType, RevisionTracker, Vfs, WritableVfs};
+use boost_fs::vfs::Overlay;
 use std::{
     collections::HashMap,
     path::PathBuf,
@@ -114,9 +114,7 @@ impl DocumentSession for MemoryVfs {
     }
 
     fn request_source(&self, uri: &str) -> Option<SourceText> {
-        self.document_snapshot(uri)
-            .map(|snapshot| snapshot.source().clone())
-            .or_else(|| self.get_source(uri))
+        self.document_snapshot(uri).map(|snapshot| snapshot.source().clone()).or_else(|| self.get_source(uri))
     }
 }
 
