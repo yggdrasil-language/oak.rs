@@ -32,6 +32,8 @@ pub enum VosTokenType {
     Const,
     /// `service` keyword.
     Service,
+    /// `stream` keyword.
+    Stream,
     /// `micro` keyword.
     Micro,
     /// `macro` keyword.

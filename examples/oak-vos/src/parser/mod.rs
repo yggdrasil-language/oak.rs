@@ -46,6 +46,141 @@ impl VosParser {
         }
     }
 
+    fn starts_attribute<'a, S: Source + ?Sized>(&self, state: &mut State<'a, S>) -> bool {
+        state.at(VosTokenType::LeftBracket) || state.peek_text().as_deref() == Some("@")
+    }
+
+    /// Parses one `[...]` or `@name(...)` attribute group.
+    ///
+    /// The attribute name and arguments are an open set, so only the outer
+    /// delimiters are validated here.
+    fn parse_attribute<'a, S: Source + ?Sized>(&self, state: &mut State<'a, S>) -> Result<(), OakError> {
+        let checkpoint = state.checkpoint();
+        if state.at(VosTokenType::LeftBracket) {
+            self.parse_group(state)?;
+            state.finish_at(checkpoint, VosElementType::FieldAttribute);
+            return Ok(());
+        }
+        if state.peek_text().as_deref() != Some("@") {
+            state.record_unexpected_token("expected VOS attribute");
+            return Err(state.errors.last().cloned().expect("Oak records the syntax error"));
+        }
+        state.bump();
+        self.skip_trivia(state);
+        if state.peek_text().as_deref() == Some("@") {
+            state.bump();
+        }
+        else if state.at(VosTokenType::Identifier) {
+            state.bump();
+            self.skip_trivia(state);
+            if state.at(VosTokenType::LeftParen) {
+                self.parse_group(state)?;
+            }
+        }
+        state.finish_at(checkpoint, VosElementType::FieldAttribute);
+        Ok(())
+    }
+
+    /// Reports whether leading attributes are followed by a `service` keyword.
+    ///
+    /// The check is speculative, so the parser state is restored afterwards.
+    fn attributes_lead_to_service<'a, S: Source + ?Sized>(&self, state: &mut State<'a, S>) -> bool {
+        let checkpoint = state.checkpoint();
+        let result = loop {
+            self.skip_trivia(state);
+            if !self.starts_attribute(state) {
+                break state.at(VosTokenType::Service);
+            }
+            if self.parse_attribute(state).is_err() {
+                break false;
+            }
+        };
+        state.restore(checkpoint);
+        result
+    }
+
+    fn parse_service_declaration<'a, S: Source + ?Sized>(&self, state: &mut State<'a, S>) -> Result<(), OakError> {
+        state.incremental_node(VosElementType::Service, |state| {
+            while self.starts_attribute(state) {
+                self.parse_attribute(state)?;
+                self.skip_trivia(state);
+            }
+            state.expect(VosTokenType::Service)?;
+            self.skip_trivia(state);
+            if state.at(VosTokenType::Identifier) {
+                state.bump();
+            }
+            self.skip_trivia(state);
+            if state.at(VosTokenType::LeftBrace) {
+                self.parse_service_body(state)?;
+            }
+            else if state.at(VosTokenType::Semicolon) {
+                state.bump();
+            }
+            Ok(())
+        })
+    }
+
+    fn parse_service_body<'a, S: Source + ?Sized>(&self, state: &mut State<'a, S>) -> Result<(), OakError> {
+        let checkpoint = state.checkpoint();
+        state.expect(VosTokenType::LeftBrace)?;
+        loop {
+            self.skip_trivia(state);
+            if state.at(VosTokenType::RightBrace) {
+                break;
+            }
+            let method_checkpoint = state.checkpoint();
+            while self.starts_attribute(state) {
+                self.parse_attribute(state)?;
+                self.skip_trivia(state);
+            }
+            state.expect(VosTokenType::Identifier)?;
+            self.skip_trivia(state);
+            if state.at(VosTokenType::LeftParen) {
+                self.parse_parameters(state)?;
+            }
+            self.skip_trivia(state);
+            if state.peek_text().as_deref() != Some("-") {
+                state.record_unexpected_token("expected `->` before VOS method return type");
+                return Err(state.errors.last().cloned().expect("Oak records the syntax error"));
+            }
+            let return_checkpoint = state.checkpoint();
+            state.bump();
+            self.skip_trivia(state);
+            if state.peek_text().as_deref() != Some(">") {
+                state.record_unexpected_token("expected `>` in VOS return type arrow");
+                return Err(state.errors.last().cloned().expect("Oak records the syntax error"));
+            }
+            state.bump();
+            self.skip_trivia(state);
+            let type_checkpoint = state.checkpoint();
+            if state.at(VosTokenType::Stream) {
+                state.bump();
+                self.skip_trivia(state);
+                state.expect(VosTokenType::Less)?;
+                self.skip_trivia(state);
+                let element_checkpoint = state.checkpoint();
+                self.parse_type(state, 0)?;
+                state.finish_at(element_checkpoint, VosElementType::TypeSyntax);
+                self.skip_trivia(state);
+                state.expect(VosTokenType::Greater)?;
+            }
+            else {
+                self.parse_type(state, 0)?;
+                state.finish_at(type_checkpoint, VosElementType::TypeSyntax);
+            }
+            state.finish_at(return_checkpoint, VosElementType::ReturnType);
+            self.skip_trivia(state);
+            if state.at(VosTokenType::Semicolon) || state.at(VosTokenType::Comma) {
+                state.bump();
+            }
+            state.finish_at(method_checkpoint, VosElementType::ServiceMethod);
+        }
+        state.expect(VosTokenType::RightBrace)?;
+        state.finish_at(checkpoint, VosElementType::Block);
+        Ok(())
+    }
+
     fn parse_declaration<'a, S: Source + ?Sized>(&self, state: &mut State<'a, S>) -> Result<(), OakError> {
         let Some(token) = state.current()
         else {
@@ -78,6 +213,9 @@ impl VosParser {
                 if kind == VosTokenType::LeftBrace {
                     if matches!(element, VosElementType::Table | VosElementType::Class) {
                         self.parse_fields(state)?;
+                    }
+                    else if element == VosElementType::Service {
+                        self.parse_service_body(state)?;
                     }
                     else {
                         self.parse_group(state)?;
@@ -337,6 +475,9 @@ impl Parser<VosLanguage> for VosParser {
                 }
                 if state.current().map(|token| Self::declaration_kind(token.kind) != VosElementType::Error).unwrap_or(false) {
                     self.parse_declaration(state)?;
+                }
+                else if self.starts_attribute(state) && self.attributes_lead_to_service(state) {
+                    self.parse_service_declaration(state)?;
                 }
                 else if matches!(state.current().map(|token| token.kind), Some(VosTokenType::LeftBrace | VosTokenType::LeftParen | VosTokenType::LeftBracket)) {
                     self.parse_group(state)?;
