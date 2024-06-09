@@ -8,6 +8,7 @@
         "regenerate": "$env:REGENERATE_TESTS=1; cargo test --release --all-features",
         "test": "cargo test --release",
         "fmt": "cargo fmt --all",
+        "fmt:check": "cargo fmt --all -- --check",
         "p": "cargo workspace publish --resume --allow-dirty",
         "u": "cargo upgrade --pinned"
     },
