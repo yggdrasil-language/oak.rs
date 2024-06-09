@@ -21,3 +21,6 @@
 *.docx linguist-detectable=false
 *.pdf linguist-detectable=false
 *.html linguist-detectable=false
+
+# 金标准 SVG 以 LF 检出，测试与生成结果逐字节比较
+projects/oak-visualize/tests/diagnostic_preview/golden/** text eol=lf
