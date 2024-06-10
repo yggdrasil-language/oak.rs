@@ -9,8 +9,8 @@ use oak_core::{ElementRole, ElementType, Source, TokenType, tree::RedNode};
 use {
     futures::Future,
     oak_hover::{Hover as HoverInfo, HoverProvider},
-    oak_lsp::{service::LanguageService, types::Hover as LspHover},
     oak_lsp::Vfs,
+    oak_lsp::{service::LanguageService, types::Hover as LspHover},
 };
 /// Hover provider for Markdown.
 #[cfg(feature = "lsp")]

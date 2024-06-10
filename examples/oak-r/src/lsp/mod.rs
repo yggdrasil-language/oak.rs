@@ -7,9 +7,9 @@ use futures::Future;
 #[cfg(feature = "lsp")]
 use oak_hover::{Hover, HoverProvider};
 #[cfg(feature = "lsp")]
-use oak_lsp::service::LanguageService;
-#[cfg(feature = "lsp")]
 use oak_lsp::Vfs;
+#[cfg(feature = "lsp")]
+use oak_lsp::service::LanguageService;
 #[cfg(feature = "oak-pretty-print")]
 pub mod formatter;
 use crate::{language::RLanguage, parser::element_type::RElementType};

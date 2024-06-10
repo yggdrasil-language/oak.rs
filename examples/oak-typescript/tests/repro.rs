@@ -62,14 +62,7 @@ fn repro_assertions_inside_subscripts() {
 #[test]
 fn repro_array_type_positions() {
     let lang = TypeScriptLanguage::standard();
-    for source in [
-        "interface P { a: string[]; }",
-        "interface P { vendors: VendorId[]; tags: string[] }",
-        "const o = { a: string[] };",
-        "const o = { a: [] };",
-        "type T = { a: X[] };",
-        "const grid: string[][] = [];",
-    ] {
+    for source in ["interface P { a: string[]; }", "interface P { vendors: VendorId[]; tags: string[] }", "const o = { a: string[] };", "const o = { a: [] };", "type T = { a: X[] };", "const grid: string[][] = [];"] {
         let mut cache = ParseSession::<TypeScriptLanguage>::new(32);
         let result = TypeScriptBuilder::new(&lang).build(&SourceText::new(source), &[], &mut cache);
         assert!(result.result.is_ok(), "{source}");
@@ -106,7 +99,8 @@ fn repro_return_type_keeps_body_statements() {
     let mut cache = ParseSession::<TypeScriptLanguage>::new(32);
     let result = TypeScriptBuilder::new(&lang).build(&SourceText::new(source), &[], &mut cache);
     let root = result.result.expect("root");
-    let Some(Statement::FunctionDeclaration(func)) = root.statements.first() else {
+    let Some(Statement::FunctionDeclaration(func)) = root.statements.first()
+    else {
         panic!("expected function declaration, got {:?}", root.statements);
     };
     assert_eq!(func.body.len(), 1, "function body parsed as statements");
@@ -158,12 +152,7 @@ fn repro_typed_string_array_literal() {
 #[test]
 fn repro_type_only_import_and_export() {
     let lang = TypeScriptLanguage::standard();
-    for source in [
-        "import { a, type B, type C } from './x.ts';",
-        "import { a } from './x.ts';\nimport type { B, C } from './x.ts';",
-        "export type { B };",
-        "export type { B, C };",
-    ] {
+    for source in ["import { a, type B, type C } from './x.ts';", "import { a } from './x.ts';\nimport type { B, C } from './x.ts';", "export type { B };", "export type { B, C };"] {
         let mut cache = ParseSession::<TypeScriptLanguage>::new(32);
         let result = TypeScriptBuilder::new(&lang).build(&SourceText::new(source), &[], &mut cache);
         println!("{source} => {:?}", result.diagnostics);

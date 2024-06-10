@@ -9,8 +9,8 @@ use {
     futures::Future,
     oak_core::tree::RedNode,
     oak_hover::{Hover, HoverProvider},
-    oak_lsp::service::LanguageService,
     oak_lsp::Vfs,
+    oak_lsp::service::LanguageService,
 };
 
 #[cfg(feature = "oak-pretty-print")]

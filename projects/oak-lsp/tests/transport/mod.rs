@@ -62,19 +62,12 @@ fn run(inbound: Vec<Inbound>) -> Vec<Outbound> {
 fn request_is_dispatched_and_answered_with_the_same_id() {
     let sent = run(vec![Inbound::Request { id: RequestId::Number(7), request: Request::Shutdown }]);
     assert_eq!(sent.len(), 1);
-    assert!(matches!(
-        &sent[0],
-        Outbound::Response { id: RequestId::Number(7), result: ResponseResult::Shutdown }
-    ));
+    assert!(matches!(&sent[0], Outbound::Response { id: RequestId::Number(7), result: ResponseResult::Shutdown }));
 }
 
 #[test]
 fn exit_notification_stops_the_driver_before_peer_close() {
-    let sent = run(vec![
-        Inbound::Request { id: RequestId::String("first".into()), request: Request::Shutdown },
-        Inbound::Notification(Notification::Exit),
-        Inbound::Request { id: RequestId::Number(2), request: Request::Shutdown },
-    ]);
+    let sent = run(vec![Inbound::Request { id: RequestId::String("first".into()), request: Request::Shutdown }, Inbound::Notification(Notification::Exit), Inbound::Request { id: RequestId::Number(2), request: Request::Shutdown }]);
     assert_eq!(sent.len(), 1, "requests after `exit` must not be answered");
     assert!(matches!(&sent[0], Outbound::Response { id: RequestId::String(id), .. } if id == "first"));
 }

@@ -51,17 +51,13 @@ impl<T: LanguageService> Lsp for T {
                 Request::FoldingRange(request) => ResponseResult::FoldingRanges(LanguageService::folding_ranges(self, &request.uri).await),
                 Request::SemanticTokensFull(request) => ResponseResult::SemanticTokens(LanguageService::semantic_tokens(self, &request.uri).await),
                 Request::Completion(request) => ResponseResult::Completion(LanguageService::completion(self, &request.uri, request.position).await),
-                Request::DocumentHighlight(request) => {
-                    ResponseResult::DocumentHighlights(LanguageService::document_highlight(self, &request.uri, request.range).await)
-                }
+                Request::DocumentHighlight(request) => ResponseResult::DocumentHighlights(LanguageService::document_highlight(self, &request.uri, request.range).await),
                 Request::SignatureHelp(request) => ResponseResult::SignatureHelp(LanguageService::signature_help(self, &request.uri, request.range).await),
                 Request::InlayHint(request) => ResponseResult::InlayHints(LanguageService::inlay_hint(self, &request.uri, request.range).await),
                 Request::CodeAction(request) => ResponseResult::CodeActions(LanguageService::code_action(self, &request.uri, request.range).await),
                 Request::Formatting(request) => ResponseResult::Edits(LanguageService::formatting(self, &request.uri).await),
                 Request::RangeFormatting(request) => ResponseResult::Edits(LanguageService::range_formatting(self, &request.uri, request.range).await),
-                Request::Rename(request) => {
-                    ResponseResult::Rename(LanguageService::rename(self, &request.uri, request.range, request.new_name.clone()).await)
-                }
+                Request::Rename(request) => ResponseResult::Rename(LanguageService::rename(self, &request.uri, request.range, request.new_name.clone()).await),
                 Request::TypeDefinition(request) => ResponseResult::Locations(LanguageService::type_definition(self, &request.uri, request.range).await),
                 Request::Implementation(request) => ResponseResult::Locations(LanguageService::implementation(self, &request.uri, request.range).await),
                 Request::WorkspaceSymbol(request) => ResponseResult::WorkspaceSymbols(LanguageService::workspace_symbols(self, request.query.clone()).await),

@@ -8,9 +8,9 @@ use oak_core::{Range, tree::RedNode};
 use {
     futures::Future,
     oak_hover::{Hover, HoverProvider},
+    oak_lsp::Vfs,
     oak_lsp::service::LanguageService,
     oak_lsp::types::Hover as LspHover,
-    oak_lsp::Vfs,
 };
 /// Hover provider implementation for LLVM IR.
 #[cfg(feature = "lsp")]

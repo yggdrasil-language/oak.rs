@@ -9,8 +9,8 @@ use oak_core::tree::RedNode;
 #[cfg(feature = "lsp")]
 use {
     oak_hover::{Hover as ProviderHover, HoverProvider},
-    oak_lsp::{service::LanguageService, types::Hover as LspHover},
     oak_lsp::Vfs,
+    oak_lsp::{service::LanguageService, types::Hover as LspHover},
 };
 /// Hover provider implementation for Perl.
 #[cfg(feature = "lsp")]
