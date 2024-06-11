@@ -109,6 +109,7 @@ pub(crate) fn format_source(source: &str, options: &FormatOptions) -> Result<Str
                 constraint = oak_formatter::GapConstraint::RequiredSpace;
             }
         }
+
         if matches!(left_text, "<" | ">" | ">>" | ">>>") {
             let generic_angle = (left_text == "<" && looks_like_type_arguments(&significant, index, source)) || (matches!(left_text, ">" | ">>" | ">>>") && is_type_argument_close(&significant, index, source));
             // A `<` after an operand is a comparison. A postfix `++`/`--`
@@ -134,53 +135,63 @@ pub(crate) fn format_source(source: &str, options: &FormatOptions) -> Result<Str
             let type_close = matches!(right_text, ">>" | ">>>") && is_type_argument_close(&significant, index + 1, source);
             constraint = if type_close { oak_formatter::GapConstraint::NoSpace } else { oak_formatter::GapConstraint::RequiredSpace };
         }
+        // `!` is the logical not operator here, so a regex literal after it binds
+        // tight: `!/^\d+$/.test(value)`, not `! /^\d+$/.test(value)`.
+        if right.kind == TypeScriptTokenType::RegexLiteral && matches!(left_text, "!" | "~") {
+            constraint = oak_formatter::GapConstraint::NoSpace;
+        }
         if matches!(left_text, "+" | "-") {
             let previous = index.checked_sub(1).and_then(|previous| significant.get(previous)).and_then(|token| source.get(token.span.clone()));
-            if previous.is_none()
-                || matches!(
+            // `<` and `>` are comparison operators unless they delimit type
+            // arguments, so `length < -1` keeps the sign attached to its operand
+            // while `Box<T> - 1` stays a subtraction.
+            let prefix_operand = match previous {
+                None => true,
+                // After `<` a sign always belongs to a literal: `a < -1` and
+                // `Box<-1>` are both prefix uses.
+                Some("<") => true,
+                Some(">" | ">>" | ">>>") => !is_type_argument_close(&significant, index - 1, source),
+                Some(previous) => matches!(
                     previous,
-                    Some(
-                        "(" | "["
-                            | "{"
-                            | "="
-                            | ","
-                            | ":"
-                            | "?"
-                            | "return"
-                            | "throw"
-                            | "=>"
-                            | "!"
-                            | "+"
-                            | "-"
-                            | "*"
-                            | "/"
-                            | "%"
-                            | "??"
-                            | "&&"
-                            | "||"
-                            | "=="
-                            | "==="
-                            | "!="
-                            | "!=="
-                            | "<="
-                            | ">="
-                            | "<<"
-                            | ">>"
-                            | ">>>"
-                            | "&"
-                            | "|"
-                            | "^"
-                            | "case"
-                            | "in"
-                            | "of"
-                            | "typeof"
-                            | "void"
-                            | "delete"
-                            | "await"
-                            | "new"
-                    )
-                )
-            {
+                    "(" | "["
+                        | "{"
+                        | "="
+                        | ","
+                        | ":"
+                        | "?"
+                        | "return"
+                        | "throw"
+                        | "=>"
+                        | "!"
+                        | "+"
+                        | "-"
+                        | "*"
+                        | "/"
+                        | "%"
+                        | "??"
+                        | "&&"
+                        | "||"
+                        | "=="
+                        | "==="
+                        | "!="
+                        | "!=="
+                        | "<="
+                        | ">="
+                        | "<<"
+                        | "&"
+                        | "|"
+                        | "^"
+                        | "case"
+                        | "in"
+                        | "of"
+                        | "typeof"
+                        | "void"
+                        | "delete"
+                        | "await"
+                        | "new"
+                ),
+            };
+            if prefix_operand {
                 constraint = oak_formatter::GapConstraint::NoSpace;
             }
         }
@@ -266,6 +277,7 @@ pub(crate) fn format_source(source: &str, options: &FormatOptions) -> Result<Str
     let _ = options;
     Ok(formatted)
 }
+
 fn is_reserved_word(text: &str) -> bool {
     matches!(text, "if" | "for" | "while" | "switch" | "catch" | "with" | "function" | "return" | "throw" | "new" | "typeof" | "void" | "delete" | "await" | "yield" | "as" | "in" | "instanceof")
 }
@@ -399,11 +411,36 @@ fn is_jsx_attribute_gap(significant: &[&oak_core::Token<TypeScriptTokenType>], i
 fn looks_like_type_arguments(significant: &[&oak_core::Token<TypeScriptTokenType>], index: usize, source: &str) -> bool {
     let mut depth = 0usize;
     let mut delimiters = 0usize;
+    let mut previous: Option<&str> = None;
+    // A space between a value-like operand and `<` reads as a comparison. Type
+    // arguments follow their callee or type name without a gap.
+    if let (Some(open), Some(left)) = (significant.get(index), index.checked_sub(1).and_then(|before| significant.get(before))) {
+        let gap = source.get(Range { start: left.span.end, end: open.span.start });
+        let operand = source.get(left.span.clone()).is_some_and(|text| text.chars().last().is_some_and(|ch| ch.is_ascii_alphanumeric() || matches!(ch, '_' | '$' | ')' | ']' | '}')));
+        if operand && gap.is_some_and(|gap| !gap.is_empty()) {
+            return false;
+        }
+    }
     for token in significant.iter().skip(index + 1) {
         let text = match source.get(token.span.clone()) {
             Some(text) => text,
             None => return false,
         };
+        // Binary and logical operators have no top-level place in a type
+        // argument list, so `parsed < minimum || parsed > max` is a comparison.
+        // A `+`/`-` in value position is arithmetic, while `<T = unknown>` and
+        // `Foo<-1>` stay type syntax.
+        if depth == 0 && delimiters == 0 {
+            let expression_operator = match text {
+                "||" | "&&" | "==" | "===" | "!=" | "!==" | "*" | "%" | "/" | ";" | "??" | "?" | ":" => true,
+                "+" | "-" => previous.is_some_and(|left| left.chars().last().is_some_and(|ch| ch.is_ascii_alphanumeric() || matches!(ch, '_' | '$' | ')' | ']' | '}'))),
+                _ => false,
+            };
+            if expression_operator {
+                return false;
+            }
+        }
+        previous = Some(text);
         match text {
             "{" | "(" | "[" => delimiters += 1,
             "}" | ")" | "]" if delimiters > 0 => delimiters -= 1,
@@ -413,18 +450,18 @@ fn looks_like_type_arguments(significant: &[&oak_core::Token<TypeScriptTokenType
             "<" => depth += 1,
             ">" if depth == 0 && delimiters == 0 => {
                 let after = significant.iter().skip_while(|candidate| candidate.span.start <= token.span.start).find_map(|candidate| source.get(candidate.span.clone()));
-                return after.is_none_or(|next| next.is_empty() || matches!(next, "=" | "," | ";" | ")" | "]" | "[" | "}" | "." | "(" | "{" | ">" | "|" | "&" | "=>" | "?" | ":"));
+                return after.is_none_or(|next| next.is_empty() || matches!(next, "=" | "," | ";" | ")" | "]" | "[" | "}" | "." | "(" | "{" | ">" | "|" | "&" | "=>" | "?" | ":" | "-" | "+" | "*" | "%" | "==" | "===" | "!=" | "!==" | "&&" | "||"));
             }
             ">" if depth == 0 => return false,
             ">" => depth -= 1,
             ">>>" if depth <= 2 && delimiters == 0 => {
                 let after = significant.iter().skip_while(|candidate| candidate.span.start <= token.span.start).find_map(|candidate| source.get(candidate.span.clone()));
-                return after.is_none_or(|next| next.is_empty() || matches!(next, "=" | "," | ";" | ")" | "]" | "[" | "}" | "." | "(" | "{" | "|" | "&" | "=>" | "?" | ":"));
+                return after.is_none_or(|next| next.is_empty() || matches!(next, "=" | "," | ";" | ")" | "]" | "[" | "}" | "." | "(" | "{" | "|" | "&" | "=>" | "?" | ":" | "-" | "+" | "*" | "%" | "==" | "===" | "!=" | "!==" | "&&" | "||"));
             }
             ">>>" => depth -= 3,
             ">>" if depth <= 2 && delimiters == 0 => {
                 let after = significant.iter().skip_while(|candidate| candidate.span.start <= token.span.start).find_map(|candidate| source.get(candidate.span.clone()));
-                return after.is_none_or(|next| next.is_empty() || matches!(next, "=" | "," | ";" | ")" | "]" | "[" | "}" | "." | "(" | "{" | "|" | "&" | "=>" | "?" | ":"));
+                return after.is_none_or(|next| next.is_empty() || matches!(next, "=" | "," | ";" | ")" | "]" | "[" | "}" | "." | "(" | "{" | "|" | "&" | "=>" | "?" | ":" | "-" | "+" | "*" | "%" | "==" | "===" | "!=" | "!==" | "&&" | "||"));
             }
             ">>" => depth -= 2,
             ";" | "?" | ":" if depth == 0 && delimiters == 0 => return false,

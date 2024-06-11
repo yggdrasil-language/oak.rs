@@ -1,4 +1,4 @@
-use oak_typescript::formatter::{FormatOptions, format_source};
+use oak_typescript::formatter::{FormatOptions, QuoteStyle, format_source};
 
 fn format(source: &str) -> String {
     let options = FormatOptions::default();
@@ -159,7 +159,68 @@ fn bitwise_shift_operators_keep_spaces() {
     }
 }
 
-// --- Bug 4: non-null assertion glued to !== ---
+// --- Bug 5: `<` / `>` comparisons misread as type arguments ---
+#[test]
+fn comparison_operators_are_not_type_arguments() {
+    for (source, expected) in [
+        ("if (parsed < minimum || parsed > 65535) { run(); }", "if (parsed < minimum || parsed > 65535) { run(); }"),
+        (
+            "if (\n    !Number.isInteger(parsed) ||\n    parsed < minimum ||\n    parsed > (arg === \"-n\" || arg === \"--db\" ? 15 : 65535)\n) {\n    fail();\n}\n",
+            "if (\n    !Number.isInteger(parsed) ||\n    parsed < minimum ||\n    parsed > (arg === \"-n\" || arg === \"--db\" ? 15 : 65535)\n) {\n    fail();\n}\n",
+        ),
+        ("const picked = index < limit && index > floor;", "const picked = index < limit && index > floor;"),
+        ("const clamped = value < low ? low : value;", "const clamped = value < low ? low : value;"),
+    ] {
+        assert_eq!(format(source), expected, "comparison read as type arguments: {source:?}");
+    }
+}
+
+#[test]
+fn type_arguments_stay_tight_next_to_comparisons() {
+    for source in ["const items = make<Item>(value);", "function read<T = unknown>(file: string): T { return load(file) as T; }", "type Fixed = Box<-1>;", "const pair = a < b && c > d;"] {
+        assert_eq!(format(source), source, "type arguments lost their shape: {source:?}");
+    }
+}
+
+// --- Bug 6: `!` gained a space before a regex literal ---
+#[test]
+fn logical_not_binds_to_regex_literals() {
+    for source in [r"if (!/^-?\d+$/.test(line)) { fail(); }", r"if (!/^(?:-1|\d+)$/.test(line)) { fail(); }", r"const ok = !/x/.test(value);"] {
+        assert_eq!(format(source), source, "regex literal detached from `!`: {source:?}");
+    }
+}
+
+// --- Bug 7: unary signs separated from their operand after a comparison ---
+#[test]
+fn unary_signs_after_comparisons_bind_to_their_operands() {
+    for (source, expected) in [
+        ("if (length < -1) { fail(); }", "if (length < -1) { fail(); }"),
+        ("if (length<-1) { fail(); }", "if (length < -1) { fail(); }"),
+        ("if (count > +1) { fail(); }", "if (count > +1) { fail(); }"),
+        ("if (eq === -1) { reset(); }", "if (eq === -1) { reset(); }"),
+        ("const shifted = Box<number> - 1;", "const shifted = Box<number> - 1;"),
+    ] {
+        assert_eq!(format(source), expected, "unary sign spacing changed: {source:?}");
+    }
+}
+
+// --- Bug 8: `quoteStyle` rejected instead of accepted by the gap formatter ---
+#[test]
+fn quote_style_options_keep_literal_text_intact() {
+    for quote_style in [QuoteStyle::Single, QuoteStyle::Double, QuoteStyle::Preserve] {
+        let options = FormatOptions { quote_style, ..FormatOptions::default() };
+        for (source, expected) in [
+            ("const a = 'x';", "const a = 'x';"),
+            ("const a = \"x\";", "const a = \"x\";"),
+            ("const a = 'it\\'s';", "const a = 'it\\'s';"),
+            ("const a = `keep '${value}'`;", "const a = `keep '${value}'`;"),
+            ("const a = /'x'/;", "const a = /'x'/;"),
+        ] {
+            assert_eq!(format_source(source, &options).expect("format"), expected, "quote literal rewritten under {quote_style:?}: {source:?}");
+        }
+    }
+}
+
 #[test]
 fn non_null_assertion_stays_separate_from_inequality() {
     // 真正的 discussion case：两个相邻的 ! — non-null assertion + inequality 前导 !
