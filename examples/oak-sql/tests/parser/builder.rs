@@ -25,6 +25,30 @@ fn test_select_ast() {
     assert!(select.expr.is_some());
 }
 
+#[test]
+fn test_update_assignment_accepts_bare_identifier() {
+    let language = SqlLanguage::default();
+    let builder = SqlBuilder::new(&language);
+    let mut cache = oak_core::parser::session::ParseSession::default();
+
+    // A parameter rewriter replaces placeholders with plain identifiers, so
+    // `SET column = <identifier>` must build like any other value expression.
+    let source = "UPDATE accounts SET owner = next_owner WHERE id = 1";
+    let result = builder.build(source, &[], &mut cache);
+
+    if let Err(e) = &result.result {
+        panic!("Build failed: {e:?}");
+    }
+    let root = result.result.unwrap();
+    let oak_sql::ast::SqlStatement::Update(update) = &root.statements[0]
+    else {
+        panic!("Expected Update statement");
+    };
+    assert_eq!(update.assignments.len(), 1);
+    assert!(matches!(update.assignments[0].value, oak_sql::ast::Expression::Identifier(_)));
+    assert!(update.selection.is_some());
+}
+
 #[ignore = "SQL builder/AST round-trip tests are out of date"]
 #[test]
 fn test_create_table_ast() {

@@ -280,6 +280,7 @@ impl<'config> SqlBuilder<'config> {
                     SqlElementType::TableName => table_name = Some(self.build_table_name(n, source)?),
                     SqlElementType::Assignment => assignments.push(self.build_assignment(n, source)?),
                     SqlElementType::Expression => selection = Some(self.build_expression(n, source)?),
+                    SqlElementType::Identifier => selection = Some(Expression::Identifier(self.build_identifier(n, source)?)),
                     _ => {}
                 },
             }
@@ -302,6 +303,10 @@ impl<'config> SqlBuilder<'config> {
                 match n.green.kind {
                     SqlElementType::ColumnName => column = Some(self.build_identifier(n, source)?),
                     SqlElementType::Expression => value = Some(self.build_expression(n, source)?),
+                    // A bare identifier is a valid right-hand side
+                    // (`SET owner = next_owner`); the parser emits it as an
+                    // `Identifier` node rather than wrapping it in `Expression`.
+                    SqlElementType::Identifier => value = Some(Expression::Identifier(self.build_identifier(n, source)?)),
                     _ => {}
                 }
             }
@@ -326,6 +331,7 @@ impl<'config> SqlBuilder<'config> {
                 RedTree::Node(n) => match n.green.kind {
                     SqlElementType::TableName => table_name = Some(self.build_table_name(n, source)?),
                     SqlElementType::Expression => selection = Some(self.build_expression(n, source)?),
+                    SqlElementType::Identifier => selection = Some(Expression::Identifier(self.build_identifier(n, source)?)),
                     _ => {}
                 },
             }
