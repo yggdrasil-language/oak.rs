@@ -92,6 +92,24 @@ fn expression_question_marks_keep_their_spacing() {
     }
 }
 
+// Regression: a `{` after a signature with a return type annotation is the
+// function body, not a type-literal member body, so `if (` keeps its space.
+#[test]
+fn function_bodies_with_return_types_are_not_member_bodies() {
+    for (source, expected) in [
+        ("function f(x: number): void { if (x) {} }", "function f(x: number): void { if (x) {} }"),
+        ("function f(x: number): void { for (const y of x) {} }", "function f(x: number): void { for (const y of x) {} }"),
+        ("function f(x: number): void { while (x) {} }", "function f(x: number): void { while (x) {} }"),
+        ("function f(x: number): void { switch (x) { case 1: break; } }", "function f(x: number): void { switch (x) { case 1: break; } }"),
+        ("function f(): void { while (x) {} }", "function f(): void { while (x) {} }"),
+        ("const f = (x: number): void => { if (x) {} };", "const f = (x: number): void => { if (x) {} };"),
+        ("class A { m(x: number): void { if (x) {} } }", "class A { m(x: number): void { if (x) {} } }"),
+        ("const o = { m(x: number): void { if (x) {} } };", "const o = { m(x: number): void { if (x) {} } };"),
+    ] {
+        assert_eq!(format(source), expected, "function body treated as member body: {source:?}");
+    }
+}
+
 #[test]
 fn optional_chaining_stays_attached() {
     for source in ["const v = a?.b;", "const v = a?.b?.c;", "const v = a?.delete?.(k);", "const v = a?.[k];", "obj?.delete(key);"] {
