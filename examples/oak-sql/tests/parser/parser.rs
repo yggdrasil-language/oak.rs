@@ -598,6 +598,69 @@ fn test_sql_builder_identifier_spans_skip_leading_trivia() {
 }
 
 #[test]
+fn test_sql_builder_select_quantifier() {
+    let sql = "SELECT DISTINCT name FROM users;";
+    let (statement, source) = build_statement(sql);
+    let SqlStatement::Select(select) = &statement
+    else {
+        panic!("Expected Select statement, got {statement:?}");
+    };
+    let Some(SelectQuantifier::Distinct { span }) = &select.quantifier
+    else {
+        panic!("Expected DISTINCT quantifier, got {:?}", select.quantifier);
+    };
+    assert_eq!(sql.get(span.start..span.end), Some("DISTINCT"));
+    assert_eq!(source, "SELECT DISTINCT name FROM users;");
+
+    let sql = "SELECT DISTINCT ON (user_id, name) name FROM users;";
+    let (statement, source) = build_statement(sql);
+    let SqlStatement::Select(select) = &statement
+    else {
+        panic!("Expected Select statement, got {statement:?}");
+    };
+    let Some(SelectQuantifier::DistinctOn { expressions, span }) = &select.quantifier
+    else {
+        panic!("Expected DISTINCT ON quantifier, got {:?}", select.quantifier);
+    };
+    assert_eq!(sql.get(span.start..span.end), Some("DISTINCT ON (user_id, name)"));
+    assert_eq!(expressions.len(), 2);
+    assert!(matches!(&expressions[0], Expression::Identifier(identifier) if identifier.name.as_ref() == "user_id"));
+    assert!(matches!(&expressions[1], Expression::Identifier(identifier) if identifier.name.as_ref() == "name"));
+    assert_eq!(source, "SELECT DISTINCT ON(user_id,name)name FROM users;");
+
+    let (statement, source) = build_statement("SELECT ALL name FROM users;");
+    let SqlStatement::Select(select) = &statement
+    else {
+        panic!("Expected Select statement, got {statement:?}");
+    };
+    assert!(matches!(select.quantifier, Some(SelectQuantifier::All { .. })));
+    assert_eq!(source, "SELECT ALL name FROM users;");
+
+    let (statement, _) = build_statement("SELECT name FROM users;");
+    let SqlStatement::Select(select) = &statement
+    else {
+        panic!("Expected Select statement, got {statement:?}");
+    };
+    assert!(select.quantifier.is_none());
+}
+
+#[test]
+fn test_sql_builder_distinct_outside_select_is_reported() {
+    // `DISTINCT` may only appear in the SELECT quantifier position. The aggregate
+    // form is not supported yet, but it must not be swallowed as an expression.
+    for sql in ["SELECT COUNT(DISTINCT name) FROM users;", "SELECT name FROM users ORDER BY DISTINCT name;", "DISTINCT name FROM users;"] {
+        let reason = rejection_reason(sql);
+        assert!(reason.contains("`DISTINCT` is only allowed immediately after `SELECT`"), "{sql}: {reason}");
+    }
+
+    let reason = rejection_reason("SELECT DISTINCT ON name FROM users;");
+    assert!(reason.contains("`DISTINCT ON` requires a parenthesized expression list"), "{reason}");
+
+    let reason = rejection_reason("SELECT DISTINCT ON () name FROM users;");
+    assert!(reason.contains("`DISTINCT ON` requires at least one expression"), "{reason}");
+}
+
+#[test]
 fn test_sql_builder_insert() {
     let config = SqlLanguage::default();
     let builder = SqlBuilder::new(&config);

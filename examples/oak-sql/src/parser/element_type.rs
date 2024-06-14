@@ -20,6 +20,8 @@ pub enum SqlElementType {
     ShowStatement,
     /// SELECT statement.
     SelectStatement,
+    /// Explicit `ALL` / `DISTINCT` quantifier of a SELECT statement.
+    SelectQuantifier,
     /// VECTOR search clause.
     VectorSearch,
     /// Identifier.
@@ -104,6 +106,7 @@ impl ElementType for SqlElementType {
             | Self::HavingClause
             | Self::OrderByClause
             | Self::LimitClause
+            | Self::SelectQuantifier
             | Self::SelectItem
             | Self::ColumnDefinition
             | Self::ValueList

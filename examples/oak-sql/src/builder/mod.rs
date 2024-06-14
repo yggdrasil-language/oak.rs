@@ -125,6 +125,7 @@ impl<'config> SqlBuilder<'config> {
 
     /// Builds a `SELECT` statement AST node.
     fn build_select_statement<'a>(&self, node: RedNode<'a, SqlLanguage>, source: &SourceText) -> Result<SelectStatement, OakError> {
+        let mut quantifier = None;
         let mut items = Vec::new();
         let mut from = None;
         let mut joins = Vec::new();
@@ -139,6 +140,7 @@ impl<'config> SqlBuilder<'config> {
         for child in node.children() {
             match child {
                 RedTree::Node(n) => match n.green.kind {
+                    SqlElementType::SelectQuantifier => quantifier = Some(self.build_select_quantifier(n, source)?),
                     SqlElementType::SelectItem => items.push(self.build_select_item(n, source)?),
                     SqlElementType::TableName => from = Some(self.build_table_name(n, source)?),
                     SqlElementType::JoinClause => joins.push(self.build_join_clause(n, source)?),
@@ -165,7 +167,40 @@ impl<'config> SqlBuilder<'config> {
             return Err(OakError::custom_error("WHERE predicate could not be built"));
         }
 
-        Ok(SelectStatement { items, from, joins, expr, group_by, having, order_by, limit, span: node.span() })
+        Ok(SelectStatement { quantifier, items, from, joins, expr, group_by, having, order_by, limit, span: node.span() })
+    }
+
+    /// Builds the explicit `ALL` / `DISTINCT` quantifier of a `SELECT` statement.
+    fn build_select_quantifier<'a>(&self, node: RedNode<'a, SqlLanguage>, source: &SourceText) -> Result<SelectQuantifier, OakError> {
+        let mut all = None;
+        let mut distinct = None;
+        let mut on = false;
+        let mut expressions = Vec::new();
+
+        for child in node.children() {
+            match child {
+                RedTree::Leaf(t) => match t.kind {
+                    SqlTokenType::All => all = Some(t.span.clone()),
+                    SqlTokenType::Distinct => distinct = Some(t.span.clone()),
+                    SqlTokenType::On => on = true,
+                    _ => {}
+                },
+                RedTree::Node(n) if matches!(n.green.kind, SqlElementType::Expression | SqlElementType::Identifier | SqlElementType::FunctionCall) => {
+                    expressions.push(self.build_expression(n, source)?);
+                }
+                _ => {}
+            }
+        }
+
+        if let Some(span) = all {
+            Ok(SelectQuantifier::All { span })
+        }
+        else if let Some(span) = distinct {
+            if on { Ok(SelectQuantifier::DistinctOn { expressions, span: node.span() }) } else { Ok(SelectQuantifier::Distinct { span }) }
+        }
+        else {
+            Err(OakError::custom_error("Missing ALL or DISTINCT in select quantifier"))
+        }
     }
 
     /// Builds a select item (column or expression) for a `SELECT` statement.
