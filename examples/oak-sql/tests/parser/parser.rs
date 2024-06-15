@@ -661,6 +661,89 @@ fn test_sql_builder_distinct_outside_select_is_reported() {
 }
 
 #[test]
+fn test_sql_builder_group_by_items_and_having() {
+    let sql = "SELECT dept, COUNT(*) FROM employees GROUP BY dept, 1, LOWER(name) HAVING COUNT(*) > 1;";
+    let (statement, source) = build_statement(sql);
+    let SqlStatement::Select(select) = &statement
+    else {
+        panic!("Expected Select statement, got {statement:?}");
+    };
+
+    let group_by = select.group_by.as_ref().unwrap_or_else(|| panic!("Missing GROUP BY"));
+    assert_eq!(group_by.items.len(), 3);
+
+    let GroupByItem::Column(column) = &group_by.items[0]
+    else {
+        panic!("Expected a bare column item, got {:?}", group_by.items[0]);
+    };
+    assert_eq!(column.name.as_ref(), "dept");
+    assert_eq!(sql.get(column.span.start..column.span.end), Some("dept"));
+
+    let GroupByItem::Position { index, span } = &group_by.items[1]
+    else {
+        panic!("Expected a positional item, got {:?}", group_by.items[1]);
+    };
+    assert_eq!(*index, 1);
+    assert_eq!(sql.get(span.start..span.end), Some("1"));
+
+    assert!(matches!(&group_by.items[2], GroupByItem::Expression(Expression::FunctionCall { .. })), "expected a function item, got {:?}", group_by.items[2]);
+
+    let having = select.having.as_ref().unwrap_or_else(|| panic!("Missing HAVING"));
+    assert!(matches!(having.condition, Expression::Binary { op: BinaryOperator::Greater, .. }), "unexpected HAVING predicate {:?}", having.condition);
+
+    assert_eq!(source, "SELECT dept,COUNT(*)FROM employees GROUP BY dept,1,LOWER(name)HAVING COUNT(*)>1;");
+}
+
+#[test]
+fn test_sql_builder_group_by_distinguishes_positions_from_expressions() {
+    let (statement, source) = build_statement("SELECT a FROM t GROUP BY (1), 1 + 1, t.a;");
+    let SqlStatement::Select(select) = &statement
+    else {
+        panic!("Expected Select statement, got {statement:?}");
+    };
+    let group_by = select.group_by.as_ref().unwrap_or_else(|| panic!("Missing GROUP BY"));
+
+    // A parenthesized constant is an expression, not a select-list position.
+    assert!(matches!(&group_by.items[0], GroupByItem::Expression(Expression::Literal(_))), "unexpected item {:?}", group_by.items[0]);
+    assert!(matches!(&group_by.items[1], GroupByItem::Expression(Expression::Binary { .. })), "unexpected item {:?}", group_by.items[1]);
+    let GroupByItem::Column(column) = &group_by.items[2]
+    else {
+        panic!("Expected a qualified column item, got {:?}", group_by.items[2]);
+    };
+    assert_eq!(column.name.as_ref(), "t.a");
+    assert_eq!(source, "SELECT a FROM t GROUP BY 1,1+1,t.a;");
+}
+
+/// `HAVING` must bind without a `GROUP BY` clause. Rejecting it is the
+/// downstream semantic layer's job, not the parser's.
+#[test]
+fn test_sql_builder_having_without_group_by_binds() {
+    let (statement, source) = build_statement("SELECT flag FROM events HAVING flag;");
+    let SqlStatement::Select(select) = &statement
+    else {
+        panic!("Expected Select statement, got {statement:?}");
+    };
+    assert!(select.group_by.is_none());
+    let having = select.having.as_ref().unwrap_or_else(|| panic!("Missing HAVING"));
+    assert!(matches!(&having.condition, Expression::Identifier(identifier) if identifier.name.as_ref() == "flag"));
+    assert_eq!(source, "SELECT flag FROM events HAVING flag;");
+}
+
+#[test]
+fn test_sql_builder_group_by_and_having_trailing_tokens_are_reported() {
+    for (sql, expected) in [
+        ("SELECT a FROM t GROUP BY;", "`GROUP BY` requires at least one item"),
+        ("SELECT a FROM t GROUP BY a,;", "trailing comma in `GROUP BY`"),
+        ("SELECT a FROM t GROUP BY a FOO;", "unsupported token in GROUP BY clause"),
+        ("SELECT a FROM t HAVING;", "`HAVING` requires a predicate"),
+        ("SELECT a FROM t HAVING a FOO;", "unsupported token in HAVING predicate"),
+    ] {
+        let reason = rejection_reason(sql);
+        assert!(reason.contains(expected), "{sql}: {reason}");
+    }
+}
+
+#[test]
 fn test_sql_builder_insert() {
     let config = SqlLanguage::default();
     let builder = SqlBuilder::new(&config);
