@@ -71,6 +71,9 @@ impl oak_core::TokenType for SqlTokenType {
             | Self::Order
             | Self::Asc
             | Self::Desc
+            | Self::Nulls
+            | Self::First
+            | Self::Last
             | Self::Limit
             | Self::Offset
             | Self::Union
@@ -301,6 +304,12 @@ pub enum SqlTokenType {
     Asc,
     /// `DESC` keyword.
     Desc,
+    /// `NULLS` keyword.
+    Nulls,
+    /// `FIRST` keyword.
+    First,
+    /// `LAST` keyword.
+    Last,
     /// `LIMIT` keyword.
     Limit,
     /// `OFFSET` keyword.
