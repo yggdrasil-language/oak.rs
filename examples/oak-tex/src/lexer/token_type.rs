@@ -30,6 +30,12 @@ pub enum TexTokenType {
     InlineMath,
     /// Display math mode ($$...$$ or \[...\]).
     DisplayMath,
+    /// \( or \) inline math delimiter.
+    ParenInlineMathDelim,
+    /// \[ or \] display math delimiter.
+    BracketDisplayMathDelim,
+    /// \{ or \} brace delimiter command.
+    BraceDelim,
     /// Grouped content ({...}).
     Group,
     /// Superscript (^).
@@ -219,8 +225,20 @@ pub enum TexTokenType {
     TextTt,
     /// \emph command.
     Emph,
+    /// \left command.
+    LeftCommand,
+    /// \right command.
+    RightCommand,
+    /// \middle command.
+    MiddleCommand,
+    /// \limits command.
+    Limits,
+    /// \nolimits command.
+    Nolimits,
     /// \underline command.
     Underline,
+    /// CST node for `\left ... \middle ... \right` paired delimiters.
+    LeftRightPair,
 
     /// Identifier.
     Identifier,
@@ -348,6 +366,16 @@ pub enum TexTokenType {
     TextitKeyword,
     /// 'emph' keyword.
     EmphKeyword,
+    /// 'left' keyword.
+    LeftKeyword,
+    /// 'right' keyword.
+    RightKeyword,
+    /// 'middle' keyword.
+    MiddleKeyword,
+    /// 'limits' keyword.
+    LimitsKeyword,
+    /// 'nolimits' keyword.
+    NolimitsKeyword,
 
     /// End of stream.
     Eof,
@@ -386,7 +414,12 @@ impl TokenType for TexTokenType {
             | Self::IncludegraphicsKeyword
             | Self::TextbfKeyword
             | Self::TextitKeyword
-            | Self::EmphKeyword => UniversalTokenRole::Keyword,
+            | Self::EmphKeyword
+            | Self::LeftKeyword
+            | Self::RightKeyword
+            | Self::MiddleKeyword
+            | Self::LimitsKeyword
+            | Self::NolimitsKeyword => UniversalTokenRole::Keyword,
             Self::Number | Self::StringLiteral => UniversalTokenRole::Literal,
             Self::Backslash
             | Self::Plus
@@ -433,6 +466,8 @@ impl From<crate::parser::element_type::TexElementType> for TexTokenType {
             E::MathMode => Self::MathMode,
             E::InlineMath => Self::InlineMath,
             E::DisplayMath => Self::DisplayMath,
+            E::ParenInlineMath => Self::ParenInlineMathDelim,
+            E::BracketDisplayMath => Self::BracketDisplayMathDelim,
             E::Group => Self::Group,
             E::Superscript => Self::Superscript,
             E::Subscript => Self::Subscript,
@@ -524,6 +559,9 @@ impl From<crate::parser::element_type::TexElementType> for TexTokenType {
             E::TextTt => Self::TextTt,
             E::Emph => Self::Emph,
             E::Underline => Self::Underline,
+            E::LeftRightPair => Self::LeftRightPair,
+            E::Limits => Self::Limits,
+            E::Nolimits => Self::Nolimits,
             E::Identifier => Self::Identifier,
             E::StringLiteral => Self::StringLiteral,
             E::Number => Self::Number,
@@ -585,6 +623,11 @@ impl From<crate::parser::element_type::TexElementType> for TexTokenType {
             E::TextbfKeyword => Self::TextbfKeyword,
             E::TextitKeyword => Self::TextitKeyword,
             E::EmphKeyword => Self::EmphKeyword,
+            E::LeftKeyword => Self::LeftKeyword,
+            E::RightKeyword => Self::RightKeyword,
+            E::MiddleKeyword => Self::MiddleKeyword,
+            E::LimitsKeyword => Self::LimitsKeyword,
+            E::NolimitsKeyword => Self::NolimitsKeyword,
             E::Eof => Self::Eof,
         }
     }

@@ -31,9 +31,14 @@ impl<'config> TexParser<'config> {
     fn parse_item<'a, S: Source + ?Sized>(&self, state: &mut State<'a, S>) -> Result<(), OakError> {
         match state.peek_kind() {
             Some(TexTokenType::BeginKeyword) => self.parse_environment(state),
+            Some(TexTokenType::Dollar) => self.parse_math_delimiter(state, TexTokenType::Dollar, TexElementType::InlineMath),
+            Some(TexTokenType::DoubleDollar) => self.parse_math_delimiter(state, TexTokenType::DoubleDollar, TexElementType::DisplayMath),
+            Some(TexTokenType::ParenInlineMathDelim) => self.parse_math_delimiter(state, TexTokenType::ParenInlineMathDelim, TexElementType::ParenInlineMath),
+            Some(TexTokenType::BracketDisplayMathDelim) => self.parse_math_delimiter(state, TexTokenType::BracketDisplayMathDelim, TexElementType::BracketDisplayMath),
+            Some(TexTokenType::LeftCommand) => self.parse_left_right(state),
+            Some(TexTokenType::Limits) | Some(TexTokenType::Nolimits) => self.parse_limits(state),
             Some(kind) if self.is_command_like(kind) => self.parse_command(state),
             Some(TexTokenType::LeftBrace) => self.parse_group(state),
-            Some(TexTokenType::Dollar) | Some(TexTokenType::DoubleDollar) => self.parse_math(state),
             Some(TexTokenType::Caret) => self.parse_superscript(state),
             Some(TexTokenType::Underscore) => self.parse_subscript(state),
             _ => {
@@ -46,40 +51,42 @@ impl<'config> TexParser<'config> {
     /// Returns true if the token kind is considered command-like.
     fn is_command_like(&self, kind: TexTokenType) -> bool {
         match kind {
-            TexTokenType::Backslash |
-            TexTokenType::Command |
-            // TexTokenType::BeginKeyword | // Handled separately
-            TexTokenType::EndKeyword |
-            TexTokenType::DocumentclassKeyword |
-            TexTokenType::UsepackageKeyword |
-            TexTokenType::SectionKeyword |
-            TexTokenType::SubsectionKeyword |
-            TexTokenType::SubsubsectionKeyword |
-            TexTokenType::ChapterKeyword |
-            TexTokenType::PartKeyword |
-            TexTokenType::TitleKeyword |
-            TexTokenType::AuthorKeyword |
-            TexTokenType::DateKeyword |
-            TexTokenType::MaketitleKeyword |
-            TexTokenType::TableofcontentsKeyword |
-            TexTokenType::ItemKeyword |
-            TexTokenType::LabelKeyword |
-            TexTokenType::RefKeyword |
-            TexTokenType::CiteKeyword |
-            TexTokenType::IncludegraphicsKeyword |
-            TexTokenType::TextbfKeyword |
-            TexTokenType::TextitKeyword |
-            TexTokenType::EmphKeyword |
-            TexTokenType::Frac |
-            TexTokenType::Sqrt |
-            TexTokenType::Sum |
-            TexTokenType::Int |
-            TexTokenType::Lim |
-            TexTokenType::Alpha |
-            TexTokenType::Beta |
-            TexTokenType::Gamma |
-            TexTokenType::Delta |
-            TexTokenType::Epsilon => true,
+            TexTokenType::Backslash
+            | TexTokenType::Command
+            | TexTokenType::RightCommand
+            | TexTokenType::MiddleCommand
+            | TexTokenType::EndKeyword
+            | TexTokenType::DocumentclassKeyword
+            | TexTokenType::UsepackageKeyword
+            | TexTokenType::SectionKeyword
+            | TexTokenType::SubsectionKeyword
+            | TexTokenType::SubsubsectionKeyword
+            | TexTokenType::ChapterKeyword
+            | TexTokenType::PartKeyword
+            | TexTokenType::TitleKeyword
+            | TexTokenType::AuthorKeyword
+            | TexTokenType::DateKeyword
+            | TexTokenType::MaketitleKeyword
+            | TexTokenType::TableofcontentsKeyword
+            | TexTokenType::ItemKeyword
+            | TexTokenType::LabelKeyword
+            | TexTokenType::RefKeyword
+            | TexTokenType::CiteKeyword
+            | TexTokenType::IncludegraphicsKeyword
+            | TexTokenType::TextbfKeyword
+            | TexTokenType::TextitKeyword
+            | TexTokenType::EmphKeyword
+            | TexTokenType::LeftCommand
+            | TexTokenType::Frac
+            | TexTokenType::Sqrt
+            | TexTokenType::Sum
+            | TexTokenType::Int
+            | TexTokenType::Lim
+            | TexTokenType::Alpha
+            | TexTokenType::Beta
+            | TexTokenType::Gamma
+            | TexTokenType::Delta
+            | TexTokenType::Epsilon => true,
             _ => false,
         }
     }
@@ -95,26 +102,31 @@ impl<'config> TexParser<'config> {
         let mut env_name = String::new();
         if state.at(TexTokenType::LeftBrace) {
             state.bump(); // {
-            if let Some(text) = state.peek_text() {
-                env_name = text.to_string();
-            }
+            // The name can include a trailing `*` for star variants.
             while state.not_at_end() && !state.at(TexTokenType::RightBrace) {
                 state.bump();
+                if let Some(text) = state.peek_text() {
+                    // The name token is typically lexed as a single Text token;
+                    // we only want to grab text inside the braces.
+                    env_name.push_str(&text);
+                }
             }
             state.expect(TexTokenType::RightBrace)?;
         }
         state.finish_at(begin_checkpoint, TexElementType::BeginEnvironment);
 
+        // Classify environment. Math environments (AMS + classic) still get
+        // the generic Environment CST element so we keep full fidelity; the
+        // `is_math` flag and star detection happen in the builder from name.
         let env_type = match env_name.as_str() {
             "itemize" | "enumerate" | "description" => TexElementType::List,
             "tabular" | "array" => TexElementType::Table,
             "figure" => TexElementType::Figure,
             "document" => TexElementType::Document,
-            "equation" | "align" | "gather" | "multline" | "eqnarray" => TexElementType::DisplayMath,
             _ => TexElementType::Environment,
         };
 
-        // Parse content until \end{name}
+        // Parse content until \end{...}
         while state.not_at_end() && !state.at(TexTokenType::EndKeyword) {
             match env_type {
                 TexElementType::List if state.at(TexTokenType::ItemKeyword) => {
@@ -125,14 +137,8 @@ impl<'config> TexParser<'config> {
                     }
                     state.finish_at(item_checkpoint, TexElementType::Item);
                 }
-                TexElementType::Table if state.at(TexTokenType::Ampersand) || state.at(TexTokenType::Command) => {
-                    // Very basic table row/cell handling
-                    if state.at(TexTokenType::Ampersand) {
-                        state.bump();
-                    }
-                    else {
-                        self.parse_item(state)?;
-                    }
+                TexElementType::Table if state.at(TexTokenType::Ampersand) => {
+                    state.bump();
                 }
                 _ => self.parse_item(state)?,
             }
@@ -186,33 +192,31 @@ impl<'config> TexParser<'config> {
         let checkpoint = state.checkpoint();
         let kind = state.peek_kind().unwrap_or(TexTokenType::Command);
 
-        let should_parse_args = state.peek_text().map_or(true, |name| {
-            let name_str: &str = &name;
-            let name_str = name_str.strip_prefix('\\').unwrap_or(name_str);
-            name_str != "left" && name_str != "right"
-        });
-
         state.bump(); // consume \ or command keyword
 
-        let node_kind = if should_parse_args {
-            while state.at(TexTokenType::LeftBracket) || state.at(TexTokenType::LeftBrace) {
-                if state.at(TexTokenType::LeftBracket) {
-                    self.parse_optional_argument(state)?;
-                }
-                else {
-                    self.parse_mandatory_argument(state)?;
-                }
+        // Optional trailing star: \section*, \frac*, ...
+        if state.at(TexTokenType::Star) {
+            state.bump();
+        }
+
+        // Parse optional [...] and required {...} arguments.
+        while state.at(TexTokenType::LeftBracket) || state.at(TexTokenType::LeftBrace) {
+            if state.at(TexTokenType::LeftBracket) {
+                self.parse_optional_argument(state)?;
             }
-            match kind {
-                TexTokenType::Frac | TexTokenType::Sqrt | TexTokenType::Sum | TexTokenType::Int | TexTokenType::Lim | TexTokenType::Alpha | TexTokenType::Beta | TexTokenType::Gamma | TexTokenType::Delta | TexTokenType::Epsilon => kind,
-                _ => TexTokenType::Command,
+            else {
+                self.parse_mandatory_argument(state)?;
             }
         }
-        else {
-            kind
+
+        // Preserve specific command element kinds for known commands,
+        // otherwise fall back to the generic Command element.
+        let _node_kind = match kind {
+            TexTokenType::Frac | TexTokenType::Sqrt | TexTokenType::Sum | TexTokenType::Int | TexTokenType::Lim | TexTokenType::Alpha | TexTokenType::Beta | TexTokenType::Gamma | TexTokenType::Delta | TexTokenType::Epsilon => kind,
+            _ => TexTokenType::Command,
         };
 
-        state.finish_at(checkpoint, node_kind.into());
+        state.finish_at(checkpoint, _node_kind.into());
         Ok(())
     }
 
@@ -227,17 +231,90 @@ impl<'config> TexParser<'config> {
         Ok(())
     }
 
-    fn parse_math<'a, S: Source + ?Sized>(&self, state: &mut State<'a, S>) -> Result<(), OakError> {
+    /// Parse a math block delimited by `$...$`, `$$...$$`, `\(...\)` or
+    /// `\[...\]`. The same lexed token kind is used for opening and
+    /// closing, so we match on that.
+    fn parse_math_delimiter<'a, S: Source + ?Sized>(&self, state: &mut State<'a, S>, open_kind: TexTokenType, element_kind: TexElementType) -> Result<(), OakError> {
         let checkpoint = state.checkpoint();
-        let kind = state.peek_kind().unwrap();
-        state.bump();
-        while state.not_at_end() && !state.at(kind) {
+        state.bump(); // consume opening delimiter
+        while state.not_at_end() && !state.at(open_kind) {
             self.parse_item(state)?;
         }
-        state.expect(kind)?;
-        let element_kind = if kind == TexTokenType::DoubleDollar { TexElementType::DisplayMath } else { TexElementType::InlineMath };
+        // Closing delimiter is optional on EOF for forgiving parsing.
+        if state.at(open_kind) {
+            state.bump();
+        }
         state.finish_at(checkpoint, element_kind);
         Ok(())
+    }
+
+    /// Parse `\left<delim> ... \right<delim>` (optionally with
+    /// `\middle<delim>` tokens inside the content).
+    fn parse_left_right<'a, S: Source + ?Sized>(&self, state: &mut State<'a, S>) -> Result<(), OakError> {
+        let checkpoint = state.checkpoint();
+
+        // consume `\left`
+        state.bump();
+        // consume the opening delimiter (single token or group arg)
+        self.consume_delimiter_token(state)?;
+
+        while state.not_at_end() && !state.at(TexTokenType::RightCommand) {
+            self.parse_item(state)?;
+        }
+
+        // consume `\right` + its delimiter if present
+        if state.at(TexTokenType::RightCommand) {
+            state.bump();
+            self.consume_delimiter_token(state)?;
+        }
+
+        state.finish_at(checkpoint, TexElementType::LeftRightPair);
+        Ok(())
+    }
+
+    /// Parse a `\limits` or `\nolimits` command.
+    fn parse_limits<'a, S: Source + ?Sized>(&self, state: &mut State<'a, S>) -> Result<(), OakError> {
+        let checkpoint = state.checkpoint();
+        state.bump();
+        state.finish_at(checkpoint, TexElementType::Limits);
+        Ok(())
+    }
+
+    /// Consume a single delimiter token after `\left`, `\middle` or `\right`.
+    /// Handles `\left\{` and `\left(`, but also the invisible `\left.`.
+    fn consume_delimiter_token<'a, S: Source + ?Sized>(&self, state: &mut State<'a, S>) -> Result<(), OakError> {
+        if !state.not_at_end() {
+            return Ok(());
+        }
+        match state.peek_kind() {
+            // One char delimiters: ( ) [ ] . | / < > =
+            Some(TexTokenType::LeftParen)
+            | Some(TexTokenType::RightParen)
+            | Some(TexTokenType::LeftBracket)
+            | Some(TexTokenType::RightBracket)
+            | Some(TexTokenType::Dot)
+            | Some(TexTokenType::Pipe)
+            | Some(TexTokenType::Slash)
+            | Some(TexTokenType::Less)
+            | Some(TexTokenType::Greater)
+            | Some(TexTokenType::Equal) => {
+                state.bump();
+                Ok(())
+            }
+            // Delimiter commands like \{ \} \langle \rangle \lvert \rvert etc.
+            Some(TexTokenType::BraceDelim) | Some(TexTokenType::Command) | Some(TexTokenType::Backslash) => {
+                state.bump();
+                Ok(())
+            }
+            // Grouped delimiter: \left{\bigcap} ... unlikely in practice,
+            // but we tolerate it by consuming a single mandatory argument.
+            Some(TexTokenType::LeftBrace) => self.parse_group(state),
+            _ => {
+                // Unknown or no delimiter — be forgiving and move on.
+                state.bump();
+                Ok(())
+            }
+        }
     }
 
     fn parse_optional_argument<'a, S: Source + ?Sized>(&self, state: &mut State<'a, S>) -> Result<(), OakError> {
