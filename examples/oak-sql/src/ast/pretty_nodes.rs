@@ -71,6 +71,11 @@ impl AsDocument for SelectStatement {
         let mut parts = Vec::new();
         parts.push(Document::text("SELECT"));
 
+        if let Some(quantifier) = &self.quantifier {
+            parts.push(soft_space);
+            parts.push(quantifier.as_document(&()));
+        }
+
         let items = Document::join(self.items.iter().map(|it| it.as_document(&())), doc!(",", soft_space));
         parts.push(indent(doc!(line, items)));
 
@@ -114,6 +119,19 @@ impl AsDocument for SelectStatement {
         }
 
         Document::group(Document::Concat(parts))
+    }
+}
+
+#[cfg(feature = "oak-pretty-print")]
+impl AsDocument for SelectQuantifier {
+    fn as_document(&self, _config: &Self::Config) -> Document<'_> {
+        match self {
+            SelectQuantifier::All { .. } => Document::text("ALL"),
+            SelectQuantifier::Distinct { .. } => Document::text("DISTINCT"),
+            SelectQuantifier::DistinctOn { expressions, .. } => {
+                doc!("DISTINCT", soft_space, "ON", "(", Document::join(expressions.iter().map(|it| it.as_document(&())), doc!(",", soft_space)), ")")
+            }
+        }
     }
 }
 
@@ -271,7 +289,18 @@ impl AsDocument for JoinType {
 #[cfg(feature = "oak-pretty-print")]
 impl AsDocument for GroupByClause {
     fn as_document(&self, _config: &Self::Config) -> Document<'_> {
-        doc!("GROUP", soft_space, "BY", soft_space, Document::join(self.columns.iter().map(|it| it.as_document(&())), doc!(",", soft_space)))
+        doc!("GROUP", soft_space, "BY", soft_space, Document::join(self.items.iter().map(|it| it.as_document(&())), doc!(",", soft_space)))
+    }
+}
+
+#[cfg(feature = "oak-pretty-print")]
+impl AsDocument for GroupByItem {
+    fn as_document(&self, _config: &Self::Config) -> Document<'_> {
+        match self {
+            GroupByItem::Column(identifier) => identifier.as_document(&()),
+            GroupByItem::Position { index, .. } => Document::text(index.to_string()),
+            GroupByItem::Expression(expr) => expr.as_document(&()),
+        }
     }
 }
 
@@ -292,7 +321,17 @@ impl AsDocument for OrderByClause {
 #[cfg(feature = "oak-pretty-print")]
 impl AsDocument for OrderByItem {
     fn as_document(&self, _config: &Self::Config) -> Document<'_> {
-        doc!(self.expr.as_document(&()), soft_space, self.direction.as_document(&()))
+        doc!(self.expr.as_document(&()), soft_space, self.direction.as_document(&()), if let Some(nulls) = &self.nulls { doc!(soft_space, "NULLS", soft_space, nulls.as_document(&())) } else { nil })
+    }
+}
+
+#[cfg(feature = "oak-pretty-print")]
+impl AsDocument for NullsOrder {
+    fn as_document(&self, _config: &Self::Config) -> Document<'_> {
+        match self {
+            NullsOrder::First => Document::text("FIRST"),
+            NullsOrder::Last => Document::text("LAST"),
+        }
     }
 }
 
