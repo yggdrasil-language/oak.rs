@@ -262,6 +262,7 @@ impl<'config> TexLexer<'config> {
                 '~' => Some(TexTokenType::Tilde),
                 '#' => Some(TexTokenType::Hash),
                 '%' => Some(TexTokenType::Percent),
+                '*' => Some(TexTokenType::Star),
                 _ => None,
             };
 

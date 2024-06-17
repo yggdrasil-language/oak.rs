@@ -95,53 +95,18 @@ impl<'config> TexParser<'config> {
     fn parse_environment<'a, S: Source + ?Sized>(&self, state: &mut State<'a, S>) -> Result<(), OakError> {
         let checkpoint = state.checkpoint();
 
-        // Parse \begin{name}
+        // Parse \begin{name} — the name is always the first mandatory argument
+        // so the builder can extract it from the BeginEnvironment CST node.
         let begin_checkpoint = state.checkpoint();
         state.expect(TexTokenType::BeginKeyword)?;
-
-        let mut env_name = String::new();
         if state.at(TexTokenType::LeftBrace) {
-            state.bump(); // {
-            // The name can include a trailing `*` for star variants.
-            while state.not_at_end() && !state.at(TexTokenType::RightBrace) {
-                state.bump();
-                if let Some(text) = state.peek_text() {
-                    // The name token is typically lexed as a single Text token;
-                    // we only want to grab text inside the braces.
-                    env_name.push_str(&text);
-                }
-            }
-            state.expect(TexTokenType::RightBrace)?;
+            self.parse_mandatory_argument(state)?;
         }
         state.finish_at(begin_checkpoint, TexElementType::BeginEnvironment);
 
-        // Classify environment. Math environments (AMS + classic) still get
-        // the generic Environment CST element so we keep full fidelity; the
-        // `is_math` flag and star detection happen in the builder from name.
-        let env_type = match env_name.as_str() {
-            "itemize" | "enumerate" | "description" => TexElementType::List,
-            "tabular" | "array" => TexElementType::Table,
-            "figure" => TexElementType::Figure,
-            "document" => TexElementType::Document,
-            _ => TexElementType::Environment,
-        };
-
         // Parse content until \end{...}
         while state.not_at_end() && !state.at(TexTokenType::EndKeyword) {
-            match env_type {
-                TexElementType::List if state.at(TexTokenType::ItemKeyword) => {
-                    let item_checkpoint = state.checkpoint();
-                    state.bump(); // \item
-                    while state.not_at_end() && !state.at(TexTokenType::ItemKeyword) && !state.at(TexTokenType::EndKeyword) {
-                        self.parse_item(state)?;
-                    }
-                    state.finish_at(item_checkpoint, TexElementType::Item);
-                }
-                TexElementType::Table if state.at(TexTokenType::Ampersand) => {
-                    state.bump();
-                }
-                _ => self.parse_item(state)?,
-            }
+            self.parse_item(state)?;
         }
 
         // Parse \end{name}
@@ -149,12 +114,12 @@ impl<'config> TexParser<'config> {
             let end_checkpoint = state.checkpoint();
             state.bump();
             if state.at(TexTokenType::LeftBrace) {
-                self.parse_mandatory_argument(state)?
+                self.parse_mandatory_argument(state)?;
             }
             state.finish_at(end_checkpoint, TexElementType::EndEnvironment);
         }
 
-        state.finish_at(checkpoint, env_type);
+        state.finish_at(checkpoint, TexElementType::Environment);
         Ok(())
     }
 
@@ -275,8 +240,13 @@ impl<'config> TexParser<'config> {
     /// Parse a `\limits` or `\nolimits` command.
     fn parse_limits<'a, S: Source + ?Sized>(&self, state: &mut State<'a, S>) -> Result<(), OakError> {
         let checkpoint = state.checkpoint();
+        let kind = state.peek_kind().unwrap_or(TexTokenType::Limits);
         state.bump();
-        state.finish_at(checkpoint, TexElementType::Limits);
+        let element = match kind {
+            TexTokenType::Nolimits => TexElementType::Nolimits,
+            _ => TexElementType::Limits,
+        };
+        state.finish_at(checkpoint, element);
         Ok(())
     }
 
