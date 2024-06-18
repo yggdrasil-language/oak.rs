@@ -77,6 +77,10 @@ pub struct VosDeclaration {
     pub signature: Option<VosSyntaxSlice>,
     /// Structured parameters projected from the declaration signature.
     pub parameters: Vec<VosParameter>,
+    /// Declaration attributes preserved before the declaration keyword.
+    pub attributes: Vec<VosFieldAttribute>,
+    /// Service methods projected from a `service` body in declaration order.
+    pub methods: Vec<VosServiceMethod>,
     /// Exact body syntax when the declaration has a balanced body block.
     pub body: Option<VosSyntaxSlice>,
     /// Expression program projected from the body block when it is a program.
@@ -122,6 +126,38 @@ pub struct VosField {
     /// Exact default value syntax when present.
     pub default_value: Option<VosSyntaxSlice>,
     /// Source span covering the field declaration.
+    pub span: Range<usize>,
+}
+
+/// One method projected from a VOS `service` body.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct VosServiceMethod {
+    /// Method name as written.
+    pub name: String,
+    /// Source span of the method name.
+    pub name_span: Range<usize>,
+    /// Method attributes in source order.
+    pub attributes: Vec<VosFieldAttribute>,
+    /// Exact named-parameter signature, including both parentheses.
+    pub signature: Option<VosSyntaxSlice>,
+    /// Named parameters projected from the signature.
+    pub parameters: Vec<VosParameter>,
+    /// Exact return type syntax and its structured projection.
+    pub return_type: Option<VosServiceMethodReturn>,
+    /// Source span covering the method declaration.
+    pub span: Range<usize>,
+}
+
+/// A service method return type projected by Oak without resolving names.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct VosServiceMethodReturn {
+    /// Whether the source used the `stream<T>` server-streaming form.
+    pub stream: bool,
+    /// Exact return type syntax including the leading `->`.
+    pub type_syntax: VosSyntaxSlice,
+    /// Response type syntax, or the element type when `stream` is set.
+    pub type_expr: VosTypeSyntax,
+    /// Source span covering the `->` arrow and the return type.
     pub span: Range<usize>,
 }
 
@@ -176,7 +212,10 @@ pub enum VosTypeArgument {
     Literal(VosSyntaxSlice),
 }
 
-/// A field attribute preserved as syntax for VOS semantic resolution.
+/// An attribute preserved as syntax for VOS semantic resolution.
+///
+/// The attribute name is an open set: unknown names and arbitrary arguments
+/// stay in [`Self::text`] so later VOS stages can decide their meaning.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct VosFieldAttribute {
     /// First identifier in the attribute syntax when one is present.

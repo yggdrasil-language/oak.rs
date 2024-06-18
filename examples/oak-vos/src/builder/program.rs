@@ -199,6 +199,7 @@ impl<'a, 'b> ProgramParser<'a, 'b> {
                 | VosTokenType::Using
                 | VosTokenType::Const
                 | VosTokenType::Service
+                | VosTokenType::Stream
                 | VosTokenType::Micro
                 | VosTokenType::Macro
                 | VosTokenType::Query
