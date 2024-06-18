@@ -1,6 +1,6 @@
 {
     "success": true,
-    "count": 3501,
+    "count": 3505,
     "tokens": [
         {
             "kind": "DocumentclassKeyword",
@@ -9879,9 +9879,15 @@
             "end": 7393
         },
         {
-            "kind": "Text",
-            "text": "*)",
+            "kind": "Star",
+            "text": "*",
             "start": 7393,
+            "end": 7394
+        },
+        {
+            "kind": "Text",
+            "text": ")",
+            "start": 7394,
             "end": 7395
         },
         {
@@ -10011,9 +10017,15 @@
             "end": 7495
         },
         {
-            "kind": "Text",
-            "text": "*.",
+            "kind": "Star",
+            "text": "*",
             "start": 7495,
+            "end": 7496
+        },
+        {
+            "kind": "Text",
+            "text": ".",
+            "start": 7496,
             "end": 7497
         },
         {
@@ -12189,9 +12201,15 @@
             "end": 8816
         },
         {
-            "kind": "Text",
-            "text": "*pi:",
+            "kind": "Star",
+            "text": "*",
             "start": 8816,
+            "end": 8817
+        },
+        {
+            "kind": "Text",
+            "text": "pi:",
+            "start": 8817,
             "end": 8820
         },
         {
@@ -12201,9 +12219,15 @@
             "end": 8821
         },
         {
-            "kind": "Text",
-            "text": "*pi,",
+            "kind": "Star",
+            "text": "*",
             "start": 8821,
+            "end": 8822
+        },
+        {
+            "kind": "Text",
+            "text": "pi,",
+            "start": 8822,
             "end": 8825
         },
         {
