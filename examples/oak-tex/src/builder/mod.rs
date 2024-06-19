@@ -1,6 +1,15 @@
 use crate::{ast::*, language::TexLanguage, lexer::token_type::TexTokenType, parser::TexParser};
 use oak_core::{Builder, BuilderCache, GreenNode, OakDiagnostics, OakError, Parser, RedNode, RedTree, TextEdit, source::Source};
 
+/// Names of TeX environments that represent math mode (AMS + classic).
+const TEX_MATH_ENVIRONMENTS: &[&str] = &[
+    "equation", "align", "gather", "multline", "eqnarray", "flalign", "alignat",
+    "aligned", "alignedat", "gathered", "split",
+    "cases",
+    "matrix", "pmatrix", "bmatrix", "Bmatrix", "vmatrix", "Vmatrix", "smallmatrix",
+    "math", "displaymath",
+];
+
 /// An AST builder for the TeX language.
 #[derive(Clone)]
 pub struct TexBuilder<'config> {
@@ -191,7 +200,7 @@ impl<'config> TexBuilder<'config> {
                         TexTokenType::UpperOmega => "Omega".to_string(),
                         _ => tree.text(source).trim_start_matches('\\').to_string(),
                     };
-                    Ok(Some(TexItem::Command(TexCommand { span: tree.span().into(), name, arguments: Vec::new() })))
+                    Ok(Some(TexItem::Command(TexCommand { span: tree.span().into(), name, starred: false, arguments: Vec::new() })))
                 }
             }
             TexTokenType::Environment => Ok(Some(TexItem::Environment(self.build_environment(tree.as_node().unwrap(), source)?))),
@@ -339,7 +348,7 @@ impl<'config> TexBuilder<'config> {
             }
         }
 
-        Ok(TexCommand { span: node.span().into(), name, arguments })
+        Ok(TexCommand { span: node.span().into(), name, starred: false, arguments })
     }
 
     fn build_group<S: Source + ?Sized>(&self, node: RedNode<TexLanguage>, source: &S) -> Result<TexGroup, OakError> {
@@ -348,7 +357,13 @@ impl<'config> TexBuilder<'config> {
 
     fn build_math<S: Source + ?Sized>(&self, node: RedNode<TexLanguage>, source: &S) -> Result<TexMath, OakError> {
         let kind: TexTokenType = node.kind();
-        Ok(TexMath { span: node.span().into(), content: self.build_content(node, source)?, is_display: kind == TexTokenType::DoubleDollar })
+        let delimiter = match kind {
+            TexTokenType::DoubleDollar | TexTokenType::DisplayMath => crate::ast::MathDelimiter::DoubleDollar,
+            TexTokenType::Dollar | TexTokenType::InlineMath => crate::ast::MathDelimiter::Dollar,
+            TexTokenType::Command => crate::ast::MathDelimiter::Environment,
+            _ => crate::ast::MathDelimiter::Dollar,
+        };
+        Ok(TexMath { span: node.span().into(), content: self.build_content(node, source)?, is_display: delimiter.is_display(), delimiter })
     }
 
     fn build_environment<S: Source + ?Sized>(&self, node: RedNode<TexLanguage>, source: &S) -> Result<TexEnvironment, OakError> {
@@ -391,7 +406,14 @@ impl<'config> TexBuilder<'config> {
             }
         }
 
-        Ok(TexEnvironment { span: node.span().into(), name, arguments, content })
+        let starred = name.ends_with('*');
+        if starred {
+            name.truncate(name.len() - 1);
+        }
+
+        let is_math = TEX_MATH_ENVIRONMENTS.contains(&name.as_str());
+
+        Ok(TexEnvironment { span: node.span().into(), name, starred, is_math, arguments, content })
     }
 }
 

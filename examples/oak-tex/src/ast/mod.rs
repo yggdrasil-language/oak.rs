@@ -24,6 +24,10 @@ pub enum TexItem {
     Group(TexGroup),
     /// A TeX math environment.
     Math(TexMath),
+    /// A `\left...\middle...\right` paired delimiter construct.
+    LeftRightPair(TexLeftRightPair),
+    /// A `\limits` / `\nolimits` command.
+    Limits(TexLimits),
     /// A superscript.
     Superscript(TexSuperscript),
     /// A subscript.
@@ -53,8 +57,12 @@ pub struct TexEnvironment {
     /// The span of the environment.
     #[cfg_attr(feature = "serde", serde(with = "oak_core::serde_range"))]
     pub span: Range<usize>,
-    /// The name of the environment.
+    /// The name of the environment (without trailing `*`).
     pub name: String,
+    /// Whether the environment name had a trailing `*` (e.g. `align*`).
+    pub starred: bool,
+    /// Whether this is a known math environment (`equation`, `align`, `cases`, `matrix`, etc.).
+    pub is_math: bool,
     /// The arguments to the environment.
     pub arguments: Vec<TexArgument>,
     /// The content of the environment.
@@ -87,6 +95,29 @@ pub struct TexSubscript {
     pub content: Box<TexRoot>,
 }
 
+/// The delimiter style of a math mode.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub enum MathDelimiter {
+    /// `$...$` inline math
+    Dollar,
+    /// `$$...$$` display math
+    DoubleDollar,
+    /// `\(...\)` inline math
+    Paren,
+    /// `\[...\]` display math
+    Bracket,
+    /// Math environment like `equation`, `align` (delimiter-less)
+    Environment,
+}
+
+impl MathDelimiter {
+    /// Whether this delimiter produces display math.
+    pub fn is_display(&self) -> bool {
+        matches!(self, Self::DoubleDollar | Self::Bracket | Self::Environment)
+    }
+}
+
 /// A TeX math environment ($...$ or $$...$$).
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
@@ -98,6 +129,8 @@ pub struct TexMath {
     pub content: TexRoot,
     /// Whether this is a display math environment.
     pub is_display: bool,
+    /// The delimiter style that opened this math mode.
+    pub delimiter: MathDelimiter,
 }
 
 /// A TeX command (e.g., \section, \textbf).
@@ -107,8 +140,10 @@ pub struct TexCommand {
     /// The span of the command.
     #[cfg_attr(feature = "serde", serde(with = "oak_core::serde_range"))]
     pub span: Range<usize>,
-    /// The name of the command.
+    /// The name of the command (without backslash and without trailing `*`).
     pub name: String,
+    /// Whether the command has a trailing `*` (e.g. `\section*`).
+    pub starred: bool,
     /// The arguments to the command.
     pub arguments: Vec<TexArgument>,
 }
@@ -132,6 +167,32 @@ pub struct TexGroup {
     pub span: Range<usize>,
     /// The content of the group.
     pub content: TexRoot,
+}
+
+/// A `\left ... \right` construct, possibly with one or more `\middle`.
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct TexLeftRightPair {
+    /// The full span of the pair, from `\left` to the closing delimiter.
+    #[cfg_attr(feature = "serde", serde(with = "oak_core::serde_range"))]
+    pub span: Range<usize>,
+    /// The opening delimiter after `\left` (e.g. `"("`, `"["`, `"\{"`, `"."` for invisible).
+    pub left_delim: String,
+    /// The closing delimiter after `\right` (e.g. `")"`, `"]"`, `"\}"`, `"."` for invisible).
+    pub right_delim: String,
+    /// Content between `\left` and `\right`, including any `\middle` delimiters treated as text within.
+    pub content: TexRoot,
+}
+
+/// A `\limits` or `\nolimits` command that modifies the preceding operator.
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct TexLimits {
+    /// The span of the `\limits` or `\nolimits` command.
+    #[cfg_attr(feature = "serde", serde(with = "oak_core::serde_range"))]
+    pub span: Range<usize>,
+    /// True for `\limits`, false for `\nolimits`.
+    pub is_limits: bool,
 }
 
 impl TexRoot {
