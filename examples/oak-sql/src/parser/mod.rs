@@ -278,6 +278,7 @@ impl<'config> SqlParser<'config> {
                 state.finish_at(cp, SqlElementType::ErrorNode);
             }
         }
+        Self::reject_unexpected_tail(state, "statement");
         Ok(())
     }
 
@@ -431,6 +432,36 @@ impl<'config> SqlParser<'config> {
         matches!(kind, None | Some(Order | Limit | Offset | Semicolon | Eof | RightParen | Returning))
     }
 
+    /// Tokens that may legitimately follow the last `ORDER BY` item.
+    fn is_order_by_terminator(kind: Option<crate::lexer::SqlTokenType>) -> bool {
+        use crate::lexer::SqlTokenType::*;
+        matches!(kind, None | Some(Limit | Offset | Semicolon | Eof | RightParen | Returning))
+    }
+
+    /// Tokens that may start another statement.
+    fn is_statement_start(kind: Option<crate::lexer::SqlTokenType>) -> bool {
+        use crate::lexer::SqlTokenType::*;
+        matches!(kind, Some(Select | Insert | Update | Delete | Create | Drop | Alter | Explain | Begin | Commit | Rollback | Transaction | Pragma | Show | Set))
+    }
+
+    /// Reports tokens that no statement or clause accepted and consumes them, so
+    /// no tail can be silently dropped while the tree still covers the source.
+    fn reject_unexpected_tail<'a, S: Source + ?Sized>(state: &mut State<'a, S>, context: &str) {
+        use crate::lexer::SqlTokenType::*;
+        let Some(kind) = state.peek_kind()
+        else {
+            return;
+        };
+        if matches!(kind, Eof | Semicolon) || Self::is_statement_start(Some(kind)) {
+            return;
+        }
+        state.errors.push(OakError::custom_error(format!("unexpected token after {context}: {kind:?}")));
+        while state.not_at_end() && !matches!(state.peek_kind(), Some(Semicolon | Eof)) && !Self::is_statement_start(state.peek_kind()) {
+            state.bump();
+        }
+        state.eat(Semicolon);
+    }
+
     fn parse_select<'a, S: Source + ?Sized>(&self, state: &mut State<'a, S>) -> Result<(), OakError> {
         use crate::lexer::SqlTokenType::*;
         let cp = state.checkpoint();
@@ -534,14 +565,28 @@ impl<'config> SqlParser<'config> {
         if state.eat(Order) {
             let order_cp = state.checkpoint();
             state.expect(By).ok();
+            let mut first = true;
             while state.not_at_end() {
+                if Self::is_order_by_terminator(state.peek_kind()) {
+                    state.errors.push(OakError::custom_error(if first { "`ORDER BY` requires at least one item" } else { "trailing comma in `ORDER BY`" }));
+                    break;
+                }
+                first = false;
                 PrattParser::parse(state, 0, self);
                 if state.eat(Asc) || state.eat(Desc) {
                     // Handled
                 }
+                if state.eat(Nulls) {
+                    if !state.eat(First) && !state.eat(Last) {
+                        state.errors.push(OakError::custom_error("`NULLS` must be followed by `FIRST` or `LAST`"));
+                    }
+                }
                 if !state.eat(Comma) {
                     break;
                 }
+            }
+            if !Self::is_order_by_terminator(state.peek_kind()) {
+                return Err(OakError::custom_error("unsupported token in ORDER BY clause"));
             }
             state.finish_at(order_cp, SqlElementType::OrderByClause);
         }

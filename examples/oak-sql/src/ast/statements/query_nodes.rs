@@ -305,6 +305,8 @@ pub struct OrderByItem {
     pub expr: Expression,
     /// The direction of the ordering.
     pub direction: OrderDirection,
+    /// The explicit `NULLS FIRST` / `NULLS LAST` placement, when written.
+    pub nulls: Option<NullsOrder>,
     /// The span of the ORDER BY item.
     #[serde(with = "oak_core::serde_range")]
     pub span: Range<usize>,
@@ -314,6 +316,29 @@ impl ToSource for OrderByItem {
     fn to_source(&self, buffer: &mut SourceBuffer) {
         self.expr.to_source(buffer);
         self.direction.to_source(buffer);
+        if let Some(nulls) = &self.nulls {
+            buffer.push("NULLS");
+            nulls.to_source(buffer);
+        }
+    }
+}
+
+/// Placement of null values in an ordered result.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub enum NullsOrder {
+    /// `NULLS FIRST`
+    First,
+    /// `NULLS LAST`
+    Last,
+}
+
+impl ToSource for NullsOrder {
+    fn to_source(&self, buffer: &mut SourceBuffer) {
+        match self {
+            NullsOrder::First => buffer.push("FIRST"),
+            NullsOrder::Last => buffer.push("LAST"),
+        }
     }
 }
 
