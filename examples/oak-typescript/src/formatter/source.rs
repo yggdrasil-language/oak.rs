@@ -135,6 +135,12 @@ pub(crate) fn format_source(source: &str, options: &FormatOptions) -> Result<Str
             let type_close = matches!(right_text, ">>" | ">>>") && is_type_argument_close(&significant, index + 1, source);
             constraint = if type_close { oak_formatter::GapConstraint::NoSpace } else { oak_formatter::GapConstraint::RequiredSpace };
         }
+        // Shift assignment is one operator, but the lexer emits `>>>=` as
+        // `>>>` + `=`, so that compound gap stays closed. A `>>>` that closes
+        // nested type arguments still separates from the assignment.
+        if left_text == ">>>" && right_text == "=" && !is_type_argument_close(&significant, index, source) {
+            constraint = oak_formatter::GapConstraint::NoSpace;
+        }
         // `!` is the logical not operator here, so a regex literal after it binds
         // tight: `!/^\d+$/.test(value)`, not `! /^\d+$/.test(value)`.
         if right.kind == TypeScriptTokenType::RegexLiteral && matches!(left_text, "!" | "~") {
@@ -302,7 +308,17 @@ fn is_member_name_position(significant: &[&oak_core::Token<TypeScriptTokenType>]
     let mut cursor = index;
     let mut modifier = false;
     while let Some(previous) = cursor.checked_sub(1) {
-        let Some(text) = significant.get(previous).and_then(|token| token_text(token, source))
+        let Some(token) = significant.get(previous)
+        else {
+            return false;
+        };
+        // A comment between members is trivia, so `/** doc */ delete(key)` is
+        // still a member declaration rather than a `delete` operator call.
+        if matches!(token.kind, TypeScriptTokenType::LineComment | TypeScriptTokenType::BlockComment) {
+            cursor = previous;
+            continue;
+        }
+        let Some(text) = token_text(token, source)
         else {
             return false;
         };
@@ -341,8 +357,10 @@ fn brace_opens_member_body(significant: &[&oak_core::Token<TypeScriptTokenType>]
     let token = |index: usize| significant.get(index).and_then(|token| token_text(token, source));
     // A brace directly after `:` is an object or type literal body, as in
     // `type X = { … }`, `const o = { a: { … } }` and `function f(): { … }`.
+    // The one exception is a `case`/`default` label, whose block is a statement
+    // body: `case 1: { if (x) … }` must keep keyword spacing inside.
     if open.checked_sub(1).and_then(token) == Some(":") {
-        return true;
+        return !is_case_clause_colon(significant, open - 1, source);
     }
     let mut cursor = open;
     // Scanning back through a return type meets its type arguments first. A `>`
@@ -376,6 +394,29 @@ fn brace_opens_member_body(significant: &[&oak_core::Token<TypeScriptTokenType>]
 }
 fn token_text<'a>(token: &oak_core::Token<TypeScriptTokenType>, source: &'a str) -> Option<&'a str> {
     source.get(token.span.clone())
+}
+/// A `:` ends a `case`/`default` label when its clause keyword starts the
+/// statement. A property named `case` or `default` sits inside an object literal
+/// and is preceded by `{`, `,` or another `:`, so it stays an object body.
+fn is_case_clause_colon(significant: &[&oak_core::Token<TypeScriptTokenType>], colon: usize, source: &str) -> bool {
+    let mut nesting = 0usize;
+    for index in (0..colon).rev() {
+        let Some(text) = significant.get(index).and_then(|token| token_text(token, source))
+        else {
+            return false;
+        };
+        match text {
+            ")" | "]" => nesting += 1,
+            "(" | "[" if nesting > 0 => nesting -= 1,
+            "case" | "default" if nesting == 0 => {
+                let before = index.checked_sub(1).and_then(|previous| significant.get(previous)).and_then(|token| token_text(token, source));
+                return before.is_none_or(|text| matches!(text, "{" | "}" | ";" | ":"));
+            }
+            "{" | "}" | ";" | ":" if nesting == 0 => return false,
+            _ => {}
+        }
+    }
+    false
 }
 fn is_jsx_attribute_gap(significant: &[&oak_core::Token<TypeScriptTokenType>], index: usize, source: &str) -> bool {
     let mut nesting = 0usize;

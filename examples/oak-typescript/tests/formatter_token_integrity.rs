@@ -229,3 +229,30 @@ fn non_null_assertion_stays_separate_from_inequality() {
     let expected = "function read(body: Uint8Array, n: number) { return body[n]! !== 0; }";
     assert_eq!(format(source), expected);
 }
+
+// --- Bug 9: comments between members hid the member position ---
+#[test]
+fn members_after_comments_stay_attached() {
+    for source in [
+        "interface Store {\n    /** Delete one record. */\n    delete(key: string): Promise<void>;\n}",
+        "class Store {\n    // native handle\n    async delete(key: string): Promise<void> { this.native.delete(key); }\n}",
+    ] {
+        assert_eq!(format(source), source, "member after a comment gained a space: {source:?}");
+    }
+}
+
+// --- Bug 10: `case X: {` blocks were read as object literal bodies ---
+#[test]
+fn case_clause_blocks_keep_keyword_spacing() {
+    for source in ["switch (tag) { case 1: { if (x) { y(); } break; } }", "switch (tag) { case 1: { for (let i = 0; i < n; i += 1) { y(); } break; } }", "switch (tag) { default: { if (x) { y(); } break; } }", "const o = { a: { delete(key) { return key; } } };"] {
+        assert_eq!(format(source), source, "case block keyword spacing changed: {source:?}");
+    }
+}
+
+// --- Bug 11: shift assignment operators lost their spaces ---
+#[test]
+fn shift_assignment_operators_keep_spaces() {
+    for source in ["rest >>= 7n;", "rest >>>= 7n;", "rest <<= 7n;", "const deep: Box<Box<Box<number>>> = value;"] {
+        assert_eq!(format(source), source, "shift assignment lost spaces: {source:?}");
+    }
+}
