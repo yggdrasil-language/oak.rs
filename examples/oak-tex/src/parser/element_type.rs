@@ -27,6 +27,10 @@ pub enum TexElementType {
     InlineMath,
     /// Displayed mathematical content ($$...$$).
     DisplayMath,
+    /// Inline math delimited by `\(...\)`.
+    ParenInlineMath,
+    /// Display math delimited by `\[...\]`.
+    BracketDisplayMath,
     /// A grouped set of elements ({...}).
     Group,
     /// A superscript expression (^...).
@@ -218,6 +222,12 @@ pub enum TexElementType {
     Emph,
     /// \underline command.
     Underline,
+    /// \left ... \right paired delimiter.
+    LeftRightPair,
+    /// \limits command.
+    Limits,
+    /// \nolimits command.
+    Nolimits,
 
     /// An identifier.
     Identifier,
@@ -345,6 +355,16 @@ pub enum TexElementType {
     TextitKeyword,
     /// \emph keyword.
     EmphKeyword,
+    /// \left keyword.
+    LeftKeyword,
+    /// \right keyword.
+    RightKeyword,
+    /// \middle keyword.
+    MiddleKeyword,
+    /// \limits keyword.
+    LimitsKeyword,
+    /// \nolimits keyword.
+    NolimitsKeyword,
 
     /// End of file marker.
     Eof,
@@ -393,6 +413,8 @@ impl From<crate::lexer::token_type::TexTokenType> for TexElementType {
             T::MathMode => Self::MathMode,
             T::InlineMath => Self::InlineMath,
             T::DisplayMath => Self::DisplayMath,
+            T::ParenInlineMathDelim => Self::ParenInlineMath,
+            T::BracketDisplayMathDelim => Self::BracketDisplayMath,
             T::Group => Self::Group,
             T::Superscript => Self::Superscript,
             T::Subscript => Self::Subscript,
@@ -484,6 +506,13 @@ impl From<crate::lexer::token_type::TexTokenType> for TexElementType {
             T::TextTt => Self::TextTt,
             T::Emph => Self::Emph,
             T::Underline => Self::Underline,
+            T::LeftCommand => Self::Command,
+            T::RightCommand => Self::Command,
+            T::MiddleCommand => Self::Command,
+            T::Limits => Self::Limits,
+            T::Nolimits => Self::Nolimits,
+            T::BraceDelim => Self::Command,
+            T::LeftRightPair => Self::LeftRightPair,
             T::Identifier => Self::Identifier,
             T::StringLiteral => Self::StringLiteral,
             T::Number => Self::Number,
@@ -545,6 +574,11 @@ impl From<crate::lexer::token_type::TexTokenType> for TexElementType {
             T::TextbfKeyword => Self::TextbfKeyword,
             T::TextitKeyword => Self::TextitKeyword,
             T::EmphKeyword => Self::EmphKeyword,
+            T::LeftKeyword => Self::Command,
+            T::RightKeyword => Self::Command,
+            T::MiddleKeyword => Self::Command,
+            T::LimitsKeyword => Self::Limits,
+            T::NolimitsKeyword => Self::Nolimits,
             T::Eof => Self::Eof,
         }
     }
