@@ -453,6 +453,11 @@ impl<'config> SqlLexer<'config> {
             "DATABASE" => SqlTokenType::Database,
             "SCHEMA" => SqlTokenType::Schema,
             "VECTOR" => SqlTokenType::Vector,
+            "CASE" => SqlTokenType::Case,
+            "WHEN" => SqlTokenType::When,
+            "THEN" => SqlTokenType::Then,
+            "ELSE" => SqlTokenType::Else,
+            "CAST" => SqlTokenType::Cast,
             _ => SqlTokenType::Identifier_,
         };
 
