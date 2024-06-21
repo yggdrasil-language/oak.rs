@@ -55,11 +55,13 @@ impl<'config> TexBuilder<'config> {
             return Ok(TexRoot { span: node.span().into(), items });
         }
 
-        let first_kind: TexTokenType = children.first().unwrap().kind();
-        let last_kind: TexTokenType = children.last().unwrap().kind();
-
-        let start = if is_delimiter(first_kind) { 1 } else { 0 };
-        let end = if children.len() > start && is_delimiter(last_kind) { children.len() - 1 } else { children.len() };
+        // Skip leading/trailing delimiter leaf tokens — but NOT CST sub-nodes
+        // that happen to share the same kind (e.g. a `ParenInlineMath` CST node
+        // whose kind maps to `TexTokenType::ParenInlineMathDelim`).
+        let first = children.first().unwrap();
+        let last = children.last().unwrap();
+        let start = if first.as_token().is_some() && is_delimiter(first.kind::<TexTokenType>()) { 1 } else { 0 };
+        let end = if children.len() > start && last.as_token().is_some() && is_delimiter(last.kind::<TexTokenType>()) { children.len() - 1 } else { children.len() };
 
         for i in start..end {
             if let Some(item) = self.build_item(children[i], source)? {
@@ -202,17 +204,23 @@ impl<'config> TexBuilder<'config> {
             TexTokenType::Group => Ok(Some(TexItem::Group(self.build_group(tree.as_node().unwrap(), source)?))),
             TexTokenType::InlineMath | TexTokenType::DisplayMath | TexTokenType::ParenInlineMathDelim | TexTokenType::BracketDisplayMathDelim => Ok(Some(TexItem::Math(self.build_math(tree.as_node().unwrap(), source)?))),
             TexTokenType::LeftRightPair => Ok(Some(TexItem::LeftRightPair(self.build_left_right(tree.as_node().unwrap(), source)?))),
-            TexTokenType::Limits => Ok(Some(TexItem::Limits(self.build_limits(tree.as_node().unwrap(), source)?))),
+            TexTokenType::Limits | TexTokenType::Nolimits => Ok(Some(TexItem::Limits(self.build_limits(tree.as_node().unwrap(), source)?))),
             TexTokenType::Superscript => Ok(Some(TexItem::Superscript(self.build_superscript(tree.as_node().unwrap(), source)?))),
             TexTokenType::Subscript => Ok(Some(TexItem::Subscript(self.build_subscript(tree.as_node().unwrap(), source)?))),
             TexTokenType::Identifier | TexTokenType::Number | TexTokenType::Text => Ok(Some(TexItem::Text { span: tree.span().into(), content: tree.text(source).to_string() })),
             TexTokenType::Comment => Ok(Some(TexItem::Comment { span: tree.span().into(), content: tree.text(source).to_string() })),
             _ => {
-                if tree.as_token().is_some() {
-                    Ok(Some(TexItem::Text { span: tree.span().into(), content: tree.text(source).to_string() }))
-                }
-                else {
-                    Ok(None)
+                match kind {
+                    // Skip synthetic or trivia tokens that carry no semantic value.
+                    TexTokenType::Eof | TexTokenType::Whitespace | TexTokenType::Newline => Ok(None),
+                    _ => {
+                        if tree.as_token().is_some() {
+                            Ok(Some(TexItem::Text { span: tree.span().into(), content: tree.text(source).to_string() }))
+                        }
+                        else {
+                            Ok(None)
+                        }
+                    }
                 }
             }
         }
@@ -339,7 +347,12 @@ impl<'config> TexBuilder<'config> {
                 | TexTokenType::TextSc
                 | TexTokenType::TextTt
                 | TexTokenType::Emph
-                | TexTokenType::Underline => {
+                | TexTokenType::Underline
+                | TexTokenType::LeftCommand
+                | TexTokenType::RightCommand
+                | TexTokenType::MiddleCommand
+                | TexTokenType::Limits
+                | TexTokenType::Nolimits => {
                     let text = child.text(source);
                     if text.starts_with('\\') { name = text[1..].to_string() } else { name = text.to_string() }
                 }
