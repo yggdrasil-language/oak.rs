@@ -646,12 +646,31 @@ fn test_sql_builder_select_quantifier() {
 
 #[test]
 fn test_sql_builder_distinct_outside_select_is_reported() {
-    // `DISTINCT` may only appear in the SELECT quantifier position. The aggregate
-    // form is not supported yet, but it must not be swallowed as an expression.
-    for sql in ["SELECT COUNT(DISTINCT name) FROM users;", "SELECT name FROM users ORDER BY DISTINCT name;", "DISTINCT name FROM users;"] {
+    // `DISTINCT` may only appear in the SELECT quantifier position or inside
+    // aggregate function calls like `COUNT(DISTINCT x)`. The standalone keyword
+    // in other positions must still be reported instead of silently parsed.
+    for sql in ["SELECT name FROM users ORDER BY DISTINCT name;", "DISTINCT name FROM users;"] {
         let reason = rejection_reason(sql);
         assert!(reason.contains("`DISTINCT` is only allowed immediately after `SELECT`"), "{sql}: {reason}");
     }
+
+    // `COUNT(DISTINCT x)` is now parsed normally — the DISTINCT token is kept in
+    // the CST and the builder projects it onto the FunctionCall as a boolean flag.
+    let (statement, source) = build_statement("SELECT COUNT(DISTINCT name) FROM users;");
+    let SqlStatement::Select(select) = &statement
+    else {
+        panic!("expected SELECT statement")
+    };
+    let SelectItem::Expression { expr, .. } = &select.items[0]
+    else {
+        panic!("expected Expression select item")
+    };
+    let Expression::FunctionCall { distinct, args, .. } = expr
+    else {
+        panic!("expected FunctionCall projection")
+    };
+    assert!(*distinct, "DISTINCT flag must be set on COUNT call");
+    assert_eq!(args.len(), 1, "COUNT(DISTINCT name) should have one argument");
 
     let reason = rejection_reason("SELECT DISTINCT ON name FROM users;");
     assert!(reason.contains("`DISTINCT ON` requires a parenthesized expression list"), "{reason}");

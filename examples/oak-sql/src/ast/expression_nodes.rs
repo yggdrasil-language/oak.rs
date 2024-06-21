@@ -45,6 +45,8 @@ pub enum Expression {
         name: Identifier,
         /// The arguments passed to the function.
         args: Vec<Expression>,
+        /// Whether the aggregate uses `DISTINCT` quantifier (`COUNT(DISTINCT x)`).
+        distinct: bool,
         /// The span of the function call.
         #[cfg_attr(feature = "serde", serde(with = "oak_core::serde_range"))]
         span: Range<usize>,
@@ -176,9 +178,12 @@ impl ToSource for Expression {
                 op.to_source(buffer);
                 expr.to_source(buffer);
             }
-            Expression::FunctionCall { name, args, .. } => {
+            Expression::FunctionCall { name, args, distinct, .. } => {
                 name.to_source(buffer);
                 buffer.push("(");
+                if *distinct {
+                    buffer.push("DISTINCT ");
+                }
                 for (i, arg) in args.iter().enumerate() {
                     if i > 0 {
                         buffer.push(",");

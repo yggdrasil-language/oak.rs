@@ -127,6 +127,13 @@ impl<'config> Pratt<SqlLanguage> for SqlParser<'config> {
             state.expect(LeftParen).ok();
             let mut first = true;
             while state.not_at_end() && state.peek_kind() != Some(RightParen) {
+                // `DISTINCT` quantifier: skip the token so the following argument is
+                // parsed as a normal expression. Only meaningful on COUNT/SUM/AVG;
+                // downstream validation handles unsupported functions.
+                if state.peek_kind() == Some(Distinct) {
+                    state.bump();
+                    continue;
+                }
                 if first {
                     // `COUNT(*)` — the bare Star stays a leaf under the call.
                     if state.peek_kind() == Some(Star) {

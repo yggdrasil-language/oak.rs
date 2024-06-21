@@ -341,6 +341,7 @@ impl<'config> SqlBuilder<'config> {
     fn build_function_call<'a>(&self, node: RedNode<'a, SqlLanguage>, source: &SourceText) -> Result<Expression, OakError> {
         let mut name = None;
         let mut args = Vec::new();
+        let mut distinct = false;
 
         for child in node.children() {
             match child {
@@ -364,11 +365,17 @@ impl<'config> SqlBuilder<'config> {
                 RedTree::Leaf(t) if t.kind == SqlTokenType::Star => {
                     args.push(Expression::Wildcard { span: t.span.clone() });
                 }
+                // `DISTINCT` quantifier consumed by the FunctionCall parser
+                // (otherwise it would be rejected as a stray keyword). Mark the
+                // call so downstream binders can project it onto aggregates.
+                RedTree::Leaf(t) if t.kind == SqlTokenType::Distinct => {
+                    distinct = true;
+                }
                 _ => {}
             }
         }
 
-        Ok(Expression::FunctionCall { name: name.ok_or_else(|| OakError::custom_error("Missing function name"))?, args, span: node.span() })
+        Ok(Expression::FunctionCall { name: name.ok_or_else(|| OakError::custom_error("Missing function name"))?, args, distinct, span: node.span() })
     }
 
     fn build_subquery<'a>(&self, node: RedNode<'a, SqlLanguage>, source: &SourceText) -> Result<Expression, OakError> {
