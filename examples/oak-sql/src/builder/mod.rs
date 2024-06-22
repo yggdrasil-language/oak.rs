@@ -310,7 +310,10 @@ impl<'config> SqlBuilder<'config> {
     fn build_insert_statement<'a>(&self, node: RedNode<'a, SqlLanguage>, source: &SourceText) -> Result<InsertStatement, OakError> {
         let mut table_name = None;
         let mut columns = Vec::new();
-        let mut values = Vec::new();
+        let mut rows = Vec::new();
+        let mut query = None;
+        let mut on_conflict = None;
+        let mut returning = None;
 
         for child in node.children() {
             if let RedTree::Node(n) = child {
@@ -330,14 +333,105 @@ impl<'config> SqlBuilder<'config> {
                         }
                     }
                     SqlElementType::ValueList => {
-                        self.collect_expressions(n, source, &mut values)?;
+                        // The outer list holds one nested `ValueList` per written
+                        // row, so each nested node becomes exactly one row.
+                        for sub in n.children() {
+                            match sub {
+                                RedTree::Node(row) if row.green.kind == SqlElementType::ValueList => {
+                                    let mut cells = Vec::new();
+                                    self.collect_expressions(row, source, &mut cells)?;
+                                    rows.push(cells);
+                                }
+                                _ => {}
+                            }
+                        }
                     }
+                    SqlElementType::SelectStatement => {
+                        if query.is_some() {
+                            return Err(OakError::custom_error("Too many queries in INSERT"));
+                        }
+                        query = Some(Box::new(self.build_select_statement(n, source)?));
+                    }
+                    SqlElementType::SetOperationStatement => {
+                        return Err(OakError::custom_error("`INSERT ... SELECT` does not support set operations"));
+                    }
+                    SqlElementType::ConflictClause => on_conflict = Some(self.build_on_conflict_clause(n, source)?),
+                    SqlElementType::ReturningClause => returning = Some(self.build_returning_clause(n, source)?),
                     _ => {}
                 }
             }
         }
 
-        Ok(InsertStatement { table_name: table_name.ok_or_else(|| OakError::custom_error("Missing table name in INSERT"))?, columns, values, span: node.span() })
+        let insert_source = match query {
+            Some(query) => InsertSource::Select(query),
+            None if !rows.is_empty() => InsertSource::Values,
+            None => return Err(OakError::custom_error("Missing `VALUES` list or nested `SELECT` in INSERT")),
+        };
+
+        Ok(InsertStatement {
+            table_name: table_name.ok_or_else(|| OakError::custom_error("Missing table name in INSERT"))?,
+            columns,
+            rows,
+            source: insert_source,
+            on_conflict,
+            returning,
+            span: node.span(),
+        })
+    }
+
+    /// Builds the `ON CONFLICT` clause of an `INSERT` statement.
+    fn build_on_conflict_clause<'a>(&self, node: RedNode<'a, SqlLanguage>, source: &SourceText) -> Result<OnConflictClause, OakError> {
+        let mut columns = Vec::new();
+        let mut do_nothing = false;
+        let mut do_update = false;
+        let mut assignments = Vec::new();
+        let mut selection = None;
+
+        for child in node.children() {
+            match child {
+                RedTree::Leaf(t) => match t.kind {
+                    SqlTokenType::Identifier_ => {
+                        columns.push(Identifier { name: self.get_text(t.span.clone(), source), span: t.span.clone() });
+                    }
+                    SqlTokenType::Nothing => do_nothing = true,
+                    SqlTokenType::Update => do_update = true,
+                    _ => {}
+                },
+                RedTree::Node(n) => match n.green.kind {
+                    SqlElementType::Assignment => assignments.push(self.build_assignment(n, source)?),
+                    SqlElementType::Expression => selection = Some(self.build_expression(n, source)?),
+                    SqlElementType::Identifier => selection = Some(Expression::Identifier(self.build_identifier(n, source)?)),
+                    _ => {}
+                },
+            }
+        }
+
+        let action = if do_nothing {
+            OnConflictAction::DoNothing
+        }
+        else if do_update {
+            OnConflictAction::DoUpdate { assignments, selection }
+        }
+        else {
+            return Err(OakError::custom_error("`ON CONFLICT` requires `DO NOTHING` or `DO UPDATE`"));
+        };
+
+        Ok(OnConflictClause { columns, action, span: node.span() })
+    }
+
+    /// Builds the `RETURNING` clause of an `INSERT` statement.
+    fn build_returning_clause<'a>(&self, node: RedNode<'a, SqlLanguage>, source: &SourceText) -> Result<ReturningClause, OakError> {
+        let mut items = Vec::new();
+
+        for child in node.children() {
+            if let RedTree::Node(n) = child {
+                if n.green.kind == SqlElementType::SelectItem {
+                    items.push(self.build_select_item(n, source)?);
+                }
+            }
+        }
+
+        Ok(ReturningClause { items, span: node.span() })
     }
 
     /// Collects expressions from a node into a vector.

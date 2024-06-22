@@ -485,14 +485,84 @@ impl AsDocument for InsertStatement {
             parts.push(Document::text(")"));
         }
 
-        parts.push(line);
-        parts.push(Document::text("VALUES"));
-        parts.push(soft_space);
-        parts.push(Document::text("("));
-        parts.push(Document::join(self.values.iter().map(|it| it.as_document(&())), doc!(",", soft_space)));
-        parts.push(Document::text(")"));
+        match &self.source {
+            InsertSource::Values => {
+                parts.push(line);
+                parts.push(Document::text("VALUES"));
+                let rows = self.rows.iter().map(|row| {
+                    doc!(
+                        "(",
+                        Document::join(row.iter().map(|it| it.as_document(&())), doc!(",", soft_space)),
+                        ")"
+                    )
+                });
+                parts.push(soft_space);
+                parts.push(Document::join(rows, doc!(",", soft_space)));
+            }
+            InsertSource::Select(query) => {
+                parts.push(line);
+                parts.push(query.as_document(&()));
+            }
+        }
+
+        if let Some(on_conflict) = &self.on_conflict {
+            parts.push(line);
+            parts.push(on_conflict.as_document(&()));
+        }
+
+        if let Some(returning) = &self.returning {
+            parts.push(line);
+            parts.push(returning.as_document(&()));
+        }
 
         Document::group(Document::Concat(parts))
+    }
+}
+
+#[cfg(feature = "oak-pretty-print")]
+impl AsDocument for OnConflictClause {
+    fn as_document(&self, _config: &Self::Config) -> Document<'_> {
+        let mut parts = Vec::new();
+        parts.push(Document::text("ON CONFLICT"));
+        if !self.columns.is_empty() {
+            parts.push(soft_space);
+            parts.push(Document::text("("));
+            parts.push(Document::join(self.columns.iter().map(|it| it.as_document(&())), doc!(",", soft_space)));
+            parts.push(Document::text(")"));
+        }
+        parts.push(soft_space);
+        parts.push(self.action.as_document(&()));
+        Document::group(Document::Concat(parts))
+    }
+}
+
+#[cfg(feature = "oak-pretty-print")]
+impl AsDocument for OnConflictAction {
+    fn as_document(&self, _config: &Self::Config) -> Document<'_> {
+        match self {
+            OnConflictAction::DoNothing => Document::text("DO NOTHING"),
+            OnConflictAction::DoUpdate { assignments, selection } => {
+                let mut parts = Vec::new();
+                parts.push(Document::text("DO UPDATE"));
+                parts.push(line);
+                parts.push(Document::text("SET"));
+                parts.push(indent(doc!(line, Document::join(assignments.iter().map(|it| it.as_document(&())), doc!(",", soft_space)))));
+                if let Some(selection) = selection {
+                    parts.push(line);
+                    parts.push(Document::text("WHERE"));
+                    parts.push(soft_space);
+                    parts.push(selection.as_document(&()));
+                }
+                Document::group(Document::Concat(parts))
+            }
+        }
+    }
+}
+
+#[cfg(feature = "oak-pretty-print")]
+impl AsDocument for ReturningClause {
+    fn as_document(&self, _config: &Self::Config) -> Document<'_> {
+        doc!("RETURNING", soft_space, Document::join(self.items.iter().map(|it| it.as_document(&())), doc!(",", soft_space)))
     }
 }
 
