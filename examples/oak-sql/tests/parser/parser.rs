@@ -1009,3 +1009,89 @@ fn test_sql_builder_database_stmt() {
     assert_eq!(drop.object_type, DropObjectType::Database);
     assert_eq!(drop.name.name.as_ref(), "test_db");
 }
+
+#[test]
+fn test_sql_builder_case_when_basic() {
+    let sql = "SELECT CASE WHEN a = 1 THEN 'one' END FROM t;";
+    let (statement, source) = build_statement(sql);
+    let SqlStatement::Select(select) = &statement
+    else {
+        panic!("Expected Select statement");
+    };
+    let SelectItem::Expression { expr: Expression::Case { branches, else_branch, .. }, .. } = &select.items[0]
+    else {
+        panic!("Expected Case expression, got {:?}", select.items[0]);
+    };
+    assert_eq!(branches.len(), 1);
+    assert!(else_branch.is_none());
+    // Pretty-printer strips trivia whitespace but keeps keyword internal spacing.
+    assert_eq!(source, "SELECT CASE WHEN a=1 THEN 'one' END FROM t;");
+}
+
+#[test]
+fn test_sql_builder_case_when_multiple_and_else() {
+    let sql = "SELECT CASE WHEN a = 1 THEN 'one' WHEN a = 2 THEN 'two' ELSE 'other' END FROM t;";
+    let (statement, source) = build_statement(sql);
+    let SqlStatement::Select(select) = &statement
+    else {
+        panic!("Expected Select statement");
+    };
+    let SelectItem::Expression { expr: Expression::Case { branches, else_branch, .. }, .. } = &select.items[0]
+    else {
+        panic!("Expected Case expression");
+    };
+    assert_eq!(branches.len(), 2);
+    assert!(else_branch.is_some());
+    assert_eq!(source, "SELECT CASE WHEN a=1 THEN 'one' WHEN a=2 THEN 'two' ELSE 'other' END FROM t;");
+}
+
+#[test]
+fn test_sql_builder_cast_integer() {
+    let sql = "SELECT CAST(age AS INTEGER) FROM users;";
+    let (statement, source) = build_statement(sql);
+    let SqlStatement::Select(select) = &statement
+    else {
+        panic!("Expected Select statement");
+    };
+    let SelectItem::Expression { expr: Expression::Cast { expr, target, .. }, .. } = &select.items[0]
+    else {
+        panic!("Expected Cast expression");
+    };
+    assert!(matches!(expr.as_ref(), Expression::Identifier(identifier) if identifier.name.as_ref() == "age"));
+    assert_eq!(target.as_ref(), "INTEGER");
+    assert_eq!(source, "SELECT CAST(age AS INTEGER)FROM users;");
+}
+
+#[test]
+fn test_sql_builder_cast_blob_identifier_type() {
+    // BLOB is not a dedicated keyword token — it comes through as Identifier_.
+    let sql = "SELECT CAST(data AS BLOB) FROM records;";
+    let (statement, source) = build_statement(sql);
+    let SqlStatement::Select(select) = &statement
+    else {
+        panic!("Expected Select statement");
+    };
+    let SelectItem::Expression { expr: Expression::Cast { target, .. }, .. } = &select.items[0]
+    else {
+        panic!("Expected Cast expression");
+    };
+    assert_eq!(target.as_ref(), "BLOB");
+    assert_eq!(source, "SELECT CAST(data AS BLOB)FROM records;");
+}
+
+#[test]
+fn test_sql_builder_cast_timestamp_with_expression() {
+    let sql = "SELECT CAST(a + b AS TIMESTAMP) FROM t;";
+    let (statement, source) = build_statement(sql);
+    let SqlStatement::Select(select) = &statement
+    else {
+        panic!("Expected Select statement");
+    };
+    let SelectItem::Expression { expr: Expression::Cast { expr, target, .. }, .. } = &select.items[0]
+    else {
+        panic!("Expected Cast expression");
+    };
+    assert!(matches!(expr.as_ref(), Expression::Binary { op: BinaryOperator::Plus, .. }));
+    assert_eq!(target.as_ref(), "TIMESTAMP");
+    assert_eq!(source, "SELECT CAST(a+b AS TIMESTAMP)FROM t;");
+}
