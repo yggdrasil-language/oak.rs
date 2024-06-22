@@ -117,7 +117,8 @@ impl oak_core::TokenType for SqlTokenType {
             | Self::Ilike
             | Self::Strict
             | Self::Without
-            | Self::Rowid => Keyword,
+            | Self::Rowid
+            | Self::Cast => Keyword,
             Self::Int | Self::Integer | Self::Varchar | Self::Char | Self::Text | Self::Date | Self::Time | Self::Timestamp | Self::Decimal | Self::Float | Self::Double | Self::Boolean | Self::Serial | Self::BigSerial => Keyword, /* Types are often keywords */
             Self::Plus | Self::Minus | Self::Star | Self::Slash | Self::Percent | Self::Equal | Self::NotEqual | Self::Less | Self::Greater | Self::LessEqual | Self::GreaterEqual | Self::Concat => Operator,
             Self::LeftParen | Self::RightParen | Self::LeftBracket | Self::RightBracket | Self::LeftBrace | Self::RightBrace | Self::Comma | Self::Semicolon | Self::Dot | Self::Colon | Self::Question => Punctuation,
@@ -402,6 +403,8 @@ pub enum SqlTokenType {
     Without,
     /// `ROWID` keyword.
     Rowid,
+    /// `CAST` keyword.
+    Cast,
 
     /// `INT` type.
     Int,

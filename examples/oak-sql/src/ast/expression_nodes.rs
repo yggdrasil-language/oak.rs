@@ -131,6 +131,26 @@ pub enum Expression {
         #[cfg_attr(feature = "serde", serde(with = "oak_core::serde_range"))]
         span: Range<usize>,
     },
+    /// A `CASE WHEN ... THEN ... [ELSE ...] END` expression.
+    Case {
+        /// The WHEN/THEN branches. Each pair is `(when_expr, then_expr)`.
+        branches: Vec<(Box<Expression>, Box<Expression>)>,
+        /// Optional ELSE branch.
+        else_branch: Option<Box<Expression>>,
+        /// The span of the whole CASE expression.
+        #[cfg_attr(feature = "serde", serde(with = "oak_core::serde_range"))]
+        span: Range<usize>,
+    },
+    /// A `CAST(expr AS type)` expression.
+    Cast {
+        /// The expression being cast.
+        expr: Box<Expression>,
+        /// The target type name (e.g. `INTEGER`, `TEXT`, `TIMESTAMP`).
+        target: Arc<str>,
+        /// The span of the whole CAST expression.
+        #[cfg_attr(feature = "serde", serde(with = "oak_core::serde_range"))]
+        span: Range<usize>,
+    },
     /// An error occurred during expression parsing or building.
     Error {
         /// The error message.
@@ -158,6 +178,8 @@ impl Expression {
             Expression::Subquery { span, .. } => span.clone(),
             Expression::InSubquery { span, .. } => span.clone(),
             Expression::Vector { span, .. } => span.clone(),
+            Expression::Case { span, .. } => span.clone(),
+            Expression::Cast { span, .. } => span.clone(),
             Expression::Error { span, .. } => span.clone(),
         }
     }
@@ -256,6 +278,29 @@ impl ToSource for Expression {
                 buffer.push("IN");
                 buffer.push("(");
                 query.to_source(buffer);
+                buffer.push(")");
+            }
+            Expression::Case { branches, else_branch, .. } => {
+                buffer.push("CASE ");
+                for (when, then) in branches {
+                    buffer.push("WHEN ");
+                    when.to_source(buffer);
+                    buffer.push(" THEN ");
+                    then.to_source(buffer);
+                    buffer.push(" ");
+                }
+                if let Some(el) = else_branch {
+                    buffer.push("ELSE ");
+                    el.to_source(buffer);
+                    buffer.push(" ");
+                }
+                buffer.push("END");
+            }
+            Expression::Cast { expr, target, .. } => {
+                buffer.push("CAST(");
+                expr.to_source(buffer);
+                buffer.push(" AS ");
+                buffer.push(target);
                 buffer.push(")");
             }
             Expression::Error { message, .. } => {
