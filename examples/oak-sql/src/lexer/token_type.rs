@@ -77,6 +77,8 @@ impl oak_core::TokenType for SqlTokenType {
             | Self::Limit
             | Self::Offset
             | Self::Union
+            | Self::Intersect
+            | Self::Except
             | Self::All
             | Self::Distinct
             | Self::Count
@@ -144,6 +146,8 @@ pub enum SqlTokenType {
     ShowStatement,
     /// SELECT statement.
     SelectStatement,
+    /// Set operation (`UNION` / `INTERSECT` / `EXCEPT`) statement.
+    SetOperationStatement,
     /// INSERT statement.
     InsertStatement,
     /// UPDATE statement.
@@ -317,6 +321,10 @@ pub enum SqlTokenType {
     Offset,
     /// `UNION` keyword.
     Union,
+    /// `INTERSECT` keyword.
+    Intersect,
+    /// `EXCEPT` keyword.
+    Except,
     /// `ALL` keyword.
     All,
     /// `DISTINCT` keyword.
@@ -500,6 +508,7 @@ impl From<crate::parser::element_type::SqlElementType> for SqlTokenType {
             SqlElementType::Expression => Self::Expression,
             SqlElementType::ErrorNode => Self::ErrorNode,
             SqlElementType::SelectStatement => Self::SelectStatement,
+            SqlElementType::SetOperationStatement => Self::SetOperationStatement,
             SqlElementType::VectorSearch => Self::Vector, // Map VectorSearch to Vector token for now or add a new one?
             SqlElementType::InsertStatement => Self::InsertStatement,
             SqlElementType::UpdateStatement => Self::UpdateStatement,

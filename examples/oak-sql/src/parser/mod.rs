@@ -417,7 +417,7 @@ impl<'config> SqlParser<'config> {
     /// instead of silently accepting the truncated expression as the whole filter.
     fn is_where_terminator(kind: Option<crate::lexer::SqlTokenType>) -> bool {
         use crate::lexer::SqlTokenType::*;
-        matches!(kind, None | Some(Group | Having | Order | Limit | Offset | Semicolon | Eof | RightParen | Returning))
+        matches!(kind, None | Some(Group | Having | Order | Limit | Offset | Semicolon | Eof | RightParen | Returning | Union | Intersect | Except))
     }
 
     /// Parses the explicit `ALL` / `DISTINCT` quantifier that may follow `SELECT`.
@@ -458,13 +458,13 @@ impl<'config> SqlParser<'config> {
     /// Tokens that may legitimately follow the last `GROUP BY` item.
     fn is_group_by_terminator(kind: Option<crate::lexer::SqlTokenType>) -> bool {
         use crate::lexer::SqlTokenType::*;
-        matches!(kind, None | Some(Having | Order | Limit | Offset | Semicolon | Eof | RightParen | Returning))
+        matches!(kind, None | Some(Having | Order | Limit | Offset | Semicolon | Eof | RightParen | Returning | Union | Intersect | Except))
     }
 
     /// Tokens that may legitimately follow the `HAVING` predicate.
     fn is_having_terminator(kind: Option<crate::lexer::SqlTokenType>) -> bool {
         use crate::lexer::SqlTokenType::*;
-        matches!(kind, None | Some(Order | Limit | Offset | Semicolon | Eof | RightParen | Returning))
+        matches!(kind, None | Some(Order | Limit | Offset | Semicolon | Eof | RightParen | Returning | Union | Intersect | Except))
     }
 
     /// Tokens that may legitimately follow the last `ORDER BY` item.
@@ -497,9 +497,56 @@ impl<'config> SqlParser<'config> {
         state.eat(Semicolon);
     }
 
+    /// Parses a query expression: the `SELECT` body, an optional set operation,
+    /// and the `ORDER BY` / `LIMIT` clauses that apply to the whole result.
     fn parse_select<'a, S: Source + ?Sized>(&self, state: &mut State<'a, S>) -> Result<(), OakError> {
         use crate::lexer::SqlTokenType::*;
         let cp = state.checkpoint();
+        self.parse_select_terms(state)?;
+
+        let mut set_operation = false;
+        if let Some(operator) = Self::set_operator_kind(state.peek_kind()) {
+            set_operation = true;
+            // The left branch ends before the operator, so closing it here keeps
+            // the operator and the right branch outside of it.
+            state.finish_at(cp, SqlElementType::SelectStatement);
+            state.bump();
+            if operator == Union {
+                state.eat(All);
+            }
+            let right_cp = state.checkpoint();
+            self.parse_select_terms(state)?;
+            // A trailing `ORDER BY` / `LIMIT` applies to the whole result, so the
+            // right branch is closed before those clauses are parsed.
+            state.finish_at(right_cp, SqlElementType::SelectStatement);
+            // The AST keeps one binary set operation. A longer chain would
+            // silently drop its extra operands, so it is rejected instead.
+            if Self::set_operator_kind(state.peek_kind()).is_some() {
+                return Err(OakError::custom_error("chained set operations are not supported"));
+            }
+        }
+
+        self.parse_order_by_limit(state)?;
+        state.eat(Semicolon);
+        state.finish_at(cp, if set_operation { SqlElementType::SetOperationStatement } else { SqlElementType::SelectStatement });
+        Ok(())
+    }
+
+    /// Returns the token kind that starts a set operation, if one is next.
+    fn set_operator_kind(kind: Option<crate::lexer::SqlTokenType>) -> Option<crate::lexer::SqlTokenType> {
+        use crate::lexer::SqlTokenType::*;
+        match kind {
+            Some(operator @ (Union | Intersect | Except)) => Some(operator),
+            _ => None,
+        }
+    }
+
+    /// Parses the `SELECT ... [HAVING]` body.
+    ///
+    /// `ORDER BY` and `LIMIT` are left to the caller: after a set operation they
+    /// apply to the whole result instead of the last branch.
+    fn parse_select_terms<'a, S: Source + ?Sized>(&self, state: &mut State<'a, S>) -> Result<(), OakError> {
+        use crate::lexer::SqlTokenType::*;
         state.expect(Select).ok();
         self.parse_select_quantifier(state);
 
@@ -597,6 +644,12 @@ impl<'config> SqlParser<'config> {
             state.finish_at(having_cp, SqlElementType::HavingClause);
         }
 
+        Ok(())
+    }
+
+    /// Parses the trailing `ORDER BY`, `LIMIT` and `OFFSET` clauses.
+    fn parse_order_by_limit<'a, S: Source + ?Sized>(&self, state: &mut State<'a, S>) -> Result<(), OakError> {
+        use crate::lexer::SqlTokenType::*;
         if state.eat(Order) {
             let order_cp = state.checkpoint();
             state.expect(By).ok();
@@ -640,8 +693,6 @@ impl<'config> SqlParser<'config> {
             state.finish_at(offset_cp, SqlElementType::LimitClause);
         }
 
-        state.eat(Semicolon);
-        state.finish_at(cp, SqlElementType::SelectStatement);
         Ok(())
     }
 

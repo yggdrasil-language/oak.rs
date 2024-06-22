@@ -412,6 +412,8 @@ impl<'config> SqlLexer<'config> {
             "LIMIT" => SqlTokenType::Limit,
             "OFFSET" => SqlTokenType::Offset,
             "UNION" => SqlTokenType::Union,
+            "INTERSECT" => SqlTokenType::Intersect,
+            "EXCEPT" => SqlTokenType::Except,
             "ALL" => SqlTokenType::All,
             "DISTINCT" => SqlTokenType::Distinct,
             "PRIMARY" => SqlTokenType::Primary,
