@@ -1223,6 +1223,46 @@ fn test_sql_builder_database_stmt() {
 }
 
 #[test]
+fn test_sql_builder_table_aliases() {
+    // `FROM users AS u` keeps the alias next to the table it renames.
+    let sql = "SELECT u.name FROM users AS u WHERE u.age > 18;";
+    let (statement, source) = build_statement(sql);
+    let SqlStatement::Select(select) = &statement
+    else {
+        panic!("Expected Select statement, got {statement:?}");
+    };
+    let table = select.from.as_ref().unwrap_or_else(|| panic!("Missing table"));
+    assert_eq!(table.name.name.as_ref(), "users");
+    assert_eq!(table.alias.as_ref().map(|alias| alias.name.as_ref()), Some("u"));
+    assert_eq!(sql.get(table.span.start..table.span.end).map(str::trim), Some("users AS u"));
+    assert_eq!(source, "SELECT u.name FROM users AS u WHERE u.age>18;");
+
+    // The same table can be referenced twice under different aliases.
+    let sql = "SELECT a.id, b.id FROM users a JOIN users AS b ON b.id = a.id;";
+    let (statement, source) = build_statement(sql);
+    let SqlStatement::Select(select) = &statement
+    else {
+        panic!("Expected Select statement, got {statement:?}");
+    };
+    let table = select.from.as_ref().unwrap_or_else(|| panic!("Missing table"));
+    assert_eq!(table.name.name.as_ref(), "users");
+    assert_eq!(table.alias.as_ref().map(|alias| alias.name.as_ref()), Some("a"));
+    assert_eq!(select.joins.len(), 1);
+    assert_eq!(select.joins[0].table.name.name.as_ref(), "users");
+    assert_eq!(select.joins[0].table.alias.as_ref().map(|alias| alias.name.as_ref()), Some("b"));
+    assert_eq!(source, "SELECT a.id,b.id FROM users AS a INNER JOIN users AS b ON b.id=a.id;");
+
+    // An aliased table must not swallow the clause that follows it.
+    let (statement, _) = build_statement("SELECT id FROM users u ORDER BY u.id;");
+    let SqlStatement::Select(select) = &statement
+    else {
+        panic!("Expected Select statement, got {statement:?}");
+    };
+    assert_eq!(select.from.as_ref().and_then(|table| table.alias.as_ref()).map(|alias| alias.name.as_ref()), Some("u"));
+    assert!(select.order_by.is_some());
+}
+
+#[test]
 fn test_sql_builder_case_when_basic() {
     let sql = "SELECT CASE WHEN a = 1 THEN 'one' END FROM t;";
     let (statement, source) = build_statement(sql);
