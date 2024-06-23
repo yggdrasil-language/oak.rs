@@ -20,6 +20,8 @@ pub enum SqlElementType {
     ShowStatement,
     /// SELECT statement.
     SelectStatement,
+    /// Set operation (`UNION` / `INTERSECT` / `EXCEPT`) statement.
+    SetOperationStatement,
     /// Explicit `ALL` / `DISTINCT` quantifier of a SELECT statement.
     SelectQuantifier,
     /// VECTOR search clause.
@@ -93,6 +95,7 @@ impl ElementType for SqlElementType {
             Self::Expression | Self::FunctionCall | Self::Case | Self::Cast => Expression,
             Self::ErrorNode => Error,
             Self::SelectStatement
+            | Self::SetOperationStatement
             | Self::InsertStatement
             | Self::UpdateStatement
             | Self::DeleteStatement

@@ -15,6 +15,7 @@ impl AsDocument for SqlStatement {
     fn as_document(&self, _config: &Self::Config) -> Document<'_> {
         match self {
             SqlStatement::Select(it) => it.as_document(&()),
+            SqlStatement::SetOperation(it) => it.as_document(&()),
             SqlStatement::Insert(it) => it.as_document(&()),
             SqlStatement::Update(it) => it.as_document(&()),
             SqlStatement::Delete(it) => it.as_document(&()),
@@ -107,6 +108,35 @@ impl AsDocument for SelectStatement {
             parts.push(line);
             parts.push(having.as_document(&()));
         }
+
+        if let Some(order_by) = &self.order_by {
+            parts.push(line);
+            parts.push(order_by.as_document(&()));
+        }
+
+        if let Some(limit) = &self.limit {
+            parts.push(line);
+            parts.push(limit.as_document(&()));
+        }
+
+        Document::group(Document::Concat(parts))
+    }
+}
+
+#[cfg(feature = "oak-pretty-print")]
+impl AsDocument for SetOperationStatement {
+    fn as_document(&self, _config: &Self::Config) -> Document<'_> {
+        let mut parts = Vec::new();
+        parts.push(self.left.as_document(&()));
+        parts.push(line);
+        parts.push(Document::text(match self.operator {
+            SetOperator::Union => "UNION",
+            SetOperator::UnionAll => "UNION ALL",
+            SetOperator::Intersect => "INTERSECT",
+            SetOperator::Except => "EXCEPT",
+        }));
+        parts.push(line);
+        parts.push(self.right.as_document(&()));
 
         if let Some(order_by) = &self.order_by {
             parts.push(line);

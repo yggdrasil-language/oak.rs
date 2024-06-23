@@ -97,6 +97,7 @@ impl<'config> SqlBuilder<'config> {
             if let RedTree::Node(n) = child {
                 let res = match n.green.kind {
                     SqlElementType::SelectStatement => self.build_select_statement(n, source).map(SqlStatement::Select),
+                    SqlElementType::SetOperationStatement => self.build_set_operation_statement(n, source).map(SqlStatement::SetOperation),
                     SqlElementType::InsertStatement => self.build_insert_statement(n, source).map(SqlStatement::Insert),
                     SqlElementType::UpdateStatement => self.build_update_statement(n, source).map(SqlStatement::Update),
                     SqlElementType::DeleteStatement => self.build_delete_statement(n, source).map(SqlStatement::Delete),
@@ -168,6 +169,69 @@ impl<'config> SqlBuilder<'config> {
         }
 
         Ok(SelectStatement { quantifier, items, from, joins, expr, group_by, having, order_by, limit, span: node.span() })
+    }
+
+    /// Builds a set operation (`UNION` / `INTERSECT` / `EXCEPT`) statement.
+    ///
+    /// `ORDER BY` and `LIMIT` sit on the set operation node because they apply to
+    /// the combined result, not to the last branch.
+    fn build_set_operation_statement<'a>(&self, node: RedNode<'a, SqlLanguage>, source: &SourceText) -> Result<SetOperationStatement, OakError> {
+        let mut left = None;
+        let mut right = None;
+        let mut operator = None;
+        let mut order_by = None;
+        let mut limit = None;
+        let mut union_all = false;
+
+        for child in node.children() {
+            match child {
+                RedTree::Node(n) => match n.green.kind {
+                    SqlElementType::SelectStatement => {
+                        let select = self.build_select_statement(n, source)?;
+                        if left.is_none() {
+                            left = Some(Box::new(select));
+                        }
+                        else if right.is_none() {
+                            right = Some(Box::new(select));
+                        }
+                        else {
+                            return Err(OakError::custom_error("Too many operands in set operation"));
+                        }
+                    }
+                    SqlElementType::OrderByClause => order_by = Some(self.build_order_by_clause(n, source)?),
+                    SqlElementType::LimitClause => limit = Some(self.build_limit_clause(n, source)?),
+                    _ => {}
+                },
+                RedTree::Leaf(t) => match t.kind {
+                    SqlTokenType::Union => {
+                        operator = Some(SetOperator::Union);
+                        union_all = true;
+                    }
+                    SqlTokenType::Intersect => {
+                        operator = Some(SetOperator::Intersect);
+                        union_all = false;
+                    }
+                    SqlTokenType::Except => {
+                        operator = Some(SetOperator::Except);
+                        union_all = false;
+                    }
+                    SqlTokenType::All if union_all => {
+                        operator = Some(SetOperator::UnionAll);
+                        union_all = false;
+                    }
+                    _ => {}
+                },
+            }
+        }
+
+        Ok(SetOperationStatement {
+            left: left.ok_or_else(|| OakError::custom_error("Missing left operand in set operation"))?,
+            operator: operator.ok_or_else(|| OakError::custom_error("Missing operator in set operation"))?,
+            right: right.ok_or_else(|| OakError::custom_error("Missing right operand in set operation"))?,
+            order_by,
+            limit,
+            span: node.span(),
+        })
     }
 
     /// Builds the explicit `ALL` / `DISTINCT` quantifier of a `SELECT` statement.
@@ -974,6 +1038,7 @@ impl<'config> SqlBuilder<'config> {
     fn build_statement<'a>(&self, node: RedNode<'a, SqlLanguage>, source: &SourceText) -> Result<SqlStatement, OakError> {
         match node.green.kind {
             SqlElementType::SelectStatement => Ok(SqlStatement::Select(self.build_select_statement(node, source)?)),
+            SqlElementType::SetOperationStatement => Ok(SqlStatement::SetOperation(self.build_set_operation_statement(node, source)?)),
             SqlElementType::InsertStatement => Ok(SqlStatement::Insert(self.build_insert_statement(node, source)?)),
             SqlElementType::UpdateStatement => Ok(SqlStatement::Update(self.build_update_statement(node, source)?)),
             SqlElementType::DeleteStatement => Ok(SqlStatement::Delete(self.build_delete_statement(node, source)?)),

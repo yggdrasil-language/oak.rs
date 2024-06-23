@@ -67,6 +67,67 @@ impl ToSource for SelectStatement {
     }
 }
 
+/// A set operation between two `SELECT` statements.
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct SetOperationStatement {
+    /// The left operand.
+    pub left: Box<SelectStatement>,
+    /// The set operator that combines both operands.
+    pub operator: SetOperator,
+    /// The right operand.
+    pub right: Box<SelectStatement>,
+    /// The `ORDER BY` clause applied to the whole result, when one was written.
+    pub order_by: Option<OrderByClause>,
+    /// The `LIMIT` clause applied to the whole result, when one was written.
+    pub limit: Option<LimitClause>,
+    /// The span of the set operation.
+    #[serde(with = "oak_core::serde_range")]
+    pub span: Range<usize>,
+}
+
+impl ToSource for SetOperationStatement {
+    fn to_source(&self, buffer: &mut SourceBuffer) {
+        self.left.to_source(buffer);
+        self.operator.to_source(buffer);
+        self.right.to_source(buffer);
+        if let Some(order_by) = &self.order_by {
+            order_by.to_source(buffer);
+        }
+        if let Some(limit) = &self.limit {
+            limit.to_source(buffer);
+        }
+    }
+}
+
+/// The operator of a set operation.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub enum SetOperator {
+    /// `UNION`
+    Union,
+    /// `UNION ALL`
+    UnionAll,
+    /// `INTERSECT`
+    Intersect,
+    /// `EXCEPT`
+    Except,
+}
+
+impl ToSource for SetOperator {
+    fn to_source(&self, buffer: &mut SourceBuffer) {
+        match self {
+            SetOperator::Union => buffer.push("UNION"),
+            SetOperator::UnionAll => {
+                buffer.push("UNION");
+                buffer.push("ALL");
+            }
+            SetOperator::Intersect => buffer.push("INTERSECT"),
+            SetOperator::Except => buffer.push("EXCEPT"),
+        }
+    }
+}
+
 /// The explicitly written row quantifier of a `SELECT` statement.
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
