@@ -46,6 +46,8 @@ fn reserved_member_methods_keep_their_parens_attached() {
         "class Store { delete(key: string): void {} }",
         "class Store { static delete(key: string): void {} }",
         "class Store { async delete(key: string): Promise<void> { this.native.delete(key); } }",
+        "class Store extends Base<string, number> { delete(key: string): void {} }",
+        "interface Store<T, U> { delete(key: string): void; }",
         "const handlers = { delete(key: string): void {} };",
     ] {
         assert_eq!(format(source), source, "reserved member name gained a space: {source:?}");
@@ -114,5 +116,23 @@ fn function_bodies_with_return_types_are_not_member_bodies() {
 fn optional_chaining_stays_attached() {
     for source in ["const v = a?.b;", "const v = a?.b?.c;", "const v = a?.delete?.(k);", "const v = a?.[k];", "obj?.delete(key);"] {
         assert_eq!(format(source), source, "optional chaining changed: {source:?}");
+    }
+}
+
+// Regression: commas inside a return type's type arguments are type separators,
+// not member separators, so the brace still opens a function body.
+#[test]
+fn generic_return_types_with_commas_keep_function_bodies() {
+    for (source, expected) in [
+        ("function f(x: number): Record<string, unknown> { if (x) {} }", "function f(x: number): Record<string, unknown> { if (x) {} }"),
+        ("function f(x: number): Promise<Record<string, unknown>> { if (x) {} }", "function f(x: number): Promise<Record<string, unknown>> { if (x) {} }"),
+        ("function f(x: number): Map<string, GithubAuthor> { return (x); }", "function f(x: number): Map<string, GithubAuthor> { return (x); }"),
+        ("function f(x: number): Record<string, string> { for (const y of x) {} }", "function f(x: number): Record<string, string> { for (const y of x) {} }"),
+        ("function f(x: number): Promise<Record<string, unknown>> { switch (x) { case 1: break; } }", "function f(x: number): Promise<Record<string, unknown>> { switch (x) { case 1: break; } }"),
+        ("function f(x: number): Promise<Record<string, unknown>> { return (x); }", "function f(x: number): Promise<Record<string, unknown>> { return (x); }"),
+        ("class A { m(x: number): Record<string, unknown> { if (x) {} } }", "class A { m(x: number): Record<string, unknown> { if (x) {} } }"),
+        ("const f = (x: number): Promise<Record<string, unknown>> => { if (x) {} };", "const f = (x: number): Promise<Record<string, unknown>> => { if (x) {} };"),
+    ] {
+        assert_eq!(format(source), expected, "type argument comma broke the function body: {source:?}");
     }
 }
