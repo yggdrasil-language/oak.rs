@@ -1,5 +1,5 @@
 use crate::{
-    ast::{VosDeclaration, VosDeclarationKind, VosField, VosFieldAttribute, VosParameter, VosRoot, VosSyntaxElement, VosSyntaxNode, VosSyntaxSlice, VosSyntaxToken, VosTypeArgument, VosTypeSyntax},
+    ast::{VosDeclaration, VosDeclarationKind, VosField, VosFieldAttribute, VosParameter, VosRoot, VosServiceMethod, VosServiceMethodReturn, VosSyntaxElement, VosSyntaxNode, VosSyntaxSlice, VosSyntaxToken, VosTypeArgument, VosTypeSyntax},
     language::VosLanguage,
     lexer::VosLexer,
     parser::{VosElementType, VosParser},
@@ -67,6 +67,8 @@ impl VosBuilder {
         };
         let mut signature = None;
         let mut parameters = Vec::new();
+        let mut attributes = Vec::new();
+        let mut methods = Vec::new();
         let mut body = None;
         let mut body_program = None;
         let mut return_type = None;
@@ -75,6 +77,9 @@ impl VosBuilder {
         for child in node.children {
             if let GreenTree::Node(child_node) = child {
                 match child_node.kind {
+                    VosElementType::FieldAttribute => {
+                        attributes.push(self.build_attribute(child_node, child_offset, source));
+                    }
                     VosElementType::Parentheses => {
                         signature = Some(self.slice(child_node, child_offset, source));
                         parameters = self.build_parameters(child_node, child_offset, source)?;
@@ -99,7 +104,10 @@ impl VosBuilder {
         if matches!(kind, VosDeclarationKind::Table | VosDeclarationKind::Class) {
             self.collect_fields(node, offset, source, &mut fields)?;
         }
-        Ok(VosDeclaration { kind, name, path, signature, parameters, body, body_program, return_type, return_type_expr, fields, span })
+        if kind == VosDeclarationKind::Service {
+            self.collect_methods(node, offset, source, &mut methods)?;
+        }
+        Ok(VosDeclaration { kind, name, path, signature, parameters, attributes, methods, body, body_program, return_type, return_type_expr, fields, span })
     }
 
     fn build_parameters(&self, node: &GreenNode<'_, VosLanguage>, offset: usize, source: &SourceText) -> Result<Vec<VosParameter>, OakError> {
@@ -201,6 +209,69 @@ impl VosBuilder {
         let type_syntax = type_syntax.ok_or_else(|| OakError::expected_token("VOS field type", offset, None))?;
         let type_expr = self.build_type_expr(node, offset, source)?;
         Ok(VosField { name, name_span, attributes, type_syntax, type_expr, default_value, span: span.into() })
+    }
+
+    fn collect_methods<'a>(&self, tree: &GreenNode<'a, VosLanguage>, offset: usize, source: &SourceText, methods: &mut Vec<VosServiceMethod>) -> Result<(), OakError> {
+        let mut child_offset = offset;
+        for child in tree.children {
+            match child {
+                GreenTree::Node(node) if node.kind == VosElementType::ServiceMethod => {
+                    methods.push(self.build_method(node, child_offset, source)?);
+                }
+                GreenTree::Node(node) => self.collect_methods(node, child_offset, source, methods)?,
+                GreenTree::Leaf(_) => {}
+            }
+            child_offset += match child {
+                GreenTree::Node(node) => node.byte_length as usize,
+                GreenTree::Leaf(leaf) => leaf.length as usize,
+            };
+        }
+        Ok(())
+    }
+
+    fn build_method<'a>(&self, node: &GreenNode<'a, VosLanguage>, offset: usize, source: &SourceText) -> Result<VosServiceMethod, OakError> {
+        let span = offset..offset + node.byte_length as usize;
+        let mut child_offset = offset;
+        let mut name = None;
+        let mut name_span = None;
+        let mut attributes = Vec::new();
+        let mut signature = None;
+        let mut parameters = Vec::new();
+        let mut return_type = None;
+        for child in node.children {
+            match child {
+                GreenTree::Leaf(leaf) if leaf.kind == crate::lexer::VosTokenType::Identifier && name.is_none() => {
+                    let token_span: core::range::Range<usize> = (child_offset..child_offset + leaf.length as usize).into();
+                    name = Some(self.token_text(&token_span, source).into_owned());
+                    name_span = Some(token_span);
+                }
+                GreenTree::Node(child_node) => match child_node.kind {
+                    VosElementType::FieldAttribute => attributes.push(self.build_attribute(child_node, child_offset, source)),
+                    VosElementType::Parentheses => {
+                        signature = Some(self.slice(child_node, child_offset, source));
+                        parameters = self.build_parameters(child_node, child_offset, source)?;
+                    }
+                    VosElementType::ReturnType => return_type = Some(self.build_method_return(child_node, child_offset, source)?),
+                    _ => {}
+                },
+                GreenTree::Leaf(_) => {}
+            }
+            child_offset += match child {
+                GreenTree::Node(node) => node.byte_length as usize,
+                GreenTree::Leaf(leaf) => leaf.length as usize,
+            };
+        }
+        let name = name.ok_or_else(|| OakError::expected_token("VOS method name", offset, None))?;
+        let name_span = name_span.expect("method name has a span");
+        Ok(VosServiceMethod { name, name_span, attributes, signature, parameters, return_type, span: span.into() })
+    }
+
+    fn build_method_return(&self, node: &GreenNode<'_, VosLanguage>, offset: usize, source: &SourceText) -> Result<VosServiceMethodReturn, OakError> {
+        let type_syntax = self.slice(node, offset, source);
+        let span = type_syntax.span;
+        let stream = node.children.iter().any(|child| matches!(child, GreenTree::Leaf(leaf) if leaf.kind == crate::lexer::VosTokenType::Stream));
+        let type_expr = self.build_type_expr(node, offset, source)?;
+        Ok(VosServiceMethodReturn { stream, type_syntax, type_expr, span })
     }
 
     fn build_type_expr(&self, field: &GreenNode<'_, VosLanguage>, field_offset: usize, source: &SourceText) -> Result<VosTypeSyntax, OakError> {

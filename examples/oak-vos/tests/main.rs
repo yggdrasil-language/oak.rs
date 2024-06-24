@@ -460,6 +460,149 @@ fn program_projection_rejects_unbalanced_or_incomplete_expressions() {
 }
 
 #[test]
+fn service_projects_unary_method() {
+    let source = "service IdentityService {\n  create(request: CreateRequest) -> Identity\n}";
+    let root = parse(source).expect("Oak projects the service body");
+    let service = &root.declarations[0];
+    assert_eq!(service.kind, VosDeclarationKind::Service);
+    assert_eq!(service.name.as_deref(), Some("IdentityService"));
+    assert_eq!(service.methods.len(), 1);
+
+    let method = &service.methods[0];
+    assert_eq!(method.name, "create");
+    assert_eq!(&source[method.name_span.clone()], "create");
+    assert_eq!(method.parameters.len(), 1);
+    assert_eq!(method.parameters[0].name, "request");
+    assert_eq!(method.parameters[0].type_syntax.text, "CreateRequest");
+    assert_eq!(method.signature.as_ref().unwrap().text, "(request: CreateRequest)");
+
+    let return_type = method.return_type.as_ref().expect("method return type");
+    assert!(!return_type.stream);
+    assert_eq!(return_type.type_syntax.text, "-> Identity");
+    assert!(matches!(&return_type.type_expr, VosTypeSyntax::Named { path, .. } if path == &["Identity".to_owned()]));
+    assert_eq!(&source[return_type.span.clone()], "-> Identity");
+}
+
+#[test]
+fn service_projects_multiple_methods_and_server_streams() {
+    let source = "service FeedService {\n  list(limit: i64) -> [Feed]\n  subscribe(topic: utf8) -> stream<Feed>\n}";
+    let root = parse(source).expect("Oak projects streaming methods");
+    let methods = &root.declarations[0].methods;
+    assert_eq!(methods.iter().map(|method| method.name.as_str()).collect::<Vec<_>>(), ["list", "subscribe"]);
+
+    let list = methods[0].return_type.as_ref().unwrap();
+    assert!(!list.stream);
+    assert!(matches!(&list.type_expr, VosTypeSyntax::List { element, .. } if matches!(element.as_ref(), VosTypeSyntax::Named { path, .. } if path == &["Feed".to_owned()])));
+
+    let subscribe = methods[1].return_type.as_ref().unwrap();
+    assert!(subscribe.stream);
+    assert_eq!(subscribe.type_syntax.text, "-> stream<Feed>");
+    assert!(matches!(&subscribe.type_expr, VosTypeSyntax::Named { path, .. } if path == &["Feed".to_owned()]));
+    assert!(methods[1].span.end <= source.len());
+}
+
+#[test]
+fn service_preserves_open_attribute_sets_on_service_and_methods() {
+    let source = "@route(\"/identity\")\nservice IdentityService {\n  @authorize(\"admin\")\n  [route(\"create\")]\n  create(request: CreateRequest) -> Identity\n}";
+    let root = parse(source).expect("Oak preserves service attributes");
+    let service = &root.declarations[0];
+    assert_eq!(service.attributes.len(), 1);
+    assert_eq!(service.attributes[0].name.as_deref(), Some("route"));
+    assert_eq!(service.attributes[0].text, "@route(\"/identity\")");
+    assert_eq!(&source[service.attributes[0].span.clone()], "@route(\"/identity\")");
+
+    let method = &service.methods[0];
+    assert_eq!(method.attributes.len(), 2);
+    assert_eq!(method.attributes[0].name.as_deref(), Some("authorize"));
+    assert_eq!(method.attributes[0].text, "@authorize(\"admin\")");
+    assert_eq!(method.attributes[1].name.as_deref(), Some("route"));
+    assert_eq!(method.attributes[1].text, "[route(\"create\")]");
+    for attribute in &method.attributes {
+        assert_eq!(&source[attribute.span.clone()], attribute.text);
+    }
+}
+
+#[test]
+fn service_attributes_accept_unknown_names_and_arguments() {
+    let source = "service Audit {\n  @custom_trace(source = \"edge\", retries = 3)\n  ping(request: Ping) -> Pong\n}";
+    let root = parse(source).expect("unknown attributes stay in the open set");
+    let method = &root.declarations[0].methods[0];
+    assert_eq!(method.attributes[0].name.as_deref(), Some("custom_trace"));
+    assert_eq!(method.attributes[0].text, "@custom_trace(source = \"edge\", retries = 3)");
+}
+
+#[test]
+fn empty_service_projects_an_empty_method_list() {
+    let source = "service Empty {\n  # no methods yet\n}";
+    let root = parse(source).expect("Oak accepts an empty service");
+    let service = &root.declarations[0];
+    assert!(service.methods.is_empty());
+    assert_eq!(service.body.as_ref().unwrap().text, "{\n  # no methods yet\n}");
+}
+
+#[test]
+fn service_methods_project_nested_generic_parameter_types() {
+    let source = "service Search {\n  find(filter: list<map<utf8, vector<3>>>) -> stream<[User?]>\n}";
+    let root = parse(source).expect("Oak projects nested generic types");
+    let method = &root.declarations[0].methods[0];
+    let parameter = &method.parameters[0];
+    assert_eq!(parameter.type_syntax.text, "list<map<utf8, vector<3>>>");
+    let VosTypeSyntax::Generic { path, arguments, .. } = &parameter.type_expr
+    else {
+        panic!("expected a generic parameter type")
+    };
+    assert_eq!(path, &["list".to_owned()]);
+    let VosTypeArgument::Type(VosTypeSyntax::Generic { path, arguments: inner, .. }) = &arguments[0]
+    else {
+        panic!("expected nested generic arguments")
+    };
+    assert_eq!(path, &["map".to_owned()]);
+    assert_eq!(inner.len(), 2);
+    assert!(matches!(&inner[1], VosTypeArgument::Type(VosTypeSyntax::Generic { path, arguments, .. }) if path == &["vector".to_owned()] && matches!(&arguments[0], VosTypeArgument::Literal(value) if value.text == "3")));
+
+    let return_type = method.return_type.as_ref().unwrap();
+    assert!(return_type.stream);
+    assert_eq!(return_type.type_syntax.text, "-> stream<[User?]>");
+    assert!(matches!(&return_type.type_expr, VosTypeSyntax::List { element, .. } if matches!(element.as_ref(), VosTypeSyntax::Optional { inner, .. } if matches!(inner.as_ref(), VosTypeSyntax::Named { path, .. } if path == &["User".to_owned()]))));
+}
+
+#[test]
+fn service_body_syntax_errors_produce_diagnostics_without_panicking() {
+    for source in [
+        "service Broken {",
+        "service Broken { create(request: Request) Identity }",
+        "service Broken { create(request: Request) -> }",
+        "service Broken { create(request Request) -> Response }",
+        "service Broken { create(request: Request) -> stream<Request }",
+        "service Broken { create(request: Request) -> stream<> }",
+        "service Broken { 42(request: Request) -> Response }",
+    ] {
+        assert!(parse(source).is_err(), "accepted malformed service: {source}");
+    }
+}
+
+#[test]
+fn service_surface_round_trips_through_lossless_cst() {
+    fn append_text(node: &oak_vos::VosSyntaxNode, text: &mut String) {
+        for child in &node.children {
+            match child {
+                VosSyntaxElement::Node(inner) => append_text(inner, text),
+                VosSyntaxElement::Token(token) => text.push_str(&token.text),
+            }
+        }
+    }
+    let source =
+        "# service surface\n@route(\"/identity\")\nservice IdentityService {\n  # method\n  @authorize(\"admin\")\n  create(request: CreateRequest) -> Identity\n\n  subscribe(topic: utf8) -> stream<Feed>; # trailing\n}\n\ntable User { id: uuid, }\n";
+    let root = parse(source).expect("Oak preserves the service surface");
+    assert_eq!(root.declarations.len(), 2);
+    assert_eq!(root.declarations[0].methods.len(), 2);
+    assert_eq!(root.declarations[0].methods[1].return_type.as_ref().unwrap().type_syntax.text, "-> stream<Feed>");
+    let mut restored = String::new();
+    append_text(&root.syntax, &mut restored);
+    assert_eq!(restored, source);
+}
+
+#[test]
 fn type_depth_has_process_bound() {
     use std::{
         process::Command,
