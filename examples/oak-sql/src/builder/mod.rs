@@ -143,7 +143,7 @@ impl<'config> SqlBuilder<'config> {
                 RedTree::Node(n) => match n.green.kind {
                     SqlElementType::SelectQuantifier => quantifier = Some(self.build_select_quantifier(n, source)?),
                     SqlElementType::SelectItem => items.push(self.build_select_item(n, source)?),
-                    SqlElementType::TableName => from = Some(self.build_table_name(n, source)?),
+                    SqlElementType::TableName => from = Some(self.build_table_source(n, source)?),
                     SqlElementType::JoinClause => joins.push(self.build_join_clause(n, source)?),
                     SqlElementType::GroupByClause => group_by = Some(self.build_group_by_clause(n, source)?),
                     SqlElementType::HavingClause => having = Some(self.build_having_clause(n, source)?),
@@ -810,6 +810,43 @@ impl<'config> SqlBuilder<'config> {
         }
     }
 
+    /// Builds a `FROM` / `JOIN` row source.
+    ///
+    /// A nested `SELECT` child means the source is a derived table; otherwise the
+    /// node is a plain (possibly aliased) table name.
+    fn build_table_source<'a>(&self, node: RedNode<'a, SqlLanguage>, source: &SourceText) -> Result<TableSource, OakError> {
+        for child in node.children() {
+            match child {
+                RedTree::Node(n) if n.green.kind == SqlElementType::SelectStatement => {
+                    return Ok(TableSource::Derived { query: Box::new(self.build_select_statement(n, source)?), alias: self.build_derived_alias(node.clone(), source), span: node.span() });
+                }
+                RedTree::Node(n) if matches!(n.green.kind, SqlElementType::SetOperationStatement) => {
+                    return Err(OakError::custom_error("Set operations in a derived table are not supported"));
+                }
+                _ => {}
+            }
+        }
+        Ok(TableSource::Table(self.build_table_name(node, source)?))
+    }
+
+    /// Returns the alias written after a derived table, which is the last
+    /// identifier outside the subquery.
+    fn build_derived_alias<'a>(&self, node: RedNode<'a, SqlLanguage>, source: &SourceText) -> Option<Identifier> {
+        let mut alias = None;
+        for child in node.children() {
+            match child {
+                RedTree::Leaf(t) if t.kind == SqlTokenType::Identifier_ => {
+                    alias = Some(Identifier { name: self.get_text(t.span.clone(), source), span: t.span.clone() });
+                }
+                RedTree::Node(n) if n.green.kind == SqlElementType::Identifier => {
+                    alias = self.build_identifier(n, source).ok();
+                }
+                _ => {}
+            }
+        }
+        alias
+    }
+
     fn build_table_name<'a>(&self, node: RedNode<'a, SqlLanguage>, source: &SourceText) -> Result<TableName, OakError> {
         let mut name = None;
         let mut alias = None;
@@ -946,7 +983,7 @@ impl<'config> SqlBuilder<'config> {
                     _ => {}
                 },
                 RedTree::Node(n) => match n.green.kind {
-                    SqlElementType::TableName => table = Some(self.build_table_name(n, source)?),
+                    SqlElementType::TableName => table = Some(self.build_table_source(n, source)?),
                     SqlElementType::Expression => on = Some(self.build_expression(n, source)?),
                     _ => {}
                 },

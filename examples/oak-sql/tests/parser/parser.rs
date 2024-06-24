@@ -520,7 +520,7 @@ fn test_sql_builder_in_subquery() {
         panic!("Expected IN subquery");
     };
     assert!(matches!(expr.as_ref(), Expression::Identifier(identifier) if identifier.name.as_ref() == "a"));
-    assert_eq!(query.from.as_ref().map(|table| table.name.name.as_ref()), Some("u"));
+    assert!(matches!(query.from.as_ref(), Some(TableSource::Table(table)) if table.name.name.as_ref() == "u"));
     assert!(matches!(&query.items[0], SelectItem::Expression { expr: Expression::Identifier(identifier), .. } if identifier.name.as_ref() == "b"));
 
     let Expression::InSubquery { negated: true, .. } = build_where("SELECT * FROM t WHERE a NOT IN (SELECT b FROM u);")
@@ -591,7 +591,10 @@ fn test_sql_builder_identifier_spans_skip_leading_trivia() {
         };
         assert_eq!(sql.get(identifier.span.start..identifier.span.end), Some("id"), "identifier span for {sql}");
 
-        let table = select.from.as_ref().unwrap_or_else(|| panic!("Missing table for {sql}"));
+        let Some(TableSource::Table(table)) = select.from.as_ref()
+        else {
+            panic!("Missing table for {sql}");
+        };
         assert_eq!(sql.get(table.name.span.start..table.name.span.end), Some("users"), "table span for {sql}");
         assert_eq!(sql.get(root.span.start..root.span.end), Some(sql), "root must cover the whole source for {sql}");
     }
@@ -1222,6 +1225,14 @@ fn test_sql_builder_database_stmt() {
     assert_eq!(drop.name.name.as_ref(), "test_db");
 }
 
+/// Returns the named table of a row source, panicking when it is a derived table.
+fn named_table(source: &TableSource) -> &TableName {
+    match source {
+        TableSource::Table(table) => table,
+        other => panic!("Expected a named table, got {other:?}"),
+    }
+}
+
 #[test]
 fn test_sql_builder_table_aliases() {
     // `FROM users AS u` keeps the alias next to the table it renames.
@@ -1231,7 +1242,7 @@ fn test_sql_builder_table_aliases() {
     else {
         panic!("Expected Select statement, got {statement:?}");
     };
-    let table = select.from.as_ref().unwrap_or_else(|| panic!("Missing table"));
+    let table = named_table(select.from.as_ref().unwrap_or_else(|| panic!("Missing table")));
     assert_eq!(table.name.name.as_ref(), "users");
     assert_eq!(table.alias.as_ref().map(|alias| alias.name.as_ref()), Some("u"));
     assert_eq!(sql.get(table.span.start..table.span.end).map(str::trim), Some("users AS u"));
@@ -1244,12 +1255,13 @@ fn test_sql_builder_table_aliases() {
     else {
         panic!("Expected Select statement, got {statement:?}");
     };
-    let table = select.from.as_ref().unwrap_or_else(|| panic!("Missing table"));
+    let table = named_table(select.from.as_ref().unwrap_or_else(|| panic!("Missing table")));
     assert_eq!(table.name.name.as_ref(), "users");
     assert_eq!(table.alias.as_ref().map(|alias| alias.name.as_ref()), Some("a"));
     assert_eq!(select.joins.len(), 1);
-    assert_eq!(select.joins[0].table.name.name.as_ref(), "users");
-    assert_eq!(select.joins[0].table.alias.as_ref().map(|alias| alias.name.as_ref()), Some("b"));
+    let joined = named_table(&select.joins[0].table);
+    assert_eq!(joined.name.name.as_ref(), "users");
+    assert_eq!(joined.alias.as_ref().map(|alias| alias.name.as_ref()), Some("b"));
     assert_eq!(source, "SELECT a.id,b.id FROM users AS a INNER JOIN users AS b ON b.id=a.id;");
 
     // An aliased table must not swallow the clause that follows it.
@@ -1258,8 +1270,43 @@ fn test_sql_builder_table_aliases() {
     else {
         panic!("Expected Select statement, got {statement:?}");
     };
-    assert_eq!(select.from.as_ref().and_then(|table| table.alias.as_ref()).map(|alias| alias.name.as_ref()), Some("u"));
+    assert_eq!(named_table(select.from.as_ref().unwrap_or_else(|| panic!("Missing table"))).alias.as_ref().map(|alias| alias.name.as_ref()), Some("u"));
     assert!(select.order_by.is_some());
+}
+
+#[test]
+fn test_sql_builder_derived_tables() {
+    let sql = "SELECT x.id FROM (SELECT id FROM users WHERE age > 18) AS x WHERE x.id > 1;";
+    let (statement, source) = build_statement(sql);
+    let SqlStatement::Select(select) = &statement
+    else {
+        panic!("Expected Select statement, got {statement:?}");
+    };
+    let Some(TableSource::Derived { query, alias, .. }) = select.from.as_ref()
+    else {
+        panic!("Expected a derived table, got {:?}", select.from);
+    };
+    assert_eq!(alias.as_ref().map(|alias| alias.name.as_ref()), Some("x"));
+    assert_eq!(query.items.len(), 1);
+    assert!(matches!(query.from.as_ref(), Some(TableSource::Table(table)) if table.name.name.as_ref() == "users"));
+    assert!(query.expr.is_some(), "the inner WHERE must stay with the inner SELECT");
+    assert!(select.expr.is_some(), "the outer WHERE must stay with the outer SELECT");
+    assert_eq!(source, "SELECT x.id FROM(SELECT id FROM users WHERE age>18)AS x WHERE x.id>1;");
+
+    // A derived table also works as the right side of a JOIN.
+    let sql = "SELECT u.id FROM users u JOIN (SELECT id FROM orders) o ON o.id = u.id;";
+    let (statement, source) = build_statement(sql);
+    let SqlStatement::Select(select) = &statement
+    else {
+        panic!("Expected Select statement, got {statement:?}");
+    };
+    let Some(TableSource::Derived { query, alias, .. }) = select.joins.first().map(|join| &join.table)
+    else {
+        panic!("Expected a derived table in the JOIN, got {:?}", select.joins);
+    };
+    assert_eq!(alias.as_ref().map(|alias| alias.name.as_ref()), Some("o"));
+    assert!(matches!(query.from.as_ref(), Some(TableSource::Table(table)) if table.name.name.as_ref() == "orders"));
+    assert_eq!(source, "SELECT u.id FROM users AS u INNER JOIN(SELECT id FROM orders)AS o ON o.id=u.id;");
 }
 
 #[test]
