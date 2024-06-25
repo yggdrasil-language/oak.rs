@@ -49,6 +49,7 @@ impl<'config> SqlBuilder<'config> {
                 match leaf.kind {
                     SqlTokenType::Case => return self.build_case_expression(node, source),
                     SqlTokenType::Cast => return self.build_cast_expression(node, source),
+                    SqlTokenType::Exists => return self.build_exists_expression(node, source),
                     _ => {}
                 }
                 let _ = full_span;
@@ -89,7 +90,12 @@ impl<'config> SqlBuilder<'config> {
             }
             if logical_not {
                 let end = left.span().end;
-                left = Expression::Unary { op: UnaryOperator::Not, expr: Box::new(left), span: Range { start, end } };
+                // `NOT EXISTS (...)` is one predicate, so the negation belongs to
+                // the `EXISTS` node instead of wrapping it in a unary `NOT`.
+                left = match left {
+                    Expression::Exists { query, negated: false, .. } => Expression::Exists { query, negated: true, span: Range { start, end } },
+                    other => Expression::Unary { op: UnaryOperator::Not, expr: Box::new(other), span: Range { start, end } },
+                };
             }
         }
 
@@ -576,6 +582,26 @@ impl<'config> SqlBuilder<'config> {
         }
 
         Ok(Expression::FunctionCall { name: name.ok_or_else(|| OakError::custom_error("Missing function name"))?, args, distinct, span: node.span() })
+    }
+
+    /// Builds an `[NOT] EXISTS (SELECT ...)` predicate.
+    ///
+    /// The parser keeps the parenthesized query as a `Subquery` child, so the
+    /// predicate reuses the subquery lowering and only tags the node as `Exists`.
+    fn build_exists_expression<'a>(&self, node: RedNode<'a, SqlLanguage>, source: &SourceText) -> Result<Expression, OakError> {
+        let span = node.span();
+        for child in node.children() {
+            if let RedTree::Node(n) = child {
+                if n.green.kind == SqlElementType::Subquery {
+                    let Expression::Subquery { query, .. } = self.build_subquery(n, source)?
+                    else {
+                        return Err(OakError::custom_error("EXISTS expected a subquery"));
+                    };
+                    return Ok(Expression::Exists { query, negated: false, span });
+                }
+            }
+        }
+        Err(OakError::custom_error("EXISTS expected a subquery"))
     }
 
     fn build_subquery<'a>(&self, node: RedNode<'a, SqlLanguage>, source: &SourceText) -> Result<Expression, OakError> {

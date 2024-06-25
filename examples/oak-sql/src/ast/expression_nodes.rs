@@ -131,6 +131,16 @@ pub enum Expression {
         #[cfg_attr(feature = "serde", serde(with = "oak_core::serde_range"))]
         span: Range<usize>,
     },
+    /// An `[NOT] EXISTS (SELECT ...)` predicate.
+    Exists {
+        /// The subquery whose rows are tested for existence.
+        query: Box<SelectStatement>,
+        /// Whether the predicate is negated (NOT EXISTS).
+        negated: bool,
+        /// The span of the predicate.
+        #[cfg_attr(feature = "serde", serde(with = "oak_core::serde_range"))]
+        span: Range<usize>,
+    },
     /// A `CASE WHEN ... THEN ... [ELSE ...] END` expression.
     Case {
         /// The WHEN/THEN branches. Each pair is `(when_expr, then_expr)`.
@@ -177,6 +187,7 @@ impl Expression {
             Expression::IsTruth { span, .. } => span.clone(),
             Expression::Subquery { span, .. } => span.clone(),
             Expression::InSubquery { span, .. } => span.clone(),
+            Expression::Exists { span, .. } => span.clone(),
             Expression::Vector { span, .. } => span.clone(),
             Expression::Case { span, .. } => span.clone(),
             Expression::Cast { span, .. } => span.clone(),
@@ -276,6 +287,15 @@ impl ToSource for Expression {
                     buffer.push("NOT");
                 }
                 buffer.push("IN");
+                buffer.push("(");
+                query.to_source(buffer);
+                buffer.push(")");
+            }
+            Expression::Exists { query, negated, .. } => {
+                if *negated {
+                    buffer.push("NOT");
+                }
+                buffer.push("EXISTS");
                 buffer.push("(");
                 query.to_source(buffer);
                 buffer.push(")");
