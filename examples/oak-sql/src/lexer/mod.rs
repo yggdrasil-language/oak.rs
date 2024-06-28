@@ -397,6 +397,7 @@ impl<'config> SqlLexer<'config> {
             "END" => SqlTokenType::End,
             "IF" => SqlTokenType::If,
             "EXISTS" => SqlTokenType::Exists,
+            "WITH" => SqlTokenType::With,
             "RENAME" => SqlTokenType::Rename,
             "TO" => SqlTokenType::To,
             "AS" => SqlTokenType::As,

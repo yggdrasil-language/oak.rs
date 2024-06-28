@@ -4467,7 +4467,7 @@
             "end": 4217
         },
         {
-            "kind": "Identifier_",
+            "kind": "With",
             "text": "WITH",
             "start": 4252,
             "end": 4256

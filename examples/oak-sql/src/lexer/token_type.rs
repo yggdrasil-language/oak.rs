@@ -119,6 +119,7 @@ impl oak_core::TokenType for SqlTokenType {
             | Self::Ilike
             | Self::Strict
             | Self::Without
+            | Self::With
             | Self::Rowid
             | Self::Cast => Keyword,
             Self::Int | Self::Integer | Self::Varchar | Self::Char | Self::Text | Self::Date | Self::Time | Self::Timestamp | Self::Decimal | Self::Float | Self::Double | Self::Boolean | Self::Serial | Self::BigSerial => Keyword, /* Types are often keywords */
@@ -409,6 +410,8 @@ pub enum SqlTokenType {
     Strict,
     /// `WITHOUT` keyword.
     Without,
+    /// `WITH` keyword.
+    With,
     /// `ROWID` keyword.
     Rowid,
     /// `CAST` keyword.
