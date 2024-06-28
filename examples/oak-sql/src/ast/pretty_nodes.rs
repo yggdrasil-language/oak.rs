@@ -286,7 +286,12 @@ impl AsDocument for Identifier {
 #[cfg(feature = "oak-pretty-print")]
 impl AsDocument for TableName {
     fn as_document(&self, _config: &Self::Config) -> Document<'_> {
-        self.name.as_document(&())
+        if let Some(alias) = &self.alias {
+            doc!(self.name.as_document(&()), soft_space, "AS", soft_space, alias.as_document(&()))
+        }
+        else {
+            self.name.as_document(&())
+        }
     }
 }
 

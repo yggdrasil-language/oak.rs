@@ -573,9 +573,7 @@ impl<'config> SqlParser<'config> {
         }
 
         if state.eat(From) {
-            let table_cp = state.checkpoint();
-            state.expect(Identifier_).ok(); // TableName
-            state.finish_at(table_cp, SqlElementType::TableName);
+            self.parse_table_name(state);
 
             // Parse JOIN clauses
             while let Some(kind) = state.peek_kind() {
@@ -587,9 +585,7 @@ impl<'config> SqlParser<'config> {
                     }
                     state.expect(Join).ok();
 
-                    let table_cp = state.checkpoint();
-                    state.expect(Identifier_).ok(); // Joined TableName
-                    state.finish_at(table_cp, SqlElementType::TableName);
+                    self.parse_table_name(state);
 
                     if state.eat(On) {
                         PrattParser::parse(state, 0, self); // Join condition
@@ -694,6 +690,24 @@ impl<'config> SqlParser<'config> {
         }
 
         Ok(())
+    }
+
+    /// Parses one `FROM` / `JOIN` table source, including its optional alias.
+    ///
+    /// Both `FROM users AS u` and `FROM users u` are accepted, so a self join and
+    /// any other aliased reference can be written. The alias is only taken when a
+    /// bare identifier follows, which keeps `FROM users WHERE ...` unambiguous.
+    fn parse_table_name<'a, S: Source + ?Sized>(&self, state: &mut State<'a, S>) {
+        use crate::lexer::SqlTokenType::*;
+        let table_cp = state.checkpoint();
+        state.expect(Identifier_).ok(); // TableName
+        if state.eat(As) {
+            state.expect(Identifier_).ok();
+        }
+        else if state.peek_kind() == Some(Identifier_) {
+            state.bump();
+        }
+        state.finish_at(table_cp, SqlElementType::TableName);
     }
 
     fn parse_insert<'a, S: Source + ?Sized>(&self, state: &mut State<'a, S>) -> Result<(), OakError> {

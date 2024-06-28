@@ -464,7 +464,7 @@ impl<'config> SqlBuilder<'config> {
                     SqlTokenType::Identifier_ => {
                         if table_name.is_none() {
                             let ident = Identifier { name: self.get_text(t.span.clone(), source), span: t.span.clone() };
-                            table_name = Some(TableName { name: ident, span: t.span.clone() });
+                            table_name = Some(TableName { name: ident, alias: None, span: t.span.clone() });
                         }
                     }
                     _ => {}
@@ -574,7 +574,7 @@ impl<'config> SqlBuilder<'config> {
                     }
                     SqlElementType::Identifier => {
                         if object_type == CreateObjectType::Index && name.is_some() && table_name.is_none() {
-                            table_name = Some(ast::TableName { name: self.build_identifier(n, source)?, span: n.span() });
+                            table_name = Some(ast::TableName { name: self.build_identifier(n, source)?, alias: None, span: n.span() });
                         }
                         else if name.is_none() {
                             name = Some(self.build_identifier(n, source)?);
@@ -812,18 +812,25 @@ impl<'config> SqlBuilder<'config> {
 
     fn build_table_name<'a>(&self, node: RedNode<'a, SqlLanguage>, source: &SourceText) -> Result<TableName, OakError> {
         let mut name = None;
+        let mut alias = None;
         for child in node.children() {
-            match child {
-                RedTree::Leaf(t) if t.kind == SqlTokenType::Identifier_ => {
-                    name = Some(Identifier { name: self.get_text(t.span.clone(), source), span: t.span.clone() });
+            let identifier = match child {
+                RedTree::Leaf(t) if t.kind == SqlTokenType::Identifier_ => Some(Identifier { name: self.get_text(t.span.clone(), source), span: t.span.clone() }),
+                RedTree::Node(n) if n.green.kind == SqlElementType::Identifier => Some(self.build_identifier(n, source)?),
+                _ => None,
+            };
+            if let Some(identifier) = identifier {
+                // The first identifier is the table itself, a later one is the
+                // alias written as `FROM users u` or `FROM users AS u`.
+                if name.is_none() {
+                    name = Some(identifier);
                 }
-                RedTree::Node(n) if n.green.kind == SqlElementType::Identifier => {
-                    name = Some(self.build_identifier(n, source)?);
+                else if alias.is_none() {
+                    alias = Some(identifier);
                 }
-                _ => {}
             }
         }
-        Ok(TableName { name: name.ok_or_else(|| OakError::custom_error("Missing table name"))?, span: node.span() })
+        Ok(TableName { name: name.ok_or_else(|| OakError::custom_error("Missing table name"))?, alias, span: node.span() })
     }
 
     fn build_transaction_statement<'a>(&self, node: RedNode<'a, SqlLanguage>) -> Result<TransactionStatement, OakError> {
