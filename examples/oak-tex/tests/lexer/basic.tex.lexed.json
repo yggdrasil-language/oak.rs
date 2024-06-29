@@ -2175,7 +2175,7 @@
             "end": 2008
         },
         {
-            "kind": "Command",
+            "kind": "LeftCommand",
             "text": "\\left",
             "start": 2008,
             "end": 2013
@@ -2199,7 +2199,7 @@
             "end": 2021
         },
         {
-            "kind": "Command",
+            "kind": "RightCommand",
             "text": "\\right",
             "start": 2021,
             "end": 2027
@@ -2265,7 +2265,7 @@
             "end": 2056
         },
         {
-            "kind": "Command",
+            "kind": "LeftCommand",
             "text": "\\left",
             "start": 2056,
             "end": 2061
@@ -2289,7 +2289,7 @@
             "end": 2064
         },
         {
-            "kind": "Command",
+            "kind": "RightCommand",
             "text": "\\right",
             "start": 2064,
             "end": 2070
@@ -2355,13 +2355,13 @@
             "end": 2094
         },
         {
-            "kind": "Command",
+            "kind": "LeftCommand",
             "text": "\\left",
             "start": 2094,
             "end": 2099
         },
         {
-            "kind": "Command",
+            "kind": "BraceDelim",
             "text": "\\{",
             "start": 2099,
             "end": 2101
@@ -2379,13 +2379,13 @@
             "end": 2103
         },
         {
-            "kind": "Command",
+            "kind": "RightCommand",
             "text": "\\right",
             "start": 2103,
             "end": 2109
         },
         {
-            "kind": "Command",
+            "kind": "BraceDelim",
             "text": "\\}",
             "start": 2109,
             "end": 2111
@@ -2445,7 +2445,7 @@
             "end": 2134
         },
         {
-            "kind": "Command",
+            "kind": "LeftCommand",
             "text": "\\left",
             "start": 2134,
             "end": 2139
@@ -2469,7 +2469,7 @@
             "end": 2148
         },
         {
-            "kind": "Command",
+            "kind": "RightCommand",
             "text": "\\right",
             "start": 2148,
             "end": 2154
@@ -7509,7 +7509,7 @@
             "end": 5729
         },
         {
-            "kind": "Command",
+            "kind": "LeftCommand",
             "text": "\\left",
             "start": 5730,
             "end": 5735
@@ -7635,7 +7635,7 @@
             "end": 5797
         },
         {
-            "kind": "Command",
+            "kind": "RightCommand",
             "text": "\\right",
             "start": 5797,
             "end": 5803
@@ -7755,7 +7755,7 @@
             "end": 5866
         },
         {
-            "kind": "Command",
+            "kind": "LeftCommand",
             "text": "\\left",
             "start": 5867,
             "end": 5872
@@ -7821,7 +7821,7 @@
             "end": 5888
         },
         {
-            "kind": "Command",
+            "kind": "RightCommand",
             "text": "\\right",
             "start": 5888,
             "end": 5894

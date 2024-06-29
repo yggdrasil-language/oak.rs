@@ -2,13 +2,8 @@ use crate::{ast::*, language::TexLanguage, lexer::token_type::TexTokenType, pars
 use oak_core::{Builder, BuilderCache, GreenNode, OakDiagnostics, OakError, Parser, RedNode, RedTree, TextEdit, source::Source};
 
 /// Names of TeX environments that represent math mode (AMS + classic).
-const TEX_MATH_ENVIRONMENTS: &[&str] = &[
-    "equation", "align", "gather", "multline", "eqnarray", "flalign", "alignat",
-    "aligned", "alignedat", "gathered", "split",
-    "cases",
-    "matrix", "pmatrix", "bmatrix", "Bmatrix", "vmatrix", "Vmatrix", "smallmatrix",
-    "math", "displaymath",
-];
+const TEX_MATH_ENVIRONMENTS: &[&str] =
+    &["equation", "align", "gather", "multline", "eqnarray", "flalign", "alignat", "aligned", "alignedat", "gathered", "split", "cases", "matrix", "pmatrix", "bmatrix", "Bmatrix", "vmatrix", "Vmatrix", "smallmatrix", "math", "displaymath"];
 
 /// An AST builder for the TeX language.
 #[derive(Clone)]
@@ -205,7 +200,9 @@ impl<'config> TexBuilder<'config> {
             }
             TexTokenType::Environment => Ok(Some(TexItem::Environment(self.build_environment(tree.as_node().unwrap(), source)?))),
             TexTokenType::Group => Ok(Some(TexItem::Group(self.build_group(tree.as_node().unwrap(), source)?))),
-            TexTokenType::InlineMath | TexTokenType::DisplayMath => Ok(Some(TexItem::Math(self.build_math(tree.as_node().unwrap(), source)?))),
+            TexTokenType::InlineMath | TexTokenType::DisplayMath | TexTokenType::ParenInlineMathDelim | TexTokenType::BracketDisplayMathDelim => Ok(Some(TexItem::Math(self.build_math(tree.as_node().unwrap(), source)?))),
+            TexTokenType::LeftRightPair => Ok(Some(TexItem::LeftRightPair(self.build_left_right(tree.as_node().unwrap(), source)?))),
+            TexTokenType::Limits => Ok(Some(TexItem::Limits(self.build_limits(tree.as_node().unwrap(), source)?))),
             TexTokenType::Superscript => Ok(Some(TexItem::Superscript(self.build_superscript(tree.as_node().unwrap(), source)?))),
             TexTokenType::Subscript => Ok(Some(TexItem::Subscript(self.build_subscript(tree.as_node().unwrap(), source)?))),
             TexTokenType::Identifier | TexTokenType::Number | TexTokenType::Text => Ok(Some(TexItem::Text { span: tree.span().into(), content: tree.text(source).to_string() })),
@@ -259,11 +256,15 @@ impl<'config> TexBuilder<'config> {
 
     fn build_command<S: Source + ?Sized>(&self, node: RedNode<TexLanguage>, source: &S) -> Result<TexCommand, OakError> {
         let mut name = String::new();
+        let mut starred = false;
         let mut arguments = Vec::new();
 
         for child in node.children() {
             let kind: TexTokenType = child.kind();
             match kind {
+                TexTokenType::Star => {
+                    starred = true;
+                }
                 TexTokenType::Backslash
                 | TexTokenType::Command
                 | TexTokenType::BeginKeyword
@@ -348,7 +349,7 @@ impl<'config> TexBuilder<'config> {
             }
         }
 
-        Ok(TexCommand { span: node.span().into(), name, starred: false, arguments })
+        Ok(TexCommand { span: node.span().into(), name, starred, arguments })
     }
 
     fn build_group<S: Source + ?Sized>(&self, node: RedNode<TexLanguage>, source: &S) -> Result<TexGroup, OakError> {
@@ -356,14 +357,60 @@ impl<'config> TexBuilder<'config> {
     }
 
     fn build_math<S: Source + ?Sized>(&self, node: RedNode<TexLanguage>, source: &S) -> Result<TexMath, OakError> {
-        let kind: TexTokenType = node.kind();
-        let delimiter = match kind {
-            TexTokenType::DoubleDollar | TexTokenType::DisplayMath => crate::ast::MathDelimiter::DoubleDollar,
-            TexTokenType::Dollar | TexTokenType::InlineMath => crate::ast::MathDelimiter::Dollar,
-            TexTokenType::Command => crate::ast::MathDelimiter::Environment,
-            _ => crate::ast::MathDelimiter::Dollar,
+        let delimiter = match node.kind::<TexTokenType>() {
+            TexTokenType::DisplayMath | TexTokenType::DoubleDollar => crate::ast::MathDelimiter::DoubleDollar,
+            TexTokenType::InlineMath | TexTokenType::Dollar => crate::ast::MathDelimiter::Dollar,
+            TexTokenType::ParenInlineMathDelim => crate::ast::MathDelimiter::Paren,
+            TexTokenType::BracketDisplayMathDelim => crate::ast::MathDelimiter::Bracket,
+            _ => crate::ast::MathDelimiter::Environment,
         };
         Ok(TexMath { span: node.span().into(), content: self.build_content(node, source)?, is_display: delimiter.is_display(), delimiter })
+    }
+
+    fn build_left_right<S: Source + ?Sized>(&self, node: RedNode<TexLanguage>, source: &S) -> Result<TexLeftRightPair, OakError> {
+        let mut left_delim = String::new();
+        let mut right_delim = String::new();
+        let mut content = TexRoot::new(node.span().into());
+        let mut stage: u8 = 0; // 0: left delim, 1: content, 2: right delim
+
+        for child in node.children() {
+            let kind: TexTokenType = child.kind();
+            match kind {
+                TexTokenType::LeftCommand => {
+                    stage = 0;
+                }
+                TexTokenType::RightCommand => {
+                    stage = 2;
+                }
+                TexTokenType::MiddleCommand => {
+                    // \middle is still part of the content semantically;
+                    // treat as a text token carrying the command name.
+                    content.items.push(TexItem::Command(TexCommand { span: child.span().into(), name: "middle".to_string(), starred: false, arguments: Vec::new() }));
+                    stage = 1;
+                }
+                _ => {
+                    let text = child.text(source).to_string();
+                    if stage == 0 && left_delim.is_empty() {
+                        left_delim = text;
+                        stage = 1;
+                    }
+                    else if stage == 2 && right_delim.is_empty() {
+                        right_delim = text;
+                        stage = 2; // stay for anything unexpected
+                    }
+                    else if let Some(item) = self.build_item(child, source)? {
+                        content.items.push(item);
+                    }
+                }
+            }
+        }
+
+        Ok(TexLeftRightPair { span: node.span().into(), left_delim, right_delim, content })
+    }
+
+    fn build_limits<S: Source + ?Sized>(&self, node: RedNode<TexLanguage>, _source: &S) -> Result<TexLimits, OakError> {
+        let is_limits = node.kind::<TexTokenType>() == TexTokenType::Limits;
+        Ok(TexLimits { span: node.span().into(), is_limits })
     }
 
     fn build_environment<S: Source + ?Sized>(&self, node: RedNode<TexLanguage>, source: &S) -> Result<TexEnvironment, OakError> {
@@ -418,5 +465,5 @@ impl<'config> TexBuilder<'config> {
 }
 
 fn is_delimiter(kind: TexTokenType) -> bool {
-    matches!(kind, TexTokenType::LeftBrace | TexTokenType::RightBrace | TexTokenType::LeftBracket | TexTokenType::RightBracket | TexTokenType::Dollar | TexTokenType::DoubleDollar)
+    matches!(kind, TexTokenType::LeftBrace | TexTokenType::RightBrace | TexTokenType::LeftBracket | TexTokenType::RightBracket | TexTokenType::Dollar | TexTokenType::DoubleDollar | TexTokenType::ParenInlineMathDelim | TexTokenType::BracketDisplayMathDelim)
 }
