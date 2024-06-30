@@ -12,19 +12,24 @@ pub(crate) fn is_member_accessor_keyword(kind: &ValkyrieTokenType) -> bool {
     matches!(kind, ValkyrieTokenType::Keyword(ValkyrieKeywords::Get) | ValkyrieTokenType::Keyword(ValkyrieKeywords::Set))
 }
 
+/// 当前 token 是否可作为名字使用（标识符或 `get` / `set` / `from` 等软关键字）。
+pub(crate) fn at_identifier_like<S: oak_core::Source + ?Sized>(state: &State<'_, S>) -> bool {
+    state.current().is_some_and(|token| token.kind.is_soft_identifier())
+}
+
 /// 字段名前的修饰符锚点（如 `readonly x: f64`、`mut total: i64`）。
 pub(crate) fn is_field_name_follower(kind: &ValkyrieTokenType) -> bool {
-    matches!(kind, ValkyrieTokenType::Identifier)
+    kind.is_soft_identifier()
 }
 
 /// `let` 绑定模式前的修饰符锚点（如 `let mut x = 1`）。
 pub(crate) fn is_pattern_follower(kind: &ValkyrieTokenType) -> bool {
-    matches!(kind, ValkyrieTokenType::Identifier | ValkyrieTokenType::Underscore)
+    matches!(kind, ValkyrieTokenType::Identifier | ValkyrieTokenType::Underscore) || kind.is_soft_identifier()
 }
 
 /// 形参名前的修饰符锚点（如 `mut self`）。
 pub(crate) fn is_parameter_name_follower(kind: &ValkyrieTokenType) -> bool {
-    matches!(kind, ValkyrieTokenType::Identifier)
+    kind.is_soft_identifier()
 }
 
 /// raw id（`` `any` `` / `` `==` `` 词法化为 `Identifier`）前的运算符修饰符锚点。

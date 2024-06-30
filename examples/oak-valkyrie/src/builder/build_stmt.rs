@@ -54,7 +54,7 @@ impl<'config> ValkyrieBuilder<'config> {
                         semi = true;
                     }
                     ValkyrieTokenType::Keyword(ValkyrieKeywords::Let) => continue,
-                    ValkyrieTokenType::Identifier => {
+                    _ if t.kind.is_soft_identifier() => {
                         if pattern.is_none() {
                             let name = text(source, t.span);
                             pattern = Some(Pattern::Variable(Box::new(VariablePattern { name: Identifier { name, span: t.span }, span: t.span })));

@@ -57,16 +57,9 @@ fn parse_implicit_match_arm_body<S: oak_core::Source + ?Sized>(state: &mut State
 pub(crate) fn parse_if_expression<S: oak_core::Source + ?Sized>(state: &mut State<'_, S>) -> Result<(), oak_core::OakError> {
     let cp = state.sink.checkpoint();
     state.bump();
-    if state.at(ValkyrieTokenType::ParenthesisL) {
-        state.bump();
-        parse_expression(state)?;
-        if state.at(ValkyrieTokenType::ParenthesisR) {
-            state.bump();
-        }
-    }
-    else {
-        crate::parser::parse_expressions::parse_condition_expression(state)?;
-    }
+    // `if (a) == (b) { … }` 里的括号只是分组，不是条件括号；
+    // 条件统一按“禁止对象字面量后缀”的完整表达式解析，`{` 留给 then 分支。
+    crate::parser::parse_expressions::parse_condition_expression(state)?;
     parse_block_expression(state)?;
     if state.at(ValkyrieTokenType::Keyword(ValkyrieKeywords::Else)) {
         state.bump();

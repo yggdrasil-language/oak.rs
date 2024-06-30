@@ -1,7 +1,7 @@
 use crate::{
     ValkyrieLanguage,
     lexer::{keywords::ValkyrieKeywords, token_type::ValkyrieTokenType},
-    parser::element_type::ValkyrieElementType,
+    parser::{element_type::ValkyrieElementType, parse_modifiers::at_identifier_like},
 };
 use oak_core::parser::ParserState;
 
@@ -37,7 +37,7 @@ pub(crate) fn parse_or_expression<S: oak_core::Source + ?Sized>(state: &mut Stat
 fn parse_or_expression_with_options<S: oak_core::Source + ?Sized>(state: &mut State<'_, S>, allow_object_literal: bool) -> Result<(), oak_core::OakError> {
     parse_and_expression_with_options(state, allow_object_literal)?;
     while state.at(ValkyrieTokenType::OrOr) {
-        let cp = state.sink.checkpoint() - 1;
+        let cp = state.sink.last_node_checkpoint();
         state.bump();
         parse_and_expression_with_options(state, allow_object_literal)?;
         state.sink.finish_node(cp, ValkyrieElementType::BinaryExpression);
@@ -53,7 +53,7 @@ pub(crate) fn parse_and_expression<S: oak_core::Source + ?Sized>(state: &mut Sta
 fn parse_and_expression_with_options<S: oak_core::Source + ?Sized>(state: &mut State<'_, S>, allow_object_literal: bool) -> Result<(), oak_core::OakError> {
     parse_range_expression(state, allow_object_literal)?;
     while state.at(ValkyrieTokenType::AndAnd) {
-        let cp = state.sink.checkpoint() - 1;
+        let cp = state.sink.last_node_checkpoint();
         state.bump();
         parse_range_expression(state, allow_object_literal)?;
         state.sink.finish_node(cp, ValkyrieElementType::BinaryExpression);
@@ -65,7 +65,7 @@ fn parse_and_expression_with_options<S: oak_core::Source + ?Sized>(state: &mut S
 fn parse_range_expression<S: oak_core::Source + ?Sized>(state: &mut State<'_, S>, allow_object_literal: bool) -> Result<(), oak_core::OakError> {
     parse_equality_expression_with_options(state, allow_object_literal)?;
     while state.at(ValkyrieTokenType::DotDot) {
-        let cp = state.sink.checkpoint() - 1;
+        let cp = state.sink.last_node_checkpoint();
         state.bump();
         parse_equality_expression_with_options(state, allow_object_literal)?;
         state.sink.finish_node(cp, ValkyrieElementType::BinaryExpression);
@@ -81,7 +81,7 @@ pub(crate) fn parse_equality_expression<S: oak_core::Source + ?Sized>(state: &mu
 fn parse_equality_expression_with_options<S: oak_core::Source + ?Sized>(state: &mut State<'_, S>, allow_object_literal: bool) -> Result<(), oak_core::OakError> {
     parse_comparison_expression_with_options(state, allow_object_literal)?;
     while state.at(ValkyrieTokenType::EqEq) || state.at(ValkyrieTokenType::NotEq) {
-        let cp = state.sink.checkpoint() - 1;
+        let cp = state.sink.last_node_checkpoint();
         state.bump();
         parse_comparison_expression_with_options(state, allow_object_literal)?;
         state.sink.finish_node(cp, ValkyrieElementType::BinaryExpression);
@@ -97,7 +97,7 @@ pub(crate) fn parse_comparison_expression<S: oak_core::Source + ?Sized>(state: &
 fn parse_comparison_expression_with_options<S: oak_core::Source + ?Sized>(state: &mut State<'_, S>, allow_object_literal: bool) -> Result<(), oak_core::OakError> {
     parse_bit_or_expression(state, allow_object_literal)?;
     while state.at(ValkyrieTokenType::LessThan) || state.at(ValkyrieTokenType::LessEq) || state.at(ValkyrieTokenType::GreaterThan) || state.at(ValkyrieTokenType::GreaterEq) {
-        let cp = state.sink.checkpoint() - 1;
+        let cp = state.sink.last_node_checkpoint();
         state.bump();
         parse_bit_or_expression(state, allow_object_literal)?;
         state.sink.finish_node(cp, ValkyrieElementType::BinaryExpression);
@@ -109,7 +109,7 @@ fn parse_comparison_expression_with_options<S: oak_core::Source + ?Sized>(state:
 fn parse_bit_or_expression<S: oak_core::Source + ?Sized>(state: &mut State<'_, S>, allow_object_literal: bool) -> Result<(), oak_core::OakError> {
     parse_bit_and_expression(state, allow_object_literal)?;
     while state.at(ValkyrieTokenType::Pipe) {
-        let cp = state.sink.checkpoint() - 1;
+        let cp = state.sink.last_node_checkpoint();
         state.bump();
         parse_bit_and_expression(state, allow_object_literal)?;
         state.sink.finish_node(cp, ValkyrieElementType::BinaryExpression);
@@ -126,7 +126,7 @@ fn parse_bit_and_expression<S: oak_core::Source + ?Sized>(state: &mut State<'_, 
         if !(split_right_shift || state.at(ValkyrieTokenType::Ampersand) || state.at(ValkyrieTokenType::LeftShift) || state.at(ValkyrieTokenType::RightShift)) {
             break;
         }
-        let cp = state.sink.checkpoint() - 1;
+        let cp = state.sink.last_node_checkpoint();
         state.bump();
         if split_right_shift {
             state.bump();
@@ -145,7 +145,7 @@ pub(crate) fn parse_additive_expression<S: oak_core::Source + ?Sized>(state: &mu
 fn parse_additive_expression_with_options<S: oak_core::Source + ?Sized>(state: &mut State<'_, S>, allow_object_literal: bool) -> Result<(), oak_core::OakError> {
     parse_multiplicative_expression_with_options(state, allow_object_literal)?;
     while state.at(ValkyrieTokenType::Plus) || state.at(ValkyrieTokenType::Minus) {
-        let cp = state.sink.checkpoint() - 1;
+        let cp = state.sink.last_node_checkpoint();
         state.bump();
         parse_multiplicative_expression_with_options(state, allow_object_literal)?;
         state.sink.finish_node(cp, ValkyrieElementType::BinaryExpression);
@@ -161,7 +161,7 @@ pub(crate) fn parse_multiplicative_expression<S: oak_core::Source + ?Sized>(stat
 fn parse_multiplicative_expression_with_options<S: oak_core::Source + ?Sized>(state: &mut State<'_, S>, allow_object_literal: bool) -> Result<(), oak_core::OakError> {
     parse_caret_expression(state, allow_object_literal)?;
     while state.at(ValkyrieTokenType::Star) || state.at(ValkyrieTokenType::Slash) || state.at(ValkyrieTokenType::Percent) {
-        let cp = state.sink.checkpoint() - 1;
+        let cp = state.sink.last_node_checkpoint();
         state.bump();
         parse_caret_expression(state, allow_object_literal)?;
         state.sink.finish_node(cp, ValkyrieElementType::BinaryExpression);
@@ -173,7 +173,7 @@ fn parse_multiplicative_expression_with_options<S: oak_core::Source + ?Sized>(st
 fn parse_caret_expression<S: oak_core::Source + ?Sized>(state: &mut State<'_, S>, allow_object_literal: bool) -> Result<(), oak_core::OakError> {
     parse_unary_expression_with_options(state, allow_object_literal)?;
     while state.at(ValkyrieTokenType::Caret) {
-        let cp = state.sink.checkpoint() - 1;
+        let cp = state.sink.last_node_checkpoint();
         state.bump();
         parse_unary_expression_with_options(state, allow_object_literal)?;
         state.sink.finish_node(cp, ValkyrieElementType::BinaryExpression);
@@ -211,9 +211,9 @@ fn parse_postfix_expression_with_options<S: oak_core::Source + ?Sized>(state: &m
     parse_primary_expression(state)?;
     loop {
         if state.at(ValkyrieTokenType::Dot) || (state.at(ValkyrieTokenType::ColonColon) && state.peek_non_trivia_kind_at(1) != Some(ValkyrieTokenType::LessThan) && state.peek_non_trivia_kind_at(1) != Some(ValkyrieTokenType::BracketL)) {
-            let cp = state.sink.checkpoint() - 1;
+            let cp = state.sink.last_node_checkpoint();
             state.bump();
-            if state.at(ValkyrieTokenType::Identifier) || state.at(ValkyrieTokenType::Keyword(ValkyrieKeywords::Get)) || state.at(ValkyrieTokenType::Keyword(ValkyrieKeywords::Set)) {
+            if at_identifier_like(state) {
                 state.bump();
             }
             else {
@@ -222,7 +222,7 @@ fn parse_postfix_expression_with_options<S: oak_core::Source + ?Sized>(state: &m
             state.sink.finish_node(cp, ValkyrieElementType::FieldExpression);
         }
         else if state.at(ValkyrieTokenType::OffsetL) || (state.at(ValkyrieTokenType::ColonColon) && state.peek_non_trivia_kind_at(1) == Some(ValkyrieTokenType::BracketL)) {
-            let cp = state.sink.checkpoint() - 1;
+            let cp = state.sink.last_node_checkpoint();
             let closing = if state.at(ValkyrieTokenType::ColonColon) {
                 state.bump();
                 ValkyrieTokenType::BracketR
@@ -239,7 +239,7 @@ fn parse_postfix_expression_with_options<S: oak_core::Source + ?Sized>(state: &m
             state.sink.finish_node(cp, ValkyrieElementType::OffsetExpression);
         }
         else if state.at(ValkyrieTokenType::BracketL) {
-            let cp = state.sink.checkpoint() - 1;
+            let cp = state.sink.last_node_checkpoint();
             state.bump();
             parse_expression(state)?;
             if state.at(ValkyrieTokenType::BracketR) {
@@ -248,23 +248,23 @@ fn parse_postfix_expression_with_options<S: oak_core::Source + ?Sized>(state: &m
             state.sink.finish_node(cp, ValkyrieElementType::IndexExpression);
         }
         else if state.at(ValkyrieTokenType::ColonColon) && state.peek_non_trivia_kind_at(1) == Some(ValkyrieTokenType::LessThan) {
-            let cp = state.sink.checkpoint() - 1;
+            let cp = state.sink.last_node_checkpoint();
             state.bump();
             crate::parser::parse_types::parse_generic_argument_list(state)?;
             state.sink.finish_node(cp, ValkyrieElementType::TurbofishExpression);
         }
         else if state.at(ValkyrieTokenType::ParenthesisL) {
-            let cp = state.sink.checkpoint() - 1;
+            let cp = state.sink.last_node_checkpoint();
             parse_argument_list(state)?;
             state.sink.finish_node(cp, ValkyrieElementType::CallExpression);
         }
         else if allow_object_literal && state.at(ValkyrieTokenType::BraceL) {
-            let cp = state.sink.checkpoint() - 1;
+            let cp = state.sink.last_node_checkpoint();
             crate::parser::parse_blocks::parse_object_initializer(state)?;
             state.sink.finish_node(cp, ValkyrieElementType::ObjectExpression);
         }
         else if state.at(ValkyrieTokenType::Keyword(ValkyrieKeywords::As)) {
-            let cp = state.sink.checkpoint() - 1;
+            let cp = state.sink.last_node_checkpoint();
             state.bump();
             crate::parser::parse_types::parse_type(state)?;
             state.sink.finish_node(cp, ValkyrieElementType::CastExpression);
@@ -301,13 +301,13 @@ pub(crate) fn parse_argument_list<S: oak_core::Source + ?Sized>(state: &mut Stat
 pub(crate) fn parse_primary_expression<S: oak_core::Source + ?Sized>(state: &mut State<'_, S>) -> Result<(), oak_core::OakError> {
     if let Some(token) = state.current() {
         match &token.kind {
-            ValkyrieTokenType::Identifier | ValkyrieTokenType::Keyword(ValkyrieKeywords::Get) | ValkyrieTokenType::Keyword(ValkyrieKeywords::Set) => {
+            _ if token.kind.is_soft_identifier() => {
                 let cp = state.sink.checkpoint();
                 state.bump();
                 if state.at(ValkyrieTokenType::ColonColon) && state.peek_non_trivia_kind_at(1) != Some(ValkyrieTokenType::LessThan) && state.peek_non_trivia_kind_at(1) != Some(ValkyrieTokenType::BracketL) {
                     while state.at(ValkyrieTokenType::ColonColon) {
                         state.bump();
-                        if state.at(ValkyrieTokenType::Identifier) {
+                        if at_identifier_like(state) {
                             state.bump();
                         }
                     }

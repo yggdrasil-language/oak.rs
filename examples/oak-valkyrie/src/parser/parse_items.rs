@@ -910,14 +910,14 @@ pub(crate) fn parse_attribute_argument<S: oak_core::Source + ?Sized>(state: &mut
         if next == Some(ValkyrieTokenType::Colon) || next == Some(ValkyrieTokenType::Eq) {
             state.bump();
             state.bump();
-            crate::parser::parse_expressions::parse_primary_expression(state)?;
+            crate::parser::parse_expressions::parse_expression(state)?;
         }
         else {
-            crate::parser::parse_expressions::parse_primary_expression(state)?;
+            crate::parser::parse_expressions::parse_expression(state)?;
         }
     }
     else {
-        crate::parser::parse_expressions::parse_primary_expression(state)?;
+        crate::parser::parse_expressions::parse_expression(state)?;
     }
     state.sink.finish_node(cp, ValkyrieElementType::AttributeArgument);
     Ok(())

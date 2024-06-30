@@ -122,6 +122,16 @@ impl<'a, L: Language> TreeSink<'a, L> {
         self.children.len()
     }
 
+    /// Returns the checkpoint immediately before the last child node, skipping trailing trivia.
+    ///
+    /// [`Self::finish_node`] moves the trivia that follows a node's last token out of the node and
+    /// keeps it as a sibling, so callers that wrap an already-built node (binary/suffix operators,
+    /// object fields) cannot locate it with `checkpoint() - 1`. This returns the index of the last
+    /// node child, or `checkpoint()` when the sink holds no node.
+    pub fn last_node_checkpoint(&self) -> usize {
+        self.children.iter().rposition(|child| child.is_node()).unwrap_or(self.children.len())
+    }
+
     /// Returns the syntax arena used by this sink.
     #[inline(always)]
     pub fn arena(&self) -> &'a SyntaxArena {
