@@ -217,12 +217,7 @@ impl<'config> SqlBuilder<'config> {
                 _ => {}
             }
         }
-        Ok(CteDefinition {
-            name: name.ok_or_else(|| OakError::custom_error("Missing common table expression name"))?,
-            columns,
-            query: query.ok_or_else(|| OakError::custom_error("Missing common table expression query"))?,
-            span: node.span(),
-        })
+        Ok(CteDefinition { name: name.ok_or_else(|| OakError::custom_error("Missing common table expression name"))?, columns, query: query.ok_or_else(|| OakError::custom_error("Missing common table expression query"))?, span: node.span() })
     }
 
     /// Builds a set operation (`UNION` / `INTERSECT` / `EXCEPT`) statement.
@@ -422,15 +417,7 @@ impl<'config> SqlBuilder<'config> {
             None => return Err(OakError::custom_error("Missing `VALUES` list or nested `SELECT` in INSERT")),
         };
 
-        Ok(InsertStatement {
-            table_name: table_name.ok_or_else(|| OakError::custom_error("Missing table name in INSERT"))?,
-            columns,
-            rows,
-            source: insert_source,
-            on_conflict,
-            returning,
-            span: node.span(),
-        })
+        Ok(InsertStatement { table_name: table_name.ok_or_else(|| OakError::custom_error("Missing table name in INSERT"))?, columns, rows, source: insert_source, on_conflict, returning, span: node.span() })
     }
 
     /// Builds the `ON CONFLICT` clause of an `INSERT` statement.

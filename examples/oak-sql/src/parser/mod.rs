@@ -564,10 +564,7 @@ impl<'config> SqlParser<'config> {
         use crate::lexer::SqlTokenType::*;
         let cp = state.checkpoint();
         state.expect(With).ok();
-        if state.peek_kind() == Some(Identifier_)
-            && state.peek_text().is_some_and(|text| text.eq_ignore_ascii_case("RECURSIVE"))
-            && state.peek_non_trivia_kind_at(1) == Some(Identifier_)
-        {
+        if state.peek_kind() == Some(Identifier_) && state.peek_text().is_some_and(|text| text.eq_ignore_ascii_case("RECURSIVE")) && state.peek_non_trivia_kind_at(1) == Some(Identifier_) {
             return Err(OakError::custom_error("recursive CTEs are not supported"));
         }
         loop {

@@ -1,5 +1,7 @@
-use crate::ast::expr::{Expression, Identifier, TableName};
-use crate::ast::statements::query::{SelectItem, SelectStatement};
+use crate::ast::{
+    expr::{Expression, Identifier, TableName},
+    statements::query::{SelectItem, SelectStatement},
+};
 use core::range::Range;
 use oak_core::source::{SourceBuffer, ToSource};
 

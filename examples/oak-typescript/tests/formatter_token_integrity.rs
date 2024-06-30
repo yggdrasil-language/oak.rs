@@ -209,13 +209,9 @@ fn unary_signs_after_comparisons_bind_to_their_operands() {
 fn quote_style_options_keep_literal_text_intact() {
     for quote_style in [QuoteStyle::Single, QuoteStyle::Double, QuoteStyle::Preserve] {
         let options = FormatOptions { quote_style, ..FormatOptions::default() };
-        for (source, expected) in [
-            ("const a = 'x';", "const a = 'x';"),
-            ("const a = \"x\";", "const a = \"x\";"),
-            ("const a = 'it\\'s';", "const a = 'it\\'s';"),
-            ("const a = `keep '${value}'`;", "const a = `keep '${value}'`;"),
-            ("const a = /'x'/;", "const a = /'x'/;"),
-        ] {
+        for (source, expected) in
+            [("const a = 'x';", "const a = 'x';"), ("const a = \"x\";", "const a = \"x\";"), ("const a = 'it\\'s';", "const a = 'it\\'s';"), ("const a = `keep '${value}'`;", "const a = `keep '${value}'`;"), ("const a = /'x'/;", "const a = /'x'/;")]
+        {
             assert_eq!(format_source(source, &options).expect("format"), expected, "quote literal rewritten under {quote_style:?}: {source:?}");
         }
     }
@@ -233,10 +229,7 @@ fn non_null_assertion_stays_separate_from_inequality() {
 // --- Bug 9: comments between members hid the member position ---
 #[test]
 fn members_after_comments_stay_attached() {
-    for source in [
-        "interface Store {\n    /** Delete one record. */\n    delete(key: string): Promise<void>;\n}",
-        "class Store {\n    // native handle\n    async delete(key: string): Promise<void> { this.native.delete(key); }\n}",
-    ] {
+    for source in ["interface Store {\n    /** Delete one record. */\n    delete(key: string): Promise<void>;\n}", "class Store {\n    // native handle\n    async delete(key: string): Promise<void> { this.native.delete(key); }\n}"] {
         assert_eq!(format(source), source, "member after a comment gained a space: {source:?}");
     }
 }
@@ -244,7 +237,9 @@ fn members_after_comments_stay_attached() {
 // --- Bug 10: `case X: {` blocks were read as object literal bodies ---
 #[test]
 fn case_clause_blocks_keep_keyword_spacing() {
-    for source in ["switch (tag) { case 1: { if (x) { y(); } break; } }", "switch (tag) { case 1: { for (let i = 0; i < n; i += 1) { y(); } break; } }", "switch (tag) { default: { if (x) { y(); } break; } }", "const o = { a: { delete(key) { return key; } } };"] {
+    for source in
+        ["switch (tag) { case 1: { if (x) { y(); } break; } }", "switch (tag) { case 1: { for (let i = 0; i < n; i += 1) { y(); } break; } }", "switch (tag) { default: { if (x) { y(); } break; } }", "const o = { a: { delete(key) { return key; } } };"]
+    {
         assert_eq!(format(source), source, "case block keyword spacing changed: {source:?}");
     }
 }
