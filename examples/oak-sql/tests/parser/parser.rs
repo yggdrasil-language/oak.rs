@@ -541,14 +541,41 @@ fn test_sql_builder_in_subquery() {
 }
 
 #[test]
+fn test_sql_builder_exists_predicate() {
+    let Expression::Exists { query, negated: false, .. } = build_where("SELECT * FROM t WHERE EXISTS (SELECT b FROM u);")
+    else {
+        panic!("Expected EXISTS");
+    };
+    assert!(matches!(query.from.as_ref(), Some(TableSource::Table(table)) if table.name.name.as_ref() == "u"));
+    assert!(matches!(&query.items[0], SelectItem::Expression { expr: Expression::Identifier(identifier), .. } if identifier.name.as_ref() == "b"));
+
+    // `NOT EXISTS` is one predicate, not a unary `NOT` wrapped around `EXISTS`.
+    let Expression::Exists { negated: true, .. } = build_where("SELECT * FROM t WHERE NOT EXISTS (SELECT b FROM u);")
+    else {
+        panic!("Expected NOT EXISTS");
+    };
+
+    let (_, source) = build_statement("SELECT * FROM t WHERE EXISTS (SELECT b FROM u);");
+    assert_eq!(source, "SELECT*FROM t WHERE EXISTS(SELECT b FROM u);");
+
+    let (_, source) = build_statement("SELECT * FROM t WHERE NOT EXISTS (SELECT b FROM u);");
+    assert_eq!(source, "SELECT*FROM t WHERE NOT EXISTS(SELECT b FROM u);");
+}
+
+#[test]
 fn test_sql_builder_unsupported_predicate_is_reported() {
     let config = SqlLanguage::default();
     let builder = SqlBuilder::new(&config);
     // An unsupported predicate must surface as an error. Before the fix it became
     // `SelectStatement.expr == None`, which downstream read as "match every row".
+    // `*` is not a predicate, so it stays an error node instead of an expression.
     let mut session = ParseSession::<SqlLanguage>::default();
-    let result = builder.build(&SourceText::new("SELECT * FROM t WHERE EXISTS (SELECT 1);"), &[], &mut session);
-    assert!(result.result.is_err(), "Unsupported predicate must not become `None`: {:?}", result.result);
+    let result = builder.build(&SourceText::new("SELECT * FROM t WHERE *;"), &[], &mut session);
+    let rejected = match &result.result {
+        Ok(root) => root.statements.iter().any(|statement| matches!(statement, SqlStatement::Error { .. })),
+        Err(_) => true,
+    };
+    assert!(rejected, "Unsupported predicate must not become `None`: {:?}", result.result);
 
     // A trailing unsupported token must abort parsing instead of keeping only the
     // first half of the predicate.
