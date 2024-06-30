@@ -573,7 +573,7 @@ impl<'config> SqlParser<'config> {
         }
 
         if state.eat(From) {
-            self.parse_table_name(state);
+            self.parse_table_source(state);
 
             // Parse JOIN clauses
             while let Some(kind) = state.peek_kind() {
@@ -585,7 +585,7 @@ impl<'config> SqlParser<'config> {
                     }
                     state.expect(Join).ok();
 
-                    self.parse_table_name(state);
+                    self.parse_table_source(state);
 
                     if state.eat(On) {
                         PrattParser::parse(state, 0, self); // Join condition
@@ -692,7 +692,36 @@ impl<'config> SqlParser<'config> {
         Ok(())
     }
 
-    /// Parses one `FROM` / `JOIN` table source, including its optional alias.
+    /// Parses one `FROM` / `JOIN` row source: a named table or a derived table.
+    ///
+    /// Both forms keep their optional alias, and a derived table is recognised by
+    /// the `(` that opens its subquery. The node kind stays `TableName` so the
+    /// builder tells `FROM users u` from `FROM (SELECT ...) AS x` by the nested
+    /// `SELECT` rather than by a second CST node shape.
+    fn parse_table_source<'a, S: Source + ?Sized>(&self, state: &mut State<'a, S>) {
+        use crate::lexer::SqlTokenType::*;
+        if state.peek_kind() != Some(LeftParen) {
+            self.parse_table_name(state);
+            return;
+        }
+        let table_cp = state.checkpoint();
+        state.expect(LeftParen).ok();
+        if let Err(error) = self.parse_select(state) {
+            // `parse_table_source` has no error channel of its own, so the
+            // diagnostic is kept with the parse state like the `IN` subquery.
+            state.errors.push(error);
+        }
+        state.expect(RightParen).ok();
+        if state.eat(As) {
+            state.expect(Identifier_).ok();
+        }
+        else if state.peek_kind() == Some(Identifier_) {
+            state.bump();
+        }
+        state.finish_at(table_cp, SqlElementType::TableName);
+    }
+
+    /// Parses one `FROM` / `JOIN` table name, including its optional alias.
     ///
     /// Both `FROM users AS u` and `FROM users u` are accepted, so a self join and
     /// any other aliased reference can be written. The alias is only taken when a

@@ -296,6 +296,24 @@ impl AsDocument for TableName {
 }
 
 #[cfg(feature = "oak-pretty-print")]
+impl AsDocument for TableSource {
+    fn as_document(&self, _config: &Self::Config) -> Document<'_> {
+        match self {
+            TableSource::Table(table) => table.as_document(&()),
+            TableSource::Derived { query, alias, .. } => {
+                let subquery = doc!("(", query.as_document(&()), ")");
+                if let Some(alias) = alias {
+                    doc!(subquery, soft_space, "AS", soft_space, alias.as_document(&()))
+                }
+                else {
+                    subquery
+                }
+            }
+        }
+    }
+}
+
+#[cfg(feature = "oak-pretty-print")]
 impl AsDocument for ColumnName {
     fn as_document(&self, _config: &Self::Config) -> Document<'_> {
         self.name.as_document(&())
