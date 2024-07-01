@@ -304,7 +304,7 @@ impl<'config> SqlParser<'config> {
     fn parse_statement<'a, S: Source + ?Sized>(&self, state: &mut State<'a, S>) -> Result<(), OakError> {
         use crate::lexer::SqlTokenType::*;
         match state.peek_kind() {
-            Some(Select) => self.parse_select(state)?,
+            Some(Select) | Some(With) => self.parse_select(state)?,
             Some(Insert) => self.parse_insert(state)?,
             Some(Update) => self.parse_update(state)?,
             Some(Delete) => self.parse_delete(state)?,
@@ -494,7 +494,7 @@ impl<'config> SqlParser<'config> {
     /// Tokens that may start another statement.
     fn is_statement_start(kind: Option<crate::lexer::SqlTokenType>) -> bool {
         use crate::lexer::SqlTokenType::*;
-        matches!(kind, Some(Select | Insert | Update | Delete | Create | Drop | Alter | Explain | Begin | Commit | Rollback | Transaction | Pragma | Show | Set))
+        matches!(kind, Some(Select | With | Insert | Update | Delete | Create | Drop | Alter | Explain | Begin | Commit | Rollback | Transaction | Pragma | Show | Set))
     }
 
     /// Reports tokens that no statement or clause accepted and consumes them, so
@@ -515,11 +515,15 @@ impl<'config> SqlParser<'config> {
         state.eat(Semicolon);
     }
 
-    /// Parses a query expression: the `SELECT` body, an optional set operation,
-    /// and the `ORDER BY` / `LIMIT` clauses that apply to the whole result.
+    /// Parses a query expression: an optional `WITH` clause, the `SELECT` body, an
+    /// optional set operation, and the `ORDER BY` / `LIMIT` clauses that apply to
+    /// the whole result.
     fn parse_select<'a, S: Source + ?Sized>(&self, state: &mut State<'a, S>) -> Result<(), OakError> {
         use crate::lexer::SqlTokenType::*;
         let cp = state.checkpoint();
+        if state.peek_kind() == Some(With) {
+            self.parse_with_clause(state)?;
+        }
         self.parse_select_terms(state)?;
 
         let mut set_operation = false;
@@ -547,6 +551,47 @@ impl<'config> SqlParser<'config> {
         self.parse_order_by_limit(state)?;
         state.eat(Semicolon);
         state.finish_at(cp, if set_operation { SqlElementType::SetOperationStatement } else { SqlElementType::SelectStatement });
+        Ok(())
+    }
+
+    /// Parses the non-recursive `WITH name [(col, ...)] AS (query), ...` prefix.
+    ///
+    /// `RECURSIVE` is not a keyword, so it is only treated as the modifier when a
+    /// CTE name follows it. That keeps an ordinary CTE named `recursive` usable
+    /// while `WITH RECURSIVE` is still rejected, because a self-referencing CTE
+    /// cannot be evaluated by the current AST.
+    fn parse_with_clause<'a, S: Source + ?Sized>(&self, state: &mut State<'a, S>) -> Result<(), OakError> {
+        use crate::lexer::SqlTokenType::*;
+        let cp = state.checkpoint();
+        state.expect(With).ok();
+        if state.peek_kind() == Some(Identifier_)
+            && state.peek_text().is_some_and(|text| text.eq_ignore_ascii_case("RECURSIVE"))
+            && state.peek_non_trivia_kind_at(1) == Some(Identifier_)
+        {
+            return Err(OakError::custom_error("recursive CTEs are not supported"));
+        }
+        loop {
+            let cte_cp = state.checkpoint();
+            state.expect(Identifier_).ok();
+            if state.eat(LeftParen) {
+                while state.peek_kind() == Some(Identifier_) {
+                    state.bump();
+                    if !state.eat(Comma) {
+                        break;
+                    }
+                }
+                state.expect(RightParen).ok();
+            }
+            state.expect(As).ok();
+            state.expect(LeftParen).ok();
+            self.parse_select(state)?;
+            state.expect(RightParen).ok();
+            state.finish_at(cte_cp, SqlElementType::CteDefinition);
+            if !state.eat(Comma) {
+                break;
+            }
+        }
+        state.finish_at(cp, SqlElementType::WithClause);
         Ok(())
     }
 

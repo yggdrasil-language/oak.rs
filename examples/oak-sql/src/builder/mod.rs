@@ -126,6 +126,7 @@ impl<'config> SqlBuilder<'config> {
 
     /// Builds a `SELECT` statement AST node.
     fn build_select_statement<'a>(&self, node: RedNode<'a, SqlLanguage>, source: &SourceText) -> Result<SelectStatement, OakError> {
+        let mut with = None;
         let mut quantifier = None;
         let mut items = Vec::new();
         let mut from = None;
@@ -141,6 +142,7 @@ impl<'config> SqlBuilder<'config> {
         for child in node.children() {
             match child {
                 RedTree::Node(n) => match n.green.kind {
+                    SqlElementType::WithClause => with = Some(self.build_with_clause(n, source)?),
                     SqlElementType::SelectQuantifier => quantifier = Some(self.build_select_quantifier(n, source)?),
                     SqlElementType::SelectItem => items.push(self.build_select_item(n, source)?),
                     SqlElementType::TableName => from = Some(self.build_table_source(n, source)?),
@@ -168,7 +170,59 @@ impl<'config> SqlBuilder<'config> {
             return Err(OakError::custom_error("WHERE predicate could not be built"));
         }
 
-        Ok(SelectStatement { quantifier, items, from, joins, expr, group_by, having, order_by, limit, span: node.span() })
+        Ok(SelectStatement { with, quantifier, items, from, joins, expr, group_by, having, order_by, limit, span: node.span() })
+    }
+
+    /// Builds the `WITH` clause of a query.
+    fn build_with_clause<'a>(&self, node: RedNode<'a, SqlLanguage>, source: &SourceText) -> Result<WithClause, OakError> {
+        let mut ctes = Vec::new();
+        for child in node.children() {
+            if let RedTree::Node(n) = child {
+                if n.green.kind == SqlElementType::CteDefinition {
+                    ctes.push(self.build_cte_definition(n, source)?);
+                }
+            }
+        }
+        if ctes.is_empty() {
+            return Err(OakError::custom_error("`WITH` requires at least one common table expression"));
+        }
+        Ok(WithClause { ctes, span: node.span() })
+    }
+
+    /// Builds one common table expression.
+    ///
+    /// The name is the first identifier of the definition and the optional column
+    /// list follows it, so the split is by order rather than by lookahead.
+    fn build_cte_definition<'a>(&self, node: RedNode<'a, SqlLanguage>, source: &SourceText) -> Result<CteDefinition, OakError> {
+        let mut name = None;
+        let mut columns = Vec::new();
+        let mut query = None;
+        for child in node.children() {
+            match child {
+                RedTree::Node(n) if n.green.kind == SqlElementType::SelectStatement => {
+                    query = Some(Box::new(self.build_select_statement(n, source)?));
+                }
+                RedTree::Node(n) if n.green.kind == SqlElementType::SetOperationStatement => {
+                    return Err(OakError::custom_error("Set operations in a CTE are not supported"));
+                }
+                RedTree::Leaf(t) if t.kind == SqlTokenType::Identifier_ => {
+                    let identifier = Identifier { name: self.get_text(t.span.clone(), source), span: t.span.clone() };
+                    if name.is_none() {
+                        name = Some(identifier);
+                    }
+                    else {
+                        columns.push(identifier);
+                    }
+                }
+                _ => {}
+            }
+        }
+        Ok(CteDefinition {
+            name: name.ok_or_else(|| OakError::custom_error("Missing common table expression name"))?,
+            columns,
+            query: query.ok_or_else(|| OakError::custom_error("Missing common table expression query"))?,
+            span: node.span(),
+        })
     }
 
     /// Builds a set operation (`UNION` / `INTERSECT` / `EXCEPT`) statement.

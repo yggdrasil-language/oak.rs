@@ -6,6 +6,9 @@ use oak_core::source::{SourceBuffer, ToSource};
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct SelectStatement {
+    /// The `WITH` clause that defines the common table expressions the statement
+    /// may reference.
+    pub with: Option<WithClause>,
     /// The `ALL` or `DISTINCT` quantifier, when one was written explicitly.
     pub quantifier: Option<SelectQuantifier>,
     /// The items to select (columns, expressions, or `*`).
@@ -31,6 +34,9 @@ pub struct SelectStatement {
 
 impl ToSource for SelectStatement {
     fn to_source(&self, buffer: &mut SourceBuffer) {
+        if let Some(with) = &self.with {
+            with.to_source(buffer);
+        }
         buffer.push("SELECT");
         if let Some(quantifier) = &self.quantifier {
             quantifier.to_source(buffer);
@@ -64,6 +70,67 @@ impl ToSource for SelectStatement {
         if let Some(limit) = &self.limit {
             limit.to_source(buffer);
         }
+    }
+}
+
+/// The `WITH` clause of a query, holding one or more common table expressions.
+///
+/// Only non-recursive CTEs are represented: every query references tables that
+/// exist before the clause, so there is no self-reference flag to model.
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct WithClause {
+    /// The common table expressions in the order they were written.
+    pub ctes: Vec<CteDefinition>,
+    /// The span of the clause, from `WITH` to the last CTE.
+    #[serde(with = "oak_core::serde_range")]
+    pub span: Range<usize>,
+}
+
+impl ToSource for WithClause {
+    fn to_source(&self, buffer: &mut SourceBuffer) {
+        buffer.push("WITH");
+        for (i, cte) in self.ctes.iter().enumerate() {
+            if i > 0 {
+                buffer.push(",");
+            }
+            cte.to_source(buffer);
+        }
+    }
+}
+
+/// A common table expression: `name [(col, ...)] AS (query)`.
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct CteDefinition {
+    /// The name the query is referenced by.
+    pub name: Identifier,
+    /// The optional column names that rename the query output.
+    pub columns: Vec<Identifier>,
+    /// The query that produces the rows.
+    pub query: Box<SelectStatement>,
+    /// The span of the definition.
+    #[serde(with = "oak_core::serde_range")]
+    pub span: Range<usize>,
+}
+
+impl ToSource for CteDefinition {
+    fn to_source(&self, buffer: &mut SourceBuffer) {
+        self.name.to_source(buffer);
+        if !self.columns.is_empty() {
+            buffer.push("(");
+            for (i, column) in self.columns.iter().enumerate() {
+                if i > 0 {
+                    buffer.push(",");
+                }
+                column.to_source(buffer);
+            }
+            buffer.push(")");
+        }
+        buffer.push("AS");
+        buffer.push("(");
+        self.query.to_source(buffer);
+        buffer.push(")");
     }
 }
 

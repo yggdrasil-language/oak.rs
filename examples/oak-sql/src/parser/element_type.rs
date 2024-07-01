@@ -82,6 +82,10 @@ pub enum SqlElementType {
     Case,
     /// CAST(expr AS type) expression.
     Cast,
+    /// `WITH` clause holding one or more common table expressions.
+    WithClause,
+    /// One `name [(col, ...)] AS (query)` common table expression.
+    CteDefinition,
 }
 
 impl ElementType for SqlElementType {
@@ -122,6 +126,8 @@ impl ElementType for SqlElementType {
             | Self::ReturningClause
             | Self::ConflictClause
             | Self::VectorSearch
+            | Self::WithClause
+            | Self::CteDefinition
             | Self::Subquery => Statement,
         }
     }

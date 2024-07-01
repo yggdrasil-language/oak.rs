@@ -70,6 +70,10 @@ impl AsDocument for SqlStatement {
 impl AsDocument for SelectStatement {
     fn as_document(&self, _config: &Self::Config) -> Document<'_> {
         let mut parts = Vec::new();
+        if let Some(with) = &self.with {
+            parts.push(with.as_document(&()));
+            parts.push(line);
+        }
         parts.push(Document::text("SELECT"));
 
         if let Some(quantifier) = &self.quantifier {
@@ -120,6 +124,25 @@ impl AsDocument for SelectStatement {
         }
 
         Document::group(Document::Concat(parts))
+    }
+}
+
+#[cfg(feature = "oak-pretty-print")]
+impl AsDocument for WithClause {
+    fn as_document(&self, _config: &Self::Config) -> Document<'_> {
+        let ctes = Document::join(self.ctes.iter().map(|cte| cte.as_document(&())), doc!(",", line));
+        doc!("WITH", indent(doc!(line, ctes)))
+    }
+}
+
+#[cfg(feature = "oak-pretty-print")]
+impl AsDocument for CteDefinition {
+    fn as_document(&self, _config: &Self::Config) -> Document<'_> {
+        let mut head = self.name.as_document(&());
+        if !self.columns.is_empty() {
+            head = doc!(head, "(", Document::join(self.columns.iter().map(|column| column.as_document(&())), doc!(",", soft_space)), ")");
+        }
+        doc!(head, soft_space, "AS", soft_space, "(", self.query.as_document(&()), ")")
     }
 }
 
