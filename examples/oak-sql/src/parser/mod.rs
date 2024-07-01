@@ -37,6 +37,36 @@ impl<'config> SqlParser<'config> {
 
 pub(crate) type State<'a, S> = ParserState<'a, SqlLanguage, S>;
 
+/// Returns whether the current token is the bare word `word`, ignoring case.
+///
+/// `OVER`, `PARTITION`, `ROWS`, `RANGE`, `UNBOUNDED`, `PRECEDING`, `FOLLOWING`
+/// and `CURRENT` are not keywords in this lexer: they stay `Identifier_` tokens
+/// and only act as window syntax where a window specification is expected, so
+/// they keep working as ordinary column names everywhere else.
+fn at_word<S: Source + ?Sized>(state: &State<'_, S>, word: &str) -> bool {
+    state.peek_kind() == Some(crate::lexer::SqlTokenType::Identifier_) && state.peek_text().is_some_and(|text| text.eq_ignore_ascii_case(word))
+}
+
+/// Consumes the current token when it is the bare word `word`.
+fn eat_word<S: Source + ?Sized>(state: &mut State<'_, S>, word: &str) -> bool {
+    if at_word(state, word) {
+        state.bump();
+        true
+    }
+    else {
+        false
+    }
+}
+
+/// Returns whether the current token can start a column of a window clause.
+///
+/// Inside `OVER (...)` the clause words are syntax, so `ROWS`, `RANGE`,
+/// `PARTITION`, `ORDER`, `)`, `,` and the end of the stream all close the list.
+fn at_window_item_start<S: Source + ?Sized>(state: &State<'_, S>) -> bool {
+    use crate::lexer::SqlTokenType::*;
+    matches!(state.peek_kind(), Some(kind) if !matches!(kind, RightParen | Comma | Semicolon | Eof | Order | Asc | Desc | Nulls)) && !at_word(state, "ROWS") && !at_word(state, "RANGE") && !at_word(state, "PARTITION")
+}
+
 impl<'config> Pratt<SqlLanguage> for SqlParser<'config> {
     fn primary<'a, S: Source + ?Sized>(&self, state: &mut State<'a, S>) -> &'a GreenNode<'a, SqlLanguage> {
         use crate::lexer::SqlTokenType::*;
@@ -213,6 +243,12 @@ impl<'config> Pratt<SqlLanguage> for SqlParser<'config> {
                 }
             }
             state.expect(RightParen).ok();
+            // `OVER (...)` turns the call into a window function. A bare `OVER`
+            // that is not followed by `(` keeps its old reading as an alias, so
+            // `SELECT COUNT(*) over` does not start a window specification.
+            if at_word(state, "OVER") && state.peek_non_trivia_kind_at(1) == Some(LeftParen) {
+                self.parse_window_spec(state);
+            }
             return Some(state.finish_at(cp, SqlElementType::FunctionCall));
         }
 
@@ -316,6 +352,193 @@ impl<'config> Pratt<SqlLanguage> for SqlParser<'config> {
 }
 
 impl<'config> SqlParser<'config> {
+    /// Parses `OVER (PARTITION BY ... ORDER BY ... [ROWS|RANGE frame])`.
+    ///
+    /// Each clause becomes its own child node so the builder reads the window
+    /// without scanning leaves. Forms the AST cannot express are reported here
+    /// rather than silently accepted.
+    fn parse_window_spec<'a, S: Source + ?Sized>(&self, state: &mut State<'a, S>) -> &'a GreenNode<'a, SqlLanguage> {
+        use crate::lexer::SqlTokenType::*;
+        let cp = state.checkpoint();
+        state.bump(); // OVER
+        state.expect(LeftParen).ok();
+
+        if state.peek_kind() == Some(RightParen) {
+            state.errors.push(OakError::custom_error("`OVER` requires `PARTITION BY`, `ORDER BY`, or a window frame"));
+        }
+        else {
+            if at_word(state, "PARTITION") {
+                self.parse_window_partition(state);
+            }
+            // A second `PARTITION BY` is not part of the syntax. Report it and
+            // consume it so the later clauses still parse as their own nodes.
+            if at_word(state, "PARTITION") {
+                state.errors.push(OakError::custom_error("Duplicate `PARTITION BY` in window specification"));
+                self.parse_window_partition(state);
+            }
+            if state.at(Order) {
+                self.parse_window_order_by(state);
+            }
+            if at_word(state, "ROWS") || at_word(state, "RANGE") {
+                self.parse_window_frame(state);
+            }
+            if state.peek_kind() != Some(RightParen) {
+                state.errors.push(OakError::custom_error("Unexpected token in window specification"));
+                // Keep the tree covering the source so later statements keep
+                // their absolute offsets.
+                state.advance_until(RightParen);
+            }
+        }
+
+        state.expect(RightParen).ok();
+        state.finish_at(cp, SqlElementType::WindowSpec)
+    }
+
+    /// Parses `PARTITION BY column, ...` into a window clause node.
+    fn parse_window_partition<'a, S: Source + ?Sized>(&self, state: &mut State<'a, S>) {
+        use crate::lexer::SqlTokenType::*;
+        let cp = state.checkpoint();
+        state.bump(); // PARTITION
+        state.expect(By).ok();
+        self.parse_window_columns(state, "`PARTITION BY`");
+        state.finish_at(cp, SqlElementType::WindowPartition);
+    }
+
+    /// Parses `ORDER BY column [ASC|DESC] [NULLS FIRST|LAST], ...`.
+    fn parse_window_order_by<'a, S: Source + ?Sized>(&self, state: &mut State<'a, S>) {
+        use crate::lexer::SqlTokenType::*;
+        let cp = state.checkpoint();
+        state.bump(); // ORDER
+        state.expect(By).ok();
+        loop {
+            if !at_window_item_start(state) {
+                break;
+            }
+            let item = PrattParser::parse(state, 0, self);
+            if item.kind() != SqlElementType::Identifier {
+                state.errors.push(OakError::custom_error("`ORDER BY` in a window accepts only column references"));
+            }
+            if matches!(state.peek_kind(), Some(Asc | Desc)) {
+                state.bump();
+            }
+            if state.at(Nulls) {
+                state.bump();
+                if matches!(state.peek_kind(), Some(First | Last)) {
+                    state.bump();
+                }
+            }
+            if !state.eat(Comma) {
+                break;
+            }
+        }
+        state.finish_at(cp, SqlElementType::WindowOrderBy);
+    }
+
+    /// Parses the comma separated column list of `PARTITION BY`.
+    fn parse_window_columns<'a, S: Source + ?Sized>(&self, state: &mut State<'a, S>, clause: &str) {
+        let mut count = 0usize;
+        loop {
+            if !at_window_item_start(state) {
+                break;
+            }
+            let item = PrattParser::parse(state, 0, self);
+            if item.kind() != SqlElementType::Identifier {
+                state.errors.push(OakError::custom_error(format!("{clause} in a window accepts only column references")));
+            }
+            count += 1;
+            if !state.eat(crate::lexer::SqlTokenType::Comma) {
+                break;
+            }
+        }
+        if count == 0 {
+            state.errors.push(OakError::custom_error(format!("{clause} requires at least one column")));
+        }
+    }
+
+    /// Parses a `ROWS` / `RANGE` frame, including its optional `BETWEEN` pair.
+    ///
+    /// The bounds it reads also drive the frame validation: a frame may not start
+    /// with `UNBOUNDED FOLLOWING` and may not start after its end bound.
+    fn parse_window_frame<'a, S: Source + ?Sized>(&self, state: &mut State<'a, S>) {
+        use crate::ast::WindowFrameBound;
+        use crate::lexer::SqlTokenType::*;
+        let cp = state.checkpoint();
+        state.bump(); // ROWS | RANGE
+        if state.at(Between) {
+            state.bump();
+            let start = self.parse_window_frame_bound(state);
+            state.expect(And).ok();
+            let end = self.parse_window_frame_bound(state);
+            if let (Some(start), Some(end)) = (&start, &end) {
+                if matches!(start, WindowFrameBound::UnboundedFollowing) {
+                    state.errors.push(OakError::custom_error("`UNBOUNDED FOLLOWING` cannot start a window frame"));
+                }
+                else if start.is_after(end) {
+                    state.errors.push(OakError::custom_error("A window frame cannot start after its end bound"));
+                }
+            }
+        }
+        else {
+            if let Some(start) = self.parse_window_frame_bound(state) {
+                if matches!(start, WindowFrameBound::UnboundedFollowing) {
+                    state.errors.push(OakError::custom_error("`UNBOUNDED FOLLOWING` cannot start a window frame"));
+                }
+            }
+        }
+        if at_word(state, "EXCLUDE") {
+            state.errors.push(OakError::custom_error("`EXCLUDE` is not supported in a window frame"));
+            state.advance_until(RightParen);
+        }
+        state.finish_at(cp, SqlElementType::WindowFrame);
+    }
+
+    /// Parses one `UNBOUNDED PRECEDING` / `n PRECEDING` / `CURRENT ROW` /
+    /// `n FOLLOWING` / `UNBOUNDED FOLLOWING` frame bound.
+    ///
+    /// Returns the bound when it is one the AST can express, so the caller can
+    /// validate the resulting frame before it reaches the builder.
+    fn parse_window_frame_bound<'a, S: Source + ?Sized>(&self, state: &mut State<'a, S>) -> Option<crate::ast::WindowFrameBound> {
+        use crate::ast::WindowFrameBound;
+        use crate::lexer::SqlTokenType::*;
+        if at_word(state, "UNBOUNDED") {
+            state.bump();
+            if eat_word(state, "PRECEDING") {
+                return Some(WindowFrameBound::UnboundedPreceding);
+            }
+            if eat_word(state, "FOLLOWING") {
+                return Some(WindowFrameBound::UnboundedFollowing);
+            }
+            state.errors.push(OakError::custom_error("`UNBOUNDED` must be followed by `PRECEDING` or `FOLLOWING`"));
+            return None;
+        }
+        if at_word(state, "CURRENT") {
+            state.bump();
+            if state.expect(Row).is_err() {
+                return None;
+            }
+            return Some(WindowFrameBound::CurrentRow);
+        }
+        if state.at(NumberLiteral) {
+            let offset = state.peek_text().and_then(|text| text.parse::<u64>().ok());
+            state.bump();
+            let Some(offset) = offset
+            else {
+                state.errors.push(OakError::custom_error("A window frame offset must be a non-negative integer"));
+                return None;
+            };
+            if eat_word(state, "PRECEDING") {
+                return Some(WindowFrameBound::Preceding(offset));
+            }
+            if eat_word(state, "FOLLOWING") {
+                return Some(WindowFrameBound::Following(offset));
+            }
+            state.errors.push(OakError::custom_error("A window frame offset must be followed by `PRECEDING` or `FOLLOWING`"));
+            return None;
+        }
+        state.errors.push(OakError::custom_error("Unsupported window frame bound"));
+        None
+    }
+
     fn parse_statement<'a, S: Source + ?Sized>(&self, state: &mut State<'a, S>) -> Result<(), OakError> {
         use crate::lexer::SqlTokenType::*;
         match state.peek_kind() {
