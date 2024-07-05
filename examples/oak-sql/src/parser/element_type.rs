@@ -76,6 +76,10 @@ pub enum SqlElementType {
     Subquery,
     /// Function call.
     FunctionCall,
+    /// CASE WHEN ... THEN ... [ELSE ...] END expression.
+    Case,
+    /// CAST(expr AS type) expression.
+    Cast,
 }
 
 impl ElementType for SqlElementType {
@@ -86,7 +90,7 @@ impl ElementType for SqlElementType {
         match self {
             Self::Root => Root,
             Self::Identifier | Self::TableName | Self::ColumnName | Self::Alias => Name,
-            Self::Expression | Self::FunctionCall => Expression,
+            Self::Expression | Self::FunctionCall | Self::Case | Self::Cast => Expression,
             Self::ErrorNode => Error,
             Self::SelectStatement
             | Self::InsertStatement

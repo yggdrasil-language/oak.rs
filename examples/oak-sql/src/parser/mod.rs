@@ -88,6 +88,34 @@ impl<'config> Pratt<SqlLanguage> for SqlParser<'config> {
                 state.bump();
                 state.finish_at(cp, SqlElementType::ErrorNode)
             }
+            Some(Case) => {
+                // CASE WHEN ... THEN ... [ELSE ...] END — bare CASE form only
+                state.bump(); // CASE
+                while state.peek_kind() == Some(When) {
+                    state.bump(); // WHEN
+                    PrattParser::parse(state, 0, self);
+                    state.expect(Then).ok();
+                    PrattParser::parse(state, 0, self);
+                }
+                if state.eat(Else) {
+                    PrattParser::parse(state, 0, self);
+                }
+                state.expect(End).ok();
+                state.finish_at(cp, SqlElementType::Expression)
+            }
+            Some(Cast) => {
+                // CAST(expr AS type_name) — type_name may be multi-token (e.g. VARCHAR(32))
+                state.bump(); // CAST
+                state.expect(LeftParen).ok();
+                PrattParser::parse(state, 0, self);
+                state.expect(As).ok();
+                // Consume type tokens until RightParen
+                while state.not_at_end() && state.peek_kind() != Some(RightParen) {
+                    state.bump();
+                }
+                state.expect(RightParen).ok();
+                state.finish_at(cp, SqlElementType::Expression)
+            }
             _ => {
                 state.bump();
                 state.finish_at(cp, SqlElementType::ErrorNode)
