@@ -929,7 +929,146 @@ fn test_sql_builder_insert() {
     };
     assert_eq!(insert.table_name.name.name.as_ref(), "users");
     assert_eq!(insert.columns.len(), 2);
-    assert_eq!(insert.values.len(), 2);
+    assert_eq!(insert.rows.len(), 1);
+    assert_eq!(insert.rows[0].len(), 2);
+    assert!(matches!(insert.source, InsertSource::Values));
+    assert!(insert.on_conflict.is_none());
+    assert!(insert.returning.is_none());
+}
+
+#[test]
+fn test_sql_builder_insert_multiple_rows() {
+    let (statement, source) = build_statement("INSERT INTO users (name, age) VALUES ('John', 25), ('Jane', 30);");
+
+    let SqlStatement::Insert(insert) = &statement
+    else {
+        panic!("Expected Insert statement, got {statement:?}");
+    };
+    assert!(matches!(insert.source, InsertSource::Values));
+    assert_eq!(insert.rows.len(), 2);
+    assert_eq!(insert.rows[0].len(), 2);
+    assert_eq!(insert.rows[1].len(), 2);
+    assert_eq!(source, "INSERT INTO users(name,age)VALUES('John',25),('Jane',30);");
+
+    // The rendered source must reparse into the same row boundaries.
+    let (reparsed, reparsed_source) = build_statement(&source);
+    let SqlStatement::Insert(reparsed) = &reparsed
+    else {
+        panic!("Expected Insert statement after round trip, got {reparsed:?}");
+    };
+    assert_eq!(reparsed.rows.len(), 2);
+    assert_eq!(reparsed.rows[0].len(), 2);
+    assert_eq!(reparsed_source, source);
+}
+
+#[test]
+fn test_sql_builder_insert_select() {
+    let (statement, source) = build_statement("INSERT INTO archive (id, name) SELECT id, name FROM users;");
+
+    let SqlStatement::Insert(insert) = &statement
+    else {
+        panic!("Expected Insert statement, got {statement:?}");
+    };
+    let InsertSource::Select(query) = &insert.source
+    else {
+        panic!("Expected a nested SELECT, got {:?}", insert.source);
+    };
+    assert_eq!(query.items.len(), 2);
+    assert!(query.from.is_some());
+    assert!(insert.rows.is_empty());
+    assert_eq!(source, "INSERT INTO archive(id,name)SELECT id,name FROM users;");
+
+    let (reparsed, reparsed_source) = build_statement(&source);
+    let SqlStatement::Insert(reparsed) = &reparsed
+    else {
+        panic!("Expected Insert statement after round trip, got {reparsed:?}");
+    };
+    assert!(matches!(reparsed.source, InsertSource::Select(_)));
+    assert_eq!(reparsed_source, source);
+}
+
+#[test]
+fn test_sql_builder_insert_on_conflict_do_nothing() {
+    let (statement, source) = build_statement("INSERT INTO users (name) VALUES ('John') ON CONFLICT (name) DO NOTHING;");
+
+    let SqlStatement::Insert(insert) = &statement
+    else {
+        panic!("Expected Insert statement, got {statement:?}");
+    };
+    let on_conflict = insert.on_conflict.as_ref().unwrap_or_else(|| panic!("Expected `ON CONFLICT`, got {insert:?}"));
+    assert_eq!(on_conflict.columns.len(), 1);
+    assert_eq!(on_conflict.columns[0].name.as_ref(), "name");
+    assert!(matches!(on_conflict.action, OnConflictAction::DoNothing));
+    assert_eq!(source, "INSERT INTO users(name)VALUES('John')ON CONFLICT(name)DO NOTHING;");
+
+    let (reparsed, reparsed_source) = build_statement(&source);
+    let SqlStatement::Insert(reparsed) = &reparsed
+    else {
+        panic!("Expected Insert statement after round trip, got {reparsed:?}");
+    };
+    assert!(matches!(reparsed.on_conflict.as_ref().map(|it| &it.action), Some(OnConflictAction::DoNothing)));
+    assert_eq!(reparsed_source, source);
+}
+
+#[test]
+fn test_sql_builder_insert_on_conflict_do_update() {
+    let (statement, _source) = build_statement("INSERT INTO users (id, name) VALUES (1, 'John') ON CONFLICT (id) DO UPDATE SET name = 'Jane' WHERE users.name IS NULL;");
+
+    let SqlStatement::Insert(insert) = &statement
+    else {
+        panic!("Expected Insert statement, got {statement:?}");
+    };
+    let on_conflict = insert.on_conflict.as_ref().unwrap_or_else(|| panic!("Expected `ON CONFLICT`, got {insert:?}"));
+    assert_eq!(on_conflict.columns.len(), 1);
+    let OnConflictAction::DoUpdate { assignments, selection } = &on_conflict.action
+    else {
+        panic!("Expected `DO UPDATE`, got {:?}", on_conflict.action);
+    };
+    assert_eq!(assignments.len(), 1);
+    assert_eq!(assignments[0].column.name.as_ref(), "name");
+    assert!(selection.is_some());
+
+    // Round trip through `ToSource` keeps the clause intact.
+    let (_, rendered) = build_statement("INSERT INTO users (id, name) VALUES (1, 'John') ON CONFLICT (id) DO UPDATE SET name = 'Jane' WHERE users.name IS NULL;");
+    let (reparsed, reparsed_source) = build_statement(&rendered);
+    let SqlStatement::Insert(reparsed) = &reparsed
+    else {
+        panic!("Expected Insert statement after round trip, got {reparsed:?}");
+    };
+    let reparsed_conflict = reparsed.on_conflict.as_ref().unwrap_or_else(|| panic!("Expected `ON CONFLICT` after round trip, got {reparsed:?}"));
+    let OnConflictAction::DoUpdate { assignments, selection } = &reparsed_conflict.action
+    else {
+        panic!("Expected `DO UPDATE` after round trip, got {:?}", reparsed_conflict.action);
+    };
+    assert_eq!(assignments.len(), 1);
+    assert!(selection.is_some());
+    assert_eq!(reparsed_source, rendered);
+}
+
+#[test]
+fn test_sql_builder_insert_returning() {
+    let (statement, source) = build_statement("INSERT INTO users (name) VALUES ('John') RETURNING id, name AS alias;");
+
+    let SqlStatement::Insert(insert) = &statement
+    else {
+        panic!("Expected Insert statement, got {statement:?}");
+    };
+    let returning = insert.returning.as_ref().unwrap_or_else(|| panic!("Expected `RETURNING`, got {insert:?}"));
+    assert_eq!(returning.items.len(), 2);
+    let SelectItem::Expression { alias: Some(alias), .. } = &returning.items[1]
+    else {
+        panic!("Expected an aliased returned item, got {:?}", returning.items[1]);
+    };
+    assert_eq!(alias.name.as_ref(), "alias");
+    assert_eq!(source, "INSERT INTO users(name)VALUES('John')RETURNING id,name AS alias;");
+
+    let (reparsed, reparsed_source) = build_statement(&source);
+    let SqlStatement::Insert(reparsed) = &reparsed
+    else {
+        panic!("Expected Insert statement after round trip, got {reparsed:?}");
+    };
+    assert_eq!(reparsed.returning.as_ref().map(|it| it.items.len()), Some(2));
+    assert_eq!(reparsed_source, source);
 }
 
 #[ignore = "SQL builder/AST round-trip tests are out of date"]

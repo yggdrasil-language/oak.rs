@@ -771,9 +771,13 @@ impl<'config> SqlParser<'config> {
                     }
                     else if state.eat(Update) {
                         state.expect(Set).ok();
-                        while state.not_at_end() && state.peek_kind() != Some(Where) && state.peek_kind() != Some(Semicolon) && state.peek_kind() != Some(Returning) {
+                        while state.not_at_end() && !matches!(state.peek_kind(), Some(Where | Semicolon | Returning | Eof)) {
                             let assign_cp = state.checkpoint();
+
+                            let col_cp = state.checkpoint();
                             state.expect(Identifier_).ok();
+                            state.finish_at(col_cp, SqlElementType::ColumnName);
+
                             state.expect(Equal).ok();
                             PrattParser::parse(state, 0, self);
                             state.finish_at(assign_cp, SqlElementType::Assignment);
@@ -795,7 +799,10 @@ impl<'config> SqlParser<'config> {
         use crate::lexer::SqlTokenType::*;
         if state.eat(Returning) {
             let cp = state.checkpoint();
-            while state.not_at_end() && state.peek_kind() != Some(Semicolon) {
+            while state.not_at_end() && !matches!(state.peek_kind(), Some(Semicolon | Eof)) {
+                // A returned item has the same shape as a select item, so the
+                // builder can reuse `build_select_item` for both.
+                let item_cp = state.checkpoint();
                 if state.eat(Star) {
                     // All columns
                 }
@@ -808,6 +815,7 @@ impl<'config> SqlParser<'config> {
                         state.bump();
                     }
                 }
+                state.finish_at(item_cp, SqlElementType::SelectItem);
                 if !state.eat(Comma) {
                     break;
                 }
