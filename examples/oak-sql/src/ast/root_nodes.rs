@@ -1,7 +1,7 @@
 use crate::ast::statements::{
     ddl::{AlterStatement, CreateStatement, DropStatement},
     dml::{DeleteStatement, InsertStatement, UpdateStatement},
-    query::SelectStatement,
+    query::{SelectStatement, SetOperationStatement},
     session::{PragmaStatement, SetNamesStatement, SetVariableStatement, ShowStatement, TransactionStatement},
 };
 use core::range::Range;
@@ -39,6 +39,8 @@ impl ToSource for SqlRoot {
 pub enum SqlStatement {
     /// A SELECT statement.
     Select(SelectStatement),
+    /// A set operation between SELECT statements.
+    SetOperation(SetOperationStatement),
     /// An INSERT statement.
     Insert(InsertStatement),
     /// An UPDATE statement.
@@ -81,6 +83,7 @@ impl ToSource for SqlStatement {
     fn to_source(&self, buffer: &mut SourceBuffer) {
         match self {
             SqlStatement::Select(s) => s.to_source(buffer),
+            SqlStatement::SetOperation(s) => s.to_source(buffer),
             SqlStatement::Insert(s) => s.to_source(buffer),
             SqlStatement::Update(s) => s.to_source(buffer),
             SqlStatement::Delete(s) => s.to_source(buffer),

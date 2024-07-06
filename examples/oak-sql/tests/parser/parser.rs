@@ -836,6 +836,79 @@ fn test_sql_builder_unconsumed_trailing_tokens_are_reported() {
 }
 
 #[test]
+fn test_sql_builder_set_operations() {
+    for (sql, expected_operator, expected_source) in [
+        ("SELECT a FROM t UNION SELECT b FROM u;", SetOperator::Union, "SELECT a FROM t UNION SELECT b FROM u;"),
+        ("SELECT a FROM t UNION ALL SELECT b FROM u;", SetOperator::UnionAll, "SELECT a FROM t UNION ALL SELECT b FROM u;"),
+        ("SELECT a FROM t INTERSECT SELECT b FROM u;", SetOperator::Intersect, "SELECT a FROM t INTERSECT SELECT b FROM u;"),
+        ("SELECT a FROM t EXCEPT SELECT b FROM u;", SetOperator::Except, "SELECT a FROM t EXCEPT SELECT b FROM u;"),
+    ] {
+        let (statement, source) = build_statement(sql);
+        let SqlStatement::SetOperation(set) = &statement
+        else {
+            panic!("Expected set operation for {sql}, got {statement:?}");
+        };
+        assert_eq!(set.operator, expected_operator, "{sql}");
+        assert_eq!(sql.get(set.left.span.start..set.left.span.end).map(str::trim), Some("SELECT a FROM t"), "{sql}");
+        assert_eq!(sql.get(set.right.span.start..set.right.span.end).map(str::trim), Some("SELECT b FROM u"), "{sql}");
+        assert!(set.order_by.is_none(), "{sql}");
+        assert!(set.limit.is_none(), "{sql}");
+        assert_eq!(source, expected_source, "{sql}");
+
+        // The printed source must parse back into the same statement.
+        let (rebuilt, rebuilt_source) = build_statement(&source);
+        let SqlStatement::SetOperation(rebuilt) = &rebuilt
+        else {
+            panic!("Expected set operation after round trip for {sql}, got {rebuilt:?}");
+        };
+        assert_eq!(rebuilt.operator, expected_operator, "{sql}");
+        assert_eq!(rebuilt_source, source, "{sql}");
+    }
+}
+
+/// `ORDER BY` and `LIMIT` after a set operation apply to the combined result, so
+/// they must not end up on the right branch.
+#[test]
+fn test_sql_builder_set_operation_tail_binds_to_whole_result() {
+    let sql = "SELECT a FROM t UNION SELECT b FROM u ORDER BY a LIMIT 5;";
+    let (statement, source) = build_statement(sql);
+    let SqlStatement::SetOperation(set) = &statement
+    else {
+        panic!("Expected set operation, got {statement:?}");
+    };
+    assert_eq!(set.operator, SetOperator::Union);
+    let order_by = set.order_by.as_ref().unwrap_or_else(|| panic!("Missing ORDER BY on the set operation"));
+    assert_eq!(order_by.items.len(), 1);
+    let limit = set.limit.as_ref().unwrap_or_else(|| panic!("Missing LIMIT on the set operation"));
+    assert!(matches!(&limit.limit, Expression::Literal(Literal::Number(value, _)) if value.as_ref() == "5"));
+    assert!(set.right.order_by.is_none(), "ORDER BY must not bind to the right branch");
+    assert!(set.right.limit.is_none(), "LIMIT must not bind to the right branch");
+    assert_eq!(source, "SELECT a FROM t UNION SELECT b FROM u ORDER BY a ASC LIMIT 5;");
+
+    let (rebuilt, rebuilt_source) = build_statement(&source);
+    let SqlStatement::SetOperation(rebuilt) = &rebuilt
+    else {
+        panic!("Expected set operation after round trip, got {rebuilt:?}");
+    };
+    assert!(rebuilt.order_by.is_some());
+    assert!(rebuilt.limit.is_some());
+    assert!(rebuilt.right.order_by.is_none());
+    assert_eq!(rebuilt_source, source);
+}
+
+#[test]
+fn test_sql_builder_set_operations_reject_unsupported_shapes() {
+    let config = SqlLanguage::default();
+    let builder = SqlBuilder::new(&config);
+    let mut session = ParseSession::<SqlLanguage>::default();
+    let result = builder.build(&SourceText::new("SELECT a FROM t UNION SELECT b FROM u UNION SELECT c FROM v;"), &[], &mut session);
+    assert!(result.result.is_err(), "chained set operations must be rejected: {:?}", result.result);
+
+    let reason = rejection_reason("SELECT a FROM t UNION;");
+    assert!(!reason.is_empty(), "a set operation without its right SELECT must be reported");
+}
+
+#[test]
 fn test_sql_builder_insert() {
     let config = SqlLanguage::default();
     let builder = SqlBuilder::new(&config);
