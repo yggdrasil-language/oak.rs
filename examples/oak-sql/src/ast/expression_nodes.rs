@@ -482,7 +482,9 @@ impl ToSource for Identifier {
 pub struct TableName {
     /// The name of the table.
     pub name: Identifier,
-    /// The span of the table name.
+    /// The optional alias, as written in `FROM users u` or `FROM users AS u`.
+    pub alias: Option<Identifier>,
+    /// The span of the table name, including its alias when one was written.
     #[serde(with = "oak_core::serde_range")]
     pub span: Range<usize>,
 }
@@ -490,6 +492,10 @@ pub struct TableName {
 impl ToSource for TableName {
     fn to_source(&self, buffer: &mut SourceBuffer) {
         self.name.to_source(buffer);
+        if let Some(alias) = &self.alias {
+            buffer.push("AS");
+            alias.to_source(buffer);
+        }
     }
 }
 
