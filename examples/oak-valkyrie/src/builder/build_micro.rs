@@ -374,7 +374,7 @@ impl<'config> ValkyrieBuilder<'config> {
             match child {
                 RedTree::Leaf(t) => match t.kind {
                     ValkyrieTokenType::Whitespace | ValkyrieTokenType::Newline | ValkyrieTokenType::LineComment | ValkyrieTokenType::BlockComment => continue,
-                    ValkyrieTokenType::Identifier => {
+                    _ if t.kind.is_soft_identifier() => {
                         if name.is_none() {
                             name = Some(Identifier { name: text(source, t.span), span: t.span });
                         }

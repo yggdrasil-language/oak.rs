@@ -45,7 +45,7 @@ pub(crate) fn parse_object_initializer<S: oak_core::Source + ?Sized>(state: &mut
             state.bump();
             state.sink.finish_node(name_cp, ValkyrieElementType::IdentifierExpression);
             if state.at(ValkyrieTokenType::Colon) || state.at(ValkyrieTokenType::Eq) {
-                let field_cp = state.sink.checkpoint() - 1;
+                let field_cp = state.sink.last_node_checkpoint();
                 state.bump();
                 crate::parser::parse_expressions::parse_expression(state)?;
                 state.sink.finish_node(field_cp, ValkyrieElementType::BinaryExpression);
