@@ -10,8 +10,8 @@ pub struct SelectStatement {
     pub quantifier: Option<SelectQuantifier>,
     /// The items to select (columns, expressions, or `*`).
     pub items: Vec<SelectItem>,
-    /// The table to select from.
-    pub from: Option<TableName>,
+    /// The row source of the `FROM` clause.
+    pub from: Option<TableSource>,
     /// Any JOIN clauses.
     pub joins: Vec<JoinClause>,
     /// The WHERE clause selection expression.
@@ -212,6 +212,45 @@ impl ToSource for SelectItem {
     }
 }
 
+/// A row source of a `FROM` or `JOIN` clause.
+///
+/// A plain table and a derived table are different shapes: the first only names
+/// storage, the second carries a whole query that must be planned as a subquery,
+/// so flattening both into a table name would lose the query.
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub enum TableSource {
+    /// A named table, optionally aliased (`FROM users u`).
+    Table(TableName),
+    /// A derived table built from a subquery (`FROM (SELECT ...) AS x`).
+    Derived {
+        /// The subquery that produces the rows.
+        query: Box<SelectStatement>,
+        /// The optional alias the derived table is referenced by.
+        alias: Option<Identifier>,
+        /// The span of the whole derived table, including its alias.
+        #[serde(with = "oak_core::serde_range")]
+        span: Range<usize>,
+    },
+}
+
+impl ToSource for TableSource {
+    fn to_source(&self, buffer: &mut SourceBuffer) {
+        match self {
+            TableSource::Table(table) => table.to_source(buffer),
+            TableSource::Derived { query, alias, .. } => {
+                buffer.push("(");
+                query.to_source(buffer);
+                buffer.push(")");
+                if let Some(alias) = alias {
+                    buffer.push("AS");
+                    alias.to_source(buffer);
+                }
+            }
+        }
+    }
+}
+
 /// JOIN clause.
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
@@ -219,7 +258,7 @@ pub struct JoinClause {
     /// The type of join (e.g., INNER, LEFT).
     pub join_type: JoinType,
     /// The table being joined.
-    pub table: TableName,
+    pub table: TableSource,
     /// The join condition (ON clause).
     pub on: Option<Expression>,
     /// The span of the JOIN clause.
