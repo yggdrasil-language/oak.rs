@@ -312,12 +312,7 @@ impl AsDocument for Identifier {
 #[cfg(feature = "oak-pretty-print")]
 impl AsDocument for TableName {
     fn as_document(&self, _config: &Self::Config) -> Document<'_> {
-        if let Some(alias) = &self.alias {
-            doc!(self.name.as_document(&()), soft_space, "AS", soft_space, alias.as_document(&()))
-        }
-        else {
-            self.name.as_document(&())
-        }
+        if let Some(alias) = &self.alias { doc!(self.name.as_document(&()), soft_space, "AS", soft_space, alias.as_document(&())) } else { self.name.as_document(&()) }
     }
 }
 
@@ -328,12 +323,7 @@ impl AsDocument for TableSource {
             TableSource::Table(table) => table.as_document(&()),
             TableSource::Derived { query, alias, .. } => {
                 let subquery = doc!("(", query.as_document(&()), ")");
-                if let Some(alias) = alias {
-                    doc!(subquery, soft_space, "AS", soft_space, alias.as_document(&()))
-                }
-                else {
-                    subquery
-                }
+                if let Some(alias) = alias { doc!(subquery, soft_space, "AS", soft_space, alias.as_document(&())) } else { subquery }
             }
         }
     }
@@ -538,13 +528,7 @@ impl AsDocument for InsertStatement {
             InsertSource::Values => {
                 parts.push(line);
                 parts.push(Document::text("VALUES"));
-                let rows = self.rows.iter().map(|row| {
-                    doc!(
-                        "(",
-                        Document::join(row.iter().map(|it| it.as_document(&())), doc!(",", soft_space)),
-                        ")"
-                    )
-                });
+                let rows = self.rows.iter().map(|row| doc!("(", Document::join(row.iter().map(|it| it.as_document(&())), doc!(",", soft_space)), ")"));
                 parts.push(soft_space);
                 parts.push(Document::join(rows, doc!(",", soft_space)));
             }

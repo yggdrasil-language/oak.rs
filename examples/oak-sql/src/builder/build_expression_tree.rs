@@ -40,9 +40,7 @@ impl<'config> SqlBuilder<'config> {
         // as SqlElementType::Expression nodes whose first leaf is the CASE/CAST
         // keyword. Recognise them before the usual precedence-climbing so we don't
         // try to interpret their WHEN/THEN/ELSE tokens as binary operators.
-        let first_non_ws = children.iter().position(|c| {
-            !matches!(c, RedTree::Leaf(l) if l.kind == SqlTokenType::Whitespace)
-        });
+        let first_non_ws = children.iter().position(|c| !matches!(c, RedTree::Leaf(l) if l.kind == SqlTokenType::Whitespace));
         if let Some(pos) = first_non_ws {
             if let RedTree::Leaf(leaf) = &children[pos] {
                 let full_span = node.span();
@@ -334,11 +332,7 @@ impl<'config> SqlBuilder<'config> {
     /// The parser packages the whole CASE as a single SqlElementType::Expression
     /// node whose children interleave keyword leaves (CASE/WHEN/THEN/ELSE/END)
     /// with nested expression nodes.
-    fn build_case_expression<'a>(
-        &self,
-        node: RedNode<'a, SqlLanguage>,
-        source: &SourceText,
-    ) -> Result<Expression, OakError> {
+    fn build_case_expression<'a>(&self, node: RedNode<'a, SqlLanguage>, source: &SourceText) -> Result<Expression, OakError> {
         let full_span = node.span();
         let children: Vec<_> = node.children().collect();
         let mut iter = children.iter().peekable();
@@ -347,7 +341,8 @@ impl<'config> SqlBuilder<'config> {
         while let Some(RedTree::Leaf(l)) = iter.peek() {
             if l.kind == SqlTokenType::Whitespace || l.kind == SqlTokenType::Case {
                 iter.next();
-            } else {
+            }
+            else {
                 break;
             }
         }
@@ -360,7 +355,8 @@ impl<'config> SqlBuilder<'config> {
             while let Some(RedTree::Leaf(l)) = iter.peek() {
                 if l.kind == SqlTokenType::Whitespace {
                     iter.next();
-                } else {
+                }
+                else {
                     break;
                 }
             }
@@ -372,7 +368,8 @@ impl<'config> SqlBuilder<'config> {
                     while let Some(RedTree::Leaf(l)) = iter.peek() {
                         if l.kind == SqlTokenType::Whitespace || l.kind == SqlTokenType::Then {
                             iter.next();
-                        } else {
+                        }
+                        else {
                             break;
                         }
                     }
@@ -397,11 +394,7 @@ impl<'config> SqlBuilder<'config> {
     }
 
     /// Build a `CAST(expr AS type_name)` expression.
-    fn build_cast_expression<'a>(
-        &self,
-        node: RedNode<'a, SqlLanguage>,
-        source: &SourceText,
-    ) -> Result<Expression, OakError> {
+    fn build_cast_expression<'a>(&self, node: RedNode<'a, SqlLanguage>, source: &SourceText) -> Result<Expression, OakError> {
         let full_span = node.span();
         let children: Vec<_> = node.children().collect();
         let mut iter = children.iter().peekable();
@@ -410,7 +403,8 @@ impl<'config> SqlBuilder<'config> {
         while let Some(RedTree::Leaf(l)) = iter.peek() {
             if l.kind == SqlTokenType::Whitespace || l.kind == SqlTokenType::Cast || l.kind == SqlTokenType::LeftParen {
                 iter.next();
-            } else {
+            }
+            else {
                 break;
             }
         }
@@ -421,7 +415,8 @@ impl<'config> SqlBuilder<'config> {
         while let Some(RedTree::Leaf(l)) = iter.peek() {
             if l.kind == SqlTokenType::Whitespace || l.kind == SqlTokenType::As {
                 iter.next();
-            } else {
+            }
+            else {
                 break;
             }
         }
@@ -460,11 +455,7 @@ impl<'config> SqlBuilder<'config> {
     /// Advances the peekable iterator over a single expression child (either a
     /// nested SqlElementType::Expression node or, as a fallback, builds a leaf
     /// literal/identifier).
-    fn consume_expression_child<'a, I>(
-        &self,
-        iter: &mut std::iter::Peekable<I>,
-        source: &SourceText,
-    ) -> Result<Expression, OakError>
+    fn consume_expression_child<'a, I>(&self, iter: &mut std::iter::Peekable<I>, source: &SourceText) -> Result<Expression, OakError>
     where
         I: Iterator<Item = &'a RedTree<'a, SqlLanguage>>,
     {
@@ -472,20 +463,20 @@ impl<'config> SqlBuilder<'config> {
         while let Some(RedTree::Leaf(l)) = iter.peek() {
             if l.kind == SqlTokenType::Whitespace {
                 iter.next();
-            } else {
+            }
+            else {
                 break;
             }
         }
-        let Some(item) = iter.next() else {
+        let Some(item) = iter.next()
+        else {
             return Err(OakError::custom_error("Expected expression in CASE/CAST"));
         };
         match item {
             RedTree::Leaf(l) => {
                 // Bare literal / identifier leaf — wrap it directly.
                 match l.kind {
-                    SqlTokenType::NumberLiteral => {
-                        Ok(Expression::Literal(Literal::Number(self.get_text(l.span.clone(), source), l.span.clone())))
-                    }
+                    SqlTokenType::NumberLiteral => Ok(Expression::Literal(Literal::Number(self.get_text(l.span.clone(), source), l.span.clone()))),
                     SqlTokenType::StringLiteral => {
                         let text = self.get_text(l.span.clone(), source);
                         let content = text.trim_matches('\'');
@@ -494,19 +485,11 @@ impl<'config> SqlBuilder<'config> {
                     SqlTokenType::True => Ok(Expression::Literal(Literal::Boolean(true, l.span.clone()))),
                     SqlTokenType::False => Ok(Expression::Literal(Literal::Boolean(false, l.span.clone()))),
                     SqlTokenType::Null => Ok(Expression::Literal(Literal::Null(l.span.clone()))),
-                    SqlTokenType::Identifier_ => Ok(Expression::Identifier(Identifier {
-                        name: self.get_text(l.span.clone(), source),
-                        span: l.span.clone(),
-                    })),
-                    _ => Err(OakError::custom_error(format!(
-                        "Expected expression in CASE/CAST, got {:?}",
-                        l.kind
-                    ))),
+                    SqlTokenType::Identifier_ => Ok(Expression::Identifier(Identifier { name: self.get_text(l.span.clone(), source), span: l.span.clone() })),
+                    _ => Err(OakError::custom_error(format!("Expected expression in CASE/CAST, got {:?}", l.kind))),
                 }
             }
-            RedTree::Node(child) => {
-                self.build_expression(*child, source)
-            }
+            RedTree::Node(child) => self.build_expression(*child, source),
         }
     }
 
