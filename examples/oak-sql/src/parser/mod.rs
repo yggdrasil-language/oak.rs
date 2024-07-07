@@ -460,8 +460,7 @@ impl<'config> SqlParser<'config> {
     /// The bounds it reads also drive the frame validation: a frame may not start
     /// with `UNBOUNDED FOLLOWING` and may not start after its end bound.
     fn parse_window_frame<'a, S: Source + ?Sized>(&self, state: &mut State<'a, S>) {
-        use crate::ast::WindowFrameBound;
-        use crate::lexer::SqlTokenType::*;
+        use crate::{ast::WindowFrameBound, lexer::SqlTokenType::*};
         let cp = state.checkpoint();
         state.bump(); // ROWS | RANGE
         if state.at(Between) {
@@ -498,8 +497,7 @@ impl<'config> SqlParser<'config> {
     /// Returns the bound when it is one the AST can express, so the caller can
     /// validate the resulting frame before it reaches the builder.
     fn parse_window_frame_bound<'a, S: Source + ?Sized>(&self, state: &mut State<'a, S>) -> Option<crate::ast::WindowFrameBound> {
-        use crate::ast::WindowFrameBound;
-        use crate::lexer::SqlTokenType::*;
+        use crate::{ast::WindowFrameBound, lexer::SqlTokenType::*};
         if at_word(state, "UNBOUNDED") {
             state.bump();
             if eat_word(state, "PRECEDING") {
