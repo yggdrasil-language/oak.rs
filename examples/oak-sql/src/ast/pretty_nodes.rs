@@ -216,6 +216,9 @@ impl AsDocument for Expression {
             Expression::InSubquery { expr, query: subquery, negated, .. } => {
                 doc!(expr.as_document(&()), if *negated { doc!(soft_space, "NOT") } else { nil }, soft_space, "IN", soft_space, "(", subquery.as_document(&()), ")")
             }
+            Expression::Exists { query, negated, .. } => {
+                doc!(if *negated { doc!("NOT", soft_space) } else { nil }, "EXISTS", "(", query.as_document(&()), ")")
+            }
             Expression::Error { .. } => nil,
             Expression::Vector { elements, .. } => {
                 doc!("[", Document::join(elements.iter().map(|it| it.as_document(&())), doc!(",", soft_space)), "]")

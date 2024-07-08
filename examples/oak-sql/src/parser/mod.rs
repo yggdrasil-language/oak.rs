@@ -103,6 +103,24 @@ impl<'config> Pratt<SqlLanguage> for SqlParser<'config> {
                 state.expect(End).ok();
                 state.finish_at(cp, SqlElementType::Expression)
             }
+            Some(Exists) => {
+                // `EXISTS (SELECT ...)`: the parenthesized query is its own child
+                // node so the builder reads the subquery without scanning leaves.
+                // A leading `NOT` is handled by the prefix branch as unary `NOT`
+                // and folded back into the predicate by the builder.
+                state.bump(); // EXISTS
+                let inner_cp = state.checkpoint();
+                state.expect(LeftParen).ok();
+                if state.peek_kind() != Some(Select) {
+                    state.errors.push(OakError::custom_error("`EXISTS` requires a subquery"));
+                }
+                else if let Err(error) = self.parse_select(state) {
+                    state.errors.push(error);
+                }
+                state.expect(RightParen).ok();
+                state.finish_at(inner_cp, SqlElementType::Subquery);
+                state.finish_at(cp, SqlElementType::Expression)
+            }
             Some(Cast) => {
                 // CAST(expr AS type_name) — type_name may be multi-token (e.g. VARCHAR(32))
                 state.bump(); // CAST
