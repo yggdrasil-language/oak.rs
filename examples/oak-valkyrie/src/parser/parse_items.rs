@@ -147,11 +147,13 @@ pub(crate) fn parse_micro<S: oak_core::Source + ?Sized>(state: &mut State<'_, S>
     if state.at(ValkyrieTokenType::BraceL) {
         parse_block(state)?;
     }
+    else if state.at(ValkyrieTokenType::Semicolon) {
+        // Abstract / signature-only declaration: `micro poll(self): bool;`
+        state.bump();
+        // Do NOT create a BlockExpression — let the builder detect body.is_none() → is_abstract = true.
+    }
     else {
-        // Signature-only declaration: `private micro __host_utf8_length(s: Utf8Text): i32` or `micro poll(self): bool;`
-        if state.at(ValkyrieTokenType::Semicolon) {
-            state.bump();
-        }
+        // Implicit empty body for error recovery.
         let bcp = state.sink.checkpoint();
         state.sink.finish_node(bcp, ValkyrieElementType::BlockExpression);
     }
@@ -246,28 +248,39 @@ pub(crate) fn parse_class_member<S: oak_core::Source + ?Sized>(state: &mut State
     while state.at(ValkyrieTokenType::At) {
         parse_attribute(state)?;
     }
+    // Detect field pattern: [modifiers] name : type [= default]
+    // Case 1: name : type  (no modifier — Identifier directly followed by Colon)
+    // Case 2: mod name : type  (modifier like `mut` — Identifier, Identifier, Colon)
+    let looks_like_field = if state.at(ValkyrieTokenType::Identifier) {
+        let t1 = state.peek_non_trivia_kind_at(1);
+        let t2 = state.peek_non_trivia_kind_at(2);
+        t1 == Some(ValkyrieTokenType::Colon)  // Case 1: name : type
+            || (t1 == Some(ValkyrieTokenType::Identifier) && t2 == Some(ValkyrieTokenType::Colon))  // Case 2: mod name : type
+    } else {
+        false
+    };
+    if looks_like_field {
+        let cp = state.sink.checkpoint();
+        parse_field_modifiers(state)?;
+        if state.at(ValkyrieTokenType::Identifier) {
+            state.bump();
+        }
+        if state.at(ValkyrieTokenType::Colon) {
+            state.bump();
+            parse_type(state)?;
+        }
+        if state.at(ValkyrieTokenType::Eq) {
+            state.bump();
+            parse_expression(state)?;
+        }
+        state.sink.finish_node(cp, ValkyrieElementType::Field);
+        if state.at(ValkyrieTokenType::Comma) {
+            state.bump();
+        }
+        return Ok(());
+    }
     if state.at(ValkyrieTokenType::Identifier) {
         let next = state.peek_non_trivia_kind_at(1);
-        if next == Some(ValkyrieTokenType::Colon) {
-            let cp = state.sink.checkpoint();
-            parse_field_modifiers(state)?;
-            if state.at(ValkyrieTokenType::Identifier) {
-                state.bump();
-            }
-            if state.at(ValkyrieTokenType::Colon) {
-                state.bump();
-                parse_type(state)?;
-            }
-            if state.at(ValkyrieTokenType::Eq) {
-                state.bump();
-                parse_expression(state)?;
-            }
-            state.sink.finish_node(cp, ValkyrieElementType::Field);
-            if state.at(ValkyrieTokenType::Comma) {
-                state.bump();
-            }
-            return Ok(());
-        }
         if next.is_some_and(|kind| is_declaration_keyword(&kind)) {
             return dispatch_prefixed_declaration(state);
         }
@@ -827,7 +840,7 @@ pub(crate) fn parse_singleton<S: oak_core::Source + ?Sized>(state: &mut State<'_
     if state.at(ValkyrieTokenType::BraceL) {
         state.bump();
         while state.not_at_end() && !state.at(ValkyrieTokenType::BraceR) {
-            parse_item(state)?;
+            parse_class_member(state)?;
         }
         if state.at(ValkyrieTokenType::BraceR) {
             state.bump();

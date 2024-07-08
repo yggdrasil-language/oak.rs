@@ -648,6 +648,10 @@ impl<'config> ValkyrieBuilder<'config> {
                     _ => {}
                 },
                 RedTree::Node(n) => match n.green.kind {
+                    ValkyrieElementType::Modifier => {
+                        let modifier = self.build_modifier(n, source)?;
+                        annotations.push(ValkyrieBuilder::modifier_to_attribute(modifier));
+                    }
                     ValkyrieElementType::Attribute => annotations.push(self.build_attribute(n, source)?),
                     ValkyrieElementType::GenericParameterList => {
                         generics = self.build_generic_params(n, source)?;
