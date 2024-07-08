@@ -1337,6 +1337,41 @@ fn test_sql_builder_derived_tables() {
 }
 
 #[test]
+fn test_sql_builder_cte() {
+    let sql = "WITH young AS (SELECT id FROM users WHERE age < 18) SELECT id FROM young;";
+    let (statement, source) = build_statement(sql);
+    let SqlStatement::Select(select) = &statement
+    else {
+        panic!("Expected Select statement, got {statement:?}");
+    };
+    let with = select.with.as_ref().unwrap_or_else(|| panic!("Missing WITH clause"));
+    assert_eq!(with.ctes.len(), 1);
+    assert_eq!(with.ctes[0].name.name.as_ref(), "young");
+    assert!(with.ctes[0].columns.is_empty());
+    assert!(with.ctes[0].query.expr.is_some(), "the CTE body keeps its own WHERE");
+    assert!(matches!(select.from.as_ref(), Some(TableSource::Table(table)) if table.name.name.as_ref() == "young"));
+    assert_eq!(source, "WITH young AS(SELECT id FROM users WHERE age<18)SELECT id FROM young;");
+
+    // Multiple CTEs, an explicit column list, and a later CTE reading an earlier one.
+    let sql = "WITH a(x, y) AS (SELECT 1, 2), b AS (SELECT x FROM a) SELECT * FROM b;";
+    let (statement, source) = build_statement(sql);
+    let SqlStatement::Select(select) = &statement
+    else {
+        panic!("Expected Select statement, got {statement:?}");
+    };
+    let with = select.with.as_ref().unwrap_or_else(|| panic!("Missing WITH clause"));
+    assert_eq!(with.ctes.len(), 2);
+    assert_eq!(with.ctes[0].columns.iter().map(|column| column.name.as_ref()).collect::<Vec<_>>(), ["x", "y"]);
+    assert!(matches!(with.ctes[1].query.from.as_ref(), Some(TableSource::Table(table)) if table.name.name.as_ref() == "a"));
+    assert_eq!(source, "WITH a(x,y)AS(SELECT 1,2),b AS(SELECT x FROM a)SELECT*FROM b;");
+
+    // A recursive CTE cannot be evaluated by this AST, so it is rejected instead
+    // of being silently read as a non-recursive one.
+    let reason = rejection_reason("WITH RECURSIVE t AS (SELECT 1) SELECT * FROM t;");
+    assert!(reason.contains("recursive CTEs are not supported"), "unexpected rejection: {reason}");
+}
+
+#[test]
 fn test_sql_builder_case_when_basic() {
     let sql = "SELECT CASE WHEN a = 1 THEN 'one' END FROM t;";
     let (statement, source) = build_statement(sql);
