@@ -18,7 +18,8 @@ oak-sql = { path = "..." }
 The following is a standard workflow for parsing a complex SQL query with Joins and CTEs:
 
 ```rust
-use oak_sql::{SqlParser, SourceText, SqlLanguage};
+use oak_core::{SourceText, parser::{Parser, session::ParseSession}};
+use oak_sql::{SqlLanguage, SqlParser};
 
 fn main() {
     // 1. Prepare source code (PostgreSQL dialect)
@@ -39,13 +40,14 @@ fn main() {
     // 2. Initialize parser with specific dialect configuration
     let config = SqlLanguage::postgresql();
     let parser = SqlParser::new(&config);
+    let mut session: ParseSession<_> = ParseSession::default();
 
     // 3. Execute parsing
-    let result = parser.parse(&source);
+    let result = parser.parse(&source, &[], &mut session);
 
     // 4. Handle results
-    if result.is_success() {
-        println!("Parsing successful! AST node count: {}", result.node_count());
+    if !result.has_errors() {
+        println!("Parsing successful!");
     } else {
         eprintln!("Errors found during parsing.");
     }
@@ -60,15 +62,41 @@ After a successful parse, you can use the built-in visitor pattern or manually t
 ### 2. Incremental Parsing
 No need to re-parse an entire multi-megabyte SQL dump when small changes occur:
 ```rust
-// Assuming you have an old parse result 'old_result' and new source text 'new_source'
-let new_result = parser.reparse(&new_source, &old_result);
+use oak_core::{SourceText, TextEdit, parser::{Parser, session::ParseSession}};
+use oak_sql::{SqlLanguage, SqlParser};
+
+let config = SqlLanguage::postgresql();
+let parser = SqlParser::new(&config);
+
+let old_source = SourceText::new("SELECT a FROM t WHERE x = 1".to_string());
+let mut session: ParseSession<_> = ParseSession::default();
+let _old_result = parser.parse(&old_source, &[], &mut session);
+
+let new_source = SourceText::new("SELECT a, b FROM t WHERE x = 1".to_string());
+// Session carries the previous tree and enables node reuse via edits.
+let edits = [TextEdit { span: (7usize..7).into(), text: ", b".into() }];
+let new_result = parser.parse(&new_source, &edits, &mut session);
+# let _ = new_result;
 ```
 
 ### 3. Diagnostics
 `oak-sql` provides rich error contexts specifically tailored for database developers, handling dialect-specific syntax quirks and providing clear feedback on malformed queries:
 ```rust
-for diag in result.diagnostics() {
-    println!("[{}:{}] {}", diag.line, diag.column, diag.message);
+use oak_core::{SourceText, parser::{Parser, session::ParseSession}};
+use oak_sql::{SqlLanguage, SqlParser};
+
+let config = SqlLanguage::postgresql();
+let parser = SqlParser::new(&config);
+let source = SourceText::new("SELECT a FROM t WHERE".to_string());
+let mut session: ParseSession<_> = ParseSession::default();
+let result = parser.parse(&source, &[], &mut session);
+
+for diag in &result.diagnostics {
+    if let Some(offset) = diag.source_offset() {
+        println!("[offset {}] {}", offset, diag);
+    } else {
+        println!("{}", diag);
+    }
 }
 ```
 
