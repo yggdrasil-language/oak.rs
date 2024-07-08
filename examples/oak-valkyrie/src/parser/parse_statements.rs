@@ -64,7 +64,7 @@ pub(crate) fn parse_pattern<S: oak_core::Source + ?Sized>(state: &mut State<'_, 
     if state.at(ValkyrieTokenType::Underscore) {
         state.bump();
     }
-    else if state.at(ValkyrieTokenType::Identifier) {
+    else if super::parse_modifiers::at_identifier_like(state) {
         state.bump();
     }
     state.sink.finish_node(cp, ValkyrieElementType::Pattern);

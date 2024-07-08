@@ -66,7 +66,7 @@ pub(crate) fn build_identifier<S: Source + ?Sized>(node: &RedNode<ValkyrieLangua
     let mut name = String::new();
     for child in node.children() {
         if let RedTree::Leaf(t) = child {
-            if matches!(t.kind, ValkyrieTokenType::Identifier | ValkyrieTokenType::Keyword(crate::lexer::ValkyrieKeywords::Get | crate::lexer::ValkyrieKeywords::Set | crate::lexer::ValkyrieKeywords::SelfType)) {
+            if t.kind.is_soft_identifier() || t.kind == ValkyrieTokenType::Keyword(crate::lexer::ValkyrieKeywords::SelfType) {
                 name = crate::builder::identifier_text(source, t.span);
                 return Ok(Identifier { name, span: t.span });
             }
@@ -205,7 +205,7 @@ pub(crate) fn build_field_expr<S: Source + ?Sized>(node: &RedNode<ValkyrieLangua
 
         match child {
             RedTree::Leaf(t) => {
-                if matches!(t.kind, ValkyrieTokenType::Identifier | ValkyrieTokenType::Keyword(crate::lexer::ValkyrieKeywords::Get | crate::lexer::ValkyrieKeywords::Set)) && receiver.is_some() && field.is_none() {
+                if t.kind.is_soft_identifier() && receiver.is_some() && field.is_none() {
                     field = Some(Identifier { name: crate::builder::text(source, t.span), span: t.span });
                 }
             }
