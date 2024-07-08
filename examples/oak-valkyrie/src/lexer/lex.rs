@@ -86,6 +86,12 @@ impl crate::lexer::ValkyrieLexer<'_> {
 
     fn lex_whitespace<S: Source + ?Sized>(&self, state: &mut State<'_, S>) -> bool {
         let start = state.get_position();
+        // UTF-8 BOM（U+FEFF）只可能出现在文件开头；按 trivia 处理，不进入语法。
+        if start == 0 && state.current() == Some('\u{feff}') {
+            state.advance('\u{feff}'.len_utf8());
+            state.add_token(ValkyrieTokenType::Whitespace, start, state.get_position());
+            return true;
+        }
         let range = if VK_WHITESPACE.unicode_whitespace { state.take_while(|c| c.is_whitespace()) } else { state.skip_ascii_whitespace() };
 
         if range.end > start {
@@ -164,8 +170,10 @@ impl crate::lexer::ValkyrieLexer<'_> {
 
         if has_prefix {
             if let Some('"') = state.current() {
+                // 只有 `r"..."` 是 raw string，不解释转义；其余前缀串仍按普通串处理转义。
+                let raw = state.get_text_in((prefix_start..prefix_end).into()) == "r";
                 state.add_token(ValkyrieTokenType::StringPrefix, prefix_start, prefix_end);
-                return self.lex_symmetric_string(state, '"', ValkyrieTokenType::StringLiteral);
+                return self.lex_symmetric_string(state, '"', ValkyrieTokenType::StringLiteral, !raw);
             }
             else {
                 state.set_position(initial_start);
@@ -173,7 +181,7 @@ impl crate::lexer::ValkyrieLexer<'_> {
             }
         }
 
-        self.lex_symmetric_string(state, '"', ValkyrieTokenType::StringLiteral)
+        self.lex_symmetric_string(state, '"', ValkyrieTokenType::StringLiteral, true)
     }
 
     /// `'outer` 循环标签；`'a'` 仍按字符字面量处理。
@@ -208,10 +216,11 @@ impl crate::lexer::ValkyrieLexer<'_> {
     }
 
     fn lex_char_literal<S: Source + ?Sized>(&self, state: &mut State<'_, S>) -> bool {
-        self.lex_symmetric_string(state, '\'', ValkyrieTokenType::CharLiteral)
+        self.lex_symmetric_string(state, '\'', ValkyrieTokenType::CharLiteral, true)
     }
 
-    fn lex_symmetric_string<S: Source + ?Sized>(&self, state: &mut State<'_, S>, quote: char, kind: ValkyrieTokenType) -> bool {
+    /// 扫描对称引号字面量；`escapes` 为真时 `\` 会跳过下一个字符，避免 `\"` 提前闭合普通字符串。
+    fn lex_symmetric_string<S: Source + ?Sized>(&self, state: &mut State<'_, S>, quote: char, kind: ValkyrieTokenType, escapes: bool) -> bool {
         let start = state.get_position();
 
         let mut quote_count = 0;
@@ -239,7 +248,15 @@ impl crate::lexer::ValkyrieLexer<'_> {
         let mut current_consecutive = 0;
 
         while let Some(c) = state.current() {
-            if c == quote {
+            if escapes && c == '\\' {
+                // 转义序列属于字面量内容，不参与闭合判定。
+                current_consecutive = 0;
+                state.advance(c.len_utf8());
+                if let Some(next) = state.current() {
+                    state.advance(next.len_utf8());
+                }
+            }
+            else if c == quote {
                 current_consecutive += 1;
                 state.advance(c.len_utf8());
                 if current_consecutive == quote_count {
