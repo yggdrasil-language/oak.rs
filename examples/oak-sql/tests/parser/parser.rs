@@ -52,6 +52,54 @@ fn test_sql_builder_session_statements() {
     assert_eq!(statement.collation.as_deref(), Some("utf8mb4_bin"));
 }
 
+#[test]
+fn test_sql_builder_savepoint_round_trip() {
+    // SAVEPOINT name
+    let (statement, source) = build_statement("SAVEPOINT sp1;");
+    let SqlStatement::Transaction(t) = &statement else { panic!("Expected Transaction, got {statement:?}"); };
+    assert!(matches!(&t.action, TransactionAction::Savepoint(name) if name.as_ref() == "sp1"));
+    assert_eq!(source, "SAVEPOINT sp1;");
+
+    // ROLLBACK TO SAVEPOINT name
+    let (statement, source) = build_statement("ROLLBACK TO SAVEPOINT sp1;");
+    let SqlStatement::Transaction(t) = &statement else { panic!("Expected Transaction, got {statement:?}"); };
+    assert!(matches!(&t.action, TransactionAction::RollbackToSavepoint(name) if name.as_ref() == "sp1"));
+    assert_eq!(source, "ROLLBACK TO SAVEPOINT sp1;");
+
+    // ROLLBACK TO name (short form) — parser 接受，ToSource 输出标准全拼
+    let (statement, source) = build_statement("ROLLBACK TO sp2;");
+    let SqlStatement::Transaction(t) = &statement else { panic!("Expected Transaction, got {statement:?}"); };
+    assert!(matches!(&t.action, TransactionAction::RollbackToSavepoint(name) if name.as_ref() == "sp2"));
+    assert_eq!(source, "ROLLBACK TO SAVEPOINT sp2;");
+
+    // RELEASE SAVEPOINT name
+    let (statement, source) = build_statement("RELEASE SAVEPOINT sp3;");
+    let SqlStatement::Transaction(t) = &statement else { panic!("Expected Transaction, got {statement:?}"); };
+    assert!(matches!(&t.action, TransactionAction::ReleaseSavepoint(name) if name.as_ref() == "sp3"));
+    assert_eq!(source, "RELEASE SAVEPOINT sp3;");
+
+    // RELEASE name (short form)
+    let (statement, source) = build_statement("RELEASE sp4;");
+    let SqlStatement::Transaction(t) = &statement else { panic!("Expected Transaction, got {statement:?}"); };
+    assert!(matches!(&t.action, TransactionAction::ReleaseSavepoint(name) if name.as_ref() == "sp4"));
+    assert_eq!(source, "RELEASE SAVEPOINT sp4;");
+
+    // plain ROLLBACK still round-trips
+    let (statement, source) = build_statement("ROLLBACK;");
+    let SqlStatement::Transaction(t) = &statement else { panic!("Expected Transaction, got {statement:?}"); };
+    assert_eq!(t.action, TransactionAction::Rollback);
+    assert_eq!(source, "ROLLBACK;");
+}
+
+#[test]
+fn test_sql_builder_savepoint_missing_name_is_rejected() {
+    assert!(rejection_reason("SAVEPOINT;").contains("requires a name"), "SAVEPOINT without name must be rejected");
+    assert!(rejection_reason("ROLLBACK TO;").contains("requires a savepoint name"), "ROLLBACK TO without name must be rejected");
+    assert!(rejection_reason("ROLLBACK TO SAVEPOINT;").contains("requires a savepoint name"), "ROLLBACK TO SAVEPOINT without name must be rejected");
+    assert!(rejection_reason("RELEASE;").contains("requires a savepoint name"), "RELEASE without name must be rejected");
+    assert!(rejection_reason("RELEASE SAVEPOINT;").contains("requires a savepoint name"), "RELEASE SAVEPOINT without name must be rejected");
+}
+
 /// Builds `sql` and returns its single statement with the source it round-trips to.
 fn build_statement(sql: &str) -> (SqlStatement, String) {
     let config = SqlLanguage::default();

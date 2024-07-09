@@ -393,6 +393,8 @@ impl<'config> SqlLexer<'config> {
             "BEGIN" => SqlTokenType::Begin,
             "COMMIT" => SqlTokenType::Commit,
             "ROLLBACK" => SqlTokenType::Rollback,
+            "SAVEPOINT" => SqlTokenType::Savepoint,
+            "RELEASE" => SqlTokenType::Release,
             "TRANSACTION" => SqlTokenType::Transaction,
             "END" => SqlTokenType::End,
             "IF" => SqlTokenType::If,
