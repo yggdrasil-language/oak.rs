@@ -992,15 +992,15 @@ impl<'config> SqlParser<'config> {
 
         if state.eat(Limit) {
             let limit_cp = state.checkpoint();
-            state.expect(NumberLiteral).ok();
+            PrattParser::parse(state, 0, self);
             if state.eat(Offset) {
-                state.expect(NumberLiteral).ok();
+                PrattParser::parse(state, 0, self);
             }
             state.finish_at(limit_cp, SqlElementType::LimitClause);
         }
         else if state.eat(Offset) {
             let offset_cp = state.checkpoint();
-            state.expect(NumberLiteral).ok();
+            PrattParser::parse(state, 0, self);
             state.finish_at(offset_cp, SqlElementType::LimitClause);
         }
 
