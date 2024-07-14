@@ -1,5 +1,5 @@
-use oak_core::{ParseSession, SourceText, builder::Builder, source::ToSource};
-use oak_sql::{SqlBuilder, SqlLanguage, ast::*};
+use oak_core::{GreenNode, GreenTree, ParseSession, Parser, RedNode, RedTree, SourceText, builder::Builder, source::ToSource};
+use oak_sql::{SqlBuilder, SqlElementType, SqlLanguage, SqlParser, ast::*};
 
 #[test]
 fn test_sql_builder_select() {
@@ -1455,4 +1455,131 @@ fn test_sql_builder_cast_timestamp_with_expression() {
     assert!(matches!(expr.as_ref(), Expression::Binary { op: BinaryOperator::Plus, .. }));
     assert_eq!(target.as_ref(), "TIMESTAMP");
     assert_eq!(source, "SELECT CAST(a+b AS TIMESTAMP)FROM t;");
+}
+
+/// Returns the kinds of every node in the CST of `sql`, depth first.
+fn cst_node_kinds(sql: &str) -> Vec<SqlElementType> {
+    fn collect<'a>(node: &GreenNode<'a, SqlLanguage>, kinds: &mut Vec<SqlElementType>) {
+        kinds.push(node.kind());
+        for child in node.children() {
+            if let GreenTree::Node(child) = child {
+                collect(child, kinds);
+            }
+        }
+    }
+
+    let config = SqlLanguage::default();
+    let parser = SqlParser::new(&config);
+    let source = SourceText::new(sql.to_string());
+    let mut session = ParseSession::<SqlLanguage>::default();
+    let output = parser.parse(&source, &[], &mut session);
+    let root = output.result.unwrap_or_else(|error| panic!("{sql}: {error:?} {:?}", output.diagnostics));
+    let mut kinds = Vec::new();
+    collect(root, &mut kinds);
+    kinds
+}
+
+#[test]
+fn test_sql_builder_scalar_subquery_in_projection() {
+    let (statement, source) = build_statement("SELECT (SELECT MAX(v) FROM t) AS top FROM x;");
+    let SqlStatement::Select(select) = &statement
+    else {
+        panic!("Expected Select statement, got {statement:?}");
+    };
+    let SelectItem::Expression { expr: Expression::Subquery { query, .. }, alias, .. } = &select.items[0]
+    else {
+        panic!("Expected a scalar subquery select item, got {:?}", select.items[0]);
+    };
+    assert_eq!(alias.as_ref().map(|alias| alias.name.as_ref()), Some("top"));
+    assert!(matches!(query.from.as_ref(), Some(TableSource::Table(table)) if table.name.name.as_ref() == "t"));
+    assert!(matches!(&query.items[0], SelectItem::Expression { expr: Expression::FunctionCall { name, .. }, .. } if name.name.as_ref() == "MAX"), "Expected `MAX(v)` in the subquery, got {:?}", query.items[0]);
+    assert_eq!(source, "SELECT(SELECT MAX(v)FROM t)AS top FROM x;");
+}
+
+#[test]
+fn test_sql_builder_scalar_subquery_as_comparison_operand() {
+    let Expression::Binary { op: BinaryOperator::Equal, left, right, .. } = build_where("SELECT * FROM t WHERE a = (SELECT MAX(v) FROM u);")
+    else {
+        panic!("Expected an equality whose right operand is a subquery");
+    };
+    assert!(matches!(left.as_ref(), Expression::Identifier(identifier) if identifier.name.as_ref() == "a"));
+    let Expression::Subquery { query, span } = right.as_ref()
+    else {
+        panic!("Expected a scalar subquery, got {right:?}");
+    };
+    assert!(matches!(query.from.as_ref(), Some(TableSource::Table(table)) if table.name.name.as_ref() == "u"));
+    // The span starts at `(` and ends at the matching `)`, not at the inner query.
+    assert_eq!(&"SELECT * FROM t WHERE a = (SELECT MAX(v) FROM u);"[span.start..span.end], "(SELECT MAX(v) FROM u)");
+
+    let (_, source) = build_statement("SELECT * FROM t WHERE a = (SELECT MAX(v) FROM u);");
+    assert_eq!(source, "SELECT*FROM t WHERE a=(SELECT MAX(v)FROM u);");
+}
+
+#[test]
+fn test_sql_builder_parenthesized_expressions_stay_grouped() {
+    // Ordinary parentheses keep their grouped-expression reading and must not
+    // become subqueries.
+    let (statement, _) = build_statement("SELECT (a + b) * 2 FROM t;");
+    let SqlStatement::Select(select) = &statement
+    else {
+        panic!("Expected Select statement");
+    };
+    let SelectItem::Expression { expr: Expression::Binary { op: BinaryOperator::Star, left, .. }, .. } = &select.items[0]
+    else {
+        panic!("Expected `(a + b) * 2`, got {:?}", select.items[0]);
+    };
+    assert!(matches!(left.as_ref(), Expression::Binary { op: BinaryOperator::Plus, .. }));
+
+    // Nested parentheses still resolve to the innermost expression.
+    let (statement, _) = build_statement("SELECT ((age)) FROM users;");
+    let SqlStatement::Select(select) = &statement
+    else {
+        panic!("Expected Select statement");
+    };
+    let SelectItem::Expression { expr: Expression::Identifier(identifier), .. } = &select.items[0]
+    else {
+        panic!("Expected `age`, got {:?}", select.items[0]);
+    };
+    assert_eq!(identifier.name.as_ref(), "age");
+
+    // A comma list is a row constructor, not a subquery.
+    let Expression::InList { list, .. } = build_where("SELECT * FROM t WHERE a IN (1, 2);")
+    else {
+        panic!("Expected an IN list");
+    };
+    assert_eq!(list.len(), 2);
+}
+
+#[test]
+fn test_sql_cst_subquery_nodes() {
+    // A parenthesized query in an expression position becomes an `Expression`
+    // wrapping a `Subquery` whose child is the nested `SelectStatement`.
+    let kinds = cst_node_kinds("SELECT (SELECT MAX(v) FROM t) FROM x;");
+    let subquery = kinds.iter().position(|kind| *kind == SqlElementType::Subquery).unwrap_or_else(|| panic!("Missing Subquery node in {kinds:?}"));
+    assert_eq!(kinds.get(subquery + 1), Some(&SqlElementType::SelectStatement));
+
+    // `IN (SELECT ...)` and `EXISTS (SELECT ...)` keep producing `Subquery`
+    // nodes, so their builders keep binding as before.
+    for sql in ["SELECT * FROM t WHERE a IN (SELECT b FROM u);", "SELECT * FROM t WHERE EXISTS (SELECT b FROM u);"] {
+        let kinds = cst_node_kinds(sql);
+        assert!(kinds.contains(&SqlElementType::Subquery), "Missing Subquery node for {sql}: {kinds:?}");
+    }
+
+    // A `WITH`-prefixed parenthesized query takes the same path.
+    let kinds = cst_node_kinds("SELECT (WITH n AS (SELECT 1 AS v) SELECT v FROM n) FROM t;");
+    assert!(kinds.contains(&SqlElementType::Subquery), "Missing Subquery node for a `WITH` subquery: {kinds:?}");
+    assert!(kinds.contains(&SqlElementType::WithClause), "Missing `WithClause` node for a `WITH` subquery: {kinds:?}");
+
+    // Grouped expressions never produce a `Subquery` node.
+    let kinds = cst_node_kinds("SELECT (a + b) FROM t;");
+    assert!(!kinds.contains(&SqlElementType::Subquery), "Grouped expression became a subquery: {kinds:?}");
+}
+
+#[test]
+fn test_sql_builder_subquery_parentheses_are_required() {
+    // An empty parenthesis has nothing to select, so it stays an error.
+    assert!(!rejection_reason("SELECT () FROM t;").is_empty(), "`()` must be rejected");
+    // An unclosed subquery parenthesis must be reported instead of silently
+    // keeping a truncated query.
+    assert!(!rejection_reason("SELECT * FROM t WHERE a = (SELECT b FROM u;").is_empty(), "Unclosed `(SELECT` must be rejected");
 }

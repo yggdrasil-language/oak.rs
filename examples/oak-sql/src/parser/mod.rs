@@ -70,6 +70,21 @@ impl<'config> Pratt<SqlLanguage> for SqlParser<'config> {
                 state.finish_at(cp, SqlElementType::Expression)
             }
             Some(LeftParen) => {
+                // `(SELECT ...)` and `(WITH ... SELECT ...)` in an expression position
+                // are scalar subqueries. The parenthesized query becomes its own
+                // `Subquery` child node, the same shape `EXISTS` and `IN` already use.
+                // Any other content stays a grouped expression so `(a + b)`, nested
+                // parentheses and `(a, b)` row constructors keep their reading.
+                if matches!(state.peek_non_trivia_kind_at(1), Some(Select | With)) {
+                    let inner_cp = state.checkpoint();
+                    state.expect(LeftParen).ok();
+                    if let Err(error) = self.parse_select(state) {
+                        state.errors.push(error);
+                    }
+                    state.expect(RightParen).ok();
+                    state.finish_at(inner_cp, SqlElementType::Subquery);
+                    return state.finish_at(cp, SqlElementType::Expression);
+                }
                 state.bump();
                 while state.not_at_end() && state.peek_kind() != Some(RightParen) {
                     PrattParser::parse(state, 0, self);
