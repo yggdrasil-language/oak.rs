@@ -1,4 +1,4 @@
-use crate::ast::statements::query::SelectStatement;
+use crate::ast::statements::query::{NullsOrder, OrderDirection, SelectStatement};
 use core::range::Range;
 use oak_core::source::{SourceBuffer, ToSource};
 use std::sync::Arc;
@@ -47,6 +47,8 @@ pub enum Expression {
         args: Vec<Expression>,
         /// Whether the aggregate uses `DISTINCT` quantifier (`COUNT(DISTINCT x)`).
         distinct: bool,
+        /// The `OVER (...)` window specification, absent for plain calls.
+        window: Option<WindowSpec>,
         /// The span of the function call.
         #[cfg_attr(feature = "serde", serde(with = "oak_core::serde_range"))]
         span: Range<usize>,
@@ -211,7 +213,7 @@ impl ToSource for Expression {
                 op.to_source(buffer);
                 expr.to_source(buffer);
             }
-            Expression::FunctionCall { name, args, distinct, .. } => {
+            Expression::FunctionCall { name, args, distinct, window, .. } => {
                 name.to_source(buffer);
                 buffer.push("(");
                 if *distinct {
@@ -224,6 +226,9 @@ impl ToSource for Expression {
                     arg.to_source(buffer);
                 }
                 buffer.push(")");
+                if let Some(window) = window {
+                    window.to_source(buffer);
+                }
             }
             Expression::Vector { elements, .. } => {
                 buffer.push("[");
@@ -533,5 +538,194 @@ pub struct ColumnName {
 impl ToSource for ColumnName {
     fn to_source(&self, buffer: &mut SourceBuffer) {
         self.name.to_source(buffer);
+    }
+}
+
+/// The `OVER (...)` window specification of a function call.
+///
+/// Only column references are accepted in `PARTITION BY` and `ORDER BY`, and the
+/// frame is limited to the `ROWS` / `RANGE` forms below. Anything else is
+/// rejected while lowering the parse tree.
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct WindowSpec {
+    /// The `PARTITION BY` columns, in source order.
+    pub partition_by: Vec<Identifier>,
+    /// The `ORDER BY` items, in source order.
+    pub order_by: Vec<WindowOrderItem>,
+    /// The explicit `ROWS` / `RANGE` frame, when written.
+    pub frame: Option<WindowFrame>,
+    /// The span of the whole `OVER (...)` clause.
+    #[cfg_attr(feature = "serde", serde(with = "oak_core::serde_range"))]
+    pub span: Range<usize>,
+}
+
+impl ToSource for WindowSpec {
+    fn to_source(&self, buffer: &mut SourceBuffer) {
+        // The clauses are joined in their own buffer so optional parts never leave
+        // a doubled or trailing space inside `OVER (...)`.
+        let mut inner = SourceBuffer::new();
+        let mut empty = true;
+        if !self.partition_by.is_empty() {
+            inner.push("PARTITION BY ");
+            for (i, column) in self.partition_by.iter().enumerate() {
+                if i > 0 {
+                    inner.push(", ");
+                }
+                column.to_source(&mut inner);
+            }
+            empty = false;
+        }
+        if !self.order_by.is_empty() {
+            if !empty {
+                inner.push(" ");
+            }
+            inner.push("ORDER BY ");
+            for (i, item) in self.order_by.iter().enumerate() {
+                if i > 0 {
+                    inner.push(", ");
+                }
+                item.to_source(&mut inner);
+            }
+            empty = false;
+        }
+        if let Some(frame) = &self.frame {
+            if !empty {
+                inner.push(" ");
+            }
+            frame.to_source(&mut inner);
+        }
+        buffer.push(" OVER (");
+        buffer.push(&inner.finish());
+        buffer.push(")");
+    }
+}
+
+/// One `ORDER BY` column inside a window specification.
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct WindowOrderItem {
+    /// The column the window ordering is computed on.
+    pub column: Identifier,
+    /// The direction of the ordering.
+    pub direction: OrderDirection,
+    /// The explicit `NULLS FIRST` / `NULLS LAST` placement, when written.
+    pub nulls: Option<NullsOrder>,
+    /// The span of the item, including its direction and nulls placement.
+    #[cfg_attr(feature = "serde", serde(with = "oak_core::serde_range"))]
+    pub span: Range<usize>,
+}
+
+impl ToSource for WindowOrderItem {
+    fn to_source(&self, buffer: &mut SourceBuffer) {
+        self.column.to_source(buffer);
+        self.direction.to_source(buffer);
+        if let Some(nulls) = &self.nulls {
+            buffer.push("NULLS");
+            nulls.to_source(buffer);
+        }
+    }
+}
+
+/// The rows a window function is evaluated over.
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct WindowFrame {
+    /// Whether the frame counts rows or value ranges.
+    pub unit: WindowFrameUnit,
+    /// The bound the frame starts at.
+    pub start: WindowFrameBound,
+    /// The bound the frame ends at, absent for the single-bound form.
+    pub end: Option<WindowFrameBound>,
+    /// The span of the whole frame.
+    #[cfg_attr(feature = "serde", serde(with = "oak_core::serde_range"))]
+    pub span: Range<usize>,
+}
+
+impl ToSource for WindowFrame {
+    fn to_source(&self, buffer: &mut SourceBuffer) {
+        self.unit.to_source(buffer);
+        match &self.end {
+            Some(end) => {
+                buffer.push(" BETWEEN ");
+                self.start.to_source(buffer);
+                buffer.push(" AND ");
+                end.to_source(buffer);
+            }
+            None => {
+                buffer.push(" ");
+                self.start.to_source(buffer);
+            }
+        }
+    }
+}
+
+/// Unit of a window frame.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub enum WindowFrameUnit {
+    /// `ROWS`.
+    Rows,
+    /// `RANGE`.
+    Range,
+}
+
+impl ToSource for WindowFrameUnit {
+    fn to_source(&self, buffer: &mut SourceBuffer) {
+        match self {
+            WindowFrameUnit::Rows => buffer.push("ROWS"),
+            WindowFrameUnit::Range => buffer.push("RANGE"),
+        }
+    }
+}
+
+/// One bound of a window frame.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub enum WindowFrameBound {
+    /// `UNBOUNDED PRECEDING`.
+    UnboundedPreceding,
+    /// `n PRECEDING`.
+    Preceding(u64),
+    /// `CURRENT ROW`.
+    CurrentRow,
+    /// `n FOLLOWING`.
+    Following(u64),
+    /// `UNBOUNDED FOLLOWING`.
+    UnboundedFollowing,
+}
+
+impl WindowFrameBound {
+    /// Returns whether this bound sits after `end` in a `BETWEEN` frame.
+    ///
+    /// Offsets are compared ordinally, so `5 PRECEDING` is before `2 PRECEDING`.
+    /// An `UNBOUNDED PRECEDING` end bound is never valid, so any start is after it.
+    /// The parser and the builder share this rule to report the same frames.
+    pub(crate) fn is_after(&self, end: &WindowFrameBound) -> bool {
+        fn rank(bound: &WindowFrameBound) -> i64 {
+            match bound {
+                WindowFrameBound::UnboundedPreceding => i64::MIN,
+                WindowFrameBound::Preceding(offset) => -(*offset as i64),
+                WindowFrameBound::CurrentRow => 0,
+                WindowFrameBound::Following(offset) => *offset as i64,
+                WindowFrameBound::UnboundedFollowing => i64::MAX,
+            }
+        }
+        match end {
+            WindowFrameBound::UnboundedPreceding => true,
+            _ => rank(self) > rank(end),
+        }
+    }
+}
+
+impl ToSource for WindowFrameBound {
+    fn to_source(&self, buffer: &mut SourceBuffer) {
+        match self {
+            WindowFrameBound::UnboundedPreceding => buffer.push("UNBOUNDED PRECEDING"),
+            WindowFrameBound::Preceding(offset) => buffer.push(&format!("{offset} PRECEDING")),
+            WindowFrameBound::CurrentRow => buffer.push("CURRENT ROW"),
+            WindowFrameBound::Following(offset) => buffer.push(&format!("{offset} FOLLOWING")),
+            WindowFrameBound::UnboundedFollowing => buffer.push("UNBOUNDED FOLLOWING"),
+        }
     }
 }

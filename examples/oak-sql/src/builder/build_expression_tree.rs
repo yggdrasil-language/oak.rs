@@ -1,5 +1,5 @@
 use crate::{SqlElementType, SqlLanguage, ast::*, builder::SqlBuilder, lexer::token_type::SqlTokenType};
-use oak_core::{OakError, Range, RedNode, RedTree, SourceText};
+use oak_core::{OakError, Range, RedNode, RedTree, SourceText, TokenType};
 use std::sync::Arc;
 
 impl<'config> SqlBuilder<'config> {
@@ -531,6 +531,7 @@ impl<'config> SqlBuilder<'config> {
         let mut name = None;
         let mut args = Vec::new();
         let mut distinct = false;
+        let mut window = None;
 
         for child in node.children() {
             match child {
@@ -548,6 +549,9 @@ impl<'config> SqlBuilder<'config> {
                     else if n.green.kind == SqlElementType::Expression {
                         args.push(self.build_expression(n, source)?);
                     }
+                    else if n.green.kind == SqlElementType::WindowSpec {
+                        window = Some(self.build_window_spec(n, source)?);
+                    }
                 }
                 // `COUNT(*)` keeps the wildcard as a bare Star leaf. Dropping it
                 // would turn the call into `COUNT()` on the way back to source.
@@ -564,7 +568,169 @@ impl<'config> SqlBuilder<'config> {
             }
         }
 
-        Ok(Expression::FunctionCall { name: name.ok_or_else(|| OakError::custom_error("Missing function name"))?, args, distinct, span: node.span() })
+        Ok(Expression::FunctionCall { name: name.ok_or_else(|| OakError::custom_error("Missing function name"))?, args, distinct, window, span: node.span() })
+    }
+
+    /// Lowers an `OVER (...)` node into a [`WindowSpec`].
+    ///
+    /// `PARTITION BY` and `ORDER BY` accept only column references, a window must
+    /// name at least one clause, and the frame is limited to the forms the AST
+    /// models. Rejecting here keeps unsupported windows out of an analyzer as
+    /// valid calls.
+    fn build_window_spec<'a>(&self, node: RedNode<'a, SqlLanguage>, source: &SourceText) -> Result<WindowSpec, OakError> {
+        let mut partition_by: Vec<Identifier> = Vec::new();
+        let mut order_by: Vec<WindowOrderItem> = Vec::new();
+        let mut frame = None;
+        let mut partition_clauses = 0usize;
+
+        for child in node.children() {
+            let RedTree::Node(n) = child
+            else {
+                continue;
+            };
+            match n.green.kind {
+                SqlElementType::WindowPartition => {
+                    partition_clauses += 1;
+                    for item in n.children() {
+                        let RedTree::Node(column) = item
+                        else {
+                            continue;
+                        };
+                        partition_by.push(self.build_window_column(column, source, "`PARTITION BY`")?);
+                    }
+                }
+                SqlElementType::WindowOrderBy => order_by = self.build_window_order_by(n, source)?,
+                SqlElementType::WindowFrame => frame = Some(self.build_window_frame(n, source)?),
+                _ => {}
+            }
+        }
+
+        if partition_clauses > 1 {
+            return Err(OakError::custom_error("Duplicate `PARTITION BY` in window specification"));
+        }
+        if partition_by.is_empty() && order_by.is_empty() && frame.is_none() {
+            return Err(OakError::custom_error("`OVER` requires `PARTITION BY`, `ORDER BY`, or a window frame"));
+        }
+
+        Ok(WindowSpec { partition_by, order_by, frame, span: node.span() })
+    }
+
+    /// Builds one window column, rejecting anything that is not a column reference.
+    fn build_window_column<'a>(&self, node: RedNode<'a, SqlLanguage>, source: &SourceText, clause: &str) -> Result<Identifier, OakError> {
+        match self.build_expression(node.clone(), source)? {
+            Expression::Identifier(identifier) => Ok(identifier),
+            _ => Err(OakError::custom_error(format!("{clause} in a window accepts only column references"))),
+        }
+    }
+
+    /// Builds the `ORDER BY` items of a window specification.
+    fn build_window_order_by<'a>(&self, node: RedNode<'a, SqlLanguage>, source: &SourceText) -> Result<Vec<WindowOrderItem>, OakError> {
+        let mut items: Vec<WindowOrderItem> = Vec::new();
+        let mut current: Option<WindowOrderItem> = None;
+
+        for child in node.children() {
+            match child {
+                RedTree::Node(n) => {
+                    if matches!(n.green.kind, SqlElementType::Expression | SqlElementType::Identifier) {
+                        if let Some(item) = current.take() {
+                            items.push(item);
+                        }
+                        let column = self.build_window_column(n.clone(), source, "`ORDER BY`")?;
+                        current = Some(WindowOrderItem { column, direction: OrderDirection::Asc, nulls: None, span: n.span() });
+                    }
+                }
+                RedTree::Leaf(t) => match t.kind {
+                    SqlTokenType::Asc => {
+                        if let Some(item) = current.as_mut() {
+                            item.direction = OrderDirection::Asc;
+                            item.span.end = t.span.end;
+                        }
+                    }
+                    SqlTokenType::Desc => {
+                        if let Some(item) = current.as_mut() {
+                            item.direction = OrderDirection::Desc;
+                            item.span.end = t.span.end;
+                        }
+                    }
+                    SqlTokenType::First => {
+                        if let Some(item) = current.as_mut() {
+                            item.nulls = Some(NullsOrder::First);
+                            item.span.end = t.span.end;
+                        }
+                    }
+                    SqlTokenType::Last => {
+                        if let Some(item) = current.as_mut() {
+                            item.nulls = Some(NullsOrder::Last);
+                            item.span.end = t.span.end;
+                        }
+                    }
+                    SqlTokenType::Comma => {
+                        if let Some(item) = current.take() {
+                            items.push(item);
+                        }
+                    }
+                    _ => {}
+                },
+            }
+        }
+
+        if let Some(item) = current {
+            items.push(item);
+        }
+        if items.is_empty() {
+            return Err(OakError::custom_error("`ORDER BY` in a window requires at least one column"));
+        }
+        Ok(items)
+    }
+
+    /// Builds a `ROWS` / `RANGE` frame from its lowered leaves.
+    fn build_window_frame<'a>(&self, node: RedNode<'a, SqlLanguage>, source: &SourceText) -> Result<WindowFrame, OakError> {
+        let mut leaves: Vec<(SqlTokenType, String)> = Vec::new();
+        for child in node.children() {
+            if let RedTree::Leaf(t) = child {
+                // Trivia stays a leaf child of the frame node, so whitespace must be
+                // skipped or every bound token is read at the wrong index.
+                if t.kind.is_ignored() {
+                    continue;
+                }
+                leaves.push((t.kind, self.get_text(t.span.clone(), source).to_ascii_uppercase()));
+            }
+        }
+
+        let unit = match leaves.first().map(|(_, text)| text.as_str()) {
+            Some("ROWS") => WindowFrameUnit::Rows,
+            Some("RANGE") => WindowFrameUnit::Range,
+            _ => return Err(OakError::custom_error("A window frame must start with `ROWS` or `RANGE`")),
+        };
+
+        let mut index = 1usize;
+        let (start, end) = if leaves.get(index).is_some_and(|(_, text)| text == "BETWEEN") {
+            index += 1;
+            let start = window_frame_bound(&leaves, &mut index)?;
+            if !leaves.get(index).is_some_and(|(_, text)| text == "AND") {
+                return Err(OakError::custom_error("A window frame `BETWEEN` requires `AND`"));
+            }
+            index += 1;
+            let end = window_frame_bound(&leaves, &mut index)?;
+            (start, Some(end))
+        }
+        else {
+            (window_frame_bound(&leaves, &mut index)?, None)
+        };
+
+        if index != leaves.len() {
+            return Err(OakError::custom_error("Unsupported window frame"));
+        }
+        if matches!(start, WindowFrameBound::UnboundedFollowing) {
+            return Err(OakError::custom_error("`UNBOUNDED FOLLOWING` cannot start a window frame"));
+        }
+        if let Some(end) = &end {
+            if start.is_after(end) {
+                return Err(OakError::custom_error("A window frame cannot start after its end bound"));
+            }
+        }
+
+        Ok(WindowFrame { unit, start, end, span: node.span() })
     }
 
     /// Builds an `[NOT] EXISTS (SELECT ...)` predicate.
@@ -608,5 +774,56 @@ impl<'config> SqlBuilder<'config> {
             }
         }
         Ok(Expression::Vector { elements, span: node.span() })
+    }
+}
+
+/// Reads one bound of a window frame from its upper-cased frame leaves.
+///
+/// The parser already validated the token sequence, so a mismatch here means the
+/// frame is not one of the supported forms rather than a syntax error.
+fn window_frame_bound(leaves: &[(SqlTokenType, String)], index: &mut usize) -> Result<WindowFrameBound, OakError> {
+    let Some((kind, text)) = leaves.get(*index)
+    else {
+        return Err(OakError::custom_error("Missing window frame bound"));
+    };
+    match text.as_str() {
+        "UNBOUNDED" => {
+            *index += 1;
+            match leaves.get(*index).map(|(_, text)| text.as_str()) {
+                Some("PRECEDING") => {
+                    *index += 1;
+                    Ok(WindowFrameBound::UnboundedPreceding)
+                }
+                Some("FOLLOWING") => {
+                    *index += 1;
+                    Ok(WindowFrameBound::UnboundedFollowing)
+                }
+                _ => Err(OakError::custom_error("`UNBOUNDED` must be followed by `PRECEDING` or `FOLLOWING`")),
+            }
+        }
+        "CURRENT" => {
+            *index += 1;
+            if leaves.get(*index).map(|(kind, _)| *kind) != Some(SqlTokenType::Row) {
+                return Err(OakError::custom_error("`CURRENT` must be followed by `ROW`"));
+            }
+            *index += 1;
+            Ok(WindowFrameBound::CurrentRow)
+        }
+        _ if *kind == SqlTokenType::NumberLiteral => {
+            let offset = text.parse::<u64>().map_err(|_| OakError::custom_error("A window frame offset must be a non-negative integer"))?;
+            *index += 1;
+            match leaves.get(*index).map(|(_, text)| text.as_str()) {
+                Some("PRECEDING") => {
+                    *index += 1;
+                    Ok(WindowFrameBound::Preceding(offset))
+                }
+                Some("FOLLOWING") => {
+                    *index += 1;
+                    Ok(WindowFrameBound::Following(offset))
+                }
+                _ => Err(OakError::custom_error("A window frame offset must be followed by `PRECEDING` or `FOLLOWING`")),
+            }
+        }
+        _ => Err(OakError::custom_error("Unsupported window frame bound")),
     }
 }

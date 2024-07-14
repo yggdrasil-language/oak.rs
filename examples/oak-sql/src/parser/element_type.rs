@@ -78,6 +78,14 @@ pub enum SqlElementType {
     Subquery,
     /// Function call.
     FunctionCall,
+    /// `OVER (...)` window specification of a function call.
+    WindowSpec,
+    /// `PARTITION BY` list of a window specification.
+    WindowPartition,
+    /// `ORDER BY` list of a window specification.
+    WindowOrderBy,
+    /// `ROWS` / `RANGE` frame of a window specification.
+    WindowFrame,
     /// CASE WHEN ... THEN ... [ELSE ...] END expression.
     Case,
     /// CAST(expr AS type) expression.
@@ -128,6 +136,10 @@ impl ElementType for SqlElementType {
             | Self::VectorSearch
             | Self::WithClause
             | Self::CteDefinition
+            | Self::WindowSpec
+            | Self::WindowPartition
+            | Self::WindowOrderBy
+            | Self::WindowFrame
             | Self::Subquery => Statement,
         }
     }
