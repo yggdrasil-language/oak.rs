@@ -549,6 +549,13 @@ impl<'config> SqlBuilder<'config> {
                     else if n.green.kind == SqlElementType::Expression {
                         args.push(self.build_expression(n, source)?);
                     }
+                    // A nested call such as `SUM(LENGTH(email))` is its own
+                    // `FunctionCall` child, so it must be lowered as an argument
+                    // instead of being skipped. Dropping it would leave the outer
+                    // call with zero arguments.
+                    else if n.green.kind == SqlElementType::FunctionCall {
+                        args.push(self.build_function_call(n, source)?);
+                    }
                     else if n.green.kind == SqlElementType::WindowSpec {
                         window = Some(self.build_window_spec(n, source)?);
                     }
