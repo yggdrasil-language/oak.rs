@@ -1385,6 +1385,31 @@ fn test_sql_builder_derived_tables() {
 }
 
 #[test]
+fn test_sql_builder_cross_join() {
+    let sql = "SELECT * FROM a CROSS JOIN b;";
+    let (statement, source) = build_statement(sql);
+    let SqlStatement::Select(select) = &statement
+    else {
+        panic!("Expected Select statement, got {statement:?}");
+    };
+    assert_eq!(select.joins.len(), 1);
+    assert_eq!(select.joins[0].join_type, JoinType::Cross);
+    assert!(select.joins[0].on.is_none(), "CROSS JOIN must have no ON clause");
+    let joined = named_table(&select.joins[0].table);
+    assert_eq!(joined.name.name.as_ref(), "b");
+    assert_eq!(source, "SELECT*FROM a CROSS JOIN b;");
+
+    // Round-trip stability.
+    let (rebuilt, rebuilt_source) = build_statement(&source);
+    let SqlStatement::Select(rebuilt_select) = &rebuilt
+    else {
+        panic!("Expected Select after round trip");
+    };
+    assert_eq!(rebuilt_select.joins[0].join_type, JoinType::Cross);
+    assert_eq!(rebuilt_source, source);
+}
+
+#[test]
 fn test_sql_builder_cte() {
     let sql = "WITH young AS (SELECT id FROM users WHERE age < 18) SELECT id FROM young;";
     let (statement, source) = build_statement(sql);

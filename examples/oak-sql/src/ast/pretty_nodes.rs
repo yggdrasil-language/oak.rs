@@ -354,6 +354,7 @@ impl AsDocument for JoinType {
             JoinType::Left => Document::text("LEFT"),
             JoinType::Right => Document::text("RIGHT"),
             JoinType::Full => Document::text("FULL"),
+            JoinType::Cross => Document::text("CROSS"),
         }
     }
 }

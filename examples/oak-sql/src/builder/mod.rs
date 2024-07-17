@@ -1040,6 +1040,7 @@ impl<'config> SqlBuilder<'config> {
                     SqlTokenType::Left => join_type = JoinType::Left,
                     SqlTokenType::Right => join_type = JoinType::Right,
                     SqlTokenType::Full => join_type = JoinType::Full,
+                    SqlTokenType::Cross => join_type = JoinType::Cross,
                     _ => {}
                 },
                 RedTree::Node(n) => match n.green.kind {
