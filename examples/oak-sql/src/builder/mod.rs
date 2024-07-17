@@ -1054,21 +1054,208 @@ impl<'config> SqlBuilder<'config> {
         Ok(JoinClause { join_type, table: table.ok_or_else(|| OakError::custom_error("Missing table in JOIN"))?, on, span: node.span() })
     }
 
-    fn build_group_by_clause<'a>(&self, node: RedNode<'a, SqlLanguage>, source: &SourceText) -> Result<GroupByClause, OakError> {
-        let mut items = Vec::new();
-        for child in node.children() {
-            if let RedTree::Node(n) = child {
-                match n.green.kind {
-                    SqlElementType::Identifier => items.push(GroupByItem::Column(self.build_identifier(n, source)?)),
-                    SqlElementType::Expression | SqlElementType::FunctionCall => items.push(self.build_group_by_item(n, source)?),
-                    _ => {}
+    fn build_group_by_clause<'a>(&self, node: RedNode<'a, SqlLanguage>, source: &SourceText) -> Result<crate::ast::GroupByClause, OakError> {
+        use crate::lexer::SqlTokenType::{Comma, Cube, Grouping, LeftParen, RightParen, Rollup, Sets};
+        use crate::ast::GroupByItem;
+        let mut items: Vec<GroupByItem> = Vec::new();
+        let children: Vec<_> = node.children().collect();
+        let mut i = 0usize;
+        while i < children.len() {
+            let child = &children[i];
+            match child {
+                RedTree::Leaf(t) if t.kind == Grouping => {
+                    i += 1; // GROUPING
+                    // SETS
+                    if i < children.len() {
+                        if let RedTree::Leaf(t) = &children[i] {
+                            if t.kind != Sets {
+                                return Err(OakError::custom_error("expected `SETS` after `GROUPING`"));
+                            }
+                        }
+                        i += 1;
+                    }
+                    // outer (
+                    if i < children.len() {
+                        if let RedTree::Leaf(t) = &children[i] {
+                            if t.kind != LeftParen {
+                                return Err(OakError::custom_error("expected `(` after `GROUPING SETS`"));
+                            }
+                        }
+                        i += 1;
+                    }
+                    let mut groups: Vec<Vec<GroupByItem>> = Vec::new();
+                    loop {
+                        if i >= children.len() {
+                            return Err(OakError::custom_error("unexpected end in `GROUPING SETS`"));
+                        }
+                        let RedTree::Leaf(t) = &children[i]
+                        else {
+                            return Err(OakError::custom_error("expected `(` or `)` in `GROUPING SETS`"));
+                        };
+                        if t.kind == RightParen {
+                            i += 1;
+                            break;
+                        }
+                        if t.kind == LeftParen {
+                            i += 1;
+                            let mut group_items: Vec<GroupByItem> = Vec::new();
+                            loop {
+                                if i >= children.len() {
+                                    return Err(OakError::custom_error("unexpected end in `GROUPING SETS` group"));
+                                }
+                                let next = &children[i];
+                                match next {
+                                    RedTree::Leaf(t) if t.kind == RightParen => {
+                                        i += 1;
+                                        break;
+                                    }
+                                    RedTree::Leaf(t) if t.kind == Comma => {
+                                        i += 1;
+                                        continue;
+                                    }
+                                    RedTree::Node(n) => {
+                                        group_items.push(self.build_group_by_item(n.clone(), source)?);
+                                        i += 1;
+                                    }
+                                    _ => {
+                                        return Err(OakError::custom_error("unexpected token in `GROUPING SETS` group"));
+                                    }
+                                }
+                            }
+                            groups.push(group_items);
+                            if i < children.len() {
+                                if let RedTree::Leaf(t) = &children[i] {
+                                    if t.kind == Comma {
+                                        i += 1;
+                                    }
+                                }
+                            }
+                        }
+                        else {
+                            return Err(OakError::custom_error("expected `(` in `GROUPING SETS`"));
+                        }
+                    }
+                    items.push(GroupByItem::GroupingSets(groups));
+                    if i < children.len() {
+                        if let RedTree::Leaf(t) = &children[i] {
+                            if t.kind == Comma {
+                                i += 1;
+                            }
+                        }
+                    }
+                }
+                RedTree::Leaf(t) if t.kind == Rollup => {
+                    i += 1;
+                    if i < children.len() {
+                        if let RedTree::Leaf(t) = &children[i] {
+                            if t.kind == LeftParen {
+                                i += 1;
+                            }
+                        }
+                    }
+                    let mut rollup_items: Vec<GroupByItem> = Vec::new();
+                    loop {
+                        if i >= children.len() {
+                            return Err(OakError::custom_error("unexpected end in `ROLLUP`"));
+                        }
+                        let next = &children[i];
+                        match next {
+                            RedTree::Leaf(t) if t.kind == RightParen => {
+                                i += 1;
+                                break;
+                            }
+                            RedTree::Leaf(t) if t.kind == Comma => {
+                                i += 1;
+                                continue;
+                            }
+                            RedTree::Node(n) => {
+                                rollup_items.push(self.build_group_by_item(n.clone(), source)?);
+                                i += 1;
+                            }
+                            _ => {
+                                return Err(OakError::custom_error("unexpected token in `ROLLUP`"));
+                            }
+                        }
+                    }
+                    items.push(GroupByItem::Rollup(rollup_items));
+                    if i < children.len() {
+                        if let RedTree::Leaf(t) = &children[i] {
+                            if t.kind == Comma {
+                                i += 1;
+                            }
+                        }
+                    }
+                }
+                RedTree::Leaf(t) if t.kind == Cube => {
+                    i += 1;
+                    if i < children.len() {
+                        if let RedTree::Leaf(t) = &children[i] {
+                            if t.kind == LeftParen {
+                                i += 1;
+                            }
+                        }
+                    }
+                    let mut cube_items: Vec<GroupByItem> = Vec::new();
+                    loop {
+                        if i >= children.len() {
+                            return Err(OakError::custom_error("unexpected end in `CUBE`"));
+                        }
+                        let next = &children[i];
+                        match next {
+                            RedTree::Leaf(t) if t.kind == RightParen => {
+                                i += 1;
+                                break;
+                            }
+                            RedTree::Leaf(t) if t.kind == Comma => {
+                                i += 1;
+                                continue;
+                            }
+                            RedTree::Node(n) => {
+                                cube_items.push(self.build_group_by_item(n.clone(), source)?);
+                                i += 1;
+                            }
+                            _ => {
+                                return Err(OakError::custom_error("unexpected token in `CUBE`"));
+                            }
+                        }
+                    }
+                    items.push(GroupByItem::Cube(cube_items));
+                    if i < children.len() {
+                        if let RedTree::Leaf(t) = &children[i] {
+                            if t.kind == Comma {
+                                i += 1;
+                            }
+                        }
+                    }
+                }
+                RedTree::Leaf(t) if t.kind == Comma => {
+                    i += 1;
+                }
+                RedTree::Node(n) => {
+                    let n = n.clone();
+                    match n.green.kind {
+                        SqlElementType::Identifier => items.push(GroupByItem::Column(self.build_identifier(n, source)?)),
+                        SqlElementType::Expression | SqlElementType::FunctionCall => items.push(self.build_group_by_item(n, source)?),
+                        _ => {}
+                    }
+                    i += 1;
+                    if i < children.len() {
+                        if let RedTree::Leaf(t) = &children[i] {
+                            if t.kind == Comma {
+                                i += 1;
+                            }
+                        }
+                    }
+                }
+                _ => {
+                    i += 1;
                 }
             }
         }
         if items.is_empty() {
             return Err(OakError::custom_error("Missing item in GROUP BY clause"));
         }
-        Ok(GroupByClause { items, span: node.span() })
+        Ok(crate::ast::GroupByClause { items, span: node.span() })
     }
 
     /// Classifies one `GROUP BY` expression node. A lone integer literal is a
