@@ -225,27 +225,18 @@ impl<'config> SqlBuilder<'config> {
     /// `ORDER BY` and `LIMIT` sit on the set operation node because they apply to
     /// the combined result, not to the last branch.
     fn build_set_operation_statement<'a>(&self, node: RedNode<'a, SqlLanguage>, source: &SourceText) -> Result<SetOperationStatement, OakError> {
-        let mut left = None;
-        let mut right = None;
-        let mut operator = None;
+        let mut operands = Vec::new();
+        let mut operators = Vec::new();
         let mut order_by = None;
         let mut limit = None;
-        let mut union_all = false;
+        let mut union_all_pending = false;
 
         for child in node.children() {
             match child {
                 RedTree::Node(n) => match n.green.kind {
                     SqlElementType::SelectStatement => {
                         let select = self.build_select_statement(n, source)?;
-                        if left.is_none() {
-                            left = Some(Box::new(select));
-                        }
-                        else if right.is_none() {
-                            right = Some(Box::new(select));
-                        }
-                        else {
-                            return Err(OakError::custom_error("Too many operands in set operation"));
-                        }
+                        operands.push(Box::new(select));
                     }
                     SqlElementType::OrderByClause => order_by = Some(self.build_order_by_clause(n, source)?),
                     SqlElementType::LimitClause => limit = Some(self.build_limit_clause(n, source)?),
@@ -253,30 +244,41 @@ impl<'config> SqlBuilder<'config> {
                 },
                 RedTree::Leaf(t) => match t.kind {
                     SqlTokenType::Union => {
-                        operator = Some(SetOperator::Union);
-                        union_all = true;
+                        operators.push(SetOperator::Union);
+                        union_all_pending = true;
                     }
                     SqlTokenType::Intersect => {
-                        operator = Some(SetOperator::Intersect);
-                        union_all = false;
+                        operators.push(SetOperator::Intersect);
+                        union_all_pending = false;
                     }
                     SqlTokenType::Except => {
-                        operator = Some(SetOperator::Except);
-                        union_all = false;
+                        operators.push(SetOperator::Except);
+                        union_all_pending = false;
                     }
-                    SqlTokenType::All if union_all => {
-                        operator = Some(SetOperator::UnionAll);
-                        union_all = false;
+                    SqlTokenType::All if union_all_pending => {
+                        if let Some(last) = operators.last_mut() {
+                            *last = SetOperator::UnionAll;
+                        }
+                        union_all_pending = false;
                     }
                     _ => {}
                 },
             }
         }
 
+        // Sanity check: operands should always be one more than operators, which
+        // also catches the edge case of a stray operator with no right-hand
+        // operand (e.g. `SELECT a UNION;`).
+        if operands.len() != operators.len() + 1 {
+            return Err(OakError::custom_error("Malformed set operation: operand and operator counts do not match"));
+        }
+        if operands.is_empty() {
+            return Err(OakError::custom_error("Missing operand in set operation"));
+        }
+
         Ok(SetOperationStatement {
-            left: left.ok_or_else(|| OakError::custom_error("Missing left operand in set operation"))?,
-            operator: operator.ok_or_else(|| OakError::custom_error("Missing operator in set operation"))?,
-            right: right.ok_or_else(|| OakError::custom_error("Missing right operand in set operation"))?,
+            operands,
+            operators,
             order_by,
             limit,
             span: node.span(),

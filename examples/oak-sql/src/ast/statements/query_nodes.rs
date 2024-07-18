@@ -134,16 +134,18 @@ impl ToSource for CteDefinition {
     }
 }
 
-/// A set operation between two `SELECT` statements.
+/// A set operation between two or more `SELECT` statements, stored as a flat
+/// chain of operands interleaved with their operators.
+///
+/// Invariant: `operands.len() == operators.len() + 1`.
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct SetOperationStatement {
-    /// The left operand.
-    pub left: Box<SelectStatement>,
-    /// The set operator that combines both operands.
-    pub operator: SetOperator,
-    /// The right operand.
-    pub right: Box<SelectStatement>,
+    /// The operands, in left-to-right order.
+    pub operands: Vec<Box<SelectStatement>>,
+    /// The operators between consecutive operands. Length is always
+    /// `operands.len() - 1`.
+    pub operators: Vec<SetOperator>,
     /// The `ORDER BY` clause applied to the whole result, when one was written.
     pub order_by: Option<OrderByClause>,
     /// The `LIMIT` clause applied to the whole result, when one was written.
@@ -155,9 +157,12 @@ pub struct SetOperationStatement {
 
 impl ToSource for SetOperationStatement {
     fn to_source(&self, buffer: &mut SourceBuffer) {
-        self.left.to_source(buffer);
-        self.operator.to_source(buffer);
-        self.right.to_source(buffer);
+        for (i, operand) in self.operands.iter().enumerate() {
+            operand.to_source(buffer);
+            if i < self.operators.len() {
+                self.operators[i].to_source(buffer);
+            }
+        }
         if let Some(order_by) = &self.order_by {
             order_by.to_source(buffer);
         }

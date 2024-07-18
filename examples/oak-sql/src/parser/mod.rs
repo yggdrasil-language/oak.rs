@@ -782,24 +782,21 @@ impl<'config> SqlParser<'config> {
         self.parse_select_terms(state)?;
 
         let mut set_operation = false;
-        if let Some(operator) = Self::set_operator_kind(state.peek_kind()) {
+        if Self::set_operator_kind(state.peek_kind()).is_some() {
             set_operation = true;
-            // The left branch ends before the operator, so closing it here keeps
-            // the operator and the right branch outside of it.
+            // The first operand ends before its operator, so closing it here keeps
+            // everything outside the set-operation node cleanly separated.
             state.finish_at(cp, SqlElementType::SelectStatement);
-            state.bump();
-            if operator == Union {
-                state.eat(All);
-            }
-            let right_cp = state.checkpoint();
-            self.parse_select_terms(state)?;
-            // A trailing `ORDER BY` / `LIMIT` applies to the whole result, so the
-            // right branch is closed before those clauses are parsed.
-            state.finish_at(right_cp, SqlElementType::SelectStatement);
-            // The AST keeps one binary set operation. A longer chain would
-            // silently drop its extra operands, so it is rejected instead.
-            if Self::set_operator_kind(state.peek_kind()).is_some() {
-                return Err(OakError::custom_error("chained set operations are not supported"));
+
+            // Collect the rest of the chain: operator + operand, repeated.
+            while let Some(operator) = Self::set_operator_kind(state.peek_kind()) {
+                state.bump();
+                if operator == Union {
+                    state.eat(All);
+                }
+                let operand_cp = state.checkpoint();
+                self.parse_select_terms(state)?;
+                state.finish_at(operand_cp, SqlElementType::SelectStatement);
             }
         }
 
