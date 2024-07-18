@@ -21,7 +21,7 @@ impl<'config> TypeScriptBuilder<'config> {
                 let mut name = String::new();
                 let mut ty = None;
                 let mut value = None;
-                let mut is_declare = false;
+                let mut modifiers: Vec<Modifier> = Vec::new();
                 let mut in_initializer = false;
                 let mut declaration_kind = VariableKind::Const;
                 for child in node.children() {
@@ -63,7 +63,7 @@ impl<'config> TypeScriptBuilder<'config> {
                                     name = source.get_text_in(leaf.span.into()).trim().to_string()
                                 }
                             }
-                            TypeScriptTokenType::Declare => is_declare = true,
+                            TypeScriptTokenType::Declare => modifiers.push(Modifier::new(ModifierKind::Declare, leaf.span)),
                             TypeScriptTokenType::Let => declaration_kind = VariableKind::Let,
                             TypeScriptTokenType::Var => declaration_kind = VariableKind::Var,
                             TypeScriptTokenType::Const => declaration_kind = VariableKind::Const,
@@ -72,7 +72,7 @@ impl<'config> TypeScriptBuilder<'config> {
                         },
                     }
                 }
-                Ok(Some(Statement::VariableDeclaration(VariableDeclaration { decorators: Vec::new(), is_declare, name, kind: declaration_kind, ty, value, span: span.into() })))
+                Ok(Some(Statement::VariableDeclaration(VariableDeclaration { decorators: Vec::new(), modifiers, name, kind: declaration_kind, ty, value, span: span.into() })))
             }
             TypeScriptElementType::FunctionDeclaration => {
                 let mut name = String::new();
@@ -81,7 +81,7 @@ impl<'config> TypeScriptBuilder<'config> {
                 let mut return_type = None;
                 let mut body = Vec::new();
                 let mut decorators = Vec::new();
-                let mut is_declare = false;
+                let mut modifiers: Vec<Modifier> = Vec::new();
 
                 for child in node.children() {
                     match child {
@@ -139,22 +139,21 @@ impl<'config> TypeScriptBuilder<'config> {
                                     name = source.get_text_in(leaf.span.into()).to_string()
                                 }
                             }
-                            TypeScriptTokenType::Declare => is_declare = true,
+                            TypeScriptTokenType::Declare => modifiers.push(Modifier::new(ModifierKind::Declare, leaf.span)),
                             _ => {}
                         },
                     }
                 }
-                Ok(Some(Statement::FunctionDeclaration(FunctionDeclaration { decorators, is_declare, name, type_params, params, return_type, body, span: span.into() })))
+                Ok(Some(Statement::FunctionDeclaration(FunctionDeclaration { decorators, modifiers, name, type_params, params, return_type, body, span: span.into() })))
             }
             TypeScriptElementType::ClassDeclaration => {
                 let mut name = String::new();
                 let mut type_params = Vec::new();
                 let mut extends = None;
                 let mut implements = Vec::new();
-                let mut is_abstract = false;
+                let mut modifiers: Vec<Modifier> = Vec::new();
                 let mut body = Vec::new();
                 let mut decorators = Vec::new();
-                let mut is_declare = false;
 
                 for child in node.children() {
                     match child {
@@ -222,13 +221,13 @@ impl<'config> TypeScriptBuilder<'config> {
                                     name = source.get_text_in(leaf.span.into()).to_string()
                                 }
                             }
-                            TypeScriptTokenType::Abstract => is_abstract = true,
-                            TypeScriptTokenType::Declare => is_declare = true,
+                            TypeScriptTokenType::Abstract => modifiers.push(Modifier::new(ModifierKind::Abstract, leaf.span)),
+                            TypeScriptTokenType::Declare => modifiers.push(Modifier::new(ModifierKind::Declare, leaf.span)),
                             _ => {}
                         },
                     }
                 }
-                Ok(Some(Statement::ClassDeclaration(ClassDeclaration { decorators, is_declare, name, type_params, extends, implements, is_abstract, body, span: span.into() })))
+                Ok(Some(Statement::ClassDeclaration(ClassDeclaration { decorators, modifiers, name, type_params, extends, implements, body, span: span.into() })))
             }
             TypeScriptElementType::InterfaceDeclaration => {
                 if self.erase_types {
@@ -238,7 +237,7 @@ impl<'config> TypeScriptBuilder<'config> {
                 let mut type_params = Vec::new();
                 let mut extends = Vec::new();
                 let mut body = Vec::new();
-                let mut is_declare = false;
+                let mut modifiers: Vec<Modifier> = Vec::new();
                 let mut decorators = Vec::new();
 
                 for child in node.children() {
@@ -287,7 +286,7 @@ impl<'config> TypeScriptBuilder<'config> {
                         }
                         RedTree::Leaf(leaf) => {
                             if leaf.kind == TypeScriptTokenType::Declare {
-                                is_declare = true
+                                modifiers.push(Modifier::new(ModifierKind::Declare, leaf.span))
                             }
                             else if leaf.kind == TypeScriptTokenType::IdentifierName && name.is_empty() {
                                 name = source.get_text_in(leaf.span.into()).to_string();
@@ -295,7 +294,7 @@ impl<'config> TypeScriptBuilder<'config> {
                         }
                     }
                 }
-                Ok(Some(Statement::Interface(InterfaceDeclaration { decorators, is_declare, name, type_params, extends, body, span: span.into() })))
+                Ok(Some(Statement::Interface(InterfaceDeclaration { decorators, modifiers, name, type_params, extends, body, span: span.into() })))
             }
             TypeScriptElementType::TypeAliasDeclaration => {
                 if self.erase_types {
@@ -304,7 +303,7 @@ impl<'config> TypeScriptBuilder<'config> {
                 let mut name = String::new();
                 let mut type_params = Vec::new();
                 let mut ty = None;
-                let mut is_declare = false;
+                let mut modifiers: Vec<Modifier> = Vec::new();
                 let mut decorators = Vec::new();
 
                 for child in node.children() {
@@ -336,7 +335,7 @@ impl<'config> TypeScriptBuilder<'config> {
                         }
                         RedTree::Leaf(leaf) => {
                             if leaf.kind == TypeScriptTokenType::Declare {
-                                is_declare = true
+                                modifiers.push(Modifier::new(ModifierKind::Declare, leaf.span))
                             }
                             else if leaf.kind == TypeScriptTokenType::IdentifierName && name.is_empty() {
                                 name = source.get_text_in(leaf.span.into()).to_string();
@@ -344,12 +343,12 @@ impl<'config> TypeScriptBuilder<'config> {
                         }
                     }
                 }
-                if let Some(ty) = ty { Ok(Some(Statement::TypeAlias(TypeAliasDeclaration { decorators, is_declare, name, type_params, ty, span: span.into() }))) } else { Ok(None) }
+                if let Some(ty) = ty { Ok(Some(Statement::TypeAlias(TypeAliasDeclaration { decorators, modifiers, name, type_params, ty, span: span.into() }))) } else { Ok(None) }
             }
             TypeScriptElementType::EnumDeclaration => {
                 let mut name = String::new();
                 let mut members = Vec::new();
-                let mut is_declare = false;
+                let mut modifiers: Vec<Modifier> = Vec::new();
                 let mut decorators = Vec::new();
 
                 for child in node.children() {
@@ -377,12 +376,12 @@ impl<'config> TypeScriptBuilder<'config> {
                         }
                         RedTree::Leaf(leaf) => {
                             if leaf.kind == TypeScriptTokenType::Declare {
-                                is_declare = true
+                                modifiers.push(Modifier::new(ModifierKind::Declare, leaf.span))
                             }
                         }
                     }
                 }
-                Ok(Some(Statement::Enum(EnumDeclaration { decorators, is_declare, name, members, span: span.into() })))
+                Ok(Some(Statement::Enum(EnumDeclaration { decorators, modifiers, name, members, span: span.into() })))
             }
             TypeScriptElementType::BlockStatement => {
                 let mut statements = Vec::new();
@@ -393,7 +392,7 @@ impl<'config> TypeScriptBuilder<'config> {
                         }
                     }
                 }
-                Ok(Some(Statement::BlockStatement(BlockStatement { decorators: Vec::new(), is_declare: false, statements, span: span.into() })))
+                Ok(Some(Statement::BlockStatement(BlockStatement { decorators: Vec::new(), statements, span: span.into() })))
             }
             TypeScriptElementType::ExpressionStatement => {
                 let mut expression = None;
@@ -402,7 +401,7 @@ impl<'config> TypeScriptBuilder<'config> {
                         expression = self.build_expression(&child_node, source)?
                     }
                 }
-                if let Some(expr) = expression { Ok(Some(Statement::ExpressionStatement(ExpressionStatement { decorators: Vec::new(), is_declare: false, expression: expr, span: span.into() }))) } else { Ok(None) }
+                if let Some(expr) = expression { Ok(Some(Statement::ExpressionStatement(ExpressionStatement { decorators: Vec::new(), expression: expr, span: span.into() }))) } else { Ok(None) }
             }
             TypeScriptElementType::IfStatement => {
                 let mut test = None;
@@ -432,12 +431,7 @@ impl<'config> TypeScriptBuilder<'config> {
                     }
                 }
 
-                if let (Some(t), Some(c)) = (test, consequent) {
-                    Ok(Some(Statement::IfStatement(IfStatement { decorators: Vec::new(), is_declare: false, test: t, consequent: Box::new(c), alternate: alternate.map(Box::new), span: span.into() })))
-                }
-                else {
-                    Ok(None)
-                }
+                if let (Some(t), Some(c)) = (test, consequent) { Ok(Some(Statement::IfStatement(IfStatement { decorators: Vec::new(), test: t, consequent: Box::new(c), alternate: alternate.map(Box::new), span: span.into() }))) } else { Ok(None) }
             }
             TypeScriptElementType::ReturnStatement => {
                 let mut argument = None;
@@ -446,13 +440,13 @@ impl<'config> TypeScriptBuilder<'config> {
                         argument = self.build_expression(&child_node, source)?
                     }
                 }
-                Ok(Some(Statement::ReturnStatement(ReturnStatement { decorators: Vec::new(), is_declare: false, argument, span: span.into() })))
+                Ok(Some(Statement::ReturnStatement(ReturnStatement { decorators: Vec::new(), argument, span: span.into() })))
             }
             TypeScriptElementType::ForStatement => {
                 let mut initializer = None;
                 let mut test = None;
                 let mut incrementor = None;
-                let mut body = Box::new(Statement::BlockStatement(BlockStatement { decorators: Vec::new(), is_declare: false, statements: Vec::new(), span: (0..0).into() }));
+                let mut body = Box::new(Statement::BlockStatement(BlockStatement { decorators: Vec::new(), statements: Vec::new(), span: (0..0).into() }));
 
                 #[derive(PartialEq)]
                 enum ForState {
@@ -510,11 +504,11 @@ impl<'config> TypeScriptBuilder<'config> {
                         },
                     }
                 }
-                Ok(Some(Statement::ForStatement(ForStatement { decorators: Vec::new(), is_declare: false, initializer, test, incrementor, body, span: span.into() })))
+                Ok(Some(Statement::ForStatement(ForStatement { decorators: Vec::new(), initializer, test, incrementor, body, span: span.into() })))
             }
             TypeScriptElementType::WhileStatement => {
                 let mut test = Expression { span: (0..0).into(), kind: Box::new(ExpressionKind::BooleanLiteral(true)) };
-                let mut body = Box::new(Statement::BlockStatement(BlockStatement { decorators: Vec::new(), is_declare: false, statements: Vec::new(), span: (0..0).into() }));
+                let mut body = Box::new(Statement::BlockStatement(BlockStatement { decorators: Vec::new(), statements: Vec::new(), span: (0..0).into() }));
                 let mut past_paren = false;
 
                 for child in node.children() {
@@ -538,11 +532,11 @@ impl<'config> TypeScriptBuilder<'config> {
                         }
                     }
                 }
-                Ok(Some(Statement::WhileStatement(WhileStatement { decorators: Vec::new(), is_declare: false, test, body, span: span.into() })))
+                Ok(Some(Statement::WhileStatement(WhileStatement { decorators: Vec::new(), test, body, span: span.into() })))
             }
             TypeScriptElementType::DoWhileStatement => {
                 let mut test = Expression { span: (0..0).into(), kind: Box::new(ExpressionKind::BooleanLiteral(true)) };
-                let mut body = Box::new(Statement::BlockStatement(BlockStatement { decorators: Vec::new(), is_declare: false, statements: Vec::new(), span: (0..0).into() }));
+                let mut body = Box::new(Statement::BlockStatement(BlockStatement { decorators: Vec::new(), statements: Vec::new(), span: (0..0).into() }));
                 let mut seen_while = false;
 
                 for child in node.children() {
@@ -566,7 +560,7 @@ impl<'config> TypeScriptBuilder<'config> {
                         }
                     }
                 }
-                Ok(Some(Statement::DoWhileStatement(DoWhileStatement { decorators: Vec::new(), is_declare: false, test, body, span: span.into() })))
+                Ok(Some(Statement::DoWhileStatement(DoWhileStatement { decorators: Vec::new(), test, body, span: span.into() })))
             }
             TypeScriptElementType::SwitchStatement => {
                 let mut discriminant = None;
@@ -626,7 +620,7 @@ impl<'config> TypeScriptBuilder<'config> {
                     }
                 }
 
-                if let Some(discriminant) = discriminant { Ok(Some(Statement::SwitchStatement(SwitchStatement { decorators: Vec::new(), is_declare: false, discriminant, cases, span: span.into() }))) } else { Ok(None) }
+                if let Some(discriminant) = discriminant { Ok(Some(Statement::SwitchStatement(SwitchStatement { decorators: Vec::new(), discriminant, cases, span: span.into() }))) } else { Ok(None) }
             }
             TypeScriptElementType::TryStatement => {
                 let mut block = Vec::new();
@@ -705,12 +699,12 @@ impl<'config> TypeScriptBuilder<'config> {
                     }
                 }
 
-                if !block.is_empty() { Ok(Some(Statement::TryStatement(TryStatement { decorators: Vec::new(), is_declare: false, block, handler, finalizer, span: span.into() }))) } else { Ok(None) }
+                if !block.is_empty() { Ok(Some(Statement::TryStatement(TryStatement { decorators: Vec::new(), block, handler, finalizer, span: span.into() }))) } else { Ok(None) }
             }
             TypeScriptElementType::ImportDeclaration => {
                 let mut specifiers = Vec::new();
                 let mut source_str = String::new();
-                let mut is_type_only = false;
+                let mut modifiers: Vec<Modifier> = Vec::new();
 
                 for child in node.children() {
                     match child {
@@ -737,6 +731,7 @@ impl<'config> TypeScriptBuilder<'config> {
                                                             if named_node.green.kind == TypeScriptElementType::ImportSpecifier {
                                                                 let mut local = String::new();
                                                                 let mut imported = String::new();
+                                                                let mut type_modifier = None;
                                                                 for spec_child in named_node.children() {
                                                                     if let RedTree::Node(spec_node) = spec_child {
                                                                         if spec_node.green.kind == TypeScriptElementType::IdentifierName {
@@ -744,11 +739,16 @@ impl<'config> TypeScriptBuilder<'config> {
                                                                             if imported.is_empty() { imported = name } else { local = name }
                                                                         }
                                                                     }
+                                                                    else if let RedTree::Leaf(leaf) = spec_child {
+                                                                        if leaf.kind == TypeScriptTokenType::Type {
+                                                                            type_modifier = Some(Modifier::new(ModifierKind::Type, leaf.span));
+                                                                        }
+                                                                    }
                                                                 }
                                                                 if local.is_empty() {
                                                                     local = imported.clone()
                                                                 }
-                                                                specifiers.push(ImportSpecifier::Named { local, imported })
+                                                                specifiers.push(ImportSpecifier::Named { local, imported, type_modifier })
                                                             }
                                                         }
                                                     }
@@ -767,7 +767,7 @@ impl<'config> TypeScriptBuilder<'config> {
                         }
                         RedTree::Leaf(leaf) => {
                             if leaf.kind == TypeScriptTokenType::Type {
-                                is_type_only = true
+                                modifiers.push(Modifier::new(ModifierKind::Type, leaf.span))
                             }
                             else if leaf.kind == TypeScriptTokenType::StringLiteral && source_str.is_empty() {
                                 let text = source.get_text_in(leaf.span.into());
@@ -778,14 +778,13 @@ impl<'config> TypeScriptBuilder<'config> {
                         }
                     }
                 }
-                Ok(Some(Statement::ImportDeclaration(ImportDeclaration { specifiers, module_specifier: source_str, is_type_only, span: span.into() })))
+                Ok(Some(Statement::ImportDeclaration(ImportDeclaration { specifiers, module_specifier: source_str, modifiers, span: span.into() })))
             }
             TypeScriptElementType::ExportDeclaration => {
                 let mut declaration = None;
                 let mut specifiers = Vec::new();
                 let mut source_str = None;
-                let mut is_default = false;
-                let mut is_type_only = false;
+                let mut modifiers: Vec<Modifier> = Vec::new();
 
                 for child in node.children() {
                     match child {
@@ -793,13 +792,12 @@ impl<'config> TypeScriptBuilder<'config> {
                             let child_kind = child_node.green.kind;
                             match child_kind {
                                 TypeScriptElementType::NamedExports => {
-                                    let mut pending_type_only = false;
                                     for named_child in child_node.children() {
                                         if let RedTree::Node(named_node) = named_child {
                                             if named_node.green.kind == TypeScriptElementType::ExportSpecifier {
                                                 let mut local = String::new();
                                                 let mut exported = String::new();
-                                                let mut is_type_only = pending_type_only;
+                                                let mut type_modifier = None;
                                                 for spec_child in named_node.children() {
                                                     if let RedTree::Node(spec_node) = spec_child {
                                                         if spec_node.green.kind == TypeScriptElementType::IdentifierName {
@@ -809,18 +807,15 @@ impl<'config> TypeScriptBuilder<'config> {
                                                     }
                                                     else if let RedTree::Leaf(leaf) = spec_child {
                                                         if leaf.kind == TypeScriptTokenType::Type {
-                                                            is_type_only = true;
+                                                            type_modifier = Some(Modifier::new(ModifierKind::Type, leaf.span));
                                                         }
                                                     }
                                                 }
                                                 if exported.is_empty() {
                                                     exported = local.clone()
                                                 }
-                                                specifiers.push(ExportSpecifier { local, exported, is_type_only })
+                                                specifiers.push(ExportSpecifier { local, exported, type_modifier })
                                             }
-                                        }
-                                        else if let RedTree::Leaf(leaf) = named_child {
-                                            pending_type_only = leaf.kind == TypeScriptTokenType::Type;
                                         }
                                     }
                                 }
@@ -832,8 +827,8 @@ impl<'config> TypeScriptBuilder<'config> {
                             }
                         }
                         RedTree::Leaf(leaf) => match leaf.kind {
-                            TypeScriptTokenType::Default => is_default = true,
-                            TypeScriptTokenType::Type => is_type_only = true,
+                            TypeScriptTokenType::Default => modifiers.push(Modifier::new(ModifierKind::Default, leaf.span)),
+                            TypeScriptTokenType::Type => modifiers.push(Modifier::new(ModifierKind::Type, leaf.span)),
                             TypeScriptTokenType::StringLiteral if source_str.is_none() => {
                                 let text = source.get_text_in(leaf.span.into());
                                 if text.len() >= 2 {
@@ -844,11 +839,11 @@ impl<'config> TypeScriptBuilder<'config> {
                         },
                     }
                 }
-                Ok(Some(Statement::ExportDeclaration(ExportDeclaration { declaration: declaration.map(Box::new), specifiers, source: source_str, is_default, is_type_only, span: span.into() })))
+                Ok(Some(Statement::ExportDeclaration(ExportDeclaration { declaration: declaration.map(Box::new), specifiers, source: source_str, modifiers, span: span.into() })))
             }
             _ => {
                 // Try building as expression statement if not a recognized statement kind
-                if let Some(expr) = self.build_expression(node, source)? { Ok(Some(Statement::ExpressionStatement(ExpressionStatement { decorators: Vec::new(), is_declare: false, expression: expr, span: span.into() }))) } else { Ok(None) }
+                if let Some(expr) = self.build_expression(node, source)? { Ok(Some(Statement::ExpressionStatement(ExpressionStatement { decorators: Vec::new(), expression: expr, span: span.into() }))) } else { Ok(None) }
             }
         }
     }

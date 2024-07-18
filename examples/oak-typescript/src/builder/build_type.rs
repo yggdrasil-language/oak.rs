@@ -1,4 +1,4 @@
-use crate::{ast::*, builder::TypeScriptBuilder, language::TypeScriptLanguage, parser::element_type::TypeScriptElementType};
+use crate::{ast::*, builder::TypeScriptBuilder, language::TypeScriptLanguage, lexer::token_type::TypeScriptTokenType, parser::element_type::TypeScriptElementType};
 use oak_core::{OakError, RedNode, RedTree, Source, SourceText};
 
 impl<'config> TypeScriptBuilder<'config> {
@@ -110,18 +110,11 @@ impl<'config> TypeScriptBuilder<'config> {
                                 RedTree::Node(node) if node.green.kind == TypeScriptElementType::TypeAnnotation => self.build_type_annotation(&node, source).ok().flatten(),
                                 _ => None,
                             });
-                            members.push(ClassMember::Property {
-                                decorators: Vec::new(),
-                                name,
-                                ty,
-                                initializer: None,
-                                visibility: None,
-                                is_static: false,
-                                is_readonly: false,
-                                is_abstract: false,
-                                is_optional: text.contains('?'),
-                                span: sub_node.span().into(),
+                            let optional_marker = sub_node.children().find_map(|child| match child {
+                                RedTree::Leaf(leaf) if leaf.kind == TypeScriptTokenType::Question => Some(OptionalMarker::new(leaf.span)),
+                                _ => None,
                             });
+                            members.push(ClassMember::Property { decorators: Vec::new(), name, ty, initializer: None, visibility: None, modifiers: Vec::new(), optional_marker, span: sub_node.span().into() });
                         }
                         return Ok(Some(TypeAnnotation::Object(members)));
                     }

@@ -64,6 +64,8 @@ impl<'config> TypeScriptParser<'config> {
 
             if self.at(state, IdentifierName) {
                 self.expect(state, IdentifierName).ok();
+                // `?` is part of the parameter node so the builder records a real marker token.
+                self.eat(state, Question);
                 // Skip type annotation
                 if self.eat(state, Colon) {
                     self.parse_type_annotation(state)?;

@@ -306,7 +306,7 @@ impl<'config> TypeScriptParser<'config> {
         state.bump(); // import
 
         self.skip_trivia(state);
-        // `import type …` — leave `Type` as a leaf so the builder can set `is_type_only`.
+        // `import type …` — leave `Type` as a leaf so the builder can record it as a `Modifier`.
         if self.at(state, Type) {
             state.bump();
             self.skip_trivia(state);

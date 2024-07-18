@@ -395,7 +395,7 @@ impl<'config> TypeScriptBuilder<'config> {
                                         *body = Some(Box::new(stmt));
                                     }
                                     else if let Some(expr) = builder.build_expression(&child_node, source)? {
-                                        let expr_stmt = ExpressionStatement { decorators: Vec::new(), is_declare: false, expression: expr, span: child_node.span().into() };
+                                        let expr_stmt = ExpressionStatement { decorators: Vec::new(), expression: expr, span: child_node.span().into() };
                                         *body = Some(Box::new(Statement::ExpressionStatement(expr_stmt)));
                                     }
                                 }

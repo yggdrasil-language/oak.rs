@@ -1,4 +1,4 @@
-use crate::ast::{Decorator, Expression, FunctionParam, Statement, TypeAnnotation, TypeParameter};
+use crate::ast::{Decorator, Expression, FunctionParam, Modifier, ModifierKind, OptionalMarker, Statement, TypeAnnotation, TypeParameter, has_modifier};
 use core::range::Range;
 
 /// Represents the visibility of a class member.
@@ -29,14 +29,10 @@ pub enum ClassMember {
         initializer: Option<Expression>,
         /// Visibility of the property.
         visibility: Option<Visibility>,
-        /// Whether the property is static.
-        is_static: bool,
-        /// Whether the property is readonly.
-        is_readonly: bool,
-        /// Whether the property is abstract.
-        is_abstract: bool,
-        /// Whether the property is optional.
-        is_optional: bool,
+        /// Keyword modifiers written before the property (`static`, `readonly`, `abstract`).
+        modifiers: Vec<Modifier>,
+        /// `?` marker written after the property name.
+        optional_marker: Option<OptionalMarker>,
         /// Source span of the property.
         #[cfg_attr(feature = "serde", serde(with = "oak_core::serde_range"))]
         span: Range<usize>,
@@ -57,20 +53,58 @@ pub enum ClassMember {
         body: Vec<Statement>,
         /// Visibility of the method.
         visibility: Option<Visibility>,
-        /// Whether the method is static.
-        is_static: bool,
-        /// Whether the method is abstract.
-        is_abstract: bool,
-        /// Whether the method is `async`.
-        is_async: bool,
-        /// Whether the method is a getter.
-        is_getter: bool,
-        /// Whether the method is a setter.
-        is_setter: bool,
-        /// Whether the method is optional.
-        is_optional: bool,
+        /// Keyword modifiers written before the method (`static`, `abstract`, `async`, `get`, `set`).
+        modifiers: Vec<Modifier>,
+        /// `?` marker written after the method name.
+        optional_marker: Option<OptionalMarker>,
         /// Source span of the method.
         #[cfg_attr(feature = "serde", serde(with = "oak_core::serde_range"))]
         span: Range<usize>,
     },
+}
+
+impl ClassMember {
+    /// Returns `true` when the member carries `kind` among its keyword modifiers.
+    pub fn has_modifier(&self, kind: ModifierKind) -> bool {
+        match self {
+            ClassMember::Property { modifiers, .. } | ClassMember::Method { modifiers, .. } => has_modifier(modifiers, kind),
+        }
+    }
+
+    /// Returns `true` when the member is marked optional with `?`.
+    pub fn is_optional(&self) -> bool {
+        match self {
+            ClassMember::Property { optional_marker, .. } | ClassMember::Method { optional_marker, .. } => optional_marker.is_some(),
+        }
+    }
+
+    /// Returns `true` when the member carries a `static` modifier.
+    pub fn is_static(&self) -> bool {
+        self.has_modifier(ModifierKind::Static)
+    }
+
+    /// Returns `true` when the member carries a `readonly` modifier.
+    pub fn is_readonly(&self) -> bool {
+        self.has_modifier(ModifierKind::Readonly)
+    }
+
+    /// Returns `true` when the member carries an `abstract` modifier.
+    pub fn is_abstract(&self) -> bool {
+        self.has_modifier(ModifierKind::Abstract)
+    }
+
+    /// Returns `true` when the member carries an `async` modifier.
+    pub fn is_async(&self) -> bool {
+        self.has_modifier(ModifierKind::Async)
+    }
+
+    /// Returns `true` when the member carries a `get` modifier.
+    pub fn is_getter(&self) -> bool {
+        self.has_modifier(ModifierKind::Get)
+    }
+
+    /// Returns `true` when the member carries a `set` modifier.
+    pub fn is_setter(&self) -> bool {
+        self.has_modifier(ModifierKind::Set)
+    }
 }

@@ -240,7 +240,7 @@ pub(super) fn print_type_annotation(ty: &TypeAnnotation) -> Option<String> {
                 .iter()
                 .map(|arg| {
                     let ty = arg.ty.as_ref().and_then(print_type_annotation).map(|ty| format!(": {ty}")).unwrap_or_default();
-                    Some(format!("{}{}{}", arg.name, if arg.optional { "?" } else { "" }, ty))
+                    Some(format!("{}{}{}", arg.name, if arg.is_optional() { "?" } else { "" }, ty))
                 })
                 .collect::<Option<Vec<_>>>()?
                 .join(", ");
@@ -250,9 +250,9 @@ pub(super) fn print_type_annotation(ty: &TypeAnnotation) -> Option<String> {
             let properties = members
                 .iter()
                 .map(|member| match member {
-                    crate::ast::ClassMember::Property { name, ty, is_optional, .. } => {
+                    crate::ast::ClassMember::Property { name, ty, optional_marker, .. } => {
                         let ty = print_type_annotation(ty.as_ref()?)?;
-                        Some(format!("{}{}: {}", name, if *is_optional { "?" } else { "" }, ty))
+                        Some(format!("{}{}: {}", name, if optional_marker.is_some() { "?" } else { "" }, ty))
                     }
                     _ => None,
                 })
