@@ -1,6 +1,8 @@
 //! Oak TypeScript statement → canonical text.
 
-use crate::ast::{BlockStatement, ClassDeclaration, ClassMember, DoWhileStatement, ExportDeclaration, FunctionDeclaration, ImportDeclaration, ImportSpecifier, ModifierKind, Statement, TryStatement, TypeAliasDeclaration, VariableDeclaration};
+use crate::ast::{
+    BlockStatement, ClassDeclaration, ClassMember, DoWhileStatement, ExportDeclaration, ExportSpecifier, FunctionDeclaration, ImportDeclaration, ImportSpecifier, ModifierKind, Statement, TryStatement, TypeAliasDeclaration, VariableDeclaration,
+};
 
 use super::expr::{print_expression, print_string};
 
@@ -94,16 +96,16 @@ fn print_variable(v: &VariableDeclaration) -> Option<String> {
 
 fn print_import(d: &ImportDeclaration) -> Option<String> {
     let type_kw = if d.is_type_only() { "type " } else { "" };
-    let module = print_string(&d.module_specifier);
+    let module = print_string(&d.module_specifier.value);
     if d.specifiers.is_empty() {
         return Some(format!("import {type_kw}{module};"));
     }
     let mut parts = Vec::with_capacity(d.specifiers.len());
     for spec in &d.specifiers {
         parts.push(match spec {
-            ImportSpecifier::Default(name) => name.clone(),
-            ImportSpecifier::Namespace(name) => format!("* as {name}"),
-            ImportSpecifier::Named { local, imported, type_modifier } => {
+            ImportSpecifier::Default { local, .. } => local.clone(),
+            ImportSpecifier::Namespace { local, .. } => format!("* as {local}"),
+            ImportSpecifier::Named { local, imported, type_modifier, .. } => {
                 let type_kw = if type_modifier.is_some() { "type " } else { "" };
                 if local == imported { format!("{type_kw}{local}") } else { format!("{type_kw}{imported} as {local}") }
             }
@@ -114,14 +116,25 @@ fn print_import(d: &ImportDeclaration) -> Option<String> {
 
 fn print_export(d: &ExportDeclaration) -> Option<String> {
     if !d.specifiers.is_empty() {
+        let source = d.source.as_ref().map(|value| format!(" from {}", print_string(&value.value))).unwrap_or_default();
+        let type_kw = if d.is_type_only() { "type " } else { "" };
+        if d.specifiers.len() == 1 {
+            match &d.specifiers[0] {
+                ExportSpecifier::All { .. } => return Some(format!("export {type_kw}*{source};")),
+                ExportSpecifier::Namespace { exported, .. } => return Some(format!("export {type_kw}* as {exported}{source};")),
+                ExportSpecifier::Named { .. } => {}
+            }
+        }
         let mut parts = Vec::with_capacity(d.specifiers.len());
         for specifier in &d.specifiers {
-            let type_kw = if specifier.is_inline_type_only() { "type " } else { "" };
-            let name = if specifier.local == specifier.exported { specifier.local.clone() } else { format!("{} as {}", specifier.local, specifier.exported) };
+            let ExportSpecifier::Named { local, exported, type_modifier, .. } = specifier
+            else {
+                return None;
+            };
+            let type_kw = if type_modifier.is_some() { "type " } else { "" };
+            let name = if local == exported { local.clone() } else { format!("{local} as {exported}") };
             parts.push(format!("{type_kw}{name}"));
         }
-        let source = d.source.as_ref().map(|value| format!(" from {}", print_string(value))).unwrap_or_default();
-        let type_kw = if d.is_type_only() { "type " } else { "" };
         return Some(format!("export {type_kw}{{ {} }}{source};", parts.join(", ")));
     }
     if d.source.is_some() || d.is_type_only() {
