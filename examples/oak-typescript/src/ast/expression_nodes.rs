@@ -89,6 +89,13 @@ pub enum ExpressionKind {
         /// Whether the access is optional (using `?.`).
         optional: bool,
     },
+    /// A meta property such as `import.meta`.
+    MetaProperty {
+        /// The meta keyword, e.g. `import`.
+        meta: String,
+        /// The meta property name, e.g. `meta`.
+        property: String,
+    },
     /// A call expression.
     CallExpression {
         /// Function to call.

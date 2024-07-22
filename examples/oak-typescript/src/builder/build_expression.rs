@@ -251,6 +251,20 @@ impl<'config> TypeScriptBuilder<'config> {
 
                 if object.is_some() && property.is_some() { Ok(Some(Expression::new(ExpressionKind::MemberExpression { object: Box::new(object.unwrap()), property: Box::new(property.unwrap()), computed, optional }, span.into()))) } else { Ok(None) }
             }
+            TypeScriptElementType::MetaProperty => {
+                let mut meta = String::new();
+                let mut property = String::new();
+                for child in node.children() {
+                    if let RedTree::Leaf(leaf) = child {
+                        match leaf.kind {
+                            TypeScriptTokenType::Import => meta = source.get_text_in(leaf.span.into()).trim().to_string(),
+                            TypeScriptTokenType::IdentifierName => property = source.get_text_in(leaf.span.into()).trim().to_string(),
+                            _ => {}
+                        }
+                    }
+                }
+                if meta.is_empty() { Ok(None) } else { Ok(Some(Expression::new(ExpressionKind::MetaProperty { meta, property }, span.into()))) }
+            }
             TypeScriptElementType::ArrayExpression => {
                 let mut elements = Vec::new();
                 for child in node.children() {

@@ -495,6 +495,8 @@ pub enum TypeScriptElementType {
     HeritageClause,
     /// Enum member.
     EnumMember,
+    /// A meta property such as `import.meta`.
+    MetaProperty,
 }
 
 impl TypeScriptElementType {

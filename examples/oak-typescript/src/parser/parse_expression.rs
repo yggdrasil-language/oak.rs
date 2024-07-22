@@ -22,7 +22,7 @@ impl<'config> TypeScriptParser<'config> {
                 state.bump();
                 if self.eat(state, Dot) {
                     self.expect(state, IdentifierName).ok();
-                    state.finish_at(cp, crate::parser::element_type::TypeScriptElementType::MemberExpression)
+                    state.finish_at(cp, crate::parser::element_type::TypeScriptElementType::MetaProperty)
                 }
                 else {
                     state.finish_at(cp, crate::parser::element_type::TypeScriptElementType::IdentifierName)
@@ -206,11 +206,20 @@ impl<'config> TypeScriptParser<'config> {
                 state.finish_at(cp, crate::parser::element_type::TypeScriptElementType::UnaryExpression.into())
             }
             Some(Import) => {
-                state.bump();
-                self.expect(state, LeftParen).ok();
-                PrattParser::parse(state, 0, self);
-                self.expect(state, RightParen).ok();
-                state.finish_at(cp, crate::parser::element_type::TypeScriptElementType::CallExpression.into()) // We can use CallExpression kind for now, or a new one
+                if state.peek_non_trivia_kind_at(1) == Some(Dot) {
+                    // Meta property: `import.meta` (member access continues through the infix loop).
+                    state.bump(); // import
+                    self.eat(state, Dot);
+                    self.expect(state, IdentifierName).ok();
+                    state.finish_at(cp, crate::parser::element_type::TypeScriptElementType::MetaProperty)
+                }
+                else {
+                    state.bump();
+                    self.expect(state, LeftParen).ok();
+                    PrattParser::parse(state, 0, self);
+                    self.expect(state, RightParen).ok();
+                    state.finish_at(cp, crate::parser::element_type::TypeScriptElementType::CallExpression.into()) // We can use CallExpression kind for now, or a new one
+                }
             }
             Some(New) => {
                 state.bump();
@@ -288,17 +297,7 @@ impl<'config> TypeScriptParser<'config> {
                 while state.not_at_end() && !self.at(state, RightParen) {
                     self.skip_trivia(state);
                     let acp = state.checkpoint();
-                    if self.at(state, Import) {
-                        state.bump();
-                        self.eat(state, Dot);
-                        self.expect(state, IdentifierName).ok();
-                        if self.eat(state, Dot) {
-                            self.expect(state, IdentifierName).ok();
-                        }
-                    }
-                    else {
-                        PrattParser::parse(state, 0, self);
-                    }
+                    PrattParser::parse(state, 0, self);
                     state.finish_at(acp, crate::parser::element_type::TypeScriptElementType::CallArgument);
                     if state.checkpoint().0 == acp.0 {
                         state.bump();
