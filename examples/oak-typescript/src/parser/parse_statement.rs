@@ -216,6 +216,9 @@ impl<'config> TypeScriptParser<'config> {
         }
         self.expect(state, Function).ok();
         self.skip_trivia(state);
+        // `function*` / `async function*`: the `*` sits inside the declaration
+        // node so the generator marker is never dropped from the tree.
+        self.eat(state, Star);
         if self.at(state, IdentifierName) {
             self.expect(state, IdentifierName).ok();
         }
