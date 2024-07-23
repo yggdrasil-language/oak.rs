@@ -330,6 +330,16 @@ impl<'config> TypeScriptParser<'config> {
                     self.expect(state, RightParen).ok();
                     return Some(state.finish_at(cp, crate::parser::element_type::TypeScriptElementType::CallExpression.into()));
                 }
+                // Optional computed member: `obj?.[index]`. An empty index keeps
+                // the same `T[]` tolerance as the plain `LeftBracket` branch below.
+                if kind == QuestionDot && self.at(state, LeftBracket) {
+                    self.expect(state, LeftBracket).ok();
+                    if !self.at(state, RightBracket) {
+                        PrattParser::parse(state, 0, self);
+                    }
+                    self.expect(state, RightBracket).ok();
+                    return Some(state.finish_at(cp, crate::parser::element_type::TypeScriptElementType::MemberExpression.into()));
+                }
                 if self.at(state, IdentifierName) || state.peek_text().is_some_and(|text| TypeScriptTokenType::from_keyword(&text).is_some()) {
                     state.bump();
                 }
