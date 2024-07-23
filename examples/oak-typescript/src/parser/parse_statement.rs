@@ -528,6 +528,7 @@ impl<'config> TypeScriptParser<'config> {
         use crate::lexer::token_type::TypeScriptTokenType::*;
         let cp = state.checkpoint();
         state.bump(); // for
+        self.eat(state, Await);
         self.expect(state, LeftParen).ok();
 
         // Init
@@ -547,6 +548,15 @@ impl<'config> TypeScriptParser<'config> {
         else {
             if !self.at(state, Semicolon) {
                 PrattParser::parse(state, 0, self);
+            }
+            self.skip_trivia(state);
+            if self.at(state, Of) {
+                state.bump(); // of
+                PrattParser::parse(state, 0, self);
+                self.expect(state, RightParen).ok();
+                self.parse_statement(state)?;
+                state.finish_at(cp, crate::parser::element_type::TypeScriptElementType::ForOfStatement);
+                return Ok(());
             }
             self.expect(state, Semicolon).ok();
         }

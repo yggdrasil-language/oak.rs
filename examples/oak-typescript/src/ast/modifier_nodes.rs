@@ -44,6 +44,8 @@ pub enum ModifierKind {
     Type,
     /// `default` in `export default`.
     Default,
+    /// `await` in `for await`.
+    Await,
 }
 
 /// Returns `true` when `modifiers` contains `kind`.

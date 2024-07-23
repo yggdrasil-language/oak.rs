@@ -200,10 +200,15 @@ impl<'config> TypeScriptParser<'config> {
                 PrattParser::parse(state, 15, self);
                 state.finish_at(cp, crate::parser::element_type::TypeScriptElementType::UpdateExpression.into())
             }
-            Some(Plus) | Some(Minus) | Some(Exclamation) | Some(Tilde) | Some(Typeof) | Some(Void) | Some(Delete) | Some(Await) => {
+            Some(Plus) | Some(Minus) | Some(Exclamation) | Some(Tilde) | Some(Typeof) | Some(Void) | Some(Delete) => {
                 state.bump();
                 PrattParser::parse(state, 15, self); // High precedence for prefix
                 state.finish_at(cp, crate::parser::element_type::TypeScriptElementType::UnaryExpression.into())
+            }
+            Some(Await) => {
+                state.bump();
+                PrattParser::parse(state, 15, self);
+                state.finish_at(cp, crate::parser::element_type::TypeScriptElementType::AwaitExpression)
             }
             Some(Import) => {
                 if state.peek_non_trivia_kind_at(1) == Some(Dot) {

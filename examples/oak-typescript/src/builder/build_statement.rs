@@ -870,6 +870,48 @@ impl<'config> TypeScriptBuilder<'config> {
                 }
                 Ok(Some(Statement::ExportDeclaration(ExportDeclaration { declaration: declaration.map(Box::new), specifiers, source: module_specifier, modifiers, span: span.into() })))
             }
+            TypeScriptElementType::ForOfStatement => {
+                let mut left: Option<Statement> = None;
+                let mut right: Option<Expression> = None;
+                let mut body: Option<Statement> = None;
+                let mut await_marker: Option<Modifier> = None;
+                let mut past_of = false;
+                let mut past_paren = false;
+
+                for child in node.children() {
+                    match child {
+                        RedTree::Leaf(leaf) => match leaf.kind {
+                            TypeScriptTokenType::Await => await_marker = Some(Modifier::new(ModifierKind::Await, leaf.span)),
+                            TypeScriptTokenType::Of => past_of = true,
+                            TypeScriptTokenType::RightParen => past_paren = true,
+                            _ => {}
+                        },
+                        RedTree::Node(child_node) => {
+                            if past_paren {
+                                if let Some(stmt) = self.build_statement(&child_node, source)? {
+                                    body = Some(stmt);
+                                }
+                            }
+                            else if past_of {
+                                if let Some(expr) = self.build_expression(&child_node, source)? {
+                                    right = Some(expr);
+                                }
+                            }
+                            else if let Some(stmt) = self.build_statement(&child_node, source)? {
+                                left = Some(stmt);
+                            }
+                            else if let Some(expr) = self.build_expression(&child_node, source)? {
+                                left = Some(Statement::ExpressionStatement(ExpressionStatement { decorators: Vec::new(), expression: expr, span: child_node.span().into() }));
+                            }
+                        }
+                    }
+                }
+
+                let left = Box::new(left.unwrap_or_else(|| Statement::ExpressionStatement(ExpressionStatement { decorators: Vec::new(), expression: Expression::new(ExpressionKind::Identifier(String::new()), (0..0).into()), span: (0..0).into() })));
+                let right = right.unwrap_or_else(|| Expression::new(ExpressionKind::Identifier(String::new()), (0..0).into()));
+                let body = Box::new(body.unwrap_or_else(|| Statement::BlockStatement(BlockStatement { decorators: Vec::new(), statements: Vec::new(), span: (0..0).into() })));
+                Ok(Some(Statement::ForOfStatement(ForOfStatement { decorators: Vec::new(), await_marker, left, right, body, span: span.into() })))
+            }
             _ => {
                 // Try building as expression statement if not a recognized statement kind
                 if let Some(expr) = self.build_expression(node, source)? { Ok(Some(Statement::ExpressionStatement(ExpressionStatement { decorators: Vec::new(), expression: expr, span: span.into() }))) } else { Ok(None) }

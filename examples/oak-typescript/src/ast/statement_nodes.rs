@@ -312,6 +312,8 @@ pub struct ForInStatement {
 pub struct ForOfStatement {
     /// Decorators associated with the statement.
     pub decorators: Vec<Decorator>,
+    /// The `await` keyword marker written after `for` in `for await`.
+    pub await_marker: Option<Modifier>,
     /// The left-hand side of the for-of loop.
     pub left: Box<Statement>,
     /// The expression being iterated over.
@@ -321,6 +323,13 @@ pub struct ForOfStatement {
     /// Source span of the statement.
     #[cfg_attr(feature = "serde", serde(with = "oak_core::serde_range"))]
     pub span: Range<usize>,
+}
+
+impl ForOfStatement {
+    /// Returns `true` when the loop is written as `for await`.
+    pub fn is_await(&self) -> bool {
+        self.await_marker.is_some()
+    }
 }
 
 /// Represents a switch statement.
