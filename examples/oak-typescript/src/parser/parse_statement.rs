@@ -391,12 +391,14 @@ impl<'config> TypeScriptParser<'config> {
                 state.bump();
                 self.skip_trivia(state);
             }
-            if self.at(state, IdentifierName) {
-                self.parse_import_identifier(state);
+            // Specifier names may be keywords (`default`), which the lexer
+            // classifies as reserved tokens instead of `IdentifierName`.
+            if self.is_binding_identifier(state) {
+                self.parse_binding_identifier(state);
                 self.skip_trivia(state);
                 if self.eat(state, As) {
                     self.skip_trivia(state);
-                    self.parse_import_identifier(state);
+                    self.parse_binding_identifier(state);
                 }
                 state.finish_at(spec_cp, TypeScriptElementType::ImportSpecifier);
             }
@@ -494,12 +496,14 @@ impl<'config> TypeScriptParser<'config> {
                 state.bump();
                 self.skip_trivia(state);
             }
-            if self.at(state, IdentifierName) {
-                self.parse_import_identifier(state);
+            // Specifier names may be keywords (`default`), which the lexer
+            // classifies as reserved tokens instead of `IdentifierName`.
+            if self.is_binding_identifier(state) {
+                self.parse_binding_identifier(state);
                 self.skip_trivia(state);
                 if self.eat(state, As) {
                     self.skip_trivia(state);
-                    self.parse_import_identifier(state);
+                    self.parse_binding_identifier(state);
                 }
                 state.finish_at(spec_cp, TypeScriptElementType::ExportSpecifier);
             }
