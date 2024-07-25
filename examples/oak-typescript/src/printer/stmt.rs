@@ -83,15 +83,23 @@ fn print_variable(v: &VariableDeclaration) -> Option<String> {
     if !v.decorators.is_empty() || v.is_declare() {
         return None;
     }
-    let init = match &v.value {
-        Some(e) => format!(" = {}", print_expression(e)?),
-        None => String::new(),
-    };
-    let ty = match &v.ty {
-        Some(t) => format!(": {}", super::expr::print_type_annotation(t)?),
-        None => String::new(),
-    };
-    Some(format!("const {}{}{}", v.name, ty, init))
+    let mut parts = Vec::with_capacity(v.declarators.len());
+    for declarator in &v.declarators {
+        let binding = match &declarator.pattern_text {
+            Some(text) => text.clone(),
+            None => declarator.binding_names.first().cloned().unwrap_or_default(),
+        };
+        let init = match &declarator.value {
+            Some(e) => format!(" = {}", print_expression(e)?),
+            None => String::new(),
+        };
+        let ty = match &declarator.ty {
+            Some(t) => format!(": {}", super::expr::print_type_annotation(t)?),
+            None => String::new(),
+        };
+        parts.push(format!("{binding}{ty}{init}"));
+    }
+    Some(format!("const {}", parts.join(", ")))
 }
 
 fn print_import(d: &ImportDeclaration) -> Option<String> {

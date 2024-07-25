@@ -26,7 +26,7 @@ fn new_url_with_import_meta_url() {
     else {
         panic!("expected variable declaration: {:?}", root_statements(&root))
     };
-    let value = decl.value.as_ref().expect("initializer must exist");
+    let value = decl.value().expect("initializer must exist");
     let ExpressionKind::NewExpression { func, args } = &*value.kind
     else {
         panic!("expected new expression: {:?}", value.kind)
@@ -57,7 +57,7 @@ fn import_meta_member_access_positions() {
     else {
         panic!("stmt 0: {:?}", stmts[0])
     };
-    let value = decl.value.as_ref().expect("import.meta initializer");
+    let value = decl.value().expect("import.meta initializer");
     assert!(matches!(&*value.kind, ExpressionKind::MetaProperty { meta, property } if meta == "import" && property == "meta"));
 
     let Statement::ExpressionStatement(stmt) = &stmts[1]
@@ -167,7 +167,7 @@ fn await_expression_is_a_real_node() {
     else {
         panic!("decl")
     };
-    let value = decl.value.as_ref().expect("value");
+    let value = decl.value().expect("value");
     let ExpressionKind::AwaitExpression(argument) = &*value.kind
     else {
         panic!("expected await expression: {:?}", value.kind)

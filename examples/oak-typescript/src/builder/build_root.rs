@@ -50,8 +50,10 @@ impl<'config> TypeScriptBuilder<'config> {
 fn collect_top_level_await_statement(stmt: &Statement, spans: &mut Vec<Range<usize>>) {
     match stmt {
         Statement::VariableDeclaration(decl) => {
-            if let Some(value) = &decl.value {
-                collect_top_level_await_expression(value, spans);
+            for declarator in &decl.declarators {
+                if let Some(value) = &declarator.value {
+                    collect_top_level_await_expression(value, spans);
+                }
             }
         }
         Statement::ExpressionStatement(s) => collect_top_level_await_expression(&s.expression, spans),

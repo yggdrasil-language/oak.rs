@@ -21,7 +21,7 @@ fn initializer(root: &TypeScriptRoot) -> &Expression {
     else {
         panic!("expected variable declaration: {:?}", root.statements)
     };
-    decl.value.as_ref().expect("initializer must exist")
+    decl.value().expect("initializer must exist")
 }
 
 #[test]

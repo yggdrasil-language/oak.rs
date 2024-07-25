@@ -30,61 +30,82 @@ impl<'config> TypeScriptBuilder<'config> {
                 Ok(None)
             }
             TypeScriptElementType::VariableDeclaration => {
-                let mut name = String::new();
-                let mut ty = None;
-                let mut value = None;
+                let mut declarators: Vec<VariableDeclarator> = Vec::new();
                 let mut modifiers: Vec<Modifier> = Vec::new();
-                let mut in_initializer = false;
                 let mut declaration_kind = VariableKind::Const;
+                let mut current: Option<VariableDeclarator> = None;
+                let mut in_initializer = false;
+
                 for child in node.children() {
                     match child {
                         RedTree::Node(child_node) => {
+                            let child_span: Range<usize> = child_node.span().into();
                             let child_kind = child_node.green.kind;
-                            if child_kind == TypeScriptElementType::BindingPattern {
-                                name = source.get_text_in(child_node.span().into()).trim().to_string();
-                            }
-                            else if child_kind == TypeScriptElementType::IdentifierName && !in_initializer {
-                                if name.is_empty() {
-                                    for c in child_node.children() {
-                                        if let RedTree::Leaf(l) = c {
-                                            if l.kind == TypeScriptTokenType::IdentifierName {
-                                                name = source.get_text_in(l.span.into()).trim().to_string();
-                                                break;
-                                            }
+                            if in_initializer {
+                                if let Some(declarator) = current.as_mut() {
+                                    if declarator.value.is_none() {
+                                        if let Some(expr) = self.build_expression(&child_node, source)? {
+                                            declarator.value = Some(expr);
+                                            declarator.span.end = child_span.end;
                                         }
                                     }
-                                    if name.is_empty() {
-                                        name = source.get_text_in(child_node.span().into()).trim().to_string();
+                                }
+                                continue;
+                            }
+                            match child_kind {
+                                TypeScriptElementType::BindingPattern => {
+                                    let mut declarator = current.take().unwrap_or(VariableDeclarator { binding_names: Vec::new(), pattern_text: None, ty: None, value: None, span: child_span });
+                                    declarator.binding_names.extend(crate::builder::build_binding::binding_pattern_names(&child_node, source));
+                                    declarator.pattern_text = Some(source.get_text_in(child_span.clone()).trim().to_string());
+                                    declarator.span.end = child_span.end;
+                                    current = Some(declarator);
+                                }
+                                TypeScriptElementType::TypeAnnotation => {
+                                    if !self.erase_types {
+                                        if let Some(declarator) = current.as_mut() {
+                                            declarator.ty = self.build_type_annotation(&child_node, source)?;
+                                            declarator.span.end = child_span.end;
+                                        }
                                     }
                                 }
-                            }
-                            else if child_kind == TypeScriptElementType::TypeAnnotation {
-                                if !self.erase_types {
-                                    ty = self.build_type_annotation(&child_node, source)?
+                                TypeScriptElementType::IdentifierName => {
+                                    let name = crate::builder::build_binding::binding_identifier_text(&child_node, source);
+                                    let mut declarator = current.take().unwrap_or(VariableDeclarator { binding_names: Vec::new(), pattern_text: None, ty: None, value: None, span: child_span.clone() });
+                                    declarator.binding_names.push(name);
+                                    declarator.span.end = child_span.end;
+                                    current = Some(declarator);
                                 }
-                            }
-                            else if value.is_none() {
-                                if let Some(expr) = self.build_expression(&child_node, source)? {
-                                    value = Some(expr)
-                                }
+                                _ => {}
                             }
                         }
                         RedTree::Leaf(leaf) => match leaf.kind {
-                            TypeScriptTokenType::IdentifierName => {
-                                if name.is_empty() {
-                                    name = source.get_text_in(leaf.span.into()).trim().to_string()
-                                }
-                            }
                             TypeScriptTokenType::Declare => modifiers.push(Modifier::new(ModifierKind::Declare, leaf.span)),
                             TypeScriptTokenType::Let => declaration_kind = VariableKind::Let,
                             TypeScriptTokenType::Var => declaration_kind = VariableKind::Var,
                             TypeScriptTokenType::Const => declaration_kind = VariableKind::Const,
                             TypeScriptTokenType::Equal => in_initializer = true,
+                            TypeScriptTokenType::Comma => {
+                                in_initializer = false;
+                                if let Some(declarator) = current.take() {
+                                    declarators.push(declarator);
+                                }
+                            }
+                            TypeScriptTokenType::IdentifierName => {
+                                let span: Range<usize> = leaf.span.into();
+                                let name = source.get_text_in(span.clone()).trim().to_string();
+                                let mut declarator = current.take().unwrap_or(VariableDeclarator { binding_names: Vec::new(), pattern_text: None, ty: None, value: None, span: span.clone() });
+                                declarator.binding_names.push(name);
+                                declarator.span.end = span.end;
+                                current = Some(declarator);
+                            }
                             _ => {}
                         },
                     }
                 }
-                Ok(Some(Statement::VariableDeclaration(VariableDeclaration { decorators: Vec::new(), modifiers, name, kind: declaration_kind, ty, value, span: span.into() })))
+                if let Some(declarator) = current.take() {
+                    declarators.push(declarator);
+                }
+                Ok(Some(Statement::VariableDeclaration(VariableDeclaration { decorators: Vec::new(), modifiers, kind: declaration_kind, declarators, span: span.into() })))
             }
             TypeScriptElementType::FunctionDeclaration => {
                 let mut name = String::new();
