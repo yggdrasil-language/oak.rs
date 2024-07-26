@@ -960,7 +960,7 @@ fn test_sql_builder_set_operation_tail_binds_to_whole_result() {
     let order_by = set.order_by.as_ref().unwrap_or_else(|| panic!("Missing ORDER BY on the set operation"));
     assert_eq!(order_by.items.len(), 1);
     let limit = set.limit.as_ref().unwrap_or_else(|| panic!("Missing LIMIT on the set operation"));
-    assert!(matches!(&limit.limit, Expression::Literal(Literal::Number(value, _)) if value.as_ref() == "5"));
+    assert!(matches!(&limit.limit, Some(Expression::Literal(Literal::Number(value, _))) if value.as_ref() == "5"));
     assert!(set.operands[1].order_by.is_none(), "ORDER BY must not bind to the last operand");
     assert!(set.operands[1].limit.is_none(), "LIMIT must not bind to the last operand");
     assert_eq!(source, "SELECT a FROM t UNION SELECT b FROM u ORDER BY a ASC LIMIT 5;");
@@ -1689,7 +1689,7 @@ fn test_sql_builder_limit_offset_round_trip() {
         panic!("Expected Select statement");
     };
     let limit_clause = select.limit.as_ref().unwrap_or_else(|| panic!("Missing LIMIT clause"));
-    assert!(matches!(&limit_clause.limit, Expression::Literal(Literal::Number(v, _)) if v.as_ref() == "10"));
+    assert!(matches!(&limit_clause.limit, Some(Expression::Literal(Literal::Number(v, _))) if v.as_ref() == "10"));
     assert!(matches!(&limit_clause.offset, Some(Expression::Literal(Literal::Number(v, _))) if v.as_ref() == "5"));
     assert_eq!(source, "SELECT*FROM t LIMIT 10 OFFSET 5;");
 
@@ -1700,20 +1700,50 @@ fn test_sql_builder_limit_offset_round_trip() {
         panic!("Expected Select statement");
     };
     let limit_clause = select.limit.as_ref().unwrap_or_else(|| panic!("Missing LIMIT clause"));
-    assert!(matches!(&limit_clause.limit, Expression::Literal(Literal::Number(v, _)) if v.as_ref() == "10"));
+    assert!(matches!(&limit_clause.limit, Some(Expression::Literal(Literal::Number(v, _))) if v.as_ref() == "10"));
     assert!(limit_clause.offset.is_none());
     assert_eq!(source, "SELECT*FROM t LIMIT 10;");
+}
 
-    // OFFSET alone (MySQL-style without LIMIT).
-    let (statement, source) = build_statement("SELECT * FROM t OFFSET 5;");
+/// A standalone `OFFSET` skips rows and must never be folded into `limit`:
+/// `SELECT a FROM t OFFSET 2` builds `limit: None, offset: Some(2)` and the
+/// rendered source round-trips back to the same shape without a `LIMIT`.
+#[test]
+fn test_sql_builder_standalone_offset_keeps_offset_semantics() {
+    let (statement, source) = build_statement("SELECT a FROM t OFFSET 2");
     let SqlStatement::Select(select) = &statement
     else {
         panic!("Expected Select statement");
     };
-    let limit_clause = select.limit.as_ref().unwrap_or_else(|| panic!("Missing LIMIT clause"));
-    assert!(matches!(&limit_clause.limit, Expression::Literal(Literal::Number(v, _)) if v.as_ref() == "5"));
-    assert!(limit_clause.offset.is_none());
-    assert_eq!(source, "SELECT*FROM t LIMIT 5;");
+    let limit_clause = select.limit.as_ref().unwrap_or_else(|| panic!("Missing OFFSET clause"));
+    assert!(limit_clause.limit.is_none(), "standalone OFFSET must not become a LIMIT, got {:?}", limit_clause.limit);
+    assert!(matches!(&limit_clause.offset, Some(Expression::Literal(Literal::Number(v, _))) if v.as_ref() == "2"));
+    assert_eq!(source, "SELECT a FROM t OFFSET 2;");
+
+    // Re-parsing the rendered source keeps the offset semantics stable.
+    let (rebuilt, rebuilt_source) = build_statement(&source);
+    let SqlStatement::Select(rebuilt) = &rebuilt
+    else {
+        panic!("Expected Select statement after round trip, got {rebuilt:?}");
+    };
+    let rebuilt_clause = rebuilt.limit.as_ref().unwrap_or_else(|| panic!("OFFSET clause lost in round trip"));
+    assert!(rebuilt_clause.limit.is_none(), "round trip must not rewrite OFFSET into LIMIT");
+    assert!(matches!(&rebuilt_clause.offset, Some(Expression::Literal(Literal::Number(v, _))) if v.as_ref() == "2"));
+    assert_eq!(rebuilt_source, source);
+
+    // OFFSET with an expression value keeps working standalone.
+    let (statement, _source) = build_statement("SELECT * FROM t OFFSET a + b;");
+    let SqlStatement::Select(select) = &statement
+    else {
+        panic!("Expected Select statement");
+    };
+    let limit_clause = select.limit.as_ref().unwrap_or_else(|| panic!("Missing OFFSET clause"));
+    assert!(limit_clause.limit.is_none());
+    assert!(matches!(&limit_clause.offset, Some(Expression::Binary { .. })), "standalone OFFSET should accept a binary expression, got {:?}", limit_clause.offset);
+
+    // A clause keyword with no value at all is rejected with a clear message.
+    assert!(rejection_reason("SELECT a FROM t LIMIT;").contains("LIMIT/OFFSET clause requires at least one value"), "LIMIT without a value must name both keywords in the error");
+    assert!(rejection_reason("SELECT a FROM t OFFSET;").contains("LIMIT/OFFSET clause requires at least one value"), "OFFSET without a value must name both keywords in the error");
 }
 
 #[test]
@@ -1725,7 +1755,7 @@ fn test_sql_builder_limit_offset_expressions() {
         panic!("Expected Select statement");
     };
     let limit_clause = select.limit.as_ref().unwrap_or_else(|| panic!("Missing LIMIT clause"));
-    assert!(matches!(&limit_clause.limit, Expression::Subquery { .. }), "LIMIT should accept a scalar subquery, got {:?}", limit_clause.limit);
+    assert!(matches!(&limit_clause.limit, Some(Expression::Subquery { .. })), "LIMIT should accept a scalar subquery, got {:?}", limit_clause.limit);
 
     // Expression (column reference + arithmetic) as OFFSET value.
     let (statement, _source) = build_statement("SELECT * FROM t LIMIT 10 OFFSET a + b;");
@@ -1734,7 +1764,7 @@ fn test_sql_builder_limit_offset_expressions() {
         panic!("Expected Select statement");
     };
     let limit_clause = select.limit.as_ref().unwrap_or_else(|| panic!("Missing LIMIT clause"));
-    assert!(matches!(&limit_clause.limit, Expression::Literal(Literal::Number(v, _)) if v.as_ref() == "10"));
+    assert!(matches!(&limit_clause.limit, Some(Expression::Literal(Literal::Number(v, _))) if v.as_ref() == "10"));
     assert!(matches!(&limit_clause.offset, Some(Expression::Binary { .. })), "OFFSET should accept a binary expression, got {:?}", limit_clause.offset);
 
     // Bare identifier as LIMIT value (resolved by semantic layer, parser accepts it).
@@ -1744,7 +1774,7 @@ fn test_sql_builder_limit_offset_expressions() {
         panic!("Expected Select statement");
     };
     let limit_clause = select.limit.as_ref().unwrap_or_else(|| panic!("Missing LIMIT clause"));
-    assert!(matches!(&limit_clause.limit, Expression::Identifier(id) if id.name.as_ref() == "n"), "LIMIT should accept a bare identifier");
+    assert!(matches!(&limit_clause.limit, Some(Expression::Identifier(id)) if id.name.as_ref() == "n"), "LIMIT should accept a bare identifier");
 
     // Negative literal as LIMIT value (unary minus).
     let (statement, _source) = build_statement("SELECT * FROM t LIMIT -1;");
@@ -1753,5 +1783,5 @@ fn test_sql_builder_limit_offset_expressions() {
         panic!("Expected Select statement");
     };
     let limit_clause = select.limit.as_ref().unwrap_or_else(|| panic!("Missing LIMIT clause"));
-    assert!(matches!(&limit_clause.limit, Expression::Unary { op: UnaryOperator::Minus, .. }), "LIMIT should accept unary minus expression");
+    assert!(matches!(&limit_clause.limit, Some(Expression::Unary { op: UnaryOperator::Minus, .. })), "LIMIT should accept unary minus expression");
 }

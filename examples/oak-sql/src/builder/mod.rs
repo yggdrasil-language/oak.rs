@@ -1362,31 +1362,48 @@ impl<'config> SqlBuilder<'config> {
         let mut limit = None;
         let mut offset = None;
 
+        let mut at_offset = false;
         for child in node.children() {
-            let expr = match child {
-                RedTree::Leaf(t) if t.kind == SqlTokenType::NumberLiteral => {
-                    Some(Expression::Literal(Literal::Number(self.get_text(t.span.clone(), source), t.span.clone())))
-                }
-                RedTree::Node(n) => match n.green.kind {
-                    SqlElementType::Expression => Some(self.build_expression(n, source)?),
-                    SqlElementType::Identifier => Some(Expression::Identifier(self.build_identifier(n, source)?)),
-                    SqlElementType::FunctionCall => Some(self.build_expression(n, source)?),
-                    SqlElementType::Subquery => Some(self.build_expression(n, source)?),
-                    _ => None,
+            match child {
+                RedTree::Leaf(t) => match t.kind {
+                    SqlTokenType::Limit => at_offset = false,
+                    SqlTokenType::Offset => at_offset = true,
+                    SqlTokenType::NumberLiteral => {
+                        let expr = Expression::Literal(Literal::Number(self.get_text(t.span.clone(), source), t.span.clone()));
+                        if at_offset {
+                            offset = Some(expr);
+                        }
+                        else {
+                            limit = Some(expr);
+                        }
+                    }
+                    _ => {}
                 },
-                _ => None,
-            };
-            if let Some(expr) = expr {
-                if limit.is_none() {
-                    limit = Some(expr);
-                }
-                else {
-                    offset = Some(expr);
+                RedTree::Node(n) => {
+                    let expr = match n.green.kind {
+                        SqlElementType::Expression => Some(self.build_expression(n, source)?),
+                        SqlElementType::Identifier => Some(Expression::Identifier(self.build_identifier(n, source)?)),
+                        SqlElementType::FunctionCall => Some(self.build_expression(n, source)?),
+                        SqlElementType::Subquery => Some(self.build_expression(n, source)?),
+                        _ => None,
+                    };
+                    if let Some(expr) = expr {
+                        if at_offset {
+                            offset = Some(expr);
+                        }
+                        else {
+                            limit = Some(expr);
+                        }
+                    }
                 }
             }
         }
 
-        Ok(LimitClause { limit: limit.ok_or_else(|| OakError::custom_error("Missing limit value"))?, offset, span: node.span() })
+        if limit.is_none() && offset.is_none() {
+            return Err(OakError::custom_error("LIMIT/OFFSET clause requires at least one value"));
+        }
+
+        Ok(LimitClause { limit, offset, span: node.span() })
     }
 
     fn get_text(&self, span: core::range::Range<usize>, source: &SourceText) -> Arc<str> {
