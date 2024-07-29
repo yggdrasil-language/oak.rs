@@ -670,8 +670,17 @@ pub struct ClassDeclaration {
 pub struct FunctionParam {
     /// Decorators associated with the parameter.
     pub decorators: Vec<Decorator>,
-    /// The name of the parameter.
+    /// The simple identifier name of the parameter (empty for destructuring patterns).
     pub name: String,
+    /// Every identifier this parameter introduces (aliases, rest elements and
+    /// nested pattern targets resolve to their bound names).
+    pub binding_names: Vec<String>,
+    /// Raw source text of a destructuring pattern, `None` for plain identifiers.
+    pub pattern_text: Option<String>,
+    /// Default value written after `=`.
+    pub default: Option<Expression>,
+    /// `true` for a rest parameter (`...args`).
+    pub is_rest: bool,
     /// The type annotation of the parameter.
     pub ty: Option<TypeAnnotation>,
     /// `?` marker written after the parameter name.

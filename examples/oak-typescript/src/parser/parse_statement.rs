@@ -184,7 +184,7 @@ impl<'config> TypeScriptParser<'config> {
         Ok(())
     }
 
-    fn parse_binding_pattern<'a, S: Source + ?Sized>(&self, state: &mut State<'a, S>) {
+    pub(crate) fn parse_binding_pattern<'a, S: Source + ?Sized>(&self, state: &mut State<'a, S>) {
         use TypeScriptTokenType::*;
         let checkpoint = state.checkpoint();
         let (open, close) = if state.at(LeftBrace.into()) { (LeftBrace, RightBrace) } else { (LeftBracket, RightBracket) };

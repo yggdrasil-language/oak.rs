@@ -168,22 +168,7 @@ fn print_function(d: &FunctionDeclaration) -> Option<String> {
 }
 
 fn print_function_params(params: &[crate::ast::FunctionParam]) -> Option<String> {
-    if params.is_empty() {
-        return Some("()".into());
-    }
-    let mut parts = Vec::with_capacity(params.len());
-    for p in params {
-        if !p.decorators.is_empty() {
-            return None;
-        }
-        let ty = match &p.ty {
-            Some(t) => format!(": {}", super::expr::print_type_annotation(t)?),
-            None => String::new(),
-        };
-        let opt = if p.is_optional() { "?" } else { "" };
-        parts.push(format!("{}{}{}", p.name, opt, ty));
-    }
-    Some(format!("({})", parts.join(", ")))
+    super::expr::print_params(params)
 }
 
 fn print_class(d: &ClassDeclaration) -> Option<String> {
