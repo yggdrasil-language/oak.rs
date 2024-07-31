@@ -105,8 +105,9 @@ fn print_variable(v: &VariableDeclaration) -> Option<String> {
 fn print_import(d: &ImportDeclaration) -> Option<String> {
     let type_kw = if d.is_type_only() { "type " } else { "" };
     let module = print_string(&d.module_specifier.value);
+    let attrs = d.attributes.as_ref().map(|text| format!(" {text}")).unwrap_or_default();
     if d.specifiers.is_empty() {
-        return Some(format!("import {type_kw}{module};"));
+        return Some(format!("import {type_kw}{module}{attrs};"));
     }
     let mut parts = Vec::with_capacity(d.specifiers.len());
     for spec in &d.specifiers {
@@ -119,17 +120,18 @@ fn print_import(d: &ImportDeclaration) -> Option<String> {
             }
         });
     }
-    Some(format!("import {type_kw}{{ {} }} from {};", parts.join(", "), module))
+    Some(format!("import {type_kw}{{ {} }} from {module}{attrs};", parts.join(", ")))
 }
 
 fn print_export(d: &ExportDeclaration) -> Option<String> {
     if !d.specifiers.is_empty() {
         let source = d.source.as_ref().map(|value| format!(" from {}", print_string(&value.value))).unwrap_or_default();
+        let attrs = d.attributes.as_ref().map(|text| format!(" {text}")).unwrap_or_default();
         let type_kw = if d.is_type_only() { "type " } else { "" };
         if d.specifiers.len() == 1 {
             match &d.specifiers[0] {
-                ExportSpecifier::All { .. } => return Some(format!("export {type_kw}*{source};")),
-                ExportSpecifier::Namespace { exported, .. } => return Some(format!("export {type_kw}* as {exported}{source};")),
+                ExportSpecifier::All { .. } => return Some(format!("export {type_kw}*{source}{attrs};")),
+                ExportSpecifier::Namespace { exported, .. } => return Some(format!("export {type_kw}* as {exported}{source}{attrs};")),
                 ExportSpecifier::Named { .. } => {}
             }
         }
@@ -143,7 +145,7 @@ fn print_export(d: &ExportDeclaration) -> Option<String> {
             let name = if local == exported { local.clone() } else { format!("{local} as {exported}") };
             parts.push(format!("{type_kw}{name}"));
         }
-        return Some(format!("export {type_kw}{{ {} }}{source};", parts.join(", ")));
+        return Some(format!("export {type_kw}{{ {} }}{source}{attrs};", parts.join(", ")));
     }
     if d.source.is_some() || d.is_type_only() {
         return None;

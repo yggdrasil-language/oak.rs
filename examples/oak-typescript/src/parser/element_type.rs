@@ -455,6 +455,8 @@ pub enum TypeScriptElementType {
     ObjectBindingPattern,
     /// Binding element.
     BindingElement,
+    /// Import attribute clause (`with { … }` / `assert { … }`).
+    ImportAttributes,
     /// Type reference.
     TypeReference,
     /// Type literal.
