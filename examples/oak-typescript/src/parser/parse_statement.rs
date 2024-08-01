@@ -593,9 +593,29 @@ impl<'config> TypeScriptParser<'config> {
                 state.finish_at(cp, crate::parser::element_type::TypeScriptElementType::ForOfStatement);
                 return Ok(());
             }
+            if self.eat(state, In) {
+                PrattParser::parse(state, 0, self);
+                self.expect(state, RightParen).ok();
+                self.parse_statement(state)?;
+                state.finish_at(cp, crate::parser::element_type::TypeScriptElementType::ForInStatement);
+                return Ok(());
+            }
         }
         else {
             if !self.at(state, Semicolon) {
+                // `in` is a Pratt binary operator, so a bare `for (k in o)` would
+                // fold into one expression. Scan the header for a top-level `in`
+                // first; the left side is then parsed with relational precedence
+                // excluded so it stops before the keyword.
+                if self.for_header_has_top_level_in(state) {
+                    PrattParser::parse(state, 10, self);
+                    self.expect(state, In).ok();
+                    PrattParser::parse(state, 0, self);
+                    self.expect(state, RightParen).ok();
+                    self.parse_statement(state)?;
+                    state.finish_at(cp, crate::parser::element_type::TypeScriptElementType::ForInStatement);
+                    return Ok(());
+                }
                 PrattParser::parse(state, 0, self);
             }
             self.skip_trivia(state);
@@ -627,6 +647,33 @@ impl<'config> TypeScriptParser<'config> {
         self.parse_statement(state)?;
         state.finish_at(cp, crate::parser::element_type::TypeScriptElementType::ForStatement);
         Ok(())
+    }
+
+    /// Returns `true` when the current position is inside a `for (...)` header
+    /// that contains a top-level `in` before any top-level `;` or the closing
+    /// paren. A top-level `=>` (arrow init) disqualifies the scan.
+    fn for_header_has_top_level_in<'a, S: Source + ?Sized>(&self, state: &mut State<'a, S>) -> bool {
+        use crate::lexer::token_type::TypeScriptTokenType::*;
+        use oak_core::TokenType;
+        let mut depth = 0usize;
+        let mut offset = 0usize;
+        while let Some(token) = state.peek_at(offset) {
+            if token.kind.is_ignored() {
+                offset += 1;
+                continue;
+            }
+            match token.kind {
+                LeftParen | LeftBracket | LeftBrace => depth += 1,
+                RightParen | RightBracket | RightBrace if depth == 0 => return false,
+                RightParen | RightBracket | RightBrace => depth -= 1,
+                Semicolon if depth == 0 => return false,
+                Arrow if depth == 0 => return false,
+                In if depth == 0 => return true,
+                _ => {}
+            }
+            offset += 1;
+        }
+        false
     }
 
     pub(crate) fn parse_while_statement<'a, S: Source + ?Sized>(&self, state: &mut State<'a, S>) -> Result<(), OakError> {
