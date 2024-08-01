@@ -188,6 +188,8 @@ fn collect_top_level_await_expression(expr: &Expression, spans: &mut Vec<Range<u
             for property in properties {
                 match property {
                     ObjectProperty::Property { value, .. } => collect_top_level_await_expression(value, spans),
+                    // A method is a function boundary; awaits inside are not top-level.
+                    ObjectProperty::Method { .. } => {}
                     ObjectProperty::Spread(expr) => collect_top_level_await_expression(expr, spans),
                 }
             }

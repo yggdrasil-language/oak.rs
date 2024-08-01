@@ -349,6 +349,8 @@ pub enum TypeScriptElementType {
     PropertyAssignment,
     /// Shorthand property assignment.
     ShorthandPropertyAssignment,
+    /// Object literal method or accessor member (`{ m() {} }`, `{ get x() {} }`).
+    ObjectMethod,
     /// Spread element.
     SpreadElement,
     /// Error token.

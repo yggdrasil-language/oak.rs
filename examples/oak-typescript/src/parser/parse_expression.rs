@@ -149,9 +149,26 @@ impl<'config> TypeScriptParser<'config> {
                         state.finish_at(pcp, crate::parser::element_type::TypeScriptElementType::SpreadElement);
                     }
                     else {
+                        // `async`, `get`, `set` and `*` are method prefixes only when a
+                        // member name follows; otherwise they are ordinary property names
+                        // (`{ get: 1 }`, `{ async }`, `{ get() {} }`).
+                        if self.at(state, Async) && self.at_object_member_name(state, 1) {
+                            state.bump();
+                        }
+                        if self.at(state, Get) && self.at_object_member_name(state, 1) {
+                            state.bump();
+                        }
+                        else if self.at(state, Set) && self.at_object_member_name(state, 1) {
+                            state.bump();
+                        }
+                        if self.at(state, Star) {
+                            state.bump();
+                        }
                         // Reserved words are valid property names, so they belong to the
                         // member instead of being reported as an unexpected token.
                         let reserved_name = state.peek_text().is_some_and(|text| TypeScriptTokenType::from_keyword(&text).is_some());
+                        let name_cp = state.checkpoint();
+                        let mut keyword_name = false;
                         match self.peek_kind(state) {
                             Some(IdentifierName) => {
                                 self.expect(state, IdentifierName).ok();
@@ -166,6 +183,7 @@ impl<'config> TypeScriptParser<'config> {
                             }
                             Some(_) if reserved_name => {
                                 state.bump();
+                                keyword_name = true;
                             }
                             _ => {
                                 state.bump();
@@ -173,7 +191,25 @@ impl<'config> TypeScriptParser<'config> {
                                 continue;
                             }
                         }
-                        if self.eat(state, Colon) {
+                        if self.at(state, LeftParen) {
+                            // A keyword used as a method name (`{ get() {} }`) is wrapped
+                            // so the builder can tell it apart from an accessor prefix.
+                            if keyword_name {
+                                state.finish_at(name_cp, crate::parser::element_type::TypeScriptElementType::IdentifierName);
+                            }
+                            self.parse_parameters(state).ok();
+                            if self.eat(state, Colon) {
+                                self.parse_return_type_annotation(state).ok();
+                            }
+                            if self.at(state, LeftBrace) {
+                                self.parse_block(state).ok();
+                            }
+                            else {
+                                self.expect(state, LeftBrace).ok();
+                            }
+                            state.finish_at(pcp, crate::parser::element_type::TypeScriptElementType::ObjectMethod);
+                        }
+                        else if self.eat(state, Colon) {
                             PrattParser::parse(state, 0, self);
                             state.finish_at(pcp, crate::parser::element_type::TypeScriptElementType::PropertyAssignment);
                         }
@@ -193,6 +229,18 @@ impl<'config> TypeScriptParser<'config> {
                 state.bump();
                 state.finish_at(cp, crate::parser::element_type::TypeScriptElementType::Error)
             }
+        }
+    }
+
+    /// Returns `true` when the Nth non-trivia token can start an object member
+    /// name. `async`/`get`/`set` are method prefixes only when this holds;
+    /// otherwise the keyword itself is the property name.
+    fn at_object_member_name<'a, S: Source + ?Sized>(&self, state: &State<'a, S>, n: usize) -> bool {
+        use crate::lexer::token_type::TypeScriptTokenType::*;
+        match state.peek_non_trivia_kind_at(n) {
+            Some(IdentifierName) | Some(StringLiteral) | Some(NumericLiteral) | Some(LeftBracket) | Some(Star) => true,
+            Some(kind) => kind.is_contextual_keyword(),
+            None => false,
         }
     }
 
