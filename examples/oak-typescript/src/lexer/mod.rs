@@ -335,8 +335,8 @@ impl<'config> TypeScriptLexer<'config> {
         while let Some(ch) = state.peek() {
             if ch == '\\' {
                 state.advance(1);
-                if state.peek().is_some() {
-                    state.advance(1);
+                if let Some(escaped) = state.peek() {
+                    state.advance(escaped.len_utf8());
                 }
                 continue;
             }
@@ -482,8 +482,8 @@ fn consume_template<S: Source + ?Sized>(state: &mut State<'_, S>) {
         match ch {
             '\\' => {
                 state.advance(1);
-                if state.peek().is_some() {
-                    state.advance(1);
+                if let Some(escaped) = state.peek() {
+                    state.advance(escaped.len_utf8());
                 }
             }
             '`' => {
@@ -575,8 +575,8 @@ fn consume_regex<S: Source + ?Sized>(state: &mut State<'_, S>) {
         match ch {
             '\\' => {
                 state.advance(1);
-                if state.peek().is_some() {
-                    state.advance(1);
+                if let Some(escaped) = state.peek() {
+                    state.advance(escaped.len_utf8());
                 }
             }
             '[' => {
@@ -653,6 +653,7 @@ fn regex_can_start_after(tokens: &[oak_core::Token<TypeScriptTokenType>]) -> boo
             | TypeScriptTokenType::QuestionQuestion
             | TypeScriptTokenType::Return
             | TypeScriptTokenType::Throw
+            | TypeScriptTokenType::Default
             | TypeScriptTokenType::Case
             | TypeScriptTokenType::Delete
             | TypeScriptTokenType::Void
