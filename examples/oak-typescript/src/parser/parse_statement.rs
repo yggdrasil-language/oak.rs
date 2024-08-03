@@ -222,6 +222,16 @@ impl<'config> TypeScriptParser<'config> {
         if self.at(state, IdentifierName) {
             self.expect(state, IdentifierName).ok();
         }
+        else if self.peek_kind(state).is_some_and(|kind| kind.is_contextual_keyword()) {
+            // `function set (options)` / `async function get(code)`: contextual
+            // keywords are legal function names, but the lexer emits dedicated
+            // tokens for them instead of `IdentifierName`. Wrap the token in an
+            // `IdentifierName` node (as keyword object member names do) so the
+            // builder's name lookup finds it.
+            let name_cp = state.checkpoint();
+            state.bump();
+            state.finish_at(name_cp, crate::parser::element_type::TypeScriptElementType::IdentifierName);
+        }
         self.parse_type_parameters(state)?;
         self.parse_parameters(state)?;
         if self.eat(state, Colon) {
