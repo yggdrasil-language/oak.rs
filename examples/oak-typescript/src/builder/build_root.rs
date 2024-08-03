@@ -199,6 +199,11 @@ fn collect_top_level_await_expression(expr: &Expression, spans: &mut Vec<Range<u
                 collect_top_level_await_expression(element, spans);
             }
         }
+        ExpressionKind::SequenceExpression(elements) => {
+            for element in elements {
+                collect_top_level_await_expression(element, spans);
+            }
+        }
         ExpressionKind::YieldExpression(Some(argument)) => collect_top_level_await_expression(argument, spans),
         ExpressionKind::ImportExpression { module_specifier } => collect_top_level_await_expression(module_specifier, spans),
         ExpressionKind::TaggedTemplateExpression { tag, template } => {

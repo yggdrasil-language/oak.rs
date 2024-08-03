@@ -393,6 +393,8 @@ pub enum TypeScriptElementType {
     MemberExpression,
     /// Array expression `[a, b]`.
     ArrayExpression,
+    /// Comma sequence expression `a, b` inside a `for` header slot.
+    SequenceExpression,
     /// Object expression `{a: b}`.
     ObjectExpression,
     /// Function expression `function() {}`.

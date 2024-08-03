@@ -616,7 +616,14 @@ impl<'config> TypeScriptParser<'config> {
                     state.finish_at(cp, crate::parser::element_type::TypeScriptElementType::ForInStatement);
                     return Ok(());
                 }
+                let seq_cp = state.checkpoint();
                 PrattParser::parse(state, 0, self);
+                if self.at(state, Comma) {
+                    while self.eat(state, Comma) {
+                        PrattParser::parse(state, 0, self);
+                    }
+                    state.finish_at(seq_cp, crate::parser::element_type::TypeScriptElementType::SequenceExpression);
+                }
             }
             self.skip_trivia(state);
             if self.at(state, Of) {
@@ -640,7 +647,14 @@ impl<'config> TypeScriptParser<'config> {
         // Update
         self.skip_trivia(state);
         if !self.at(state, RightParen) {
+            let seq_cp = state.checkpoint();
             PrattParser::parse(state, 0, self);
+            if self.at(state, Comma) {
+                while self.eat(state, Comma) {
+                    PrattParser::parse(state, 0, self);
+                }
+                state.finish_at(seq_cp, crate::parser::element_type::TypeScriptElementType::SequenceExpression);
+            }
         }
         self.expect(state, RightParen).ok();
 

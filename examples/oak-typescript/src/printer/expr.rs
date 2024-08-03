@@ -114,6 +114,13 @@ fn print_expr(expr: &Expression, min_prec: Prec) -> Option<String> {
             }
             wrap_prec(format!("[{}]", parts.join(", ")), Prec::Primary, min_prec)
         }
+        ExpressionKind::SequenceExpression(elements) => {
+            let mut parts = Vec::with_capacity(elements.len());
+            for e in elements {
+                parts.push(print_expr(e, Prec::Assign)?);
+            }
+            wrap_prec(parts.join(", "), Prec::Lowest, min_prec)
+        }
         ExpressionKind::ObjectLiteral { properties } => {
             let mut parts = Vec::with_capacity(properties.len());
             for p in properties {
