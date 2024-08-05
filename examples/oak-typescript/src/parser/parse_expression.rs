@@ -18,6 +18,10 @@ impl<'config> TypeScriptParser<'config> {
                 self.parse_function_declaration_content(state).ok();
                 state.finish_at(cp, crate::parser::element_type::TypeScriptElementType::FunctionExpression)
             }
+            Some(Class) => {
+                self.parse_class_expression_content(state).ok();
+                state.finish_at(cp, crate::parser::element_type::TypeScriptElementType::ClassExpression)
+            }
             Some(Import) => {
                 state.bump();
                 if self.eat(state, Dot) {

@@ -16,7 +16,7 @@ impl<'config> TypeScriptParser<'config> {
         use crate::lexer::token_type::TypeScriptTokenType::*;
         self.eat(state, Abstract);
         self.expect(state, Class).ok();
-        self.expect(state, IdentifierName).ok();
+        self.eat_class_name_opt(state);
         self.parse_type_parameters(state)?;
         if self.eat(state, Extends) {
             self.parse_type_reference(state)?;
@@ -31,6 +31,43 @@ impl<'config> TypeScriptParser<'config> {
         }
         self.parse_class_body(state)?;
         Ok(())
+    }
+
+    pub(crate) fn parse_class_expression_content<'a, S: Source + ?Sized>(&self, state: &mut State<'a, S>) -> Result<(), OakError> {
+        use crate::lexer::token_type::TypeScriptTokenType::*;
+        self.expect(state, Class).ok();
+        self.eat_class_name_opt(state);
+        self.parse_type_parameters(state)?;
+        if self.eat(state, Extends) {
+            self.parse_type_reference(state)?;
+        }
+        if self.eat(state, Implements) {
+            loop {
+                self.parse_type_reference(state)?;
+                if !self.eat(state, Comma) {
+                    break;
+                }
+            }
+        }
+        self.parse_class_body(state)?;
+        Ok(())
+    }
+
+    /// Consumes an optional class name. `export default class { … }` and
+    /// expression-position classes may be anonymous; contextual keywords are
+    /// valid names (`class type {}`), but `implements` still starts the clause.
+    fn eat_class_name_opt<'a, S: Source + ?Sized>(&self, state: &mut State<'a, S>) {
+        use crate::{lexer::token_type::TypeScriptTokenType, parser::element_type::TypeScriptElementType};
+        let is_name = match self.peek_kind(state) {
+            Some(TypeScriptTokenType::IdentifierName) => true,
+            Some(kind) => kind.is_contextual_keyword() && kind != TypeScriptTokenType::Implements,
+            None => false,
+        };
+        if is_name {
+            let cp = state.checkpoint();
+            state.bump();
+            state.finish_at(cp, TypeScriptElementType::IdentifierName);
+        }
     }
 
     pub(crate) fn parse_class_body<'a, S: Source + ?Sized>(&self, state: &mut State<'a, S>) -> Result<(), OakError> {

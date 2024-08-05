@@ -186,10 +186,11 @@ fn print_class(d: &ClassDeclaration) -> Option<String> {
         members.push(print_class_member(member)?);
     }
     let body = if members.is_empty() { String::new() } else { format!(" {} ", members.join(" ")) };
-    Some(format!("class {}{} {{{body}}}", d.name, extends))
+    let name = if d.name.is_empty() { String::new() } else { format!(" {}", d.name) };
+    Some(format!("class{name}{extends} {{{body}}}"))
 }
 
-fn print_class_member(member: &ClassMember) -> Option<String> {
+pub(super) fn print_class_member(member: &ClassMember) -> Option<String> {
     match member {
         ClassMember::Property { decorators, name, initializer, optional_marker, .. } => {
             if !decorators.is_empty() || member.has_modifier(ModifierKind::Readonly) || member.has_modifier(ModifierKind::Abstract) || optional_marker.is_some() {

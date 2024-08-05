@@ -151,6 +151,25 @@ fn print_expr(expr: &Expression, min_prec: Prec) -> Option<String> {
         }
         ExpressionKind::NonNullExpression(inner) => wrap_prec(format!("{}!", print_expr(inner, Prec::Postfix)?), Prec::Postfix, min_prec),
         ExpressionKind::FunctionExpression { .. } | ExpressionKind::TaggedTemplateExpression { .. } => None,
+        ExpressionKind::ClassExpression { name, type_params, extends, implements, body } => {
+            if !type_params.is_empty() || !implements.is_empty() {
+                return None;
+            }
+            let extends = match extends {
+                Some(ty) => format!(" extends {}", print_type_annotation(ty)?),
+                None => String::new(),
+            };
+            let mut members = Vec::with_capacity(body.len());
+            for member in body {
+                members.push(super::stmt::print_class_member(member)?);
+            }
+            let body_text = if members.is_empty() { String::new() } else { format!(" {} ", members.join(" ")) };
+            let name = match name {
+                Some(n) => format!(" {n}"),
+                None => String::new(),
+            };
+            wrap_prec(format!("class{name}{extends} {{{body_text}}}"), Prec::Primary, min_prec)
+        }
         ExpressionKind::JsxElement(element) => wrap_prec(super::jsx::print_jsx_element(element)?, Prec::Primary, min_prec),
         ExpressionKind::JsxFragment(fragment) => wrap_prec(super::jsx::print_jsx_fragment(fragment)?, Prec::Primary, min_prec),
         ExpressionKind::JsxSelfClosingElement(element) => wrap_prec(super::jsx::print_jsx_self_closing(element)?, Prec::Primary, min_prec),

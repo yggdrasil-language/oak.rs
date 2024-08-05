@@ -616,6 +616,65 @@ impl<'config> TypeScriptBuilder<'config> {
 
                 if let Some(f) = func { Ok(Some(Expression::new(ExpressionKind::NewExpression { func: Box::new(f), args }, span.into()))) } else { Ok(None) }
             }
+            TypeScriptElementType::ClassExpression => {
+                let mut name = None;
+                let mut type_params = Vec::new();
+                let mut extends = None;
+                let mut implements = Vec::new();
+                let mut body = Vec::new();
+                let mut seen_implements = false;
+
+                for child in node.children() {
+                    match child {
+                        RedTree::Node(child_node) => {
+                            let child_kind = child_node.green.kind;
+                            match child_kind {
+                                TypeScriptElementType::IdentifierName => {
+                                    if name.is_none() {
+                                        name = Some(source.get_text_in(child_node.span().into()).trim().to_string());
+                                    }
+                                }
+                                TypeScriptElementType::TypeParameter => {
+                                    if !self.erase_types {
+                                        if let Some(tp) = self.build_type_parameter(&child_node, source)? {
+                                            type_params.push(tp);
+                                        }
+                                    }
+                                }
+                                TypeScriptElementType::TypeReference => {
+                                    let name = source.get_text_in(child_node.span().into()).trim().to_string();
+                                    let ty = TypeAnnotation::Reference { name, args: Vec::new() };
+                                    if seen_implements {
+                                        if !self.erase_types {
+                                            implements.push(ty);
+                                        }
+                                    }
+                                    else {
+                                        extends = Some(ty);
+                                    }
+                                }
+                                TypeScriptElementType::ClassBody => {
+                                    for member_child in child_node.children() {
+                                        if let RedTree::Node(member_node) = member_child {
+                                            if let Some(member) = self.build_class_member(&member_node, source)? {
+                                                body.push(member);
+                                            }
+                                        }
+                                    }
+                                }
+                                _ => {}
+                            }
+                        }
+                        RedTree::Leaf(leaf) => {
+                            if leaf.kind == TypeScriptTokenType::Implements {
+                                seen_implements = true;
+                            }
+                        }
+                    }
+                }
+
+                Ok(Some(Expression::new(ExpressionKind::ClassExpression { name, type_params, extends, implements, body }, span.into())))
+            }
             TypeScriptElementType::UpdateExpression => {
                 let mut operator = String::new();
                 let mut argument = None;

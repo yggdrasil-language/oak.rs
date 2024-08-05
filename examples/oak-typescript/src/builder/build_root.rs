@@ -211,7 +211,7 @@ fn collect_top_level_await_expression(expr: &Expression, spans: &mut Vec<Range<u
             collect_top_level_await_expression(template, spans);
         }
         // Function boundaries stop the descent.
-        ExpressionKind::ArrowFunction { .. } | ExpressionKind::FunctionExpression { .. } => {}
+        ExpressionKind::ArrowFunction { .. } | ExpressionKind::FunctionExpression { .. } | ExpressionKind::ClassExpression { .. } => {}
         ExpressionKind::Identifier(_)
         | ExpressionKind::NumericLiteral(_)
         | ExpressionKind::StringLiteral(_)
