@@ -187,6 +187,7 @@ impl<'config> TypeScriptBuilder<'config> {
                 let mut modifiers: Vec<Modifier> = Vec::new();
                 let mut body = Vec::new();
                 let mut decorators = Vec::new();
+                let mut seen_implements = false;
 
                 for child in node.children() {
                     match child {
@@ -240,6 +241,21 @@ impl<'config> TypeScriptBuilder<'config> {
                                         }
                                     }
                                 }
+                                // The parser keeps `extends`/`implements` heritage flat under the
+                                // declaration: `TypeReference` children follow the `extends` keyword
+                                // until an `implements` leaf appears. Mirror the class-expression path.
+                                TypeScriptElementType::TypeReference => {
+                                    let heritage_name = source.get_text_in(child_node.span().into()).trim().to_string();
+                                    let ty = TypeAnnotation::Reference { name: heritage_name, args: Vec::new() };
+                                    if seen_implements {
+                                        if !self.erase_types {
+                                            implements.push(ty)
+                                        }
+                                    }
+                                    else {
+                                        extends = Some(ty)
+                                    }
+                                }
                                 TypeScriptElementType::Decorator => {
                                     if let Some(d) = self.build_decorator(&child_node, source)? {
                                         decorators.push(d)
@@ -256,6 +272,7 @@ impl<'config> TypeScriptBuilder<'config> {
                             }
                             TypeScriptTokenType::Abstract => modifiers.push(Modifier::new(ModifierKind::Abstract, leaf.span)),
                             TypeScriptTokenType::Declare => modifiers.push(Modifier::new(ModifierKind::Declare, leaf.span)),
+                            TypeScriptTokenType::Implements => seen_implements = true,
                             _ => {}
                         },
                     }
