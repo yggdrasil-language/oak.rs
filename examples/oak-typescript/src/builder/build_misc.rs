@@ -25,7 +25,7 @@ impl<'config> TypeScriptBuilder<'config> {
                     }
                     match child_node.green.kind {
                         TypeScriptElementType::IdentifierName => {
-                            let text = crate::builder::build_binding::binding_identifier_text(&child_node, source);
+                            let (text, _) = crate::builder::build_binding::binding_identifier_text(&child_node, source);
                             if !text.is_empty() {
                                 name = text.clone();
                                 binding_names.push(text);
@@ -33,7 +33,7 @@ impl<'config> TypeScriptBuilder<'config> {
                         }
                         TypeScriptElementType::BindingPattern => {
                             pattern_text = Some(source.get_text_in(child_span.into()).trim().to_string());
-                            binding_names.extend(crate::builder::build_binding::binding_pattern_names(&child_node, source));
+                            binding_names.extend(crate::builder::build_binding::binding_pattern_names(&child_node, source).into_iter().map(|(name, _)| name));
                         }
                         TypeScriptElementType::TypeAnnotation => {
                             if !self.erase_types {
