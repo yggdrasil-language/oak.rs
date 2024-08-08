@@ -16,6 +16,8 @@ pub mod language;
 pub mod lexer;
 /// Parser for TypeScript.
 pub mod parser;
+/// Module-level binding and reference facts for rename-safe bundling.
+pub mod scope;
 
 pub use crate::{
     ast::TypeScriptRoot,
