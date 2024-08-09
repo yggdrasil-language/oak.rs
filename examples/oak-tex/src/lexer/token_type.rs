@@ -249,6 +249,8 @@ pub enum TexTokenType {
 
     /// Backslash (\).
     Backslash,
+    /// Row break (`\\`) inside an environment body.
+    RowBreak,
     /// Left brace ({).
     LeftBrace,
     /// Right brace (}).
@@ -422,6 +424,7 @@ impl TokenType for TexTokenType {
             | Self::NolimitsKeyword => UniversalTokenRole::Keyword,
             Self::Number | Self::StringLiteral => UniversalTokenRole::Literal,
             Self::Backslash
+            | Self::RowBreak
             | Self::Plus
             | Self::Minus
             | Self::Star

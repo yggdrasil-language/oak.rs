@@ -430,6 +430,7 @@ impl From<crate::lexer::token_type::TexTokenType> for TexElementType {
             T::Item => Self::Item,
             T::Table => Self::Table,
             T::Row => Self::Row,
+            T::RowBreak => Self::Row,
             T::Cell => Self::Cell,
             T::Label => Self::Label,
             T::Reference => Self::Reference,

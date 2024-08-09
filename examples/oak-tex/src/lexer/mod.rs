@@ -104,6 +104,13 @@ impl<'config> TexLexer<'config> {
         // Read the command name
         let mut has_name = false;
         if let Some(ch) = state.peek() {
+            if ch == '\\' {
+                // `\\` is the row break inside an environment body, not a
+                // one-character command named `\`.
+                state.advance(1);
+                state.add_token(TexTokenType::RowBreak, start, state.get_position());
+                return true;
+            }
             if ch.is_ascii_alphabetic() {
                 while let Some(ch) = state.peek() {
                     if ch.is_ascii_alphabetic() {

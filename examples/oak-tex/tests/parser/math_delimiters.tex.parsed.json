@@ -1,6 +1,6 @@
 {
     "success": true,
-    "node_count": 98,
+    "node_count": 128,
     "ast_structure": {
         "kind": "Root",
         "children": [
@@ -125,16 +125,81 @@
                         "is_leaf": false
                     },
                     {
-                        "kind": "Command",
+                        "kind": "Row",
                         "children": [
                             {
-                                "kind": "Leaves(1)",
+                                "kind": "Cell",
+                                "children": [
+                                    {
+                                        "kind": "Leaves(1)",
+                                        "children": [],
+                                        "text_length": 1,
+                                        "is_leaf": true
+                                    }
+                                ],
+                                "text_length": 1,
+                                "is_leaf": false
+                            },
+                            {
+                                "kind": "Cell",
+                                "children": [
+                                    {
+                                        "kind": "Leaves(3)",
+                                        "children": [],
+                                        "text_length": 3,
+                                        "is_leaf": true
+                                    }
+                                ],
+                                "text_length": 3,
+                                "is_leaf": false
+                            },
+                            {
+                                "kind": "Leaves(4)",
+                                "children": [],
+                                "text_length": 5,
+                                "is_leaf": true
+                            }
+                        ],
+                        "text_length": 9,
+                        "is_leaf": false
+                    },
+                    {
+                        "kind": "Row",
+                        "children": [
+                            {
+                                "kind": "Cell",
+                                "children": [
+                                    {
+                                        "kind": "Leaves(1)",
+                                        "children": [],
+                                        "text_length": 1,
+                                        "is_leaf": true
+                                    }
+                                ],
+                                "text_length": 1,
+                                "is_leaf": false
+                            },
+                            {
+                                "kind": "Cell",
+                                "children": [
+                                    {
+                                        "kind": "Leaves(3)",
+                                        "children": [],
+                                        "text_length": 3,
+                                        "is_leaf": true
+                                    }
+                                ],
+                                "text_length": 3,
+                                "is_leaf": false
+                            },
+                            {
+                                "kind": "Leaves(2)",
                                 "children": [],
                                 "text_length": 2,
                                 "is_leaf": true
                             }
                         ],
-                        "text_length": 2,
+                        "text_length": 6,
                         "is_leaf": false
                     },
                     {
@@ -164,9 +229,9 @@
                         "is_leaf": false
                     },
                     {
-                        "kind": "Leaves(16)",
+                        "kind": "Leaves(3)",
                         "children": [],
-                        "text_length": 16,
+                        "text_length": 3,
                         "is_leaf": true
                     }
                 ],
@@ -203,29 +268,94 @@
                         "is_leaf": false
                     },
                     {
-                        "kind": "Command",
+                        "kind": "Row",
                         "children": [
                             {
-                                "kind": "Leaves(1)",
+                                "kind": "Cell",
+                                "children": [
+                                    {
+                                        "kind": "Leaves(1)",
+                                        "children": [],
+                                        "text_length": 1,
+                                        "is_leaf": true
+                                    }
+                                ],
+                                "text_length": 1,
+                                "is_leaf": false
+                            },
+                            {
+                                "kind": "Cell",
+                                "children": [
+                                    {
+                                        "kind": "Leaves(5)",
+                                        "children": [],
+                                        "text_length": 5,
+                                        "is_leaf": true
+                                    }
+                                ],
+                                "text_length": 5,
+                                "is_leaf": false
+                            },
+                            {
+                                "kind": "Leaves(5)",
                                 "children": [],
-                                "text_length": 2,
+                                "text_length": 6,
                                 "is_leaf": true
                             }
                         ],
-                        "text_length": 2,
+                        "text_length": 12,
                         "is_leaf": false
                     },
                     {
-                        "kind": "Command",
+                        "kind": "Row",
                         "children": [
                             {
-                                "kind": "Leaves(1)",
+                                "kind": "Cell",
+                                "children": [
+                                    {
+                                        "kind": "Leaves(1)",
+                                        "children": [],
+                                        "text_length": 1,
+                                        "is_leaf": true
+                                    }
+                                ],
+                                "text_length": 1,
+                                "is_leaf": false
+                            },
+                            {
+                                "kind": "Cell",
+                                "children": [
+                                    {
+                                        "kind": "Command",
+                                        "children": [
+                                            {
+                                                "kind": "Leaves(1)",
+                                                "children": [],
+                                                "text_length": 3,
+                                                "is_leaf": true
+                                            }
+                                        ],
+                                        "text_length": 3,
+                                        "is_leaf": false
+                                    },
+                                    {
+                                        "kind": "Leaves(4)",
+                                        "children": [],
+                                        "text_length": 4,
+                                        "is_leaf": true
+                                    }
+                                ],
+                                "text_length": 7,
+                                "is_leaf": false
+                            },
+                            {
+                                "kind": "Leaves(3)",
                                 "children": [],
                                 "text_length": 3,
                                 "is_leaf": true
                             }
                         ],
-                        "text_length": 3,
+                        "text_length": 11,
                         "is_leaf": false
                     },
                     {
@@ -255,9 +385,9 @@
                         "is_leaf": false
                     },
                     {
-                        "kind": "Leaves(21)",
+                        "kind": "Leaves(3)",
                         "children": [],
-                        "text_length": 21,
+                        "text_length": 3,
                         "is_leaf": true
                     }
                 ],
@@ -294,16 +424,81 @@
                         "is_leaf": false
                     },
                     {
-                        "kind": "Command",
+                        "kind": "Row",
                         "children": [
                             {
-                                "kind": "Leaves(1)",
+                                "kind": "Cell",
+                                "children": [
+                                    {
+                                        "kind": "Leaves(1)",
+                                        "children": [],
+                                        "text_length": 1,
+                                        "is_leaf": true
+                                    }
+                                ],
+                                "text_length": 1,
+                                "is_leaf": false
+                            },
+                            {
+                                "kind": "Cell",
+                                "children": [
+                                    {
+                                        "kind": "Leaves(1)",
+                                        "children": [],
+                                        "text_length": 1,
+                                        "is_leaf": true
+                                    }
+                                ],
+                                "text_length": 1,
+                                "is_leaf": false
+                            },
+                            {
+                                "kind": "Leaves(5)",
                                 "children": [],
-                                "text_length": 2,
+                                "text_length": 6,
                                 "is_leaf": true
                             }
                         ],
-                        "text_length": 2,
+                        "text_length": 8,
+                        "is_leaf": false
+                    },
+                    {
+                        "kind": "Row",
+                        "children": [
+                            {
+                                "kind": "Cell",
+                                "children": [
+                                    {
+                                        "kind": "Leaves(1)",
+                                        "children": [],
+                                        "text_length": 1,
+                                        "is_leaf": true
+                                    }
+                                ],
+                                "text_length": 1,
+                                "is_leaf": false
+                            },
+                            {
+                                "kind": "Cell",
+                                "children": [
+                                    {
+                                        "kind": "Leaves(1)",
+                                        "children": [],
+                                        "text_length": 1,
+                                        "is_leaf": true
+                                    }
+                                ],
+                                "text_length": 1,
+                                "is_leaf": false
+                            },
+                            {
+                                "kind": "Leaves(3)",
+                                "children": [],
+                                "text_length": 3,
+                                "is_leaf": true
+                            }
+                        ],
+                        "text_length": 5,
                         "is_leaf": false
                     },
                     {
@@ -333,9 +528,9 @@
                         "is_leaf": false
                     },
                     {
-                        "kind": "Leaves(14)",
+                        "kind": "Leaves(3)",
                         "children": [],
-                        "text_length": 14,
+                        "text_length": 3,
                         "is_leaf": true
                     }
                 ],
