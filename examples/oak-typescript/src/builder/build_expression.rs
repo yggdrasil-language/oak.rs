@@ -506,6 +506,70 @@ impl<'config> TypeScriptBuilder<'config> {
 
                 if let Some(b) = body { Ok(Some(Expression::new(ExpressionKind::ArrowFunction { type_params, params, return_type, body: b, async_ }, span.into()))) } else { Ok(None) }
             }
+            TypeScriptElementType::FunctionExpression => {
+                // `function [name](params)[: T] { body }` 与声明共用同一份
+                // parser 内容节点；这里把它建成表达式。缺这个名字臂会让
+                // builder 落入 `_` 兜底并只返回第一个子表达式（参数），
+                // 函数体整体丢失，依赖分析看不到体内任何引用。
+                let mut name: Option<String> = None;
+                let mut type_params = Vec::new();
+                let mut params = Vec::new();
+                let mut return_type = None;
+                let mut body = Vec::new();
+                let mut async_ = false;
+                let mut generator = false;
+
+                for child in node.children() {
+                    match child {
+                        RedTree::Node(child_node) => {
+                            match child_node.green.kind {
+                                TypeScriptElementType::IdentifierName => {
+                                    if name.is_none() {
+                                        let text = source.get_text_in(child_node.span().into()).trim().to_string();
+                                        if !text.is_empty() { name = Some(text); }
+                                    }
+                                }
+                                TypeScriptElementType::TypeParameter => {
+                                    if !self.erase_types {
+                                        if let Some(tp) = self.build_type_parameter(&child_node, source)? {
+                                            type_params.push(tp)
+                                        }
+                                    }
+                                }
+                                TypeScriptElementType::Parameter => {
+                                    if let Some(p) = self.build_parameter(&child_node, source)? {
+                                        params.push(p)
+                                    }
+                                }
+                                TypeScriptElementType::TypeAnnotation => {
+                                    if !self.erase_types {
+                                        return_type = self.build_type_annotation(&child_node, source)?
+                                    }
+                                }
+                                TypeScriptElementType::BlockStatement => {
+                                    if let Some(Statement::BlockStatement(block)) = self.build_statement(&child_node, source)? {
+                                        body = block.statements
+                                    }
+                                }
+                                _ => {}
+                            }
+                        }
+                        RedTree::Leaf(leaf) => match leaf.kind {
+                            TypeScriptTokenType::IdentifierName => {
+                                if name.is_none() {
+                                    let text = source.get_text_in(leaf.span.into()).trim().to_string();
+                                    if !text.is_empty() { name = Some(text); }
+                                }
+                            }
+                            TypeScriptTokenType::Async => async_ = true,
+                            TypeScriptTokenType::Star => generator = true,
+                            _ => {}
+                        },
+                    }
+                }
+
+                Ok(Some(Expression::new(ExpressionKind::FunctionExpression { name, type_params, params, return_type, body, async_, generator }, span.into())))
+            }
             TypeScriptElementType::AsExpression => {
                 let mut expression = None;
                 let mut type_annotation = None;
