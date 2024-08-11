@@ -105,6 +105,16 @@ impl<'config> TypeScriptParser<'config> {
         self.parse_type_annotation_with_arrow(state, true)
     }
 
+    /// Return type of a declaration (function / method header).
+    ///
+    /// Unlike an arrow function, a declaration header never ends at `=>`, so a
+    /// top-level arrow belongs to the type itself (`(): () => void { body }`).
+    /// `parse_return_type_annotation` still stops at `=>` for arrow-function
+    /// bodies, where the arrow really does terminate the annotation.
+    pub(crate) fn parse_declaration_return_type_annotation<'a, S: Source + ?Sized>(&self, state: &mut State<'a, S>) -> Result<(), OakError> {
+        self.parse_type_annotation_with_arrow(state, false)
+    }
+
     /// Consumes the type that follows `as` inside an expression.
     ///
     /// [`Self::parse_type_annotation`] only knows the stop tokens that follow a
@@ -188,8 +198,10 @@ impl<'config> TypeScriptParser<'config> {
             if consumed && top && matches!(kind, Comma | Semicolon | RightParen | RightBrace | Equal) {
                 break;
             }
-            if consumed && top && stop_at_arrow {
-                if matches!(kind, Arrow) {
+            if consumed && top {
+                // Arrow 只在箭头函数体内终止注解；声明头部的 `=>` 属于类型本身
+                // （`(): () => void { … }`）。
+                if stop_at_arrow && matches!(kind, Arrow) {
                     break;
                 }
                 // A return type ends where the function body starts. `{` may also
