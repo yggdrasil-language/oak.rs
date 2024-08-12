@@ -99,7 +99,19 @@ impl<'config> TexParser<'config> {
         // so the builder can extract it from the BeginEnvironment CST node.
         let begin_checkpoint = state.checkpoint();
         state.expect(TexTokenType::BeginKeyword)?;
+        let name = state.non_trivia_text_at(1).map(|text| text.trim().to_string()).unwrap_or_default();
         if state.at(TexTokenType::LeftBrace) {
+            self.parse_mandatory_argument(state)?;
+        }
+        // Some environment grammars declare arguments after the name, such as
+        // `\begin{alignedat}{2}`. They belong to the environment, not to its
+        // first cell, so the parser consumes them here.
+        let takes_optional = matches!(name.as_str(), "matrix" | "pmatrix" | "bmatrix" | "Bmatrix" | "vmatrix" | "Vmatrix" | "smallmatrix" | "alignedat" | "alignat" | "array" | "tabular");
+        let takes_required = matches!(name.as_str(), "alignedat" | "alignat" | "array" | "tabular");
+        if takes_optional && state.at(TexTokenType::LeftBracket) {
+            self.parse_optional_argument(state)?;
+        }
+        if takes_required && state.at(TexTokenType::LeftBrace) {
             self.parse_mandatory_argument(state)?;
         }
         state.finish_at(begin_checkpoint, TexElementType::BeginEnvironment);
