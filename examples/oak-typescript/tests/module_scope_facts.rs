@@ -1,14 +1,15 @@
 //! `module_scope_facts` reports module-level bindings with the spans of their
-//! value references and a conservative `incomplete` flag. Reference spans are
-//! only ever the spans the AST really carries; anything the AST cannot see
-//! (eval, JSX, template interpolations, ambiguous keys, broken spans) flips
-//! `incomplete` instead of guessing.
+//! value references and the precise reasons that may hide references
+//! ([`ScopeIncompleteReason`]). Reference spans are only ever the spans the AST
+//! really carries; anything the AST cannot see (eval, JSX, template
+//! interpolations, ambiguous keys, broken spans, top-level `return`) names its
+//! reason instead of guessing.
 
 use oak_core::{Builder, SourceText, parser::ParseSession};
 use oak_typescript::{
     TypeScriptBuilder, TypeScriptLanguage,
     ast::TypeScriptRoot,
-    scope::{ModuleBindingFacts, ModuleBindingKind, ModuleScopeFacts, module_scope_facts},
+    scope::{ModuleBindingFacts, ModuleBindingKind, ModuleScopeFacts, ScopeIncompleteReason, module_scope_facts},
 };
 
 fn root(source: &str) -> TypeScriptRoot {
@@ -37,7 +38,7 @@ fn decl_text<'a>(source: &'a str, b: &ModuleBindingFacts) -> &'a str {
 fn function_and_const_bindings_record_value_references_in_source_order() {
     let source = "function foo(){}\nfoo();\nfoo = 1;\nfoo++;\nconst bar = foo;";
     let f = facts(source);
-    assert!(!f.incomplete, "{f:?}");
+    assert!(!f.is_incomplete(), "{f:?}");
     assert_eq!(f.bindings.len(), 2, "{:?}", f.bindings.iter().map(|b| &b.name).collect::<Vec<_>>());
 
     let foo = binding(&f, "foo");
@@ -60,7 +61,7 @@ fn function_and_const_bindings_record_value_references_in_source_order() {
 fn parameter_shadows_module_binding() {
     let source = "function foo(){}\nfunction g(foo){ foo }\nfoo;";
     let f = facts(source);
-    assert!(!f.incomplete, "{f:?}");
+    assert!(!f.is_incomplete(), "{f:?}");
     assert_eq!(ref_texts(source, binding(&f, "foo")), vec!["foo"]);
     assert_eq!(binding(&f, "foo").references[0].start, source.rfind("foo;").expect("tail use"));
 }
@@ -69,7 +70,7 @@ fn parameter_shadows_module_binding() {
 fn block_let_shadows_and_block_var_hoists_to_module() {
     let source = "let foo = 1;\n{ let foo = 2; foo; }\nfoo;\nif (x) { var v = 1; v; }\nv;";
     let f = facts(source);
-    assert!(!f.incomplete, "{f:?}");
+    assert!(!f.is_incomplete(), "{f:?}");
 
     let foo = binding(&f, "foo");
     assert!(matches!(foo.kind, ModuleBindingKind::Let));
@@ -86,30 +87,28 @@ fn block_let_shadows_and_block_var_hoists_to_module() {
 fn catch_param_shadows_module_binding() {
     let source = "let e = 1;\ntry { } catch (e) { e }\ne;";
     let f = facts(source);
-    assert!(!f.incomplete, "{f:?}");
+    assert!(!f.is_incomplete(), "{f:?}");
     assert_eq!(ref_texts(source, binding(&f, "e")), vec!["e"]);
 }
 
 #[test]
 fn function_expression_name_shadows_self_reference() {
-    // The builder does not emit `ExpressionKind::FunctionExpression` yet: its
-    // catch-all walk exposes the body's inner call as the declarator value, so
-    // the AST really carries that reference and it resolves to the module
-    // binding. `scope.rs` keeps the shadow rule for the moment the AST grows
-    // the real node; until then this test pins the actual flattened behavior.
+    // The builder emits the real `ExpressionKind::FunctionExpression` node
+    // (upstream `5e3c0f1d`), so the body's inner call resolves to the name
+    // shadow, not to the module binding.
     let source = "const f = function f(){ f(); };";
     let f = facts(source);
-    assert!(!f.incomplete, "{f:?}");
+    assert!(!f.is_incomplete(), "{f:?}");
     let binding = binding(&f, "f");
     assert!(matches!(binding.kind, ModuleBindingKind::Const));
-    assert_eq!(ref_texts(source, binding), vec!["f"], "flattened body call is the only visible use");
+    assert!(binding.references.is_empty(), "the self name is shadowed by the function expression name: {binding:?}");
 }
 
 #[test]
 fn non_computed_property_and_break_label_are_not_references() {
     let source = "let b = 1;\nlet obj = { k: 1 };\nobj.b;\nb[x];\nconst o = { b };\nb;\nfor (;;) { break b; }";
     let f = facts(source);
-    assert!(!f.incomplete, "{f:?}");
+    assert!(!f.is_incomplete(), "{f:?}");
     let b = binding(&f, "b");
     // `obj.b` (non-computed) and `break b` (label) must not count; the computed
     // object position, the shorthand `{ b }` and the tail `b;` must.
@@ -121,7 +120,7 @@ fn non_computed_property_and_break_label_are_not_references() {
 fn typeof_new_tagged_template_and_callee_are_references() {
     let source = "let F = 1;\ntypeof F;\nnew F();\ntag`x`;\nF`y`;\nfree(F);";
     let f = facts(source);
-    assert!(!f.incomplete, "{f:?}");
+    assert!(!f.is_incomplete(), "{f:?}");
     let fb = binding(&f, "F");
     assert_eq!(ref_texts(source, fb), vec!["F", "F", "F", "F"]);
     assert_eq!(fb.references[0].start, source.find("typeof F").expect("typeof") + 7);
@@ -132,7 +131,7 @@ fn typeof_new_tagged_template_and_callee_are_references() {
 fn type_annotations_mark_type_references_without_spans() {
     let source = "class Foo {}\nlet a: Foo;\nclass Bar extends Foo {}\nexport { type Foo };";
     let f = facts(source);
-    assert!(!f.incomplete, "{f:?}");
+    assert!(!f.is_incomplete(), "{f:?}");
     let foo = binding(&f, "Foo");
     assert!(matches!(foo.kind, ModuleBindingKind::Class));
     assert!(foo.has_type_references, "annotation, extends and `export {{ type Foo }}` are type uses");
@@ -149,7 +148,7 @@ fn type_parameter_shadows_module_binding_in_type_position() {
     // resolve to the module binding.
     let source = "let Foo = 1;\nfunction g<Foo>(x: Foo): Foo { }\n";
     let f = facts(source);
-    assert!(!f.incomplete, "{f:?}");
+    assert!(!f.is_incomplete(), "{f:?}");
     assert!(binding(&f, "Foo").has_type_references, "the AST loses the type-parameter name today");
 }
 
@@ -159,7 +158,7 @@ fn registered_type_parameter_names_do_shadow() {
     // variable is a real shadow entry and must not mark the module binding.
     let source = "let K = 1;\ntype M = { [K in string]: K };\n";
     let f = facts(source);
-    assert!(!f.incomplete, "{f:?}");
+    assert!(!f.is_incomplete(), "{f:?}");
     assert!(!binding(&f, "K").has_type_references, "the mapped key `K` shadows the module binding");
 }
 
@@ -167,7 +166,7 @@ fn registered_type_parameter_names_do_shadow() {
 fn import_bindings_use_local_token_spans() {
     let source = "import def from \"m\";\nimport { named, other as alias } from \"m\";\nimport * as ns from \"m\";\ndef;\nnamed;\nalias;\nns;\nimport type T from \"m\";";
     let f = facts(source);
-    assert!(!f.incomplete, "{f:?}");
+    assert!(!f.is_incomplete(), "{f:?}");
     assert_eq!(f.bindings.len(), 4, "{:?}", f.bindings.iter().map(|b| &b.name).collect::<Vec<_>>());
     assert!(f.bindings.iter().all(|b| b.name != "T"), "`import type` must not create a binding");
 
@@ -196,7 +195,7 @@ fn import_bindings_use_local_token_spans() {
 fn export_declaration_creates_binding_and_bare_clause_records_reference() {
     let source = "export function foo(){}\nfoo();\nexport { foo };";
     let f = facts(source);
-    assert!(!f.incomplete, "{f:?}");
+    assert!(!f.is_incomplete(), "{f:?}");
     let foo = binding(&f, "foo");
     assert!(matches!(foo.kind, ModuleBindingKind::Function));
     assert_eq!(decl_text(source, foo), "foo");
@@ -205,51 +204,66 @@ fn export_declaration_creates_binding_and_bare_clause_records_reference() {
 
     let reexport = facts("export { foo } from \"m\";");
     assert!(reexport.bindings.is_empty(), "re-export creates no local binding: {reexport:?}");
-    assert!(!reexport.incomplete);
+    assert!(!reexport.is_incomplete());
 }
 
 #[test]
 fn export_default_function_and_class_are_module_bindings() {
     let source = "export default function foo(){}\nexport default class Bar {}\nfoo;";
     let f = facts(source);
-    assert!(!f.incomplete, "{f:?}");
+    assert!(!f.is_incomplete(), "{f:?}");
     assert!(matches!(binding(&f, "foo").kind, ModuleBindingKind::Function));
     assert!(matches!(binding(&f, "Bar").kind, ModuleBindingKind::Class));
     assert_eq!(ref_texts(source, binding(&f, "foo")), vec!["foo"]);
 }
 
 #[test]
-fn direct_eval_marks_incomplete() {
+fn direct_eval_names_its_reason() {
     let f = facts("let foo = 1;\neval(\"foo\");\nfoo;");
-    assert!(f.incomplete, "{f:?}");
+    assert_eq!(f.incomplete_reasons, vec![ScopeIncompleteReason::DirectEval], "{f:?}");
 }
 
 #[test]
-fn jsx_marks_incomplete() {
+fn jsx_names_its_reason() {
     let f = facts("const x = <div/>;");
-    assert!(f.incomplete, "JSX must flip the flag: {:?}", module_scope_facts(&root("const x = <div/>;")));
+    assert_eq!(f.incomplete_reasons, vec![ScopeIncompleteReason::Jsx], "JSX must name the reason: {f:?}");
 }
 
 #[test]
-fn template_interpolation_marks_incomplete() {
+fn template_interpolation_names_its_reason() {
     let f = facts("let foo = 1;\nconst t = `a${foo}b`;");
-    assert!(f.incomplete, "interpolations are invisible in the AST: {f:?}");
+    assert_eq!(f.incomplete_reasons, vec![ScopeIncompleteReason::TemplateInterpolation], "interpolations are invisible in the AST: {f:?}");
 }
 
 #[test]
-fn plain_key_matching_binding_name_marks_incomplete() {
+fn plain_key_matching_binding_name_names_its_reason() {
     let f = facts("let foo = 1;\nconst o = { foo: 2 };");
-    assert!(f.incomplete, "the AST cannot tell `foo:` from `[foo]:`: {f:?}");
+    assert_eq!(f.incomplete_reasons, vec![ScopeIncompleteReason::AmbiguousMemberKey], "the AST cannot tell `foo:` from `[foo]:`: {f:?}");
 }
 
 #[test]
-fn duplicate_module_binding_marks_incomplete_and_keeps_first() {
+fn duplicate_module_binding_names_its_reason_and_keeps_first() {
     let source = "function foo(){}\nlet foo = 1;\nfoo;";
     let f = facts(source);
-    assert!(f.incomplete, "{f:?}");
+    assert_eq!(f.incomplete_reasons, vec![ScopeIncompleteReason::DuplicateBinding], "{f:?}");
     assert_eq!(f.bindings.len(), 1, "the first entry wins: {f:?}");
     assert!(matches!(binding(&f, "foo").kind, ModuleBindingKind::Function));
     assert_eq!(ref_texts(source, binding(&f, "foo")), vec!["foo"]);
+}
+
+#[test]
+fn top_level_return_names_its_reason() {
+    let f = facts("let foo = 1;\nreturn foo;");
+    assert_eq!(f.incomplete_reasons, vec![ScopeIncompleteReason::TopLevelReturn], "a module-level return cannot live in a standalone ESM file: {f:?}");
+
+    let nested = facts("let foo = 1;\nif (x) { return foo; }");
+    assert_eq!(nested.incomplete_reasons, vec![ScopeIncompleteReason::TopLevelReturn], "a return inside a module-level block is still top-level: {nested:?}");
+}
+
+#[test]
+fn return_inside_a_function_is_not_top_level() {
+    let f = facts("function g(){ return 1; }\nlet foo = 1;\nfoo;");
+    assert!(!f.is_incomplete(), "{f:?}");
 }
 
 #[test]
@@ -257,20 +271,20 @@ fn export_type_clause_marks_type_reference_on_value_binding() {
     let f = facts("class Foo {}\nexport type { Foo };");
     assert!(binding(&f, "Foo").has_type_references, "`export type {{ Foo }}` still names the class binding: {:?}", binding(&f, "Foo"));
     assert!(binding(&f, "Foo").references.is_empty());
-    assert!(!f.incomplete, "{f:?}");
+    assert!(!f.is_incomplete(), "{f:?}");
 
     let reexport = facts("export type { Foo } from \"m\";");
-    assert!(!reexport.incomplete);
+    assert!(!reexport.is_incomplete());
     assert!(reexport.bindings.is_empty());
 }
 
 #[test]
-fn interface_bodies_are_opaque_and_mark_incomplete() {
+fn interface_bodies_are_opaque_and_name_their_reason() {
     let f = facts("let foo = 1;\ninterface I { foo: string }");
-    assert!(f.incomplete, "the AST carries no interface members: {f:?}");
+    assert_eq!(f.incomplete_reasons, vec![ScopeIncompleteReason::InterfaceBody], "the AST carries no interface members: {f:?}");
 
     let empty = facts("let foo = 1;\ninterface I {}");
-    assert!(empty.incomplete, "even an empty interface flips the flag until the parser records members");
+    assert_eq!(empty.incomplete_reasons, vec![ScopeIncompleteReason::InterfaceBody], "even an empty interface names the reason until the parser records members");
     assert_eq!(empty.bindings.len(), 1, "{empty:?}");
 }
 
@@ -278,7 +292,7 @@ fn interface_bodies_are_opaque_and_mark_incomplete() {
 fn destructuring_and_shorthand_tokens_mark_rename_unsafe() {
     let source = "const { value } = obj;\nlet [a, b] = arr;\nconst { x: renamed } = obj2;\nconst plain = 1;\nconst o = { plain };\nfunction safe(){ }\nsafe();";
     let f = facts(source);
-    assert!(!f.incomplete, "{f:?}");
+    assert!(!f.is_incomplete(), "{f:?}");
     assert!(binding(&f, "value").rename_unsafe, "shorthand pattern token doubles as the property key");
     assert!(binding(&f, "a").rename_unsafe, "array pattern token");
     assert!(binding(&f, "b").rename_unsafe, "array pattern token");
@@ -291,7 +305,7 @@ fn destructuring_and_shorthand_tokens_mark_rename_unsafe() {
 fn block_var_destructuring_marks_rename_unsafe() {
     let source = "if (x) { var { value } = obj; }";
     let f = facts(source);
-    assert!(!f.incomplete, "{f:?}");
+    assert!(!f.is_incomplete(), "{f:?}");
     let value = binding(&f, "value");
     assert!(matches!(value.kind, ModuleBindingKind::Var), "block var must hoist: {value:?}");
     assert!(value.rename_unsafe, "hoisted var destructuring keeps the pattern token");
@@ -301,9 +315,9 @@ fn block_var_destructuring_marks_rename_unsafe() {
 fn export_star_re_exports_create_no_local_binding() {
     let f = facts("export * as ns from \"m\";");
     assert!(f.bindings.is_empty(), "`export * as ns from` is a re-export, not a local binding: {f:?}");
-    assert!(!f.incomplete);
+    assert!(!f.is_incomplete());
 
     let star = facts("export * from \"m\";");
     assert!(star.bindings.is_empty());
-    assert!(!star.incomplete);
+    assert!(!star.is_incomplete());
 }
