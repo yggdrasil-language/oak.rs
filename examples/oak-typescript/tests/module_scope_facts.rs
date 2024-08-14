@@ -289,7 +289,7 @@ fn interface_bodies_are_opaque_and_name_their_reason() {
 }
 
 #[test]
-fn destructuring_and_shorthand_tokens_mark_rename_unsafe() {
+fn destructuring_declarations_mark_rename_unsafe() {
     let source = "const { value } = obj;\nlet [a, b] = arr;\nconst { x: renamed } = obj2;\nconst plain = 1;\nconst o = { plain };\nfunction safe(){ }\nsafe();";
     let f = facts(source);
     assert!(!f.is_incomplete(), "{f:?}");
@@ -297,8 +297,19 @@ fn destructuring_and_shorthand_tokens_mark_rename_unsafe() {
     assert!(binding(&f, "a").rename_unsafe, "array pattern token");
     assert!(binding(&f, "b").rename_unsafe, "array pattern token");
     assert!(binding(&f, "renamed").rename_unsafe, "conservative: `{{ x: renamed }}` renames safely but the whole pattern is flagged");
-    assert!(binding(&f, "plain").rename_unsafe, "shorthand reference `{{ plain }}` doubles as the property key");
+    assert!(!binding(&f, "plain").rename_unsafe, "a shorthand reference is renamable with per-span text");
     assert!(!binding(&f, "safe").rename_unsafe, "plain declaration and plain call are rename-safe");
+}
+
+#[test]
+fn shorthand_reference_spans_record_the_key_token() {
+    let source = "const plain = 1;\nconst o = { plain };\nfunction f(plain) { return { plain }; }\nf(2);";
+    let f = facts(source);
+    assert!(!f.is_incomplete(), "{f:?}");
+    let plain = binding(&f, "plain");
+    assert_eq!(plain.references.len(), 1, "the shadowed shorthand inside `f` resolves to the parameter: {plain:?}");
+    assert_eq!(plain.shorthand_reference_spans, plain.references, "the recorded reference is the shorthand token itself");
+    assert!(!plain.rename_unsafe);
 }
 
 #[test]
