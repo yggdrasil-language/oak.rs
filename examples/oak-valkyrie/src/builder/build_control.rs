@@ -40,6 +40,26 @@ impl<'config> ValkyrieBuilder<'config> {
                             else_branch = Some(self.build_block(n, source)?);
                         }
                     }
+                    // `else if` 在 CST 里是嵌套的 `IfExpression` 子节点（parser 的
+                    // `parse_if_expression` 在 `else` 后直接递归解析 if）。它不是
+                    // `BlockExpression`，若落进 `_` 分支会被当作第二个条件丢弃，
+                    // 外层 if 因此得到 `else_branch: None`，`else if` 整条链在
+                    // HIR 之前就消失了（表现为语义缺失/循环回边读到旧值而死循环）。
+                    // 这里把它包成只含一个尾表达式语句的块，恢复 `else { if … }`
+                    // 的等价 AST 形状，交由 HIR 正常降低。
+                    crate::parser::element_type::ValkyrieElementType::IfExpression => {
+                        let nested_span = n.span();
+                        let nested = self.build_if(n, source)?;
+                        else_branch = Some(Block {
+                            statements: vec![Statement::Expression(Box::new(ExprStmt {
+                                expr: nested,
+                                semi: false,
+                                annotations: Vec::new(),
+                                span: nested_span,
+                            }))],
+                            span: nested_span,
+                        });
+                    }
                     _ => {
                         if condition.is_none() {
                             condition = Some(Box::new(self.build_expr(n, source)?));
