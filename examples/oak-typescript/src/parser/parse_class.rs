@@ -99,8 +99,10 @@ impl<'config> TypeScriptParser<'config> {
                 }
             }
 
-            // Handle get/set
-            if self.at(state, Get) || self.at(state, Set) {
+            // Handle get/set: accessor prefix only when a member name follows;
+            // otherwise `get`/`set` itself is the member name (`get(key) {}`,
+            // `set = 1`), mirroring the object-literal rule.
+            if (self.at(state, Get) || self.at(state, Set)) && self.at_object_member_name(state, 1) {
                 state.bump();
             }
 
