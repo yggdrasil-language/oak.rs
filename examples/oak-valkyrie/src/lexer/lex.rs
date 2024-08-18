@@ -145,43 +145,9 @@ impl crate::lexer::ValkyrieLexer<'_> {
         false
     }
 
+    /// 引号字面量只做捕获：不向前探测 `r`/`b` 等前缀标识符，前缀由后续编译阶段解释。
     fn lex_string_literal<S: Source + ?Sized>(&self, state: &mut State<'_, S>) -> bool {
-        let initial_start = state.get_position();
-
-        let prefix_start = state.get_position();
-        let mut prefix_end = prefix_start;
-
-        if let Some(ch) = state.current() {
-            if is_xid_start(ch) {
-                state.advance(ch.len_utf8());
-                while let Some(ch) = state.current() {
-                    if is_xid_continue(ch) {
-                        state.advance(ch.len_utf8());
-                    }
-                    else {
-                        break;
-                    }
-                }
-                prefix_end = state.get_position();
-            }
-        }
-
-        let has_prefix = prefix_end > prefix_start;
-
-        if has_prefix {
-            if let Some('"') = state.current() {
-                // 只有 `r"..."` 是 raw string，不解释转义；其余前缀串仍按普通串处理转义。
-                let raw = state.get_text_in((prefix_start..prefix_end).into()) == "r";
-                state.add_token(ValkyrieTokenType::StringPrefix, prefix_start, prefix_end);
-                return self.lex_symmetric_string(state, '"', ValkyrieTokenType::StringLiteral, !raw);
-            }
-            else {
-                state.set_position(initial_start);
-                return false;
-            }
-        }
-
-        self.lex_symmetric_string(state, '"', ValkyrieTokenType::StringLiteral, true)
+        self.lex_quote_capture(state, '"', ValkyrieTokenType::StringLiteral)
     }
 
     /// `'outer` 循环标签；`'a'` 仍按字符字面量处理。
@@ -206,8 +172,8 @@ impl crate::lexer::ValkyrieLexer<'_> {
             }
         }
         let end = state.get_position();
-        // 单字符且紧跟闭合引号时保留给字符字面量。
-        if chars == 0 || (chars == 1 && state.current() == Some('\'')) {
+        // 紧跟闭合引号的 `'name'` 是引号捕获（如 `'ab'`），不是标签；标签没有闭合引号。
+        if chars == 0 || state.current() == Some('\'') {
             state.set_position(start);
             return false;
         }
@@ -216,14 +182,20 @@ impl crate::lexer::ValkyrieLexer<'_> {
     }
 
     fn lex_char_literal<S: Source + ?Sized>(&self, state: &mut State<'_, S>) -> bool {
-        self.lex_symmetric_string(state, '\'', ValkyrieTokenType::CharLiteral, true)
+        self.lex_quote_capture(state, '\'', ValkyrieTokenType::CharLiteral)
     }
 
-    /// 扫描对称引号字面量；`escapes` 为真时 `\` 会跳过下一个字符，避免 `\"` 提前闭合普通字符串。
-    fn lex_symmetric_string<S: Source + ?Sized>(&self, state: &mut State<'_, S>, quote: char, kind: ValkyrieTokenType, escapes: bool) -> bool {
+    /// 按"等量引号串"配对捕获被引号包住的原始文本：
+    ///
+    /// - 开头连续 `N` 个引号必须由连续 `N` 个引号闭合；`""` / `''` 特判为空字面量。
+    /// - 捕获阶段不解释反斜杠：`\` 无法"救"定界符，`"\""` 在第二个 `"` 处闭合，
+    ///   内容里的悬挂 `\` 由后续编译阶段按结构化错误拒绝。
+    /// - 找不到等量闭合串时产出 `Error` token 并附精确诊断（未闭合），
+    ///   与"捕获成功但内容非法"的后续错误区分。
+    fn lex_quote_capture<S: Source + ?Sized>(&self, state: &mut State<'_, S>, quote: char, kind: ValkyrieTokenType) -> bool {
         let start = state.get_position();
 
-        let mut quote_count = 0;
+        let mut quote_count = 0usize;
 
         while let Some(c) = state.current() {
             if c == quote {
@@ -245,18 +217,10 @@ impl crate::lexer::ValkyrieLexer<'_> {
             return true;
         }
 
-        let mut current_consecutive = 0;
+        let mut current_consecutive = 0usize;
 
         while let Some(c) = state.current() {
-            if escapes && c == '\\' {
-                // 转义序列属于字面量内容，不参与闭合判定。
-                current_consecutive = 0;
-                state.advance(c.len_utf8());
-                if let Some(next) = state.current() {
-                    state.advance(next.len_utf8());
-                }
-            }
-            else if c == quote {
+            if c == quote {
                 current_consecutive += 1;
                 state.advance(c.len_utf8());
                 if current_consecutive == quote_count {
@@ -271,7 +235,12 @@ impl crate::lexer::ValkyrieLexer<'_> {
             }
         }
 
-        state.add_token(kind, start, state.get_position());
+        state.add_token(ValkyrieTokenType::Error, start, state.get_position());
+        state.add_error(oak_core::OakError::syntax_error(
+            format!("unterminated quoted literal: opening run of {quote_count} `{quote}` requires a closing run of {quote_count}"),
+            start,
+            None,
+        ));
         true
     }
 
