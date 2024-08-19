@@ -26,11 +26,10 @@ pub enum ValkyrieTokenType {
     FloatLiteral,
     /// Boolean literal token.
     BoolLiteral,
-    /// String literal token.
+    /// String literal token: a `"`-run capture carrying raw, undecoded content.
     StringLiteral,
-    /// String prefix token (e.g., `s`, `f`, `r`, `sql` in `s"..."`).
-    StringPrefix,
-    /// Character literal token.
+    /// 单引号捕获 token：词法只按等量引号串捕获原始文本；
+    /// 前缀标识符是独立的 `Identifier` token，由编译器在捕获后解释。
     CharLiteral,
     /// Identifier token.
     Identifier,
@@ -177,7 +176,7 @@ impl TokenType for ValkyrieTokenType {
             Self::Eof => UniversalTokenRole::Eof,
             Self::Error => UniversalTokenRole::Error,
             Self::Keyword(_) => UniversalTokenRole::Keyword,
-            Self::Identifier | Self::StringPrefix => UniversalTokenRole::Name,
+            Self::Identifier => UniversalTokenRole::Name,
             Self::StringLiteral | Self::CharLiteral => UniversalTokenRole::Literal,
             Self::IntegerLiteral | Self::FloatLiteral | Self::BoolLiteral => UniversalTokenRole::Literal,
             _ => UniversalTokenRole::None,

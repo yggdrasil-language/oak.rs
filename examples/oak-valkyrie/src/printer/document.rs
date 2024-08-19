@@ -116,6 +116,17 @@ fn term_document(expression: &TermExpression) -> Result<Document<'static>, Print
         TermExpression::FloatLiteral { value, .. } => Ok(Document::text(value.clone())),
         TermExpression::BooleanLiteral { value, .. } => Ok(Document::text(if *value { "true" } else { "false" })),
         TermExpression::StringLiteral(literal) => Ok(string_literal_document(literal)),
+        TermExpression::SingleQuoteLiteral { prefix, quote_count, content, .. } => {
+            let mut text = String::new();
+            if let Some(prefix) = prefix {
+                text.push_str(&prefix.name);
+            }
+            let quotes = "'".repeat(*quote_count as usize);
+            text.push_str(&quotes);
+            text.push_str(content);
+            text.push_str(&quotes);
+            Ok(Document::text(text))
+        }
         TermExpression::NamePath(path) => Ok(Document::text(name_path_text(path))),
         TermExpression::ApplyCall { callee, args, .. } => apply_call_document(callee, args),
         TermExpression::Return(node) => return_document(node.as_ref()),

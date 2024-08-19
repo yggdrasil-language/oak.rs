@@ -209,8 +209,7 @@ pub(crate) fn parse_scrutinee_expression<S: oak_core::Source + ?Sized>(state: &m
 
 /// `::<`（turbofish）与 `::[`（基数下标 ASCII 别名）是 postfix 后缀而非路径段。
 fn at_postfix_colon_colon<S: oak_core::Source + ?Sized>(state: &State<'_, S>) -> bool {
-    state.at(ValkyrieTokenType::ColonColon)
-        && (state.peek_non_trivia_kind_at(1) == Some(ValkyrieTokenType::LessThan) || state.peek_non_trivia_kind_at(1) == Some(ValkyrieTokenType::BracketL))
+    state.at(ValkyrieTokenType::ColonColon) && (state.peek_non_trivia_kind_at(1) == Some(ValkyrieTokenType::LessThan) || state.peek_non_trivia_kind_at(1) == Some(ValkyrieTokenType::BracketL))
 }
 
 fn parse_postfix_expression_with_options<S: oak_core::Source + ?Sized>(state: &mut State<'_, S>, allow_object_literal: bool) -> Result<(), oak_core::OakError> {
@@ -309,6 +308,7 @@ pub(crate) fn parse_primary_expression<S: oak_core::Source + ?Sized>(state: &mut
         match &token.kind {
             _ if token.kind.is_soft_identifier() => {
                 let cp = state.sink.checkpoint();
+                let identifier_end = token.span.end;
                 state.bump();
                 if state.at(ValkyrieTokenType::ColonColon) && !at_postfix_colon_colon(state) {
                     while state.at(ValkyrieTokenType::ColonColon) {
@@ -327,6 +327,12 @@ pub(crate) fn parse_primary_expression<S: oak_core::Source + ?Sized>(state: &mut
                         }
                     }
                     state.sink.finish_node(cp, ValkyrieElementType::PathExpression);
+                }
+                else if matches!(state.peek_kind(), Some(ValkyrieTokenType::StringLiteral | ValkyrieTokenType::CharLiteral)) && state.current().is_some_and(|literal| literal.span.start == identifier_end) {
+                    // 紧邻的标识符 + 引号捕获粘合成一个字面量节点（如 `r'...'`、`b'0'`）。
+                    // 词法不解释前缀含义；raw/byte 等语义由编译器在捕获之后判定。
+                    state.bump();
+                    state.sink.finish_node(cp, ValkyrieElementType::LiteralExpression);
                 }
                 else {
                     state.sink.finish_node(cp, ValkyrieElementType::IdentifierExpression);
