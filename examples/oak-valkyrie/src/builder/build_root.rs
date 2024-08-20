@@ -16,6 +16,11 @@ impl<'config> ValkyrieBuilder<'config> {
         for child in red_root.children() {
             match child {
                 RedTree::Node(n) => {
+                    // 根循环恢复产出的 Error 节点包裹坏 item 的片段；错误已在解析期记入
+                    // diagnostics，这里跳过该节点，让后续兄弟 item 照常进入 AST。
+                    if n.green.kind == ValkyrieElementType::Error {
+                        continue;
+                    }
                     // Empty ExprStatement with only trivia/Eof/whitespace TemplateText is omitted from the AST.
                     if n.green.kind == ValkyrieElementType::ExprStatement && is_trivia_only_expr_stmt(&n, source) {
                         continue;
