@@ -100,11 +100,58 @@ pub(crate) fn parse_match_expression<S: oak_core::Source + ?Sized>(state: &mut S
     Ok(())
 }
 
-/// 解析 match 模式：`Some(value)` / `None` / `_`。
+/// 解析 match 模式：`Some(value)` / `None` / `_` / `[head, ...tail]`。
 fn parse_match_pattern<S: oak_core::Source + ?Sized>(state: &mut State<'_, S>) -> Result<(), oak_core::OakError> {
     let pcp = state.sink.checkpoint();
     if state.at(ValkyrieTokenType::Underscore) {
         state.bump();
+    }
+    else if state.at(ValkyrieTokenType::BracketL) {
+        state.bump();
+        let mut rest_seen = false;
+        while state.not_at_end() && !state.at(ValkyrieTokenType::BracketR) {
+            state.skip_trivia();
+            if state.at(ValkyrieTokenType::BracketR) {
+                break;
+            }
+            // 未闭合保护：撞上 arm / 块结构边界立即按未闭合处理，不吞并后续结构。
+            if state.at(ValkyrieTokenType::BraceR) || state.at(ValkyrieTokenType::Arrow) || state.at(ValkyrieTokenType::Colon) || state.at(ValkyrieTokenType::Eq) {
+                break;
+            }
+            let before = state.checkpoint().0;
+            if state.at(ValkyrieTokenType::DotDot) {
+                if rest_seen {
+                    return Err(state.source.syntax_error("数组模式只允许一个 ... 剩余绑定".into(), state.current_offset()));
+                }
+                rest_seen = true;
+                state.bump();
+                if state.at(ValkyrieTokenType::Dot) {
+                    state.bump();
+                }
+                state.skip_trivia();
+                let rest_before = state.checkpoint().0;
+                parse_match_pattern(state)?;
+                if state.checkpoint().0 == rest_before {
+                    return Err(state.source.syntax_error("数组模式的 ... 后必须跟绑定模式".into(), state.current_offset()));
+                }
+            }
+            else {
+                parse_match_pattern(state)?;
+            }
+            if state.checkpoint().0 == before {
+                state.bump();
+            }
+            state.skip_trivia();
+            if state.at(ValkyrieTokenType::Comma) {
+                state.bump();
+            }
+        }
+        if state.at(ValkyrieTokenType::BracketR) {
+            state.bump();
+        }
+        else {
+            return Err(state.source.syntax_error("数组模式缺少闭合方括号".into(), state.current_offset()));
+        }
     }
     else if state.at(ValkyrieTokenType::Identifier) {
         state.bump();
