@@ -6,6 +6,27 @@ impl<'config> TypeScriptParser<'config> {
         use crate::lexer::token_type::TypeScriptTokenType::*;
         let cp = state.checkpoint();
 
+        // TSX disambiguation: a `<` that opens a type parameter list followed by a
+        // parameter list and `=>` is a generic arrow (`<T>(x: T) => x`,
+        // `<const T>(x) => x`), not an element. Trying the arrow first also keeps
+        // a `const` modifier out of the JSX attribute scanner, where a keyword
+        // attribute name would otherwise spin forever allocating empty nodes.
+        if self.at(state, Less) {
+            let arrow_cp = state.checkpoint();
+            self.parse_type_parameters(state).ok();
+            if self.at(state, LeftParen) {
+                self.parse_parameters(state).ok();
+                if self.eat(state, Colon) {
+                    self.parse_return_type_annotation(state).ok();
+                }
+                if self.eat(state, Arrow) {
+                    self.parse_statement(state).ok();
+                    return state.finish_at(cp, TypeScriptElementType::ArrowFunction);
+                }
+            }
+            state.restore(arrow_cp);
+        }
+
         if self.eat(state, Less) {
             if self.eat(state, Greater) {
                 let opening_cp = state.checkpoint();
@@ -58,7 +79,13 @@ impl<'config> TypeScriptParser<'config> {
         let attrs_cp = state.checkpoint();
         let mut has_attrs = false;
         while state.not_at_end() && !self.at(state, Greater) && !self.at(state, Slash) {
+            let before = state.checkpoint();
             self.parse_jsx_attribute(state);
+            // An attribute that consumed nothing (a keyword like `const`, a number,
+            // a stray operator) must not spin forever allocating empty nodes.
+            if state.checkpoint().0 == before.0 && state.not_at_end() {
+                state.bump();
+            }
             has_attrs = true;
         }
         if has_attrs {
@@ -77,7 +104,15 @@ impl<'config> TypeScriptParser<'config> {
         }
         else {
             let name_cp = state.checkpoint();
-            self.expect(state, IdentifierName).ok();
+            // JSX attribute names accept keywords (`class`, `for`, `type`), the
+            // same way object-literal member names do.
+            let keyword_name = state.peek_text().is_some_and(|text| crate::lexer::token_type::TypeScriptTokenType::from_keyword(&text).is_some());
+            if self.at(state, IdentifierName) || keyword_name {
+                state.bump();
+            }
+            else {
+                self.expect(state, IdentifierName).ok();
+            }
             state.finish_at(name_cp, TypeScriptElementType::IdentifierName);
             if self.eat(state, Equal) {
                 if self.at(state, StringLiteral) {
