@@ -178,6 +178,73 @@ impl<'config> TypeScriptParser<'config> {
         }
     }
 
+    /// Parse a prefix assertion `<T>expr` after a failed generic-arrow attempt.
+    ///
+    /// Consumes `<`, scans the type up to the matching `>` (a merged `>>`/`>>>`
+    /// closes inner generics and the assertion bracket together) and wraps the
+    /// type tokens in a `TypeAnnotation` node. Returns `false` when no closing
+    /// bracket exists, leaving the caller to recover an `Error` node.
+    pub(crate) fn parse_prefix_assertion_content<'a, S: Source + ?Sized>(&self, state: &mut State<'a, S>) -> bool {
+        use crate::{lexer::token_type::TypeScriptTokenType::*, parser::element_type::TypeScriptElementType};
+        if !self.at(state, Less) {
+            return false;
+        }
+        state.bump();
+        let cp = state.checkpoint();
+        let mut angles = 0usize;
+        let mut depth = 0usize;
+        let mut consumed = false;
+        let mut closed = false;
+        while state.not_at_end() {
+            let Some(kind) = self.peek_kind(state)
+            else {
+                break;
+            };
+            match kind {
+                Less => angles += 1,
+                Greater => {
+                    if angles == 0 && depth == 0 {
+                        // The closing `>` is not part of the type text.
+                        if consumed {
+                            state.finish_at(cp, TypeScriptElementType::TypeAnnotation);
+                        }
+                        closed = true;
+                        state.bump();
+                        break;
+                    }
+                    angles = angles.saturating_sub(1);
+                }
+                LeftParen | LeftBracket | LeftBrace => depth += 1,
+                RightParen | RightBracket | RightBrace => {
+                    if depth == 0 && angles == 0 {
+                        break;
+                    }
+                    depth = depth.saturating_sub(1);
+                }
+                // `>>` / `>>>` merge the inner generic close with the assertion
+                // close; the whole shift token belongs to the type text here.
+                RightShift if angles >= 2 => angles -= 2,
+                UnsignedRightShift if angles >= 3 => angles -= 3,
+                RightShift | UnsignedRightShift => {
+                    state.bump();
+                    if consumed {
+                        state.finish_at(cp, TypeScriptElementType::TypeAnnotation);
+                    }
+                    closed = true;
+                    break;
+                }
+                Semicolon if angles == 0 && depth == 0 => break,
+                _ => {}
+            }
+            state.bump();
+            consumed = true;
+        }
+        if !closed {
+            state.restore(cp);
+        }
+        closed
+    }
+
     fn parse_type_annotation_with_arrow<'a, S: Source + ?Sized>(&self, state: &mut State<'a, S>, stop_at_arrow: bool) -> Result<(), OakError> {
         use crate::{lexer::token_type::TypeScriptTokenType::*, parser::element_type::TypeScriptElementType};
 
