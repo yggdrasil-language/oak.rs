@@ -289,14 +289,17 @@ fn interface_bodies_are_opaque_and_name_their_reason() {
 }
 
 #[test]
-fn destructuring_declarations_mark_rename_unsafe() {
-    let source = "const { value } = obj;\nlet [a, b] = arr;\nconst { x: renamed } = obj2;\nconst plain = 1;\nconst o = { plain };\nfunction safe(){ }\nsafe();";
+fn destructuring_declarations_mark_only_shorthand_keys_rename_unsafe() {
+    let source =
+        "const { value } = obj;\nlet [a, b] = arr;\nconst { x: renamed } = obj2;\nconst { d = 1 } = o3;\nconst { outer: { inner } } = o4;\nconst plain = 1;\nconst o = { plain };\nfunction safe(){ }\nsafe();";
     let f = facts(source);
     assert!(!f.is_incomplete(), "{f:?}");
     assert!(binding(&f, "value").rename_unsafe, "shorthand pattern token doubles as the property key");
-    assert!(binding(&f, "a").rename_unsafe, "array pattern token");
-    assert!(binding(&f, "b").rename_unsafe, "array pattern token");
-    assert!(binding(&f, "renamed").rename_unsafe, "conservative: `{{ x: renamed }}` renames safely but the whole pattern is flagged");
+    assert!(!binding(&f, "a").rename_unsafe, "an array-pattern element is safe for a bare replacement");
+    assert!(!binding(&f, "b").rename_unsafe, "an array-pattern element is safe for a bare replacement");
+    assert!(!binding(&f, "renamed").rename_unsafe, "the value target of `{{ x: renamed }}` is safe for a bare replacement");
+    assert!(binding(&f, "d").rename_unsafe, "a shorthand key with a default still doubles as the property key");
+    assert!(binding(&f, "inner").rename_unsafe, "a shorthand key inside a nested object pattern still doubles as the property key");
     assert!(!binding(&f, "plain").rename_unsafe, "a shorthand reference is renamable with per-span text");
     assert!(!binding(&f, "safe").rename_unsafe, "plain declaration and plain call are rename-safe");
 }
