@@ -21,7 +21,8 @@ oak-tex = { path = "..." }
 The following is a standard workflow for parsing TeX/LaTeX documents, supporting commands, environments, and math mode:
 
 ```rust
-use oak_tex::{TexParser, SourceText, TexLanguage};
+use oak_core::{Builder, SourceText, parser::session::ParseSession};
+use oak_tex::{TexBuilder, TexLanguage};
 
 fn main() {
     // 1. Prepare source code
@@ -33,21 +34,21 @@ fn main() {
     "#;
     let source = SourceText::new(code);
 
-    // 2. Initialize parser
-    let config = TexLanguage::new();
-    let parser = TexParser::new(&config);
+    // 2. Initialize the language and the AST builder
+    let language = TexLanguage::default();
+    let builder = TexBuilder::new(&language);
 
-    // 3. Execute parsing
-    let result = parser.parse(&source);
+    // 3. Build the typed AST
+    let mut session = ParseSession::<TexLanguage>::default();
+    let output = builder.build(&source, &[], &mut session);
 
     // 4. Handle results
-    if result.is_success() {
-        println!("Parsing successful! AST node count: {}", result.node_count());
-    } else {
-        eprintln!("Errors found during parsing.");
-        for diag in result.diagnostics() {
-            println!("[{}:{}] {}", diag.line, diag.column, diag.message);
-        }
+    match output.result {
+        Ok(root) => println!("Parsing successful! Top-level items: {}", root.items.len()),
+        Err(error) => eprintln!("Errors found during parsing: {error}"),
+    }
+    for diagnostic in &output.diagnostics {
+        println!("diagnostic: {diagnostic}");
     }
 }
 ```
@@ -58,10 +59,20 @@ fn main() {
 After a successful parse, you can use the built-in visitor pattern or manually traverse the Green/Red Tree to extract TeX specific constructs like commands, environments, math mode groups, and plain text content.
 
 ### 2. Incremental Parsing
-TeX documents can be very large (e.g., theses, books). `oak-tex` supports sub-millisecond incremental updates:
+TeX documents can be very large (e.g., theses, books). `oak-tex` reuses the session cache across builds, so unchanged subtrees survive incremental updates:
 ```rust
-// Re-parse only the modified section
-let new_result = parser.reparse(&new_source, &old_result);
+# use oak_core::{Builder, SourceText, parser::session::ParseSession};
+# use oak_tex::{TexBuilder, TexLanguage};
+# let language = TexLanguage::default();
+# let builder = TexBuilder::new(&language);
+# let mut session = ParseSession::<TexLanguage>::default();
+# let old_source = SourceText::new(r#"\section{Old title}"#);
+# let old_output = builder.build(&old_source, &[], &mut session);
+// Rebuild from the edited source. The same session carries the typed-node
+// cache from previous builds, so unchanged subtrees can be reused.
+let new_source = SourceText::new(r#"\section{New title}"#);
+let new_output = builder.build(&new_source, &[], &mut session);
+assert!(new_output.result.is_ok());
 ```
 
 ### 3. Error Recovery
