@@ -270,6 +270,25 @@ fn alignedat_declares_its_column_pairs_as_environment_arguments() {
 }
 
 #[test]
+fn starred_alignedat_declares_its_column_pairs_as_environment_arguments() {
+    let ast = parse_to_ast(r"\begin{alignedat*}{2} a &= b \end{alignedat*}");
+    let TexItem::Environment(environment) = &ast.items[0]
+    else {
+        panic!("expected an environment")
+    };
+    assert_eq!(environment.name, "alignedat");
+    assert!(environment.starred, "the trailing star stays on the environment");
+    let TexArgument::Required(root) = &environment.arguments[0]
+    else {
+        panic!("the column-pair count is a required argument")
+    };
+    assert_eq!(root.items.iter().filter_map(|item| match item { TexItem::Text { content, .. } => Some(content.as_str()), _ => None }).collect::<String>(), "2");
+    let rows = environment_rows(environment);
+    assert_eq!(rows.len(), 1);
+    assert_eq!(cell_text(&rows[0].cells[0]), "a", "the declared pair count is not part of the first cell");
+}
+
+#[test]
 fn row_break_outside_an_environment_stays_a_command() {
     let ast = parse_to_ast(r#"first \\ second"#);
     assert!(ast.items.iter().any(|item| matches!(item, TexItem::Command(command) if command.name == "\\")), "a text-mode row break must stay the `\\\\` command: {:?}", ast.items);
