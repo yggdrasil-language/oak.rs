@@ -219,12 +219,6 @@ pub enum ValkyrieKeywords {
     /// resume value;
     /// ```
     Resume,
-    /// From keyword for yield from.
-    ///
-    /// ```v
-    /// yield from list;
-    /// ```
-    From,
     /// Type check.
     ///
     /// ```v

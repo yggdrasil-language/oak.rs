@@ -368,7 +368,6 @@ impl crate::lexer::ValkyrieLexer<'_> {
                     "raise" => ValkyrieTokenType::Keyword(ValkyrieKeywords::Raise),
                     "effect" => ValkyrieTokenType::Keyword(ValkyrieKeywords::Effect),
                     "resume" => ValkyrieTokenType::Keyword(ValkyrieKeywords::Resume),
-                    "from" => ValkyrieTokenType::Keyword(ValkyrieKeywords::From),
                     "as" => ValkyrieTokenType::Keyword(ValkyrieKeywords::As),
                     "get" => ValkyrieTokenType::Keyword(ValkyrieKeywords::Get),
                     "set" => ValkyrieTokenType::Keyword(ValkyrieKeywords::Set),
