@@ -7,8 +7,18 @@ use oak_core::parser::ParserState;
 
 type State<'a, S> = ParserState<'a, ValkyrieLanguage, S>;
 
-fn at_default_arm_keyword<S: oak_core::Source + ?Sized>(state: &State<'_, S>) -> bool {
-    state.at(ValkyrieTokenType::Identifier) && state.peek_text().as_deref() == Some("default")
+/// `default` 只有紧随 `:` / `->` 时才是臂标记；否则是臂体内的普通标识符
+/// 表达式（如 `case None: default` 读取名为 `default` 的绑定）。
+fn at_default_arm_keyword<S: oak_core::Source + ?Sized>(state: &mut State<'_, S>) -> bool {
+    if !(state.at(ValkyrieTokenType::Identifier) && state.peek_text().as_deref() == Some("default")) {
+        return false;
+    }
+    let restore = state.checkpoint();
+    state.bump();
+    state.skip_trivia();
+    let is_arm = state.at(ValkyrieTokenType::Colon) || state.at(ValkyrieTokenType::Arrow);
+    state.restore(restore);
+    is_arm
 }
 
 fn brace_balance_between<S: oak_core::Source + ?Sized>(state: &mut State<'_, S>, from: usize, to: usize) -> i32 {
@@ -334,7 +344,7 @@ fn parse_for_expression_with<S: oak_core::Source + ?Sized>(state: &mut State<'_,
     Ok(())
 }
 
-fn can_start_return_value<S: oak_core::Source + ?Sized>(state: &State<'_, S>) -> bool {
+fn can_start_return_value<S: oak_core::Source + ?Sized>(state: &mut State<'_, S>) -> bool {
     if state.at(ValkyrieTokenType::Semicolon) || state.at(ValkyrieTokenType::BraceR) || state.at(ValkyrieTokenType::ParenthesisR) || state.at(ValkyrieTokenType::Eof) {
         return false;
     }
