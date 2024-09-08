@@ -30,5 +30,5 @@ impl Language for DotLanguage {
 
     type TokenType = crate::lexer::token_type::DotTokenType;
     type ElementType = crate::parser::element_type::DotElementType;
-    type TypedRoot = ();
+    type TypedRoot = crate::ast::DotRoot;
 }

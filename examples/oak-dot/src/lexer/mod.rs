@@ -296,6 +296,11 @@ impl<'config> DotLexer<'config> {
                     state.add_token(DotTokenType::Comma, start_pos, state.get_position());
                     true
                 }
+                ':' => {
+                    state.advance(1);
+                    state.add_token(DotTokenType::Colon, start_pos, state.get_position());
+                    true
+                }
                 _ => false,
             }
         }
