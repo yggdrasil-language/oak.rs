@@ -1,33 +1,56 @@
-# 🚀 Oak PlantUML Parser
+# 🧩 Oak PlantUML Parser
 
-[![Crates.io](https://img.shields.io/crates/v/oak-plantuml.svg)](https://crates.io/crates/oak-plantuml)
-[![Documentation](https://docs.rs/oak-plantuml/badge.svg)](https://docs.rs/oak-plantuml)
+PlantUML support for the Oak language framework, limited to the class and sequence diagram subsets used by diagram front ends.
 
-**The Power of PlantUML, Reimagined for Performance** — A high-performance, incremental PlantUML parser built on the Oak framework. Optimized for large-scale system modeling, architectural documentation, and modern developer tooling.
+## 🎯 Scope
 
-## 🎯 Project Vision
+`oak-plantuml` parses one `@startuml ... @enduml` block and produces a typed AST covering:
 
-PlantUML is a versatile tool for creating UML diagrams from a simple and intuitive text description. `oak-plantuml` brings this versatility to the Rust ecosystem, providing a high-performance, incremental parser that can handle even the most massive modeling projects. By utilizing Oak's advanced parsing capabilities, it enables the creation of highly responsive IDEs and automated modeling tools that can analyze and visualize complex systems in real-time. Whether you are managing large enterprise architectures or building custom modeling solutions, `oak-plantuml` provides the robust foundation you need.
+- **Class diagrams** — `class`, `interface`, `abstract class`, `enum`, optional `{ ... }` member blocks, and relations with multiplicities, labels and normalized arrow markers.
+- **Sequence diagrams** — `participant` and `actor` declarations, four message arrows, and `activate` / `deactivate` spans.
 
-## ✨ Core Features
+The parser keeps every token in a lossless green tree, so whitespace and comments remain available to editors even though the typed AST is normalized.
 
-- **⚡ Blazing Fast**: Leverages Rust's performance to provide sub-millisecond parsing, even for large and complex model files.
-- **🔄 Incremental by Nature**: Built-in support for partial updates—re-parse only what has changed. Essential for large-scale modeling projects.
-- **🌳 High-Fidelity AST**: Generates a clean and easy-to-traverse Abstract Syntax Tree capturing:
-    - **UML Elements**: Comprehensive mapping of classes, interfaces, components, and use cases.
-    - **Relationships**: Precise tracking of associations, generalizations, and dependencies.
-    - **Notes & Annotations**: Detailed capture of comments, notes, and metadata.
-    - **Styling & Themes**: Support for PlantUML's extensive styling and skinparam directives.
-- **🛡️ Robust Error Recovery**: Engineered to handle incomplete or malformed code gracefully, providing precise diagnostics—crucial for a smooth developer experience.
-- **🧩 Deep Ecosystem Integration**: Seamlessly works with `oak-lsp` for full LSP support and `oak-mcp` for intelligent model discovery.
+## 🚫 Rejected Input
+
+This crate is deliberately a strict subset. The upstream pre-scan is expected to reject:
+
+- `skinparam`, `note`, `!include` and preprocessor directives
+- activity, state, component, deployment and timing diagram constructs
+- nested or multi-line member syntax beyond one member per line
+
+Lines outside the `@startuml` / `@enduml` wrapper and lines the grammar cannot attribute are not silently dropped: the parser records a syntax diagnostic at the line start offset.
+
+## 🚀 Quick Start
+
+```rust,ignore
+use oak_core::{Builder, Parser, SourceText, parser::session::ParseSession};
+use oak_plantuml::{PlantUmlBuilder, PlantUmlLanguage, PlantUmlParser};
+
+let source = SourceText::new(
+    "@startuml\nclass Foo {\n+ int x\n}\nFoo --> Bar\n@enduml\n",
+);
+let language = PlantUmlLanguage::new();
+let parser = PlantUmlParser::new(&language);
+let mut cache = ParseSession::<PlantUmlLanguage>::default();
+let parsed = parser.parse(&source, &[], &mut cache);
+assert!(parsed.result.is_ok());
+
+let builder = PlantUmlBuilder::new(&language);
+let mut cache = ParseSession::<PlantUmlLanguage>::default();
+let built = builder.build(&source, &[], &mut cache);
+let root = built.result.expect("the document should build");
+assert_eq!(root.diagrams.len(), 1);
+```
 
 ## 🏗️ Architecture
 
-The parser follows the **Green/Red Tree** architecture (inspired by Roslyn), which allows for:
-1. **Efficient Immutability**: Share nodes across different versions of the tree without copying.
-2. **Lossless Syntax Trees**: Retains all trivia (whitespace and comments), enabling faithful code formatting and refactoring.
-3. **Type Safety**: Strongly-typed "Red" nodes provide a convenient and safe API for tree traversal and analysis.
+The crate follows the Oak layering used by the other example languages:
+
+1. `lexer` — line-aware tokens for keywords, arrows, strings, comments and punctuation.
+2. `parser` — groups each statement into a composite green-tree element such as `ClassDeclaration`, `ClassMemberBlock`, `ClassRelation` or `SequenceMessage`.
+3. `builder` — lowers the green tree into `PlantUmlRoot`, `ClassDiagram` / `SequenceDiagram` and span-carrying AST nodes.
 
 ## 🤝 Contributing
 
-We welcome contributions of all kinds! If you find a bug, have a feature request, or want to contribute code, please check our [issues](https://github.com/ygg-lang/oaks/issues) or submit a pull request.
+Issues and pull requests are welcome at [ygg-lang/oaks](https://github.com/ygg-lang/oaks).

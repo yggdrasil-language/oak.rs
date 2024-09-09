@@ -1,14 +1,22 @@
+//! PlantUML language configuration.
+
 use oak_core::{Language, LanguageCategory};
 
-/// Represents the PlantUML language configuration.
-#[derive(Debug, Clone, Copy, Default)]
+/// PlantUML language configuration for the class and sequence subset.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct PlantUmlLanguage {}
+pub struct PlantUmlLanguage;
 
 impl PlantUmlLanguage {
-    /// Create a new `PlantUmlLanguage` instance.
+    /// Creates a PlantUML language configuration.
     pub fn new() -> Self {
-        Self::default()
+        Self
+    }
+}
+
+impl Default for PlantUmlLanguage {
+    fn default() -> Self {
+        Self::new()
     }
 }
 

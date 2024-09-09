@@ -1,88 +1,101 @@
-/// Token types and syntax kinds for PlantUML.
+//! Line-aware lexer for the PlantUML class and sequence subset.
+
 pub mod token_type;
 
 use crate::{language::PlantUmlLanguage, lexer::token_type::PlantUmlTokenType};
 use oak_core::{Lexer, LexerCache, LexerState, TextEdit, errors::OakError, lexer::LexOutput, source::Source};
 
-pub(crate) type State<'a, S> = LexerState<'a, S, PlantUmlLanguage>;
-
-/// Lexer for the PlantUML language.
+/// Lexer for the PlantUML class and sequence subset.
 pub struct PlantUmlLexer<'config> {
-    config: &'config PlantUmlLanguage,
+    /// The PlantUML language configuration.
+    _config: &'config PlantUmlLanguage,
 }
 
 impl<'config> PlantUmlLexer<'config> {
-    /// Creates a new lexer with the given configuration.
+    /// Creates a lexer with the given language configuration.
     pub fn new(config: &'config PlantUmlLanguage) -> Self {
-        Self { config }
+        Self { _config: config }
     }
 
-    fn run<S: Source + ?Sized>(&self, state: &mut State<S>) -> Result<(), OakError> {
+    fn run<S: Source + ?Sized>(&self, state: &mut LexerState<'_, S, PlantUmlLanguage>) -> Result<(), OakError> {
+        let mut at_line_start = true;
+
         while state.not_at_end() {
             let safe_point = state.get_position();
+            let Some(ch) = state.peek()
+            else {
+                break;
+            };
 
-            if let Some(ch) = state.peek() {
-                match ch {
-                    ' ' | '\t' => {
-                        self.skip_whitespace(state);
+            match ch {
+                ' ' | '\t' => {
+                    self.skip_whitespace(state);
+                    continue;
+                }
+                '\n' | '\r' => {
+                    self.lex_newline(state);
+                    at_line_start = true;
+                    continue;
+                }
+                '\'' if at_line_start => {
+                    self.lex_comment(state);
+                    at_line_start = false;
+                    continue;
+                }
+                '@' => {
+                    if self.lex_directive(state) {
+                        at_line_start = false;
+                        continue;
                     }
-                    '\n' | '\r' => {
-                        self.lex_newline(state);
+                    self.lex_text(state);
+                }
+                '"' => {
+                    self.lex_string(state);
+                }
+                '{' => self.single(state, PlantUmlTokenType::LeftBrace),
+                '}' => self.single(state, PlantUmlTokenType::RightBrace),
+                '(' => self.single(state, PlantUmlTokenType::LeftParen),
+                ')' => self.single(state, PlantUmlTokenType::RightParen),
+                '+' => self.single(state, PlantUmlTokenType::Plus),
+                '#' => self.single(state, PlantUmlTokenType::Hash),
+                ':' => self.single(state, PlantUmlTokenType::Colon),
+                _ => {
+                    if self.lex_arrow(state) {
                     }
-                    '/' => {
-                        if self.lex_comment(state) {
-                            continue;
-                        }
-                        self.lex_text(state);
+                    else if ch == '-' {
+                        self.single(state, PlantUmlTokenType::Minus);
                     }
-                    '@' => {
-                        if self.lex_directive(state) {
-                            continue;
-                        }
-                        self.lex_text(state);
+                    else if self.lex_keyword(state) {
                     }
-                    'c' => {
-                        if state.starts_with("class") {
-                            self.lex_keyword(state, "class", PlantUmlTokenType::Class);
-                            continue;
-                        }
+                    else if is_identifier_start(ch) {
                         self.lex_identifier(state);
                     }
-                    'i' => {
-                        if state.starts_with("interface") {
-                            self.lex_keyword(state, "interface", PlantUmlTokenType::Interface);
-                            continue;
-                        }
-                        self.lex_identifier(state);
-                    }
-                    'a'..='z' | 'A'..='Z' | '_' => {
-                        self.lex_identifier(state);
-                    }
-                    '"' => {
-                        self.lex_string(state);
-                    }
-                    _ => {
+                    else {
                         self.lex_text(state);
                     }
                 }
             }
 
             if state.get_position() == safe_point {
-                // Handle deadlock by advancing one character
-                let start_pos = state.get_position();
-                if let Some(ch) = state.peek() {
-                    state.advance(ch.len_utf8());
-                    state.add_token(PlantUmlTokenType::Error, start_pos, state.get_position());
-                }
+                let start = state.get_position();
+                let Some(ch) = state.peek()
+                else {
+                    break;
+                };
+                state.advance(ch.len_utf8());
+                state.add_token(PlantUmlTokenType::Error, start, state.get_position());
+                let error = state.source().syntax_error("unexpected character in PlantUML input".to_string(), start);
+                state.add_error(error);
             }
+
+            at_line_start = false;
         }
+
         Ok(())
     }
 
-    /// Skips whitespace
-    fn skip_whitespace<S: Source + ?Sized>(&self, state: &mut State<S>) -> bool {
-        let start_pos = state.get_position();
-
+    fn skip_whitespace<S: Source + ?Sized>(&self, state: &mut LexerState<'_, S, PlantUmlLanguage>) {
+        let start = state.get_position();
         while let Some(ch) = state.peek() {
             if ch == ' ' || ch == '\t' {
                 state.advance(ch.len_utf8());
@@ -91,31 +104,47 @@ impl<'config> PlantUmlLexer<'config> {
                 break;
             }
         }
-
-        if state.get_position() > start_pos {
-            state.add_token(PlantUmlTokenType::Whitespace, start_pos, state.get_position());
-            true
-        }
-        else {
-            false
+        if state.get_position() > start {
+            state.add_token(PlantUmlTokenType::Whitespace, start, state.get_position());
         }
     }
 
-    /// Handles newlines
-    fn lex_newline<S: Source + ?Sized>(&self, state: &mut State<S>) -> bool {
-        let start_pos = state.get_position();
-
-        if let Some('\n') = state.peek() {
-            state.advance(1);
-            state.add_token(PlantUmlTokenType::Newline, start_pos, state.get_position());
-            true
-        }
-        else if let Some('\r') = state.peek() {
+    fn lex_newline<S: Source + ?Sized>(&self, state: &mut LexerState<'_, S, PlantUmlLanguage>) {
+        let start = state.get_position();
+        if let Some('\r') = state.peek() {
             state.advance(1);
             if let Some('\n') = state.peek() {
                 state.advance(1);
             }
-            state.add_token(PlantUmlTokenType::Newline, start_pos, state.get_position());
+        }
+        else {
+            state.advance(1);
+        }
+        state.add_token(PlantUmlTokenType::Newline, start, state.get_position());
+    }
+
+    fn lex_comment<S: Source + ?Sized>(&self, state: &mut LexerState<'_, S, PlantUmlLanguage>) {
+        let start = state.get_position();
+        while let Some(ch) = state.peek() {
+            if ch == '\n' || ch == '\r' {
+                break;
+            }
+            state.advance(ch.len_utf8());
+        }
+        state.add_token(PlantUmlTokenType::Comment, start, state.get_position());
+    }
+
+    fn lex_directive<S: Source + ?Sized>(&self, state: &mut LexerState<'_, S, PlantUmlLanguage>) -> bool {
+        if matches_word(state, "@startuml") {
+            let start = state.get_position();
+            state.advance("@startuml".len());
+            state.add_token(PlantUmlTokenType::StartMarker, start, state.get_position());
+            true
+        }
+        else if matches_word(state, "@enduml") {
+            let start = state.get_position();
+            state.advance("@enduml".len());
+            state.add_token(PlantUmlTokenType::EndMarker, start, state.get_position());
             true
         }
         else {
@@ -123,137 +152,124 @@ impl<'config> PlantUmlLexer<'config> {
         }
     }
 
-    /// Handles comments
-    fn lex_comment<S: Source + ?Sized>(&self, state: &mut State<S>) -> bool {
-        let start_pos = state.get_position();
+    fn lex_string<S: Source + ?Sized>(&self, state: &mut LexerState<'_, S, PlantUmlLanguage>) {
+        let start = state.get_position();
+        state.advance(1);
+        let mut closed = false;
 
-        if state.peek() == Some('/') {
-            // Check if it's a comment (starts with //)
-            if state.source().get_char_at(start_pos + 1) == Some('/') {
-                state.advance(2);
-                while state.not_at_end() {
-                    if let Some(ch) = state.peek() {
-                        if ch == '\n' || ch == '\r' {
-                            break;
-                        }
-                        state.advance(ch.len_utf8());
-                    }
-                    else {
-                        break;
-                    }
+        while let Some(ch) = state.peek() {
+            if ch == '\n' || ch == '\r' {
+                break;
+            }
+            if ch == '\\' {
+                state.advance(1);
+                if let Some(next) = state.peek() {
+                    state.advance(next.len_utf8());
                 }
-                state.add_token(PlantUmlTokenType::Comment, start_pos, state.get_position());
-                return true;
+                continue;
             }
-        }
-        false
-    }
-
-    /// Handles directives like @startuml and @enduml
-    fn lex_directive<S: Source + ?Sized>(&self, state: &mut State<S>) -> bool {
-        let start_pos = state.get_position();
-
-        if state.peek() == Some('@') {
-            state.advance(1);
-            if state.starts_with("startuml") {
-                state.advance(8);
-                state.add_token(PlantUmlTokenType::StartUml, start_pos, state.get_position());
-                return true;
-            }
-            else if state.starts_with("enduml") {
-                state.advance(6);
-                state.add_token(PlantUmlTokenType::EndUml, start_pos, state.get_position());
-                return true;
-            }
-            state.set_position(start_pos);
-        }
-        false
-    }
-
-    /// Handles keywords
-    fn lex_keyword<S: Source + ?Sized>(&self, state: &mut State<S>, keyword: &str, token_type: PlantUmlTokenType) {
-        let start_pos = state.get_position();
-        state.advance(keyword.len());
-        state.add_token(token_type, start_pos, state.get_position());
-    }
-
-    /// Handles identifiers
-    fn lex_identifier<S: Source + ?Sized>(&self, state: &mut State<S>) {
-        let start_pos = state.get_position();
-
-        while state.not_at_end() {
-            if let Some(ch) = state.peek() {
-                if ch.is_alphanumeric() || ch == '_' {
-                    state.advance(ch.len_utf8());
-                }
-                else {
-                    break;
-                }
-            }
-            else {
+            state.advance(ch.len_utf8());
+            if ch == '"' {
+                closed = true;
                 break;
             }
         }
 
-        state.add_token(PlantUmlTokenType::Id, start_pos, state.get_position());
-    }
-
-    /// Handles strings (labels)
-    fn lex_string<S: Source + ?Sized>(&self, state: &mut State<S>) {
-        let start_pos = state.get_position();
-
-        if state.peek() == Some('"') {
-            state.advance(1);
-            while state.not_at_end() {
-                if let Some(ch) = state.peek() {
-                    if ch == '"' {
-                        state.advance(1);
-                        state.add_token(PlantUmlTokenType::Label, start_pos, state.get_position());
-                        return;
-                    }
-                    state.advance(ch.len_utf8());
-                }
-                else {
-                    break;
-                }
-            }
-            // Unclosed string
-            state.add_token(PlantUmlTokenType::Error, start_pos, state.get_position());
+        let kind = if closed { PlantUmlTokenType::String } else { PlantUmlTokenType::Error };
+        state.add_token(kind, start, state.get_position());
+        if !closed {
+            let error = state.source().syntax_error("unterminated PlantUML string".to_string(), start);
+            state.add_error(error);
         }
     }
 
-    /// Lexes plain text
-    fn lex_text<S: Source + ?Sized>(&self, state: &mut State<S>) -> bool {
-        let start_pos = state.get_position();
+    fn lex_arrow<S: Source + ?Sized>(&self, state: &mut LexerState<'_, S, PlantUmlLanguage>) -> bool {
+        const ARROWS: &[&str] = &["-->>", "->>", "-->", "->", "<|--", "--|>", "--*", "*--", "--o", "o--", "<..", "..>", "<--", ".."];
 
-        while state.not_at_end() {
-            if let Some(ch) = state.peek() {
-                // Stop when encountering special characters
-                match ch {
-                    ' ' | '\t' | '\n' | '\r' | '/' | '@' | '"' => break,
-                    _ => {
-                        state.advance(ch.len_utf8());
-                    }
-                }
-            }
-            else {
+        let mut matched = None;
+        for arrow in ARROWS {
+            if state.starts_with(arrow) {
+                matched = Some(*arrow);
                 break;
             }
         }
 
-        if state.get_position() > start_pos {
-            state.add_token(PlantUmlTokenType::Id, start_pos, state.get_position());
-            true
-        }
+        let Some(arrow) = matched
         else {
-            false
+            return false;
+        };
+
+        let start = state.get_position();
+        state.advance(arrow.len());
+        state.add_token(PlantUmlTokenType::Arrow, start, state.get_position());
+        true
+    }
+
+    fn lex_keyword<S: Source + ?Sized>(&self, state: &mut LexerState<'_, S, PlantUmlLanguage>) -> bool {
+        const KEYWORDS: &[(&str, PlantUmlTokenType)] = &[
+            ("deactivate", PlantUmlTokenType::Deactivate),
+            ("participant", PlantUmlTokenType::Participant),
+            ("abstract", PlantUmlTokenType::Abstract),
+            ("activate", PlantUmlTokenType::Activate),
+            ("interface", PlantUmlTokenType::Interface),
+            ("actor", PlantUmlTokenType::Actor),
+            ("class", PlantUmlTokenType::Class),
+            ("enum", PlantUmlTokenType::Enum),
+            ("as", PlantUmlTokenType::As),
+        ];
+
+        for (word, kind) in KEYWORDS {
+            if matches_word(state, word) {
+                let start = state.get_position();
+                state.advance(word.len());
+                state.add_token(*kind, start, state.get_position());
+                return true;
+            }
         }
+        false
+    }
+
+    fn lex_identifier<S: Source + ?Sized>(&self, state: &mut LexerState<'_, S, PlantUmlLanguage>) {
+        let start = state.get_position();
+
+        while let Some(ch) = state.peek() {
+            if is_identifier_continue(ch) {
+                state.advance(ch.len_utf8());
+            }
+            else if ch == '.' && state.peek_next().is_some_and(is_identifier_continue) {
+                state.advance(1);
+            }
+            else {
+                break;
+            }
+        }
+
+        state.add_token(PlantUmlTokenType::Identifier, start, state.get_position());
+    }
+
+    fn lex_text<S: Source + ?Sized>(&self, state: &mut LexerState<'_, S, PlantUmlLanguage>) {
+        let start = state.get_position();
+
+        while let Some(ch) = state.peek() {
+            if ch.is_whitespace() || matches!(ch, '"' | '@' | '{' | '}' | '(' | ')' | '+' | '#' | ':') {
+                break;
+            }
+            state.advance(ch.len_utf8());
+        }
+
+        state.add_token(PlantUmlTokenType::Text, start, state.get_position());
+    }
+
+    fn single<S: Source + ?Sized>(&self, state: &mut LexerState<'_, S, PlantUmlLanguage>, kind: PlantUmlTokenType) {
+        let start = state.get_position();
+        state.advance(1);
+        state.add_token(kind, start, state.get_position());
     }
 }
 
 impl<'config> Lexer<PlantUmlLanguage> for PlantUmlLexer<'config> {
     fn lex<'a, S: Source + ?Sized>(&self, text: &'a S, _edits: &[TextEdit], cache: &'a mut impl LexerCache<PlantUmlLanguage>) -> LexOutput<PlantUmlLanguage> {
-        let mut state = State::new(text);
+        let mut state = LexerState::new(text);
         let result = self.run(&mut state);
         if result.is_ok() {
             state.add_eof();
@@ -262,11 +278,24 @@ impl<'config> Lexer<PlantUmlLanguage> for PlantUmlLexer<'config> {
     }
 }
 
-impl<'config> PlantUmlLexer<'config> {
-    /// Runs the lexer on the given source and returns the output.
-    pub fn lex_internal<'a, S: Source + ?Sized>(&self, source: &'a S) -> LexOutput<PlantUmlLanguage> {
-        let mut state = State::new(source);
-        let result = self.run(&mut state);
-        state.finish(result)
+/// Returns `true` when the source at the current position starts with the word,
+/// compared ASCII-case-insensitively and followed by a non-identifier character.
+fn matches_word<S: Source + ?Sized>(state: &mut LexerState<'_, S, PlantUmlLanguage>, word: &str) -> bool {
+    let text = state.get_text_from(state.get_position());
+    let Some(head) = text.get(..word.len())
+    else {
+        return false;
+    };
+    if !head.eq_ignore_ascii_case(word) {
+        return false;
     }
+    text.get(word.len()..).and_then(|tail| tail.chars().next()).is_none_or(|ch| !is_identifier_continue(ch))
+}
+
+fn is_identifier_start(ch: char) -> bool {
+    ch.is_alphabetic() || ch == '_' || ch == '$'
+}
+
+fn is_identifier_continue(ch: char) -> bool {
+    ch.is_alphanumeric() || ch == '_' || ch == '$'
 }

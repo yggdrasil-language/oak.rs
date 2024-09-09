@@ -1,18 +1,21 @@
+#![doc = include_str!("readme.md")]
 #![feature(new_range_api)]
 #![warn(missing_docs)]
-//! PlantUML support for the Oak language framework.
 
-/// Abstract Syntax Tree (AST) for PlantUML.
+/// Abstract syntax tree for PlantUML class and sequence diagrams.
 pub mod ast;
-/// Language configuration for PlantUML.
+/// Builder that lowers the PlantUML green tree into the typed AST.
+pub mod builder;
+/// PlantUML language configuration.
 pub mod language;
-/// Lexer for PlantUML tokenization.
+/// Line-aware lexer for the PlantUML subset.
 pub mod lexer;
-/// Parser for PlantUML syntax analysis.
+/// Parser that groups PlantUML statements into green-tree elements.
 pub mod parser;
 
 pub use crate::{
     ast::PlantUmlRoot,
+    builder::PlantUmlBuilder,
     language::PlantUmlLanguage,
     lexer::{PlantUmlLexer, token_type::PlantUmlTokenType},
     parser::{PlantUmlParser, element_type::PlantUmlElementType},
