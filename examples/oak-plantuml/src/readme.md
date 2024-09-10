@@ -21,7 +21,7 @@ enum Color
 Foo "1" --> "many" Bar : uses
 ```
 
-- `+`, `-` and `#` select public, private and protected visibility.
+- `+`, `-`, `#` and `~` select public, private, protected and package visibility.
 - Member text is everything after the visibility marker, trimmed. A member is a method when its text contains `(`.
 - Relations normalize `-->`, `<--`, `<|--`, `--|>`, `*--`, `--*`, `o--`, `--o`, `..>`, `<..` and `..` into `ClassRelationKind` plus `marker_at_left`.
 

@@ -67,6 +67,8 @@ pub enum PlantUmlElementType {
     Minus,
     /// The `#` token.
     Hash,
+    /// The `~` token.
+    Tilde,
     /// The `:` token.
     Colon,
     /// An identifier.
@@ -94,7 +96,7 @@ impl ElementType for PlantUmlElementType {
             Self::Comment => UniversalElementRole::Documentation,
             Self::StartMarker | Self::EndMarker | Self::Trivia => UniversalElementRole::Metadata,
             Self::Class | Self::Interface | Self::Abstract | Self::Enum | Self::Participant | Self::Actor | Self::As => UniversalElementRole::Metadata,
-            Self::Arrow | Self::LeftBrace | Self::RightBrace | Self::LeftParen | Self::RightParen | Self::Plus | Self::Minus | Self::Hash | Self::Colon | Self::Identifier | Self::String | Self::Text | Self::Error | Self::Eof => {
+            Self::Arrow | Self::LeftBrace | Self::RightBrace | Self::LeftParen | Self::RightParen | Self::Plus | Self::Minus | Self::Hash | Self::Tilde | Self::Colon | Self::Identifier | Self::String | Self::Text | Self::Error | Self::Eof => {
                 UniversalElementRole::Metadata
             }
         }
@@ -125,6 +127,7 @@ impl From<PlantUmlTokenType> for PlantUmlElementType {
             PlantUmlTokenType::Plus => Self::Plus,
             PlantUmlTokenType::Minus => Self::Minus,
             PlantUmlTokenType::Hash => Self::Hash,
+            PlantUmlTokenType::Tilde => Self::Tilde,
             PlantUmlTokenType::Colon => Self::Colon,
             PlantUmlTokenType::Identifier => Self::Identifier,
             PlantUmlTokenType::String => Self::String,

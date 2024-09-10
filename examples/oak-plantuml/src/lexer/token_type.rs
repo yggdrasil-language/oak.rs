@@ -59,6 +59,8 @@ pub enum PlantUmlTokenType {
     Minus,
     /// The `#` protected visibility marker.
     Hash,
+    /// The `~` package visibility marker.
+    Tilde,
     /// The `:` label separator.
     Colon,
 
@@ -87,7 +89,7 @@ impl TokenType for PlantUmlTokenType {
             Self::Identifier | Self::Text => UniversalTokenRole::Name,
             Self::String => UniversalTokenRole::Literal,
             Self::Class | Self::Interface | Self::Abstract | Self::Enum | Self::Participant | Self::Actor | Self::Activate | Self::Deactivate | Self::As => UniversalTokenRole::Keyword,
-            Self::Arrow | Self::Colon | Self::Plus | Self::Minus | Self::Hash => UniversalTokenRole::Operator,
+            Self::Arrow | Self::Colon | Self::Plus | Self::Minus | Self::Hash | Self::Tilde => UniversalTokenRole::Operator,
             Self::LeftBrace | Self::RightBrace | Self::LeftParen | Self::RightParen => UniversalTokenRole::Punctuation,
             Self::StartMarker | Self::EndMarker => UniversalTokenRole::Keyword,
             Self::Comment => UniversalTokenRole::Comment,
