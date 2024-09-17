@@ -9,6 +9,8 @@ pub enum TypeScriptElementType {
     NamedImports,
     /// A decorator.
     Decorator,
+    /// A dynamic `import(…)` expression.
+    ImportExpression,
     /// An arrow function.
     ArrowFunction,
     /// A predefined type.

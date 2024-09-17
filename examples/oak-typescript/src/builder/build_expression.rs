@@ -265,6 +265,20 @@ impl<'config> TypeScriptBuilder<'config> {
 
                 if object.is_some() && property.is_some() { Ok(Some(Expression::new(ExpressionKind::MemberExpression { object: Box::new(object.unwrap()), property: Box::new(property.unwrap()), computed, optional }, span.into()))) } else { Ok(None) }
             }
+            TypeScriptElementType::ImportExpression => {
+                let mut module_specifier = None;
+                for child in node.children() {
+                    if let RedTree::Node(child_node) = child {
+                        if module_specifier.is_none() {
+                            module_specifier = self.build_expression(&child_node, source)?;
+                        }
+                    }
+                }
+                match module_specifier {
+                    Some(module_specifier) => Ok(Some(Expression::new(ExpressionKind::ImportExpression { module_specifier: Box::new(module_specifier) }, span.into()))),
+                    None => Ok(None),
+                }
+            }
             TypeScriptElementType::AwaitExpression => {
                 let mut argument = None;
                 for child in node.children() {

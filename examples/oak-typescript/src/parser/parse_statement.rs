@@ -2,7 +2,7 @@ use crate::{
     lexer::token_type::TypeScriptTokenType,
     parser::{State, TypeScriptParser},
 };
-use oak_core::{OakError, TokenType, parser::pratt::PrattParser, source::Source};
+use oak_core::{OakError, parser::pratt::PrattParser, source::Source};
 
 impl<'config> TypeScriptParser<'config> {
     pub(crate) fn parse_statement<'a, S: Source + ?Sized>(&self, state: &mut State<'a, S>) -> Result<(), OakError> {
@@ -84,8 +84,9 @@ impl<'config> TypeScriptParser<'config> {
                     self.parse_namespace_declaration(state)?;
                 }
                 Some(Import) => {
-                    if state.peek_non_trivia_kind_at(1) == Some(Dot) {
-                        // `import.meta` at the statement head is an expression, not a declaration.
+                    // `import.meta` and `import(…)` at the statement head are
+                    // expressions, not declarations.
+                    if matches!(state.peek_non_trivia_kind_at(1), Some(Dot) | Some(LeftParen)) {
                         PrattParser::parse(state, 0, self);
                         self.skip_trivia(state);
                         state.eat(Semicolon);

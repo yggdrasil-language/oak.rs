@@ -28,6 +28,10 @@ impl<'config> TypeScriptParser<'config> {
                     self.expect(state, IdentifierName).ok();
                     state.finish_at(cp, crate::parser::element_type::TypeScriptElementType::MetaProperty)
                 }
+                else if self.at(state, LeftParen) {
+                    self.parse_import_expression_arguments(state);
+                    state.finish_at(cp, crate::parser::element_type::TypeScriptElementType::ImportExpression)
+                }
                 else {
                     state.finish_at(cp, crate::parser::element_type::TypeScriptElementType::IdentifierName)
                 }
@@ -332,10 +336,8 @@ impl<'config> TypeScriptParser<'config> {
                 }
                 else {
                     state.bump();
-                    self.expect(state, LeftParen).ok();
-                    PrattParser::parse(state, 0, self);
-                    self.expect(state, RightParen).ok();
-                    state.finish_at(cp, crate::parser::element_type::TypeScriptElementType::CallExpression.into()) // We can use CallExpression kind for now, or a new one
+                    self.parse_import_expression_arguments(state);
+                    state.finish_at(cp, crate::parser::element_type::TypeScriptElementType::ImportExpression)
                 }
             }
             Some(New) => {
@@ -354,6 +356,22 @@ impl<'config> TypeScriptParser<'config> {
             }
             _ => self.primary(state),
         }
+    }
+
+    /// Parse the argument list of `import(…)`.
+    ///
+    /// The AST keeps the module specifier only. An optional second argument
+    /// (import attributes) is consumed so the expression stays well formed.
+    fn parse_import_expression_arguments<'a, S: Source + ?Sized>(&self, state: &mut State<'a, S>) {
+        use crate::lexer::token_type::TypeScriptTokenType::*;
+        self.expect(state, LeftParen).ok();
+        while state.not_at_end() && !self.at(state, RightParen) {
+            PrattParser::parse(state, 0, self);
+            if !self.eat(state, Comma) {
+                break;
+            }
+        }
+        self.expect(state, RightParen).ok();
     }
 
     pub(crate) fn infix<'a, S: Source + ?Sized>(&self, state: &mut State<'a, S>, left: &'a GreenNode<'a, crate::language::TypeScriptLanguage>, min_precedence: u8) -> Option<&'a GreenNode<'a, crate::language::TypeScriptLanguage>> {
