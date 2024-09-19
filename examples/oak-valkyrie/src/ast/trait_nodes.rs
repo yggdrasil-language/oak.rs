@@ -76,6 +76,13 @@ pub struct ImplyDeclaration {
     pub target_type: TypeExpression,
     /// Optional trait or protocol being implemented.
     pub trait_type: Option<TypeExpression>,
+    /// Associated type equations defined in the imply block (`type Item = U`).
+    ///
+    /// These are the impl-side bindings for the trait's associated types. They are
+    /// kept as first-class nodes: dropping them here would force downstream phases
+    /// to reconstruct the equation from member signatures, which guesses type
+    /// identity whenever an associated type is projected or duplicated.
+    pub associated_types: Vec<AssociatedType>,
     /// Methods defined in the imply block.
     pub methods: Vec<MethodDeclaration>,
     /// The source code span.
