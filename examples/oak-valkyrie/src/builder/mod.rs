@@ -20,8 +20,10 @@ mod build_unary;
 mod build_where;
 mod utils;
 
+use core::cell::RefCell;
+
 use crate::{ValkyrieLanguage, ValkyrieParser};
-use oak_core::{Builder, BuilderCache, OakDiagnostics, Parser, TextEdit, builder::BuildOutput, source::Source};
+use oak_core::{Builder, BuilderCache, OakDiagnostics, OakError, Parser, TextEdit, builder::BuildOutput, source::Source};
 
 /// Extracts text from source using a range.
 ///
@@ -67,6 +69,9 @@ pub(crate) fn identifier_text(source: &(impl Source + ?Sized), range: oak_core::
 /// ```
 pub struct ValkyrieBuilder<'config> {
     config: &'config ValkyrieLanguage,
+    /// 成员级构建失败的可恢复错误。调用方跳过该成员继续构建兄弟节点，
+    /// 这些错误由 [`Builder::build`] 统一并入 `OakDiagnostics`。
+    recoverable: RefCell<Vec<OakError>>,
 }
 
 impl<'config> ValkyrieBuilder<'config> {
@@ -78,7 +83,21 @@ impl<'config> ValkyrieBuilder<'config> {
     /// # Returns
     /// A new instance of `ValkyrieBuilder`.
     pub fn new(config: &'config ValkyrieLanguage) -> Self {
-        Self { config }
+        Self { config, recoverable: RefCell::new(Vec::new()) }
+    }
+
+    /// 记录一条可恢复的成员构建错误并返回 `None`，表示跳过该成员。
+    ///
+    /// 同层其余成员继续构建，错误随 `build` 结果一起进入 `OakDiagnostics`；
+    /// 失败的成员不再凭空消失且零诊断。
+    pub(crate) fn recover_member<T>(&self, result: Result<T, OakError>) -> Option<T> {
+        match result {
+            Ok(value) => Some(value),
+            Err(error) => {
+                self.recoverable.borrow_mut().push(error);
+                None
+            }
+        }
     }
 }
 
@@ -97,17 +116,20 @@ impl<'config> Builder<ValkyrieLanguage> for ValkyrieBuilder<'config> {
 
         let mut parse_cache = oak_core::parser::session::ParseSession::<ValkyrieLanguage>::default();
         let parse_result = parser.parse(source, edits, &mut parse_cache);
+        let mut diagnostics = parse_result.diagnostics;
 
-        match parse_result.result {
+        let result = match parse_result.result {
             Ok(green_tree) => match self.build_root(green_tree, source) {
-                Ok(ast_root) => OakDiagnostics { result: Ok(ast_root), diagnostics: parse_result.diagnostics },
+                Ok(ast_root) => Ok(ast_root),
                 Err(build_error) => {
-                    let mut diagnostics = parse_result.diagnostics;
                     diagnostics.push(build_error.clone());
-                    OakDiagnostics { result: Err(build_error), diagnostics }
+                    Err(build_error)
                 }
             },
-            Err(e) => OakDiagnostics { result: Err(e), diagnostics: parse_result.diagnostics },
-        }
+            Err(e) => Err(e),
+        };
+        // 成员级可恢复错误与解析/致命诊断走同一通道返回，不再静默丢弃。
+        diagnostics.extend(self.recoverable.borrow_mut().drain(..));
+        OakDiagnostics { result, diagnostics }
     }
 }
