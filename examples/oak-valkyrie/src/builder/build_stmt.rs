@@ -142,6 +142,7 @@ impl<'config> ValkyrieBuilder<'config> {
 
     pub(crate) fn build_using<S: Source + ?Sized>(&self, node: RedNode<ValkyrieLanguage>, source: &S) -> Result<UsingDeclaration, OakError> {
         let span = node.span();
+        let mut primary = false;
         let mut path = NamePath { parts: Vec::new(), span: Default::default() };
         let mut alias = None;
         let mut imports = Vec::new();
@@ -151,6 +152,10 @@ impl<'config> ValkyrieBuilder<'config> {
             match child {
                 RedTree::Leaf(t) => match t.kind {
                     ValkyrieTokenType::Whitespace | ValkyrieTokenType::Newline | ValkyrieTokenType::LineComment | ValkyrieTokenType::BlockComment => continue,
+                    // `using!`：`Bang` 位于路径之前，是主空间导入身份，不是别名或符号。
+                    ValkyrieTokenType::Bang if path.parts.is_empty() && imports.is_empty() && alias.is_none() && !in_import_list => {
+                        primary = true;
+                    }
                     ValkyrieTokenType::BraceL => {
                         in_import_list = true;
                     }
@@ -174,7 +179,10 @@ impl<'config> ValkyrieBuilder<'config> {
                 }
             }
         }
-        Ok(UsingDeclaration { path, alias, imports, span })
+        if path.parts.is_empty() {
+            return Err(source.syntax_error("using declaration requires a name path".to_string(), span.start));
+        }
+        Ok(UsingDeclaration { primary, path, alias, imports, span })
     }
 
     pub(crate) fn build_effect<S: Source + ?Sized>(&self, node: RedNode<ValkyrieLanguage>, source: &S) -> Result<Effect, OakError> {

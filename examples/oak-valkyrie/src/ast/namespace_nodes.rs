@@ -20,6 +20,12 @@ use crate::{
 pub struct NamespaceDeclaration {
     /// Annotations applied to the namespace.
     pub annotations: Vec<Attribute>,
+    /// 是否为 `namespace!` 主空间声明。
+    ///
+    /// `namespace!` 是独立构造，不是普通 `namespace` 的别名；身份必须保留到这里，
+    /// 由语言 frontend 校验「全工程唯一」与 `using!` 的放置。
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub primary: bool,
     /// The name path of the namespace.
     pub name: NamePath,
     /// 该 namespace 是否有 body。
@@ -52,6 +58,12 @@ impl NamespaceDeclaration {
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct UsingDeclaration {
+    /// 是否为 `using!` 主空间导入。
+    ///
+    /// `using!` 只能在 `namespace!` 内使用，其导入在所有 namespace 共享；
+    /// 普通 `using` 是文件局部导入。两者身份不得以空 `path` 或同名节点混同。
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub primary: bool,
     /// The path to import.
     pub path: NamePath,
     /// Optional alias for the import.

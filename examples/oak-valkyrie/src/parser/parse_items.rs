@@ -190,8 +190,13 @@ pub(crate) fn parse_namespace<S: oak_core::Source + ?Sized>(state: &mut State<'_
     let cp = state.sink.checkpoint();
     state.bump();
     // File-level namespace declaration: `namespace! core::types;`.
+    // `!` 是主空间身份，保留在 CST；AST 由 builder 记录 `primary`。
     if state.at(ValkyrieTokenType::Bang) {
         state.bump();
+    }
+    if !matches!(state.current().map(|token| &token.kind), Some(ValkyrieTokenType::Identifier | ValkyrieTokenType::Keyword(_))) {
+        let offset = state.current().map(|token| token.span.start).unwrap_or(0);
+        return Err(state.source.syntax_error("namespace declaration requires a name path".to_string(), offset));
     }
     parse_name_path(state)?;
     if state.at(ValkyrieTokenType::BraceL) {
@@ -721,10 +726,16 @@ pub(crate) fn parse_trait<S: oak_core::Source + ?Sized>(state: &mut State<'_, S>
 pub(crate) fn parse_using<S: oak_core::Source + ?Sized>(state: &mut State<'_, S>) -> Result<(), oak_core::OakError> {
     let cp = state.sink.checkpoint();
     state.bump();
-    parse_name_path(state)?;
-    if state.at(ValkyrieTokenType::ColonColon) {
+    // `using!` 是主空间专属导入构造，不是 `using` 的别名：必须消费 `Bang`，
+    // 让身份留在 CST（builder 记录到 `UsingDeclaration.primary`）。
+    if state.at(ValkyrieTokenType::Bang) {
         state.bump();
     }
+    if !matches!(state.current().map(|token| &token.kind), Some(ValkyrieTokenType::Identifier | ValkyrieTokenType::Keyword(_))) {
+        let offset = state.current().map(|token| token.span.start).unwrap_or(0);
+        return Err(state.source.syntax_error("using declaration requires a name path".to_string(), offset));
+    }
+    parse_using_name_path(state)?;
     if state.at(ValkyrieTokenType::BraceL) {
         state.bump();
         while state.not_at_end() && !state.at(ValkyrieTokenType::BraceR) {
@@ -743,14 +754,36 @@ pub(crate) fn parse_using<S: oak_core::Source + ?Sized>(state: &mut State<'_, S>
     }
     if state.at(ValkyrieTokenType::Keyword(ValkyrieKeywords::As)) {
         state.bump();
-        if state.at(ValkyrieTokenType::Identifier) {
-            state.bump();
+        if !state.at(ValkyrieTokenType::Identifier) {
+            let offset = state.current().map(|token| token.span.start).unwrap_or(0);
+            return Err(state.source.syntax_error("using alias requires an identifier".to_string(), offset));
         }
+        state.bump();
     }
     if state.at(ValkyrieTokenType::Semicolon) {
         state.bump();
     }
     state.sink.finish_node(cp, ValkyrieElementType::UsingStatement);
+    Ok(())
+}
+
+/// 解析导入路径：空路径、尾随 `::`/`.` 与尾随分隔符后接非名字，都是畸形导入。
+fn parse_using_name_path<S: oak_core::Source + ?Sized>(state: &mut State<'_, S>) -> Result<(), oak_core::OakError> {
+    let cp = state.sink.checkpoint();
+    state.bump();
+    while state.at(ValkyrieTokenType::ColonColon) || state.at(ValkyrieTokenType::Dot) {
+        let separator_offset = state.current().map(|token| token.span.start).unwrap_or(0);
+        state.bump();
+        // `using path::{A, B}` 的分隔符后直接接选择列表，是合法形态。
+        if state.at(ValkyrieTokenType::BraceL) {
+            break;
+        }
+        if !matches!(state.current().map(|token| &token.kind), Some(ValkyrieTokenType::Identifier | ValkyrieTokenType::Keyword(_))) {
+            return Err(state.source.syntax_error("using path must not end with a path separator".to_string(), separator_offset));
+        }
+        state.bump();
+    }
+    state.sink.finish_node(cp, ValkyrieElementType::NamePath);
     Ok(())
 }
 

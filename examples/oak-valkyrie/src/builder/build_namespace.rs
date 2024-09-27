@@ -10,6 +10,7 @@ use oak_core::{OakError, RedNode, RedTree, Source};
 impl<'config> ValkyrieBuilder<'config> {
     pub(crate) fn build_namespace<S: Source + ?Sized>(&self, node: RedNode<ValkyrieLanguage>, source: &S) -> Result<NamespaceDeclaration, OakError> {
         let span = node.span();
+        let mut primary = false;
         let mut name = NamePath { parts: Vec::new(), span: Default::default() };
         let mut annotations = Vec::new();
         let mut items = Vec::new();
@@ -20,6 +21,10 @@ impl<'config> ValkyrieBuilder<'config> {
             match child {
                 RedTree::Leaf(t) => match t.kind {
                     ValkyrieTokenType::Whitespace | ValkyrieTokenType::Newline | ValkyrieTokenType::LineComment | ValkyrieTokenType::BlockComment => continue,
+                    // `namespace!`：`Bang` 位于名字之前，是主空间身份，不是名字的一部分。
+                    ValkyrieTokenType::Bang if name.parts.is_empty() => {
+                        primary = true;
+                    }
                     ValkyrieTokenType::BraceL => {
                         has_body = true;
                         body_span = Some(t.span);
@@ -92,7 +97,10 @@ impl<'config> ValkyrieBuilder<'config> {
                 },
             }
         }
+        if name.parts.is_empty() {
+            return Err(source.syntax_error("namespace declaration requires a name path".to_string(), span.start));
+        }
         let body = if has_body { Some(ProgramBody { items, span: body_span.unwrap_or_else(|| span.clone()) }) } else { None };
-        Ok(NamespaceDeclaration { name, annotations, body, span })
+        Ok(NamespaceDeclaration { primary, name, annotations, body, span })
     }
 }
