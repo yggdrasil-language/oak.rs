@@ -7,12 +7,13 @@ use oak_core::parser::ParserState;
 
 type State<'a, S> = ParserState<'a, ValkyrieLanguage, S>;
 
-/// getter/setter 前的修饰符锚点（如 `virtual get area`）。
+/// 成员访问器/属性的修饰符锚点：修饰符由位置决定，任何标识符（含 raw id）都可出现在
+/// 这里（如 `get` / `set` / `getset`），不再依赖 `Keyword(Get|Set)` 的词法身份。
 pub(crate) fn is_member_accessor_keyword(kind: &ValkyrieTokenType) -> bool {
-    matches!(kind, ValkyrieTokenType::Keyword(ValkyrieKeywords::Get) | ValkyrieTokenType::Keyword(ValkyrieKeywords::Set))
+    matches!(kind, ValkyrieTokenType::Identifier)
 }
 
-/// 当前 token 是否可作为名字使用（标识符或 `get` / `set` / `from` 等软关键字）。
+/// 当前 token 是否可作为名字使用（标识符或 `union` / `flags` / `by` / `when` 等软关键字）。
 pub(crate) fn at_identifier_like<S: oak_core::Source + ?Sized>(state: &State<'_, S>) -> bool {
     state.current().is_some_and(|token| token.kind.is_soft_identifier())
 }
