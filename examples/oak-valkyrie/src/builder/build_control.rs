@@ -426,7 +426,7 @@ impl<'config> ValkyrieBuilder<'config> {
                             return Ok(Pattern::Wildcard(Box::new(WildcardPattern { span: t.span })));
                         }
                     }
-                    ValkyrieTokenType::Identifier => {
+                    kind if kind.is_soft_identifier() => {
                         if name_path.is_none() && fields.is_none() && nested_patterns.is_empty() && lone_identifier.is_none() && !saw_bracket {
                             let name = crate::builder::text(source, t.span);
                             lone_identifier = Some((Identifier { name, span: t.span }, t.span));
@@ -641,5 +641,51 @@ impl<'config> ValkyrieBuilder<'config> {
         }
 
         if let Some(name) = field_name { Ok(Some((name, field_pattern))) } else { Ok(None) }
+    }
+}
+
+#[cfg(test)]
+mod soft_identifier_pattern_tests {
+    use crate::{
+        ValkyrieBuilder, ValkyrieLanguage, ValkyrieRoot,
+        ast::{Pattern, StatementNode},
+    };
+    use oak_core::{Builder, OakDiagnostics, SourceText, parser::ParseSession};
+
+    fn build(source: &str) -> OakDiagnostics<ValkyrieRoot> {
+        let language = ValkyrieLanguage::default();
+        let builder = ValkyrieBuilder::new(&language);
+        let text = SourceText::new(source);
+        let mut session = ParseSession::<ValkyrieLanguage>::default();
+        builder.build(&text, &[], &mut session)
+    }
+
+    fn first_let_pattern(root: &ValkyrieRoot) -> &Pattern {
+        root.items
+            .iter()
+            .find_map(|item| match item {
+                StatementNode::Let(item) => Some(&item.pattern),
+                _ => None,
+            })
+            .expect("expected a let item")
+    }
+
+    /// 正例：软关键字 `by` 在绑定名位置按标识符处理，`let by` 必须产出
+    /// `VariablePattern`，不能掉进“不认识的叶子”兜底。
+    #[test]
+    fn soft_keyword_binding_builds_variable_pattern() {
+        let output = build("let by: i32 = 1; by");
+        assert!(output.diagnostics.is_empty(), "diagnostics: {:?}", output.diagnostics);
+        let root = output.result.unwrap_or_else(|error| panic!("let must build, got {error:?}"));
+        assert!(matches!(first_let_pattern(&root), Pattern::Variable(variable) if variable.name.name == "by"));
+    }
+
+    /// 正例：`get` / `set` 是普通标识符，绑定名同样走 `VariablePattern`。
+    #[test]
+    fn accessor_name_binding_builds_variable_pattern() {
+        let output = build("let set: i32 = 1; set");
+        assert!(output.diagnostics.is_empty(), "diagnostics: {:?}", output.diagnostics);
+        let root = output.result.unwrap_or_else(|error| panic!("let must build, got {error:?}"));
+        assert!(matches!(first_let_pattern(&root), Pattern::Variable(variable) if variable.name.name == "set"));
     }
 }
