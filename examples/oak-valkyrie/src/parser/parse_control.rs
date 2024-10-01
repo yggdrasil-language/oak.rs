@@ -1,7 +1,7 @@
 use crate::{
     ValkyrieLanguage,
     lexer::{keywords::ValkyrieKeywords, token_type::ValkyrieTokenType},
-    parser::{element_type::ValkyrieElementType, parse_blocks::parse_statement},
+    parser::{element_type::ValkyrieElementType, parse_blocks::parse_statement, parse_modifiers::at_identifier_like},
 };
 use oak_core::parser::ParserState;
 
@@ -173,7 +173,9 @@ fn parse_match_pattern<S: oak_core::Source + ?Sized>(state: &mut State<'_, S>) -
             return Err(state.source.syntax_error("数组模式缺少闭合方括号".into(), state.current_offset()));
         }
     }
-    else if state.at(ValkyrieTokenType::Identifier) {
+    // 模式位的名字按位置判定：`case by` / `case set` / `case union` 与普通标识符
+    // 等价，不按 `Identifier` 精确匹配。
+    else if at_identifier_like(state) {
         state.bump();
         if state.at(ValkyrieTokenType::ParenthesisL) {
             state.bump();
@@ -207,7 +209,7 @@ fn parse_match_pattern<S: oak_core::Source + ?Sized>(state: &mut State<'_, S>) -
                     break;
                 }
                 let before = state.checkpoint().0;
-                if state.at(ValkyrieTokenType::Identifier) || state.at(ValkyrieTokenType::Underscore) {
+                if at_identifier_like(state) || state.at(ValkyrieTokenType::Underscore) {
                     state.bump();
                     if state.at(ValkyrieTokenType::Colon) {
                         state.bump();
