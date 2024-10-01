@@ -7,9 +7,9 @@ use oak_core::parser::ParserState;
 
 type State<'a, S> = ParserState<'a, ValkyrieLanguage, S>;
 
-/// 成员访问器/属性的修饰符锚点：修饰符由位置决定，任何标识符（含 raw id）都可出现在
-/// 这里（如 `get` / `set` / `getset`），不再依赖 `Keyword(Get|Set)` 的词法身份。
-pub(crate) fn is_member_accessor_keyword(kind: &ValkyrieTokenType) -> bool {
+/// 成员名 token：成员产生式是“修饰符列表 + 名字”，这里只判 token 类别，不读文本。
+/// `get`、`set`、`getset`、`asjisdsf` 与 raw id 在语法上一律等价。
+pub(crate) fn is_member_name_token(kind: &ValkyrieTokenType) -> bool {
     matches!(kind, ValkyrieTokenType::Identifier)
 }
 
