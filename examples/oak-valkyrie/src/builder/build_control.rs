@@ -84,7 +84,7 @@ impl<'config> ValkyrieBuilder<'config> {
                     | crate::parser::element_type::ValkyrieElementType::LineComment
                     | crate::parser::element_type::ValkyrieElementType::BlockComment => continue,
                     crate::parser::element_type::ValkyrieElementType::MatchArm => {
-                        if let Ok(arm) = self.build_match_arm(n, source) {
+                        if let Some(arm) = self.recover_member(self.build_match_arm(n, source)) {
                             arms.push(arm);
                         }
                     }
@@ -561,7 +561,7 @@ impl<'config> ValkyrieBuilder<'config> {
                         }
                     }
                     crate::parser::element_type::ValkyrieElementType::IdentifierExpression => {
-                        if let Ok(expr) = self.build_identifier_expr(stmt_n.clone(), source) {
+                        if let Some(expr) = self.recover_member(self.build_identifier_expr(stmt_n.clone(), source)) {
                             if let TermExpression::NamePath(path) = expr {
                                 if let Some(ident) = path.parts.first().cloned() {
                                     fields.push((ident, None));
@@ -610,7 +610,7 @@ impl<'config> ValkyrieBuilder<'config> {
                     | crate::parser::element_type::ValkyrieElementType::BlockComment => continue,
                     crate::parser::element_type::ValkyrieElementType::IdentifierExpression => {
                         if field_name.is_none() {
-                            if let Ok(expr) = self.build_identifier_expr(n.clone(), source) {
+                            if let Some(expr) = self.recover_member(self.build_identifier_expr(n.clone(), source)) {
                                 if let TermExpression::NamePath(path) = expr {
                                     if let Some(ident) = path.parts.first().cloned() {
                                         field_name = Some(ident);
@@ -626,9 +626,8 @@ impl<'config> ValkyrieBuilder<'config> {
                     }
                     _ => {
                         if field_name.is_some() && field_pattern.is_none() {
-                            if let Ok(pattern) = self.build_pattern(n, source) {
-                                field_pattern = Some(pattern);
-                            }
+                            // 子模式构建失败时保留字段名，只丢子模式，并记录诊断。
+                            field_pattern = self.recover_member(self.build_pattern(n, source));
                         }
                     }
                 },
