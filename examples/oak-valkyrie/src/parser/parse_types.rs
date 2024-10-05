@@ -192,6 +192,11 @@ pub(crate) fn parse_generic_parameter_list<S: oak_core::Source + ?Sized>(state: 
 pub(crate) fn parse_generic_argument_list<S: oak_core::Source + ?Sized>(state: &mut State<'_, S>) -> Result<(), oak_core::OakError> {
     let cp = state.sink.checkpoint();
     state.bump();
+    // `Foo<>` / `type<>` 不是「无参应用」：空实参列表不产出任何节点却让类型位静默退化，
+    // 与 `Pattern::Wildcard` 兜底同族。这里直接报结构化语法错误，不进入空循环。
+    if state.at(ValkyrieTokenType::GreaterThan) {
+        return Err(state.source.syntax_error("泛型实参列表不能为空".to_string(), state.current().map(|t| t.span.start).unwrap_or(0)));
+    }
     while state.not_at_end() && !state.at(ValkyrieTokenType::GreaterThan) {
         let before = token_index(state);
         if state.at(ValkyrieTokenType::Identifier) && state.peek_non_trivia_kind_at(1) == Some(ValkyrieTokenType::Eq) {
