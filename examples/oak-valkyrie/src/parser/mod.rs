@@ -340,3 +340,134 @@ pub(crate) mod parse_string_segments;
 pub(crate) mod parse_template;
 pub(crate) mod parse_types;
 pub(crate) mod template_directive;
+
+#[cfg(test)]
+mod trait_member_tests {
+    use super::*;
+    use crate::{
+        ValkyrieBuilder, ValkyrieRoot,
+        ast::{ImplyDeclaration, MethodDeclaration, StatementNode, Trait},
+    };
+    use oak_core::{Builder, OakDiagnostics, SourceText, parser::ParseSession};
+
+    fn build(source: &str) -> OakDiagnostics<ValkyrieRoot> {
+        let language = ValkyrieLanguage::default();
+        let builder = ValkyrieBuilder::new(&language);
+        let text = SourceText::new(source);
+        let mut session = ParseSession::<ValkyrieLanguage>::default();
+        builder.build(&text, &[], &mut session)
+    }
+
+    fn root(source: &str) -> ValkyrieRoot {
+        let output = build(source);
+        assert!(output.diagnostics.is_empty(), "diagnostics: {:?}", output.diagnostics);
+        output.result.unwrap_or_else(|error| panic!("trait members must build, got {error:?}"))
+    }
+
+    fn trait_of<'root>(root: &'root ValkyrieRoot, name: &str) -> &'root Trait {
+        root.items
+            .iter()
+            .find_map(|item| match item {
+                StatementNode::Trait(trait_decl) if trait_decl.name.name == name => Some(trait_decl.as_ref()),
+                _ => None,
+            })
+            .unwrap_or_else(|| panic!("expected trait {name}"))
+    }
+
+    fn imply_of<'root>(root: &'root ValkyrieRoot) -> &'root ImplyDeclaration {
+        root.items
+            .iter()
+            .find_map(|item| match item {
+                StatementNode::Imply(imply) => Some(imply.as_ref()),
+                _ => None,
+            })
+            .expect("expected an imply block")
+    }
+
+    fn method<'a>(trait_decl: &'a Trait, name: &str) -> &'a MethodDeclaration {
+        trait_decl
+            .body
+            .methods
+            .iter()
+            .find(|method| method.name.name == name)
+            .unwrap_or_else(|| panic!("expected method {name}, got {:?}", trait_decl.body.methods.iter().map(|method| method.name.name.as_str()).collect::<Vec<_>>()))
+    }
+
+    fn annotations(method: &MethodDeclaration) -> Vec<&str> {
+        method.annotations.iter().map(|attribute| attribute.name.name.as_str()).collect()
+    }
+
+    /// `infix`/`suffix` 算子成员：修饰符进注解，raw id 是成员名，无体即纯声明。
+    #[test]
+    fn operator_member_without_body_stays_a_declaration() {
+        let root = root("trait Equal {\n    infix `==`(self, other: Self): bool\n}\n");
+        let equal = trait_of(&root, "Equal");
+        assert_eq!(equal.body.methods.len(), 1, "`infix` must not become a method name: {:?}", equal.body.methods.iter().map(|method| method.name.name.as_str()).collect::<Vec<_>>());
+        let equals = method(equal, "==");
+        assert_eq!(annotations(equals), ["infix"]);
+        assert_eq!(equals.parameters.len(), 2);
+        assert!(equals.return_type.is_some(), "`==` must keep its return type");
+        assert!(equals.body.is_none(), "bodyless operator member must stay `body: None`");
+    }
+
+    /// `micro` 成员：无体是纯声明，带体是默认体。
+    #[test]
+    fn micro_member_distinguishes_signature_from_default_body() {
+        let root = root("trait Counter { micro value(self) -> i32 micro bump(self) -> i32 { return 1 } }\n");
+        let counter = trait_of(&root, "Counter");
+        let value = method(counter, "value");
+        assert!(value.body.is_none(), "semicolon-less `micro` signature must stay `body: None`");
+        let bump = method(counter, "bump");
+        let body = bump.body.as_ref().expect("default body must reach the AST");
+        assert!(!body.statements.is_empty(), "default body must keep its statements");
+    }
+
+    /// 判据主用例：普通方法成员与算子成员都能带 `{ ... }` 默认体，且体内容完整进 AST。
+    #[test]
+    fn trait_members_accept_default_bodies() {
+        let root = root(
+            "trait Comparable: Equal {\n    micro compare(self, other: Self): Ordering\n    infix `<`(self, other: Self): bool { return compare(self, other) == Ordering.Less }\n}\n",
+        );
+        let comparable = trait_of(&root, "Comparable");
+        let names: Vec<&str> = comparable.body.methods.iter().map(|method| method.name.name.as_str()).collect();
+        assert_eq!(names, ["compare", "<"], "member names must not leak modifiers or body identifiers");
+
+        let compare = method(comparable, "compare");
+        assert!(compare.body.is_none(), "`compare` is a pure signature");
+        assert_eq!(compare.parameters.len(), 2);
+        assert!(compare.return_type.is_some());
+
+        let less = method(comparable, "<");
+        assert_eq!(annotations(less), ["infix"]);
+        assert_eq!(less.parameters.len(), 2);
+        assert!(less.return_type.is_some());
+        let body = less.body.as_ref().expect("`<` default body must reach the AST");
+        assert!(!body.statements.is_empty(), "`<` default body must keep its statements");
+    }
+
+    /// 普通 Identifier 方法成员：带体与不带体都要正确分类。
+    #[test]
+    fn plain_method_member_body_is_optional() {
+        let with_body = root("trait T { area(self): f64 { return 0.0 } }\n");
+        assert!(method(trait_of(&with_body, "T"), "area").body.is_some(), "plain member body must reach the AST");
+
+        let without_body = root("trait T { area(self): f64 }\n");
+        assert!(method(trait_of(&without_body, "T"), "area").body.is_none(), "plain bodyless member must stay `body: None`");
+    }
+
+    /// imply 侧同样带体（算子与 `micro` 两种写法）。
+    #[test]
+    fn imply_members_keep_bodies() {
+        let root = root(
+            "imply Utf8Text: Equal {\n    infix `<`(self, other: Self): bool { return self.length() == 0 }\n    micro length(self) -> i32 { return 1 }\n}\n",
+        );
+        let imply = imply_of(&root);
+        let names: Vec<&str> = imply.methods.iter().map(|method| method.name.name.as_str()).collect();
+        assert_eq!(names, ["<", "length"]);
+        let less = imply.methods.iter().find(|method| method.name.name == "<").expect("`<` implementation");
+        assert_eq!(annotations(less), ["infix"]);
+        assert!(!less.body.as_ref().expect("implementation body").statements.is_empty(), "implementation body must keep its statements");
+        let length = imply.methods.iter().find(|method| method.name.name == "length").expect("`length` implementation");
+        assert!(!length.body.as_ref().expect("implementation body").statements.is_empty(), "micro implementation body must keep its statements");
+    }
+}
