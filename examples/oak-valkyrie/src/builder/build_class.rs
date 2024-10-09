@@ -402,6 +402,7 @@ impl<'config> ValkyrieBuilder<'config> {
         let mut name = Identifier { name: String::new(), span: Default::default() };
         let mut generics = Vec::new();
         let mut annotations = Vec::new();
+        let mut super_traits = Vec::new();
         let mut methods = Vec::new();
         let mut associated_types = Vec::new();
 
@@ -421,7 +422,8 @@ impl<'config> ValkyrieBuilder<'config> {
                         generics = self.build_generic_params(n, source)?;
                     }
                     ValkyrieElementType::NamePath => {}
-                    ValkyrieElementType::Type => {}
+                    // 头部 `:` 之后的每个 bound 都是独立 `Type` 节点（`&` 是分隔符）。
+                    ValkyrieElementType::Type => super_traits.push(self.build_type(n, source)?),
                     ValkyrieElementType::Micro | ValkyrieElementType::Method => {
                         if let Some(func) = self.recover_member(self.build_function(n, source)) {
                             methods.push(func);
@@ -455,7 +457,7 @@ impl<'config> ValkyrieBuilder<'config> {
                 },
             }
         }
-        Ok(Trait { name, generics, annotations, body: StructureBody { fields: Vec::new(), methods, associated_types, span }, span })
+        Ok(Trait { name, generics, annotations, super_traits, body: StructureBody { fields: Vec::new(), methods, associated_types, span }, span })
     }
 
     pub(crate) fn build_trait_associated_type<S: Source + ?Sized>(&self, node: RedNode<ValkyrieLanguage>, source: &S) -> Result<AssociatedType, OakError> {

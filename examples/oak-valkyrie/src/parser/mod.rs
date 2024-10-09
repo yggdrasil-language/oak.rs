@@ -470,4 +470,21 @@ mod trait_member_tests {
         let length = imply.methods.iter().find(|method| method.name.name == "length").expect("`length` implementation");
         assert!(!length.body.as_ref().expect("implementation body").statements.is_empty(), "micro implementation body must keep its statements");
     }
+
+    /// `&` 连接的多 supertrait：每个 bound 都是独立 `Type` 节点，按源序进 AST。
+    #[test]
+    fn super_traits_accept_ampersand_list() {
+        let root = root("trait A {}\ntrait C {}\ntrait B: A & C {}\n");
+        assert!(trait_of(&root, "A").super_traits.is_empty(), "no header bound must stay an empty list");
+        let b = trait_of(&root, "B");
+        assert_eq!(b.super_traits.len(), 2, "both supertraits must reach the AST: {:?}", b.super_traits);
+        for (super_trait, expected) in b.super_traits.iter().zip(["A", "C"]) {
+            let crate::ast::TypeExpression::Namepath(path) = super_trait
+            else {
+                panic!("supertrait must stay a plain name path, got {super_trait:?}");
+            };
+            assert_eq!(path.parts.len(), 1, "supertrait must not absorb the `&` separator: {path:?}");
+            assert_eq!(path.parts[0].name, expected, "supertraits must keep source order: {:?}", b.super_traits);
+        }
+    }
 }
