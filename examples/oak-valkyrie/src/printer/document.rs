@@ -240,6 +240,7 @@ fn operator_text(operator: ValkyrieTokenType) -> Option<&'static str> {
         ValkyrieTokenType::LessThan => Some("<"),
         ValkyrieTokenType::GreaterThan => Some(">"),
         ValkyrieTokenType::LessEq => Some("<="),
+        ValkyrieTokenType::LessEqGreater => Some("<=>"),
         ValkyrieTokenType::GreaterEq => Some(">="),
         ValkyrieTokenType::AndAnd => Some("&&"),
         ValkyrieTokenType::OrOr => Some("||"),
