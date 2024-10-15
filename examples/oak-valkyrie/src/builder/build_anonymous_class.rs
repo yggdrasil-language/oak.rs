@@ -102,7 +102,7 @@ impl<'config> ValkyrieBuilder<'config> {
             }
         }
 
-        let body = StructureBody { fields, methods, associated_types: Vec::new(), span };
+        let body = StructureBody { fields, methods, associated_types: Vec::new(), templates: Vec::new(), span };
         if is_structure {
             Ok(TermExpression::AnonymousStructure(Box::new(AnonymousStructure { annotations, generics, parents, body, captures, span })))
         }

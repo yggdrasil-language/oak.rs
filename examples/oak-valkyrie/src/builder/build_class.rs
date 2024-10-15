@@ -84,7 +84,7 @@ impl<'config> ValkyrieBuilder<'config> {
                 },
             }
         }
-        Ok(ClassDeclaration { name, annotations, generics, parents, body: StructureBody { fields, methods, associated_types: Vec::new(), span }, span })
+        Ok(ClassDeclaration { name, annotations, generics, parents, body: StructureBody { fields, methods, associated_types: Vec::new(), templates: Vec::new(), span }, span })
     }
 
     pub(crate) fn build_flags<S: Source + ?Sized>(&self, node: RedNode<ValkyrieLanguage>, source: &S) -> Result<Flags, OakError> {
@@ -405,6 +405,7 @@ impl<'config> ValkyrieBuilder<'config> {
         let mut super_traits = Vec::new();
         let mut methods = Vec::new();
         let mut associated_types = Vec::new();
+        let mut templates = Vec::new();
 
         for child in node.children() {
             match child {
@@ -434,6 +435,13 @@ impl<'config> ValkyrieBuilder<'config> {
                             associated_types.push(item);
                         }
                     }
+                    // 体级模板（`<% match arch %>` 等）在 AST 有独立存储位，成员文本留在
+                    // 各分支的 `body` 里，模板展开由消费方负责。
+                    ValkyrieElementType::TemplateIfStatement | ValkyrieElementType::TemplateLoop | ValkyrieElementType::TemplateMatch | ValkyrieElementType::TemplateStatement => {
+                        if let StatementNode::Template(template) = self.build_template_item(n, source)? {
+                            templates.push(*template);
+                        }
+                    }
                     ValkyrieElementType::BlockExpression => {
                         for inner_child in n.children() {
                             if let RedTree::Node(inner_n) = inner_child {
@@ -457,7 +465,7 @@ impl<'config> ValkyrieBuilder<'config> {
                 },
             }
         }
-        Ok(Trait { name, generics, annotations, super_traits, body: StructureBody { fields: Vec::new(), methods, associated_types, span }, span })
+        Ok(Trait { name, generics, annotations, super_traits, body: StructureBody { fields: Vec::new(), methods, associated_types, templates, span }, span })
     }
 
     pub(crate) fn build_trait_associated_type<S: Source + ?Sized>(&self, node: RedNode<ValkyrieLanguage>, source: &S) -> Result<AssociatedType, OakError> {
@@ -694,7 +702,7 @@ impl<'config> ValkyrieBuilder<'config> {
                 },
             }
         }
-        Ok(SingletonDeclaration { name, annotations, generics, parents, body: StructureBody { fields, methods, associated_types: Vec::new(), span }, span })
+        Ok(SingletonDeclaration { name, annotations, generics, parents, body: StructureBody { fields, methods, associated_types: Vec::new(), templates: Vec::new(), span }, span })
     }
 
     pub(crate) fn build_struct<S: Source + ?Sized>(&self, node: RedNode<ValkyrieLanguage>, source: &S) -> Result<StructureDeclaration, OakError> {
@@ -778,6 +786,6 @@ impl<'config> ValkyrieBuilder<'config> {
                 },
             }
         }
-        Ok(StructureDeclaration { kind, name, annotations, generics, parents, body: StructureBody { fields, methods, associated_types: Vec::new(), span }, span })
+        Ok(StructureDeclaration { kind, name, annotations, generics, parents, body: StructureBody { fields, methods, associated_types: Vec::new(), templates: Vec::new(), span }, span })
     }
 }

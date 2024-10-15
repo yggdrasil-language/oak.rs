@@ -719,6 +719,11 @@ pub(crate) fn parse_trait<S: oak_core::Source + ?Sized>(state: &mut State<'_, S>
             else if state.at(ValkyrieTokenType::Keyword(ValkyrieKeywords::Type)) {
                 parse_associated_type_item(state)?;
             }
+            else if state.at(ValkyrieTokenType::TemplateL) {
+                // 体级 TGrammar（如 `<% match arch %>`）：必须产出模板节点，否则模板
+                // 区域会退化成逐 token 的 `TemplateText`，成员对所有 target 都没有候选。
+                super::parse_template::parse_template_item(state)?;
+            }
             else if state.at(ValkyrieTokenType::Identifier) {
                 parse_method_member(state)?;
             }
