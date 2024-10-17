@@ -55,6 +55,12 @@ impl<'config> TypstLexer<'config> {
                 continue;
             }
 
+            // 转义必须先于标记识别与文本切分，否则 `\*` 会先被标记分支拒收，
+            // 再由 `lex_operators` 拆成孤立的 `*`，反斜杠字节则无人覆盖。
+            if self.lex_escape(state) {
+                continue;
+            }
+
             // 行首标记必须先于数字字面量识别，否则 `1. ` 会被拆成 NumericLiteral 与 Dot，
             // 永远无法产生 EnumItem。
             if self.lex_markup(state) {
@@ -85,6 +91,27 @@ impl<'config> TypstLexer<'config> {
         }
 
         Ok(())
+    }
+
+    /// 识别 `\X` 形式的转义，并让 token 完整覆盖这两个字节。
+    ///
+    /// `GreenTree` 通过累加 token 长度还原 span，任何被消费却没有 token 覆盖的字节
+    /// 都会让其后所有节点坐标左移，因此转义不能只跳过反斜杠。
+    fn lex_escape<'s, S: Source + ?Sized>(&self, state: &mut State<'s, S>) -> bool {
+        if state.peek() != Some('\\') {
+            return false;
+        }
+
+        let start = state.get_position();
+        state.advance(1);
+
+        // 行尾反斜杠在 Typst 中用于控制换行，不能吞掉 Newline，否则会破坏行导向标记。
+        if let Some(ch) = state.peek().filter(|ch| *ch != '\n' && *ch != '\r') {
+            state.advance(ch.len_utf8());
+        }
+
+        state.add_token(TypstTokenType::Escape, start, state.get_position());
+        true
     }
 
     fn lex_whitespace<'s, S: Source + ?Sized>(&self, state: &mut State<'s, S>) -> bool {
@@ -191,20 +218,14 @@ impl<'config> TypstLexer<'config> {
                     }
                 }
                 '*' => {
-                    let is_escaped = start > 0 && state.source().get_char_at(start - 1) == Some('\\');
-                    if !is_escaped {
-                        state.advance(1);
-                        state.add_token(TypstTokenType::Strong, start, state.get_position());
-                        return true;
-                    }
+                    state.advance(1);
+                    state.add_token(TypstTokenType::Strong, start, state.get_position());
+                    return true;
                 }
                 '_' => {
-                    let is_escaped = start > 0 && state.source().get_char_at(start - 1) == Some('\\');
-                    if !is_escaped {
-                        state.advance(1);
-                        state.add_token(TypstTokenType::Emphasis, start, state.get_position());
-                        return true;
-                    }
+                    state.advance(1);
+                    state.add_token(TypstTokenType::Emphasis, start, state.get_position());
+                    return true;
                 }
                 _ => {}
             }
