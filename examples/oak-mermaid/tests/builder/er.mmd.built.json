@@ -1,0 +1,117 @@
+{
+    "success": true,
+    "typed_root": {
+        "type_name": "oak_mermaid::ast::MermaidRoot",
+        "content": {
+            "diagrams": [
+                {
+                    "EntityRelationship": {
+                        "entities": [
+                            {
+                                "attributes": [
+                                    {
+                                        "comment": null,
+                                        "keys": [
+                                            "Primary"
+                                        ],
+                                        "name": "customer_id",
+                                        "type_name": "string"
+                                    },
+                                    {
+                                        "comment": null,
+                                        "keys": [],
+                                        "name": "name",
+                                        "type_name": "string"
+                                    }
+                                ],
+                                "name": "CUSTOMER"
+                            },
+                            {
+                                "attributes": [
+                                    {
+                                        "comment": null,
+                                        "keys": [
+                                            "Primary"
+                                        ],
+                                        "name": "order_number",
+                                        "type_name": "int"
+                                    },
+                                    {
+                                        "comment": null,
+                                        "keys": [],
+                                        "name": "delivery_address",
+                                        "type_name": "string"
+                                    },
+                                    {
+                                        "comment": null,
+                                        "keys": [
+                                            "Foreign"
+                                        ],
+                                        "name": "customer_id",
+                                        "type_name": "int"
+                                    }
+                                ],
+                                "name": "ORDER"
+                            },
+                            {
+                                "attributes": [
+                                    {
+                                        "comment": null,
+                                        "keys": [
+                                            "Primary",
+                                            "Foreign"
+                                        ],
+                                        "name": "line_number",
+                                        "type_name": "int"
+                                    },
+                                    {
+                                        "comment": "item name",
+                                        "keys": [],
+                                        "name": "product",
+                                        "type_name": "string"
+                                    }
+                                ],
+                                "name": "LINE_ITEM"
+                            },
+                            {
+                                "attributes": [],
+                                "name": "DELIVERY-ADDRESS"
+                            }
+                        ],
+                        "relations": [
+                            {
+                                "identifying": true,
+                                "label": "places",
+                                "left": "CUSTOMER",
+                                "left_cardinality": "One",
+                                "right": "ORDER",
+                                "right_cardinality": "ZeroOrMore"
+                            },
+                            {
+                                "identifying": true,
+                                "label": "contains",
+                                "left": "ORDER",
+                                "left_cardinality": "One",
+                                "right": "LINE_ITEM",
+                                "right_cardinality": "OneOrMore"
+                            },
+                            {
+                                "identifying": false,
+                                "label": "uses",
+                                "left": "CUSTOMER",
+                                "left_cardinality": "OneOrMore",
+                                "right": "DELIVERY-ADDRESS",
+                                "right_cardinality": "OneOrMore"
+                            }
+                        ]
+                    }
+                }
+            ],
+            "span": {
+                "end": 412,
+                "start": 0
+            }
+        }
+    },
+    "errors": []
+}

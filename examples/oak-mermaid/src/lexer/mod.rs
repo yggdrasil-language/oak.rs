@@ -102,6 +102,28 @@ impl<'config> MermaidLexer<'config> {
                 continue;
             }
 
+            // state / ER / class 块结构的标点。
+            //
+            // 必须放在 label 之后：flowchart 的 `{Decision}` 与边标签 `|yes|`
+            // 已经作为整体 Label 匹配，这里的单字符 `{` / `}` / `|` 只覆盖
+            // 无法闭合的块标点。`:` 同时在 class 的 `:::` 与 sequence 的
+            // `A->>B: text` 中出现，按单字符切分不影响 builder 拼接原文。
+            if let Some(ch) = state.peek() {
+                let kind = match ch {
+                    '{' => Some(MermaidTokenType::LeftBrace),
+                    '}' => Some(MermaidTokenType::RightBrace),
+                    ':' => Some(MermaidTokenType::Colon),
+                    '|' => Some(MermaidTokenType::Pipe),
+                    _ => None,
+                };
+                if let Some(kind) = kind {
+                    state.advance(ch.len_utf8());
+                    state.add_token(kind, safe_point, state.get_position());
+                    last_significant = Some(kind);
+                    continue;
+                }
+            }
+
             // 标识符与关键字。
             if let Some(byte) = state.peek_byte() {
                 if byte == b'_' || byte.is_ascii_alphabetic() {

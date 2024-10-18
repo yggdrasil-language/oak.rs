@@ -21,6 +21,14 @@ pub enum MermaidElementType {
     Label,
     /// Connection arrow (e.g., `-->`).
     Arrow,
+    /// Opening brace of a composite state, class body or ER entity block.
+    LeftBrace,
+    /// Closing brace of a composite state, class body or ER entity block.
+    RightBrace,
+    /// Colon separating a statement head from its label.
+    Colon,
+    /// A single pipe inside an ER cardinality symbol.
+    Pipe,
 
     /// Lexing or parsing error.
     Error,
@@ -53,6 +61,22 @@ pub enum MermaidElementType {
     ClassMember,
     /// A relation between two classes.
     Relation,
+    /// `stateDiagram` / `stateDiagram-v2` block.
+    StateDiagram,
+    /// `state ...` declaration, including composite state bodies.
+    StateDeclaration,
+    /// A transition between two states.
+    StateTransition,
+    /// One concurrent region inside a composite state.
+    StateRegion,
+    /// `erDiagram` block.
+    ErDiagram,
+    /// An ER entity, optionally containing attribute lines.
+    ErEntity,
+    /// One attribute line inside an ER entity.
+    ErAttribute,
+    /// A relationship between two ER entities.
+    ErRelation,
 }
 
 #[cfg(feature = "serde")]
@@ -84,7 +108,28 @@ impl MermaidElementType {
 
     /// Returns `true` if this element type represents a composite element.
     pub fn is_element(&self) -> bool {
-        matches!(self, Self::Root | Self::Node | Self::Edge | Self::Subgraph | Self::SequenceDiagram | Self::Participant | Self::Message | Self::ClassDiagram | Self::ClassDeclaration | Self::ClassMember | Self::Relation)
+        matches!(
+            self,
+            Self::Root
+                | Self::Node
+                | Self::Edge
+                | Self::Subgraph
+                | Self::SequenceDiagram
+                | Self::Participant
+                | Self::Message
+                | Self::ClassDiagram
+                | Self::ClassDeclaration
+                | Self::ClassMember
+                | Self::Relation
+                | Self::StateDiagram
+                | Self::StateDeclaration
+                | Self::StateTransition
+                | Self::StateRegion
+                | Self::ErDiagram
+                | Self::ErEntity
+                | Self::ErAttribute
+                | Self::ErRelation
+        )
     }
 }
 

@@ -60,6 +60,12 @@ impl<'config> MermaidBuilder<'config> {
                     else if node.kind == MermaidElementType::ClassDiagram {
                         diagrams.push(MermaidDiagram::Class(self.build_class(node, source, &mut offset)));
                     }
+                    else if node.kind == MermaidElementType::StateDiagram {
+                        diagrams.push(MermaidDiagram::State(self.build_state(node, source, &mut offset)));
+                    }
+                    else if node.kind == MermaidElementType::ErDiagram {
+                        diagrams.push(MermaidDiagram::EntityRelationship(self.build_er(node, source, &mut offset)));
+                    }
                     else {
                         offset += node.byte_length as usize;
                     }
@@ -159,6 +165,361 @@ impl<'config> MermaidBuilder<'config> {
 
         debug_assert_eq!(*offset, end);
         SequenceDiagram { participants, messages }
+    }
+
+    /// 把一个 `StateDiagram` 段落转换成 [`StateDiagram`]。
+    fn build_state(&self, node: &GreenNode<MermaidLanguage>, source: &SourceText, offset: &mut usize) -> StateDiagram {
+        let end = *offset + node.byte_length as usize;
+        let mut version = StateDiagramVersion::V2;
+        let mut elements = Vec::new();
+        let mut state_index: HashMap<String, usize> = HashMap::new();
+
+        for child in node.children {
+            match child {
+                GreenTree::Leaf(leaf) => {
+                    let kind = leaf.kind;
+                    let text = Self::leaf_text(*leaf, source, offset);
+                    if kind == MermaidTokenType::Id && text == "stateDiagram" {
+                        version = StateDiagramVersion::V1;
+                    }
+                }
+                GreenTree::Node(child) => match child.kind {
+                    MermaidElementType::StateDeclaration => {
+                        if let Some(state) = self.build_state_definition(child, source, offset) {
+                            Self::upsert_state(&mut elements, &mut state_index, state);
+                        }
+                    }
+                    MermaidElementType::StateTransition => {
+                        let text = Self::node_text(child, source, offset);
+                        if let Some(transition) = Self::parse_state_transition(&text) {
+                            Self::ensure_state_endpoints(&mut elements, &mut state_index, &transition);
+                            elements.push(StateElement::Transition(transition));
+                        }
+                    }
+                    _ => *offset += child.byte_length as usize,
+                },
+            }
+        }
+
+        debug_assert_eq!(*offset, end);
+        StateDiagram { version, elements }
+    }
+
+    /// 把一个 `StateDeclaration` 转换成 [`StateDefinition`]，复合状态体
+    /// 的每个 `StateRegion` 子节点转换成一个 [`StateRegion`]。
+    fn build_state_definition(&self, node: &GreenNode<MermaidLanguage>, source: &SourceText, offset: &mut usize) -> Option<StateDefinition> {
+        let end = *offset + node.byte_length as usize;
+        let mut header = String::new();
+        let mut in_header = true;
+        let mut regions = Vec::new();
+
+        for child in node.children {
+            match child {
+                GreenTree::Leaf(leaf) => {
+                    let text = Self::leaf_text(*leaf, source, offset);
+                    if in_header {
+                        if leaf.kind == MermaidTokenType::Newline || text == "{" || text == "}" {
+                            in_header = false;
+                        }
+                        else {
+                            header.push_str(&text);
+                        }
+                    }
+                }
+                GreenTree::Node(child) => match child.kind {
+                    MermaidElementType::StateRegion => {
+                        regions.push(self.build_state_region(child, source, offset));
+                    }
+                    _ => *offset += child.byte_length as usize,
+                },
+            }
+        }
+
+        debug_assert_eq!(*offset, end);
+        let (id, text, kind) = Self::state_header(&header)?;
+        Some(StateDefinition { id, text, kind, regions })
+    }
+
+    /// 把一个 `StateRegion` 子节点转换成 [`StateRegion`]。
+    fn build_state_region(&self, node: &GreenNode<MermaidLanguage>, source: &SourceText, offset: &mut usize) -> StateRegion {
+        let end = *offset + node.byte_length as usize;
+        let mut elements = Vec::new();
+        let mut state_index: HashMap<String, usize> = HashMap::new();
+
+        for child in node.children {
+            match child {
+                GreenTree::Leaf(leaf) => {
+                    *offset += leaf.length as usize;
+                }
+                GreenTree::Node(child) => match child.kind {
+                    MermaidElementType::StateDeclaration => {
+                        if let Some(state) = self.build_state_definition(child, source, offset) {
+                            Self::upsert_state(&mut elements, &mut state_index, state);
+                        }
+                    }
+                    MermaidElementType::StateTransition => {
+                        let text = Self::node_text(child, source, offset);
+                        if let Some(transition) = Self::parse_state_transition(&text) {
+                            Self::ensure_state_endpoints(&mut elements, &mut state_index, &transition);
+                            elements.push(StateElement::Transition(transition));
+                        }
+                    }
+                    _ => *offset += child.byte_length as usize,
+                },
+            }
+        }
+
+        debug_assert_eq!(*offset, end);
+        StateRegion { elements }
+    }
+
+    /// 登记状态声明；同一层级重复声明时，后出现的复合区域补到已有状态上。
+    fn upsert_state(elements: &mut Vec<StateElement>, state_index: &mut HashMap<String, usize>, state: StateDefinition) {
+        if let Some(&position) = state_index.get(&state.id) {
+            if let StateElement::State(existing) = &mut elements[position] {
+                if existing.regions.is_empty() && !state.regions.is_empty() {
+                    existing.regions = state.regions;
+                    existing.kind = state.kind;
+                }
+                if existing.text.is_none() {
+                    existing.text = state.text;
+                }
+            }
+            return;
+        }
+
+        state_index.insert(state.id.clone(), elements.len());
+        elements.push(StateElement::State(state));
+    }
+
+    /// 为迁移端点补上没有显式声明的状态，保持首次出现顺序。
+    fn ensure_state_endpoints(elements: &mut Vec<StateElement>, state_index: &mut HashMap<String, usize>, transition: &StateTransition) {
+        for endpoint in [&transition.from, &transition.to] {
+            if let StateEndpoint::State(id) = endpoint {
+                if !state_index.contains_key(id) {
+                    Self::upsert_state(elements, state_index, StateDefinition { id: id.clone(), text: None, kind: StateKind::Normal, regions: Vec::new() });
+                }
+            }
+        }
+    }
+
+    /// 从 `state Foo` 头部还原 id、显示文本与状态种类。
+    ///
+    /// 支持 `state "text" as id`、`state id <<fork>>` 与 `state id : desc`。
+    fn state_header(header: &str) -> Option<(String, Option<String>, StateKind)> {
+        let rest = Self::strip_keyword(header.trim(), "state")?.trim();
+        let (rest, description) = match rest.split_once(':') {
+            Some((head, description)) => (head.trim(), Some(description.trim()).filter(|description| !description.is_empty())),
+            None => (rest, None),
+        };
+
+        let mut kind = StateKind::Normal;
+        let mut rest = rest.to_string();
+        for (glyph, value) in [("<<fork>>", StateKind::Fork), ("<<join>>", StateKind::Join), ("<<choice>>", StateKind::Choice), ("<<entryPoint>>", StateKind::EntryPoint), ("<<exitPoint>>", StateKind::ExitPoint)] {
+            if let Some(index) = rest.find(glyph) {
+                kind = value;
+                rest.replace_range(index..index + glyph.len(), "");
+                break;
+            }
+        }
+
+        let rest = rest.trim();
+        let (id, text) = if let Some(quoted) = rest.strip_prefix('"') {
+            let (text, after) = quoted.split_once('"')?;
+            let after = after.trim().strip_prefix("as").unwrap_or(after).trim();
+            (after.to_string(), Some(text.to_string()))
+        }
+        else {
+            (rest.to_string(), description.map(str::to_string))
+        };
+
+        if id.is_empty() { None } else { Some((id, text, kind)) }
+    }
+
+    /// 从一行状态迁移还原两端与可选标签。
+    fn parse_state_transition(text: &str) -> Option<StateTransition> {
+        let text = text.trim();
+        let (head, label) = match text.split_once(':') {
+            Some((head, label)) => (head.trim(), Some(label.trim()).filter(|label| !label.is_empty()).map(str::to_string)),
+            None => (text, None),
+        };
+        let (from, to) = head.split_once("-->")?;
+
+        let from = Self::state_endpoint(from.trim(), true)?;
+        let to = Self::state_endpoint(to.trim(), false)?;
+        Some(StateTransition { from, to, label })
+    }
+
+    /// 把一行迁移端点转换成 [`StateEndpoint`]。
+    fn state_endpoint(text: &str, is_source: bool) -> Option<StateEndpoint> {
+        if text.is_empty() {
+            None
+        }
+        else if text == "[*]" {
+            Some(if is_source { StateEndpoint::Start } else { StateEndpoint::End })
+        }
+        else {
+            Some(StateEndpoint::State(text.to_string()))
+        }
+    }
+
+    /// 把一个 `ErDiagram` 段落转换成 [`ErDiagram`]。
+    ///
+    /// 关系端点若没有显式实体块，会补一个空属性实体，保证实体集合完整。
+    fn build_er(&self, node: &GreenNode<MermaidLanguage>, source: &SourceText, offset: &mut usize) -> ErDiagram {
+        let end = *offset + node.byte_length as usize;
+        let mut entities: Vec<ErEntity> = Vec::new();
+        let mut entity_index: HashMap<String, usize> = HashMap::new();
+        let mut relations = Vec::new();
+
+        for child in node.children {
+            match child {
+                GreenTree::Leaf(leaf) => {
+                    *offset += leaf.length as usize;
+                }
+                GreenTree::Node(child) => match child.kind {
+                    MermaidElementType::ErEntity => {
+                        if let Some((name, attributes)) = self.build_er_entity(child, source, offset) {
+                            Self::upsert_er_entity(&mut entities, &mut entity_index, name, attributes);
+                        }
+                    }
+                    MermaidElementType::ErRelation => {
+                        let text = Self::node_text(child, source, offset);
+                        if let Some(relation) = Self::parse_er_relation(&text) {
+                            Self::upsert_er_entity(&mut entities, &mut entity_index, relation.left.clone(), Vec::new());
+                            Self::upsert_er_entity(&mut entities, &mut entity_index, relation.right.clone(), Vec::new());
+                            relations.push(relation);
+                        }
+                    }
+                    _ => *offset += child.byte_length as usize,
+                },
+            }
+        }
+
+        debug_assert_eq!(*offset, end);
+        ErDiagram { entities, relations }
+    }
+
+    /// 解析实体块或单独实体名，返回名称与属性行。
+    fn build_er_entity(&self, node: &GreenNode<MermaidLanguage>, source: &SourceText, offset: &mut usize) -> Option<(String, Vec<ErAttribute>)> {
+        let end = *offset + node.byte_length as usize;
+        let mut header = String::new();
+        let mut in_header = true;
+        let mut attributes = Vec::new();
+
+        for child in node.children {
+            match child {
+                GreenTree::Leaf(leaf) => {
+                    let text = Self::leaf_text(*leaf, source, offset);
+                    if in_header {
+                        if leaf.kind == MermaidTokenType::Newline || text == "{" {
+                            in_header = false;
+                        }
+                        else {
+                            header.push_str(&text);
+                        }
+                    }
+                }
+                GreenTree::Node(child) => match child.kind {
+                    MermaidElementType::ErAttribute => {
+                        let text = Self::node_text(child, source, offset);
+                        if let Some(attribute) = Self::parse_er_attribute(&text) {
+                            attributes.push(attribute);
+                        }
+                    }
+                    _ => *offset += child.byte_length as usize,
+                },
+            }
+        }
+
+        debug_assert_eq!(*offset, end);
+        let name = header.trim().trim_end_matches('{').trim();
+        if name.is_empty() { None } else { Some((name.to_string(), attributes)) }
+    }
+
+    /// 登记 ER 实体；已有同名的空实体在遇到实体块时补上属性。
+    fn upsert_er_entity(entities: &mut Vec<ErEntity>, entity_index: &mut HashMap<String, usize>, name: String, attributes: Vec<ErAttribute>) {
+        match entity_index.get(&name) {
+            Some(&position) => {
+                if entities[position].attributes.is_empty() {
+                    entities[position].attributes = attributes;
+                }
+            }
+            None => {
+                entity_index.insert(name.clone(), entities.len());
+                entities.push(ErEntity { name, attributes });
+            }
+        }
+    }
+
+    /// 从一行实体属性中还原类型、名称、主外键标记与注释。
+    fn parse_er_attribute(text: &str) -> Option<ErAttribute> {
+        let mut text = text.trim();
+        if text.is_empty() {
+            return None;
+        }
+
+        let comment = match (text.find('"'), text.rfind('"')) {
+            (Some(start), Some(end)) if end > start => {
+                let comment = text[start + 1..end].to_string();
+                text = text[..start].trim();
+                Some(comment)
+            }
+            _ => None,
+        };
+
+        let mut words: Vec<&str> = text.split_whitespace().collect();
+        let mut keys = Vec::new();
+        while let Some(last) = words.last().copied() {
+            let parts: Vec<&str> = last.split(',').filter(|part| !part.is_empty()).collect();
+            if parts.is_empty() || !parts.iter().all(|part| matches!(*part, "PK" | "FK")) {
+                break;
+            }
+            for part in parts {
+                keys.push(if part == "PK" { ErKey::Primary } else { ErKey::Foreign });
+            }
+            words.pop();
+        }
+        keys.reverse();
+
+        let name = words.pop()?;
+        Some(ErAttribute { type_name: words.join(" "), name: name.to_string(), keys, comment })
+    }
+
+    /// 从一行关系中还原两端实体、Crow's Foot 基数与可选标签。
+    fn parse_er_relation(text: &str) -> Option<ErRelation> {
+        let text = text.trim();
+        let (head, label) = match text.split_once(':') {
+            Some((head, label)) => (head.trim(), Some(label.trim()).filter(|label| !label.is_empty()).map(str::to_string)),
+            None => (text, None),
+        };
+
+        let words: Vec<&str> = head.split_whitespace().collect();
+        let [left, symbol, right] = words[..]
+        else {
+            return None;
+        };
+
+        let (identifying, index) = match (symbol.find("--"), symbol.find("..")) {
+            (Some(index), _) => (true, index),
+            (None, Some(index)) => (false, index),
+            (None, None) => return None,
+        };
+
+        let left_cardinality = Self::er_cardinality(&symbol[..index])?;
+        let right_cardinality = Self::er_cardinality(&symbol[index + 2..])?;
+        Some(ErRelation { left: left.to_string(), right: right.to_string(), left_cardinality, right_cardinality, identifying, label })
+    }
+
+    /// 把 Crow's Foot 字形转换成 [`ErCardinality`]。
+    fn er_cardinality(glyph: &str) -> Option<ErCardinality> {
+        match glyph {
+            "||" => Some(ErCardinality::One),
+            "|o" | "o|" => Some(ErCardinality::ZeroOrOne),
+            "|{" | "}|" => Some(ErCardinality::OneOrMore),
+            "o{" | "}o" => Some(ErCardinality::ZeroOrMore),
+            _ => None,
+        }
     }
 
     /// 从一行 participant 声明中还原 id、显示名与关键字。

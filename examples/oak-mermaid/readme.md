@@ -16,7 +16,7 @@ Mermaid has become the de facto standard for embedding diagrams in Markdown and 
 - **🌳 High-Fidelity AST**: Generates a comprehensive Abstract Syntax Tree capturing the full variety of Mermaid diagrams:
     - **Flowcharts**: Precise mapping of nodes, shapes, and directed/undirected edges.
     - **Sequence Diagrams**: Detailed tracking of participants, messages, and activations.
-    - **Class & State Diagrams**: Comprehensive management of entities and transitions.
+    - **Class, State & ER Diagrams**: Classes and relations, composite states with concurrent regions, and entities with typed attributes plus Crow's Foot cardinalities.
     - **Gantt & Pie Charts**: Accurate parsing of data-driven diagram types.
 - **🛡️ Industrial-Grade Fault Tolerance**: Engineered to recover from syntax errors gracefully, providing precise diagnostics—essential for live editing environments.
 - **🧩 Deep Ecosystem Integration**: Seamlessly works with `oak-lsp` for full LSP support and `oak-mcp` for intelligent diagram analysis.

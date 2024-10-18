@@ -387,7 +387,7 @@
             "end": 299
         },
         {
-            "kind": "Error",
+            "kind": "Colon",
             "text": ":",
             "start": 299,
             "end": 300
@@ -477,7 +477,7 @@
             "end": 366
         },
         {
-            "kind": "Error",
+            "kind": "Colon",
             "text": ":",
             "start": 366,
             "end": 367
@@ -543,7 +543,7 @@
             "end": 425
         },
         {
-            "kind": "Error",
+            "kind": "Colon",
             "text": ":",
             "start": 425,
             "end": 426
@@ -621,7 +621,7 @@
             "end": 476
         },
         {
-            "kind": "Error",
+            "kind": "Colon",
             "text": ":",
             "start": 476,
             "end": 477
@@ -663,7 +663,7 @@
             "end": 499
         },
         {
-            "kind": "Error",
+            "kind": "Colon",
             "text": ":",
             "start": 499,
             "end": 500
@@ -717,7 +717,7 @@
             "end": 531
         },
         {
-            "kind": "Error",
+            "kind": "Colon",
             "text": ":",
             "start": 531,
             "end": 532
@@ -795,7 +795,7 @@
             "end": 589
         },
         {
-            "kind": "Error",
+            "kind": "Colon",
             "text": ":",
             "start": 589,
             "end": 590
@@ -873,7 +873,7 @@
             "end": 643
         },
         {
-            "kind": "Error",
+            "kind": "LeftBrace",
             "text": "{",
             "start": 644,
             "end": 645
@@ -981,7 +981,7 @@
             "end": 722
         },
         {
-            "kind": "Error",
+            "kind": "RightBrace",
             "text": "}",
             "start": 726,
             "end": 727
@@ -1005,7 +1005,7 @@
             "end": 742
         },
         {
-            "kind": "Error",
+            "kind": "LeftBrace",
             "text": "{",
             "start": 743,
             "end": 744
@@ -1089,7 +1089,7 @@
             "end": 804
         },
         {
-            "kind": "Error",
+            "kind": "RightBrace",
             "text": "}",
             "start": 808,
             "end": 809
@@ -1113,7 +1113,7 @@
             "end": 824
         },
         {
-            "kind": "Error",
+            "kind": "LeftBrace",
             "text": "{",
             "start": 825,
             "end": 826
@@ -1173,7 +1173,7 @@
             "end": 869
         },
         {
-            "kind": "Error",
+            "kind": "RightBrace",
             "text": "}",
             "start": 873,
             "end": 874
@@ -1197,7 +1197,7 @@
             "end": 890
         },
         {
-            "kind": "Error",
+            "kind": "LeftBrace",
             "text": "{",
             "start": 891,
             "end": 892
@@ -1257,7 +1257,7 @@
             "end": 930
         },
         {
-            "kind": "Error",
+            "kind": "RightBrace",
             "text": "}",
             "start": 934,
             "end": 935
@@ -1587,7 +1587,7 @@
             "end": 1195
         },
         {
-            "kind": "Error",
+            "kind": "LeftBrace",
             "text": "{",
             "start": 1196,
             "end": 1197
@@ -1695,7 +1695,7 @@
             "end": 1325
         },
         {
-            "kind": "Error",
+            "kind": "RightBrace",
             "text": "}",
             "start": 1329,
             "end": 1330
@@ -1743,7 +1743,7 @@
             "end": 1360
         },
         {
-            "kind": "Error",
+            "kind": "LeftBrace",
             "text": "{",
             "start": 1360,
             "end": 1361
@@ -1755,7 +1755,7 @@
             "end": 1367
         },
         {
-            "kind": "Error",
+            "kind": "Colon",
             "text": ":",
             "start": 1368,
             "end": 1369
@@ -1791,13 +1791,13 @@
             "end": 1391
         },
         {
-            "kind": "Error",
+            "kind": "Pipe",
             "text": "|",
             "start": 1391,
             "end": 1392
         },
         {
-            "kind": "Error",
+            "kind": "LeftBrace",
             "text": "{",
             "start": 1392,
             "end": 1393
@@ -1809,7 +1809,7 @@
             "end": 1403
         },
         {
-            "kind": "Error",
+            "kind": "Colon",
             "text": ":",
             "start": 1404,
             "end": 1405
@@ -1833,7 +1833,7 @@
             "end": 1427
         },
         {
-            "kind": "Error",
+            "kind": "RightBrace",
             "text": "}",
             "start": 1428,
             "end": 1429
@@ -1845,7 +1845,7 @@
             "end": 1433
         },
         {
-            "kind": "Error",
+            "kind": "LeftBrace",
             "text": "{",
             "start": 1433,
             "end": 1434
@@ -1857,7 +1857,7 @@
             "end": 1451
         },
         {
-            "kind": "Error",
+            "kind": "Colon",
             "text": ":",
             "start": 1452,
             "end": 1453
@@ -1881,7 +1881,7 @@
             "end": 1468
         },
         {
-            "kind": "Error",
+            "kind": "LeftBrace",
             "text": "{",
             "start": 1469,
             "end": 1470
@@ -1929,7 +1929,7 @@
             "end": 1528
         },
         {
-            "kind": "Error",
+            "kind": "RightBrace",
             "text": "}",
             "start": 1532,
             "end": 1533
@@ -2037,7 +2037,7 @@
             "end": 1628
         },
         {
-            "kind": "Error",
+            "kind": "Colon",
             "text": ":",
             "start": 1639,
             "end": 1640
@@ -2157,7 +2157,7 @@
             "end": 1676
         },
         {
-            "kind": "Error",
+            "kind": "Colon",
             "text": ":",
             "start": 1681,
             "end": 1682
@@ -2241,7 +2241,7 @@
             "end": 1733
         },
         {
-            "kind": "Error",
+            "kind": "Colon",
             "text": ":",
             "start": 1739,
             "end": 1740
@@ -2349,7 +2349,7 @@
             "end": 1774
         },
         {
-            "kind": "Error",
+            "kind": "Colon",
             "text": ":",
             "start": 1780,
             "end": 1781
@@ -2397,7 +2397,7 @@
             "end": 1808
         },
         {
-            "kind": "Error",
+            "kind": "Colon",
             "text": ":",
             "start": 1809,
             "end": 1810
@@ -2595,7 +2595,7 @@
             "end": 1892
         },
         {
-            "kind": "Error",
+            "kind": "Colon",
             "text": ":",
             "start": 1893,
             "end": 1894
@@ -2655,7 +2655,7 @@
             "end": 1916
         },
         {
-            "kind": "Error",
+            "kind": "Colon",
             "text": ":",
             "start": 1917,
             "end": 1918
@@ -2715,7 +2715,7 @@
             "end": 1940
         },
         {
-            "kind": "Error",
+            "kind": "Colon",
             "text": ":",
             "start": 1941,
             "end": 1942
@@ -2775,7 +2775,7 @@
             "end": 1959
         },
         {
-            "kind": "Error",
+            "kind": "Colon",
             "text": ":",
             "start": 1960,
             "end": 1961
@@ -3033,7 +3033,7 @@
             "end": 2181
         },
         {
-            "kind": "Error",
+            "kind": "Colon",
             "text": ":",
             "start": 2181,
             "end": 2182
@@ -3045,7 +3045,7 @@
             "end": 2184
         },
         {
-            "kind": "Error",
+            "kind": "Colon",
             "text": ":",
             "start": 2184,
             "end": 2185
@@ -3075,7 +3075,7 @@
             "end": 2206
         },
         {
-            "kind": "Error",
+            "kind": "Colon",
             "text": ":",
             "start": 2206,
             "end": 2207
@@ -3087,7 +3087,7 @@
             "end": 2209
         },
         {
-            "kind": "Error",
+            "kind": "Colon",
             "text": ":",
             "start": 2209,
             "end": 2210
@@ -3117,7 +3117,7 @@
             "end": 2227
         },
         {
-            "kind": "Error",
+            "kind": "Colon",
             "text": ":",
             "start": 2227,
             "end": 2228
@@ -3129,7 +3129,7 @@
             "end": 2230
         },
         {
-            "kind": "Error",
+            "kind": "Colon",
             "text": ":",
             "start": 2230,
             "end": 2231
@@ -3195,7 +3195,7 @@
             "end": 2279
         },
         {
-            "kind": "Error",
+            "kind": "Colon",
             "text": ":",
             "start": 2279,
             "end": 2280
@@ -3207,7 +3207,7 @@
             "end": 2282
         },
         {
-            "kind": "Error",
+            "kind": "Colon",
             "text": ":",
             "start": 2282,
             "end": 2283
@@ -3237,7 +3237,7 @@
             "end": 2301
         },
         {
-            "kind": "Error",
+            "kind": "Colon",
             "text": ":",
             "start": 2301,
             "end": 2302
@@ -3249,7 +3249,7 @@
             "end": 2304
         },
         {
-            "kind": "Error",
+            "kind": "Colon",
             "text": ":",
             "start": 2304,
             "end": 2305
@@ -3333,13 +3333,13 @@
             "end": 2367
         },
         {
-            "kind": "Error",
+            "kind": "Colon",
             "text": ":",
             "start": 2373,
             "end": 2374
         },
         {
-            "kind": "Error",
+            "kind": "Colon",
             "text": ":",
             "start": 2374,
             "end": 2375
@@ -3603,7 +3603,7 @@
             "end": 2696
         },
         {
-            "kind": "Error",
+            "kind": "LeftBrace",
             "text": "{",
             "start": 2697,
             "end": 2698
@@ -3621,7 +3621,7 @@
             "end": 2705
         },
         {
-            "kind": "Error",
+            "kind": "Colon",
             "text": ":",
             "start": 2705,
             "end": 2706
@@ -3645,7 +3645,7 @@
             "end": 2717
         },
         {
-            "kind": "Error",
+            "kind": "Colon",
             "text": ":",
             "start": 2717,
             "end": 2718
@@ -3681,7 +3681,7 @@
             "end": 2748
         },
         {
-            "kind": "Error",
+            "kind": "Colon",
             "text": ":",
             "start": 2748,
             "end": 2749
@@ -3705,7 +3705,7 @@
             "end": 2771
         },
         {
-            "kind": "Error",
+            "kind": "Colon",
             "text": ":",
             "start": 2771,
             "end": 2772
@@ -3723,7 +3723,7 @@
             "end": 2778
         },
         {
-            "kind": "Error",
+            "kind": "RightBrace",
             "text": "}",
             "start": 2782,
             "end": 2783
@@ -3753,7 +3753,7 @@
             "end": 2812
         },
         {
-            "kind": "Error",
+            "kind": "LeftBrace",
             "text": "{",
             "start": 2813,
             "end": 2814
@@ -3771,7 +3771,7 @@
             "end": 2823
         },
         {
-            "kind": "Error",
+            "kind": "Colon",
             "text": ":",
             "start": 2823,
             "end": 2824
@@ -3789,7 +3789,7 @@
             "end": 2836
         },
         {
-            "kind": "Error",
+            "kind": "RightBrace",
             "text": "}",
             "start": 2840,
             "end": 2841
