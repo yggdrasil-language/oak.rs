@@ -34,6 +34,18 @@ pub enum PlantUmlElementType {
     Activate,
     /// A `deactivate` statement.
     Deactivate,
+    /// An activity diagram container.
+    ActivityDiagram,
+    /// One activity statement line.
+    ActivityStatement,
+    /// A state diagram container.
+    StateDiagram,
+    /// One state statement line.
+    StateStatement,
+    /// A component diagram container.
+    ComponentDiagram,
+    /// One component statement line.
+    ComponentStatement,
     /// A line comment.
     Comment,
 
@@ -90,8 +102,8 @@ impl ElementType for PlantUmlElementType {
         match self {
             Self::Root => UniversalElementRole::Root,
             Self::ClassDeclaration | Self::ParticipantDeclaration => UniversalElementRole::Definition,
-            Self::ClassMemberBlock => UniversalElementRole::Container,
-            Self::ClassRelation | Self::SequenceMessage | Self::Activate | Self::Deactivate => UniversalElementRole::Statement,
+            Self::ClassMemberBlock | Self::ActivityDiagram | Self::StateDiagram | Self::ComponentDiagram => UniversalElementRole::Container,
+            Self::ClassRelation | Self::SequenceMessage | Self::Activate | Self::Deactivate | Self::ActivityStatement | Self::StateStatement | Self::ComponentStatement => UniversalElementRole::Statement,
             Self::ClassMember => UniversalElementRole::Attribute,
             Self::Comment => UniversalElementRole::Documentation,
             Self::StartMarker | Self::EndMarker | Self::Trivia => UniversalElementRole::Metadata,

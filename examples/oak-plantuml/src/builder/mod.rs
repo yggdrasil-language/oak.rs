@@ -1,7 +1,11 @@
 //! Builder that lowers the PlantUML green tree into the typed AST.
 
 use crate::{
-    ast::{ActivationSpan, ClassDeclaration, ClassDiagram, ClassKeyword, ClassMember, ClassRelation, ClassRelationKind, MemberVisibility, MessageArrow, Participant, ParticipantKind, PlantUmlDiagram, PlantUmlRoot, SequenceDiagram, SequenceMessage},
+    ast::{
+        ActivationSpan, ActivityAction, ActivityBranch, ActivityBranchKind, ActivityDecision, ActivityDiagram, ActivityEndpoint, ActivityFork, ActivityForkBranch, ActivityNode, ActivitySwimlane, ActivityTransition, ClassDeclaration, ClassDiagram,
+        ClassKeyword, ClassMember, ClassRelation, ClassRelationKind, ComponentDiagram, ComponentElement, ComponentNode, ComponentPackage, ComponentPort, ComponentRelation, MemberVisibility, MessageArrow, Participant, ParticipantKind, PlantUmlDiagram,
+        PlantUmlRoot, PortDirection, SequenceDiagram, SequenceMessage, StateDefinition, StateDiagram, StateElement, StateEndpoint, StateKind, StateRegion, StateTransition,
+    },
     language::PlantUmlLanguage,
     lexer::token_type::PlantUmlTokenType,
     parser::element_type::PlantUmlElementType,
@@ -54,6 +58,7 @@ impl PlantUmlBuilder<'_> {
 
         let red_root = RedNode::new(green_tree, 0);
         let mut elements = Vec::new();
+        let mut container = None;
         let mut start = None;
         let mut end = None;
 
@@ -76,6 +81,11 @@ impl PlantUmlBuilder<'_> {
                     end = Some(node.span().end);
                     elements.push(node);
                 }
+                PlantUmlElementType::ActivityDiagram | PlantUmlElementType::StateDiagram | PlantUmlElementType::ComponentDiagram => {
+                    start.get_or_insert(node.span().start);
+                    end = Some(node.span().end);
+                    container = Some(node);
+                }
                 PlantUmlElementType::Comment | PlantUmlElementType::Error => {
                     if start.is_some() {
                         end = Some(node.span().end);
@@ -93,9 +103,18 @@ impl PlantUmlBuilder<'_> {
         };
         let span = core::range::Range { start: span_start, end: end.unwrap_or(span_start) };
 
-        let is_sequence = elements.iter().any(|node| matches!(node.green.kind, PlantUmlElementType::ParticipantDeclaration | PlantUmlElementType::SequenceMessage | PlantUmlElementType::Activate | PlantUmlElementType::Deactivate));
-
-        let diagram = if is_sequence { PlantUmlDiagram::Sequence(self.build_sequence_diagram(&elements, source, diagnostics, span)) } else { PlantUmlDiagram::Class(self.build_class_diagram(&elements, source, diagnostics, span)) };
+        let diagram = match container {
+            Some(node) => match node.green.kind {
+                PlantUmlElementType::ActivityDiagram => PlantUmlDiagram::Activity(self.build_activity_diagram(node, source, diagnostics, span)),
+                PlantUmlElementType::StateDiagram => PlantUmlDiagram::State(self.build_state_diagram(node, source, diagnostics, span)),
+                PlantUmlElementType::ComponentDiagram => PlantUmlDiagram::Component(self.build_component_diagram(node, source, diagnostics, span)),
+                _ => unreachable!("only diagram containers reach this branch"),
+            },
+            None => {
+                let is_sequence = elements.iter().any(|node| matches!(node.green.kind, PlantUmlElementType::ParticipantDeclaration | PlantUmlElementType::SequenceMessage | PlantUmlElementType::Activate | PlantUmlElementType::Deactivate));
+                if is_sequence { PlantUmlDiagram::Sequence(self.build_sequence_diagram(&elements, source, diagnostics, span)) } else { PlantUmlDiagram::Class(self.build_class_diagram(&elements, source, diagnostics, span)) }
+            }
+        };
 
         Ok(PlantUmlRoot { diagrams: vec![diagram] })
     }
@@ -407,6 +426,627 @@ impl PlantUmlBuilder<'_> {
 
         SequenceMessage { from, to, text, arrow, span }
     }
+
+    fn build_activity_diagram(&self, node: RedNode<PlantUmlLanguage>, source: &SourceText, diagnostics: &mut Vec<OakError>, span: core::range::Range<usize>) -> ActivityDiagram {
+        let lines = collect_lines(&node, source);
+        let mut index = 0;
+        let nodes = self.build_activity_nodes(&lines, &mut index, &[], false, diagnostics);
+        ActivityDiagram { nodes, span }
+    }
+
+    fn build_activity_nodes(&self, lines: &[StatementLine], index: &mut usize, terminators: &[&str], stop_at_lane: bool, diagnostics: &mut Vec<OakError>) -> Vec<ActivityNode> {
+        let mut nodes = Vec::new();
+
+        while *index < lines.len() {
+            let line = &lines[*index];
+            let text = line.text.as_str();
+            let head = first_word(text);
+
+            if stop_at_lane && text.starts_with('|') {
+                break;
+            }
+            if matches_terminator(text, terminators) {
+                break;
+            }
+
+            if text.starts_with(':') {
+                nodes.push(ActivityNode::Action(ActivityAction { text: action_text(text), span: line.span }));
+                *index += 1;
+            }
+            else if text.contains("-->") {
+                if let Some(transition) = parse_activity_transition(line) {
+                    nodes.push(ActivityNode::Transition(transition));
+                }
+                *index += 1;
+            }
+            else {
+                match head.as_str() {
+                    "start" => {
+                        nodes.push(ActivityNode::Start);
+                        *index += 1;
+                    }
+                    "stop" => {
+                        nodes.push(ActivityNode::Stop);
+                        *index += 1;
+                    }
+                    "end" if text == "end" => {
+                        nodes.push(ActivityNode::Stop);
+                        *index += 1;
+                    }
+                    "if" => nodes.push(ActivityNode::Decision(self.build_activity_decision(lines, index, diagnostics))),
+                    "fork" => nodes.push(ActivityNode::Fork(self.build_activity_fork(lines, index, diagnostics))),
+                    _ if text.starts_with('|') => nodes.push(ActivityNode::Swimlane(self.build_activity_swimlane(lines, index, terminators, diagnostics))),
+                    _ => *index += 1,
+                }
+            }
+        }
+
+        nodes
+    }
+
+    fn build_activity_decision(&self, lines: &[StatementLine], index: &mut usize, diagnostics: &mut Vec<OakError>) -> ActivityDecision {
+        let start = lines[*index].span.start;
+        let condition = parenthesized(&lines[*index].text);
+        let label = parenthesized_after(&lines[*index].text, "then");
+        *index += 1;
+
+        let mut branches = Vec::new();
+        let nodes = self.build_activity_nodes(lines, index, &["elseif", "else", "endif"], false, diagnostics);
+        let end = consumed_end(lines, *index, start);
+        branches.push(ActivityBranch { kind: ActivityBranchKind::Then, condition, label, nodes, span: core::range::Range { start, end } });
+
+        loop {
+            let Some(line) = lines.get(*index)
+            else {
+                diagnostics.push(OakError::syntax_error("unterminated activity decision, expected `endif`".to_string(), start, None));
+                break;
+            };
+            let normalized = line.text.to_ascii_lowercase();
+            let branch_start = line.span.start;
+
+            if normalized.starts_with("elseif") {
+                let condition = parenthesized(&line.text);
+                let label = parenthesized_after(&line.text, "then");
+                *index += 1;
+                let nodes = self.build_activity_nodes(lines, index, &["elseif", "else", "endif"], false, diagnostics);
+                let end = consumed_end(lines, *index, branch_start);
+                branches.push(ActivityBranch { kind: ActivityBranchKind::ElseIf, condition, label, nodes, span: core::range::Range { start: branch_start, end } });
+            }
+            else if normalized.starts_with("else") {
+                let label = parenthesized(&line.text);
+                *index += 1;
+                let nodes = self.build_activity_nodes(lines, index, &["elseif", "else", "endif"], false, diagnostics);
+                let end = consumed_end(lines, *index, branch_start);
+                branches.push(ActivityBranch { kind: ActivityBranchKind::Else, condition: None, label, nodes, span: core::range::Range { start: branch_start, end } });
+            }
+            else if normalized.starts_with("endif") {
+                *index += 1;
+                break;
+            }
+            else {
+                break;
+            }
+        }
+
+        let end = consumed_end(lines, *index, start);
+        ActivityDecision { branches, span: core::range::Range { start, end } }
+    }
+
+    fn build_activity_fork(&self, lines: &[StatementLine], index: &mut usize, diagnostics: &mut Vec<OakError>) -> ActivityFork {
+        let start = lines[*index].span.start;
+        *index += 1;
+        let mut branches = Vec::new();
+
+        loop {
+            let branch_start = lines.get(*index).map(|line| line.span.start).unwrap_or(start);
+            let nodes = self.build_activity_nodes(lines, index, &["fork again", "end fork", "end merge", "end split"], false, diagnostics);
+            let end = consumed_end(lines, *index, branch_start);
+            branches.push(ActivityForkBranch { nodes, span: core::range::Range { start: branch_start, end } });
+
+            let Some(line) = lines.get(*index)
+            else {
+                diagnostics.push(OakError::syntax_error("unterminated activity fork, expected `end fork`".to_string(), start, None));
+                break;
+            };
+            let normalized = line.text.to_ascii_lowercase();
+            if normalized == "fork again" {
+                *index += 1;
+                continue;
+            }
+            if matches!(normalized.as_str(), "end fork" | "end merge" | "end split") {
+                *index += 1;
+                break;
+            }
+            break;
+        }
+
+        let end = consumed_end(lines, *index, start);
+        ActivityFork { branches, span: core::range::Range { start, end } }
+    }
+
+    fn build_activity_swimlane(&self, lines: &[StatementLine], index: &mut usize, terminators: &[&str], diagnostics: &mut Vec<OakError>) -> ActivitySwimlane {
+        let line = &lines[*index];
+        let span = line.span;
+        let (name, color) = parse_swimlane(&line.text);
+        *index += 1;
+        let nodes = self.build_activity_nodes(lines, index, terminators, true, diagnostics);
+        let end = consumed_end(lines, *index, span.end);
+        ActivitySwimlane { name, color, nodes, span: core::range::Range { start: span.start, end } }
+    }
+
+    fn build_state_diagram(&self, node: RedNode<PlantUmlLanguage>, source: &SourceText, diagnostics: &mut Vec<OakError>, span: core::range::Range<usize>) -> StateDiagram {
+        let lines = collect_lines(&node, source);
+        let mut index = 0;
+        let mut elements = Vec::new();
+
+        while index < lines.len() {
+            let text = lines[index].text.as_str();
+            if text == "}" || text == "--" {
+                index += 1;
+                continue;
+            }
+            if let Some(element) = self.parse_state_element(&lines, &mut index, diagnostics) {
+                elements.push(element);
+            }
+        }
+
+        StateDiagram { elements, span }
+    }
+
+    fn parse_state_element(&self, lines: &[StatementLine], index: &mut usize, diagnostics: &mut Vec<OakError>) -> Option<StateElement> {
+        let line = &lines[*index];
+        let text = line.text.as_str();
+
+        if first_word(text) == "state" {
+            *index += 1;
+            let (id, display, kind, has_block) = parse_state_header(text, diagnostics, line.span.start);
+            let regions = if has_block { self.build_state_regions(lines, index, diagnostics) } else { Vec::new() };
+            return Some(StateElement::State(StateDefinition { id, text: display, kind, regions }));
+        }
+
+        if let Some(transition) = parse_state_transition(text) {
+            *index += 1;
+            return Some(StateElement::Transition(transition));
+        }
+
+        *index += 1;
+        None
+    }
+
+    fn build_state_regions(&self, lines: &[StatementLine], index: &mut usize, diagnostics: &mut Vec<OakError>) -> Vec<StateRegion> {
+        let mut regions = Vec::new();
+        let mut elements = Vec::new();
+
+        while *index < lines.len() {
+            let text = lines[*index].text.as_str();
+            if text == "}" {
+                *index += 1;
+                break;
+            }
+            if text == "--" {
+                regions.push(StateRegion { elements: core::mem::take(&mut elements) });
+                *index += 1;
+                continue;
+            }
+            if let Some(element) = self.parse_state_element(lines, index, diagnostics) {
+                elements.push(element);
+            }
+        }
+
+        regions.push(StateRegion { elements });
+        regions
+    }
+
+    fn build_component_diagram(&self, node: RedNode<PlantUmlLanguage>, source: &SourceText, diagnostics: &mut Vec<OakError>, span: core::range::Range<usize>) -> ComponentDiagram {
+        let lines = collect_lines(&node, source);
+        let mut index = 0;
+        let mut elements = Vec::new();
+        let mut relations = Vec::new();
+
+        self.parse_component_block(&lines, &mut index, false, &mut elements, &mut relations, diagnostics);
+
+        ComponentDiagram { elements, relations, span }
+    }
+
+    fn parse_component_block(&self, lines: &[StatementLine], index: &mut usize, in_block: bool, elements: &mut Vec<ComponentElement>, relations: &mut Vec<ComponentRelation>, diagnostics: &mut Vec<OakError>) {
+        while *index < lines.len() {
+            let line = &lines[*index];
+            let text = line.text.as_str();
+
+            if text == "}" {
+                *index += 1;
+                if in_block {
+                    return;
+                }
+                continue;
+            }
+
+            let head = first_word(text);
+            match head.as_str() {
+                "package" => {
+                    let (name, display, alias, has_block) = parse_named_header(head_word_len(text), text);
+                    *index += 1;
+                    let mut nested = Vec::new();
+                    if has_block {
+                        self.parse_component_block(lines, index, true, &mut nested, relations, diagnostics);
+                    }
+                    let end = consumed_end(lines, *index, line.span.end);
+                    elements.push(ComponentElement::Package(ComponentPackage { name, display, alias, elements: nested, span: core::range::Range { start: line.span.start, end } }));
+                }
+                "component" | "interface" => {
+                    let keyword = head.clone();
+                    let (name, display, alias, has_block) = parse_named_header(head_word_len(text), text);
+                    *index += 1;
+                    let node = ComponentNode { name, display, alias, span: line.span };
+                    if keyword == "interface" {
+                        elements.push(ComponentElement::Interface(node));
+                    }
+                    else {
+                        elements.push(ComponentElement::Component(node));
+                    }
+                    if has_block {
+                        self.parse_component_block(lines, index, true, elements, relations, diagnostics);
+                    }
+                }
+                "port" | "portin" | "portout" => {
+                    let name = first_word(text[head.len()..].trim()).to_string();
+                    let direction = match head.as_str() {
+                        "portin" => PortDirection::In,
+                        "portout" => PortDirection::Out,
+                        _ => PortDirection::InOut,
+                    };
+                    elements.push(ComponentElement::Port(ComponentPort { name, direction, span: line.span }));
+                    *index += 1;
+                }
+                _ if text.starts_with('[') => {
+                    let (name, display, alias, _) = parse_bracket_header(text);
+                    elements.push(ComponentElement::Component(ComponentNode { name, display, alias, span: line.span }));
+                    *index += 1;
+                }
+                _ => {
+                    if let Some(relation) = self.parse_component_relation(line, diagnostics) {
+                        relations.push(relation);
+                    }
+                    *index += 1;
+                }
+            }
+        }
+    }
+
+    fn parse_component_relation(&self, line: &StatementLine, diagnostics: &mut Vec<OakError>) -> Option<ComponentRelation> {
+        let mut rest = line.text.as_str();
+        let left = take_endpoint(&mut rest)?;
+        let left_multiplicity = take_multiplicity(&mut rest);
+
+        let trimmed = rest.trim_start();
+        let arrow = find_arrow(trimmed)?;
+        rest = &trimmed[arrow.len()..];
+        let right_multiplicity = take_multiplicity(&mut rest);
+        let right = take_endpoint(&mut rest)?;
+
+        let Some((kind, marker_at_left)) = relation_arrow(arrow)
+        else {
+            diagnostics.push(OakError::syntax_error(format!("unsupported component relation arrow `{arrow}`"), line.span.start, None));
+            return None;
+        };
+
+        let (_, label) = split_label(rest);
+        Some(ComponentRelation { left, right, left_multiplicity, right_multiplicity, kind, marker_at_left, label, span: line.span })
+    }
+}
+
+/// One significant statement line of a line-oriented PlantUML diagram.
+struct StatementLine {
+    span: core::range::Range<usize>,
+    text: String,
+}
+
+fn collect_lines(node: &RedNode<PlantUmlLanguage>, source: &SourceText) -> Vec<StatementLine> {
+    node.children()
+        .filter_map(|child| match child {
+            RedTree::Node(node) => Some(StatementLine { span: node.span(), text: source.get_text_in(node.span()).trim().to_string() }),
+            _ => None,
+        })
+        .collect()
+}
+
+fn first_word(text: &str) -> String {
+    text.trim().split_whitespace().next().unwrap_or_default().to_ascii_lowercase()
+}
+
+fn head_word_len(text: &str) -> usize {
+    text.trim().split_whitespace().next().map(str::len).unwrap_or(0)
+}
+
+fn matches_terminator(text: &str, terminators: &[&str]) -> bool {
+    if terminators.is_empty() {
+        return false;
+    }
+    let normalized = text.trim().to_ascii_lowercase();
+    terminators.iter().any(|terminator| normalized == *terminator || normalized.starts_with(&format!("{terminator} ")) || normalized.starts_with(&format!("{terminator}(")))
+}
+
+fn consumed_end(lines: &[StatementLine], index: usize, fallback: usize) -> usize {
+    if index == 0 {
+        return fallback;
+    }
+    lines.get(index - 1).map(|line| line.span.end).unwrap_or(fallback)
+}
+
+fn action_text(text: &str) -> String {
+    text.trim().strip_prefix(':').unwrap_or(text.trim()).trim_end_matches(';').trim().to_string()
+}
+
+fn parse_activity_transition(line: &StatementLine) -> Option<ActivityTransition> {
+    let (left, right) = line.text.split_once("-->")?;
+    let (target, label) = split_label(right);
+    Some(ActivityTransition { from: activity_endpoint(left, true), to: activity_endpoint(target, false), label, span: line.span })
+}
+
+fn activity_endpoint(raw: &str, is_left: bool) -> ActivityEndpoint {
+    let value = unquote(raw);
+    if value.starts_with("(*)") { if is_left { ActivityEndpoint::Start } else { ActivityEndpoint::Stop } } else { ActivityEndpoint::Named(value) }
+}
+
+fn parse_swimlane(text: &str) -> (String, Option<String>) {
+    let text = text.trim();
+    let Some(inner) = text.strip_prefix('|')
+    else {
+        return (text.to_string(), None);
+    };
+    let Some(end) = inner.find('|')
+    else {
+        return (inner.trim().to_string(), None);
+    };
+    let first = inner[..end].trim();
+    let rest = inner[end + 1..].trim();
+
+    if let Some(color) = first.strip_prefix('#') {
+        let name = rest.split('|').next().unwrap_or(rest).trim().to_string();
+        (name, Some(format!("#{color}")))
+    }
+    else {
+        (first.to_string(), None)
+    }
+}
+
+fn parenthesized(text: &str) -> Option<String> {
+    let start = text.find('(')?;
+    let end = text[start..].find(')')?;
+    Some(text[start + 1..start + end].trim().to_string())
+}
+
+fn parenthesized_after(text: &str, keyword: &str) -> Option<String> {
+    let lower = text.to_ascii_lowercase();
+    let position = lower.find(keyword)? + keyword.len();
+    parenthesized(&text[position..])
+}
+
+fn parse_state_transition(text: &str) -> Option<StateTransition> {
+    let (left, right) = text.split_once("-->").or_else(|| text.split_once("->"))?;
+    let (target, label) = split_label(right);
+    let from = state_endpoint(left, true);
+    let to = state_endpoint(target, false);
+    Some(StateTransition { from, to, label })
+}
+
+fn state_endpoint(raw: &str, is_left: bool) -> StateEndpoint {
+    let value = raw.trim();
+    if value == "[*]" { if is_left { StateEndpoint::Start } else { StateEndpoint::End } } else { StateEndpoint::State(unquote(value)) }
+}
+
+fn parse_state_header(text: &str, diagnostics: &mut Vec<OakError>, offset: usize) -> (String, Option<String>, StateKind, bool) {
+    let rest = text[head_word_len(text)..].trim();
+    let has_block = rest.ends_with('{');
+    let rest = rest.trim_end_matches('{').trim_end();
+
+    let (display, rest) = if let Some(after) = rest.strip_prefix('"') {
+        match after.find('"') {
+            Some(end) => (Some(after[..end].to_string()), after[end + 1..].trim()),
+            None => {
+                diagnostics.push(OakError::syntax_error("unterminated state display name".to_string(), offset, None));
+                (None, rest)
+            }
+        }
+    }
+    else {
+        (None, rest)
+    };
+
+    let mut id = String::new();
+    let mut tokens = rest.split_whitespace();
+    if display.is_some() {
+        if tokens.next() == Some("as") {
+            if let Some(name) = tokens.next() {
+                id = name.to_string();
+            }
+        }
+    }
+    else if let Some(name) = tokens.next() {
+        if name != "as" && !name.starts_with("<<") {
+            id = name.to_string();
+        }
+        else if name == "as" {
+            if let Some(name) = tokens.next() {
+                id = name.to_string();
+            }
+        }
+    }
+
+    let kind = if let Some(open) = rest.find("<<") {
+        if let Some(close) = rest[open..].find(">>") {
+            match rest[open + 2..open + close].trim().to_ascii_lowercase().as_str() {
+                "fork" => StateKind::Fork,
+                "join" => StateKind::Join,
+                "choice" => StateKind::Choice,
+                "start" => StateKind::Start,
+                "end" => StateKind::End,
+                "entrypoint" | "entry" => StateKind::EntryPoint,
+                "exitpoint" | "exit" => StateKind::ExitPoint,
+                _ => StateKind::Normal,
+            }
+        }
+        else {
+            StateKind::Normal
+        }
+    }
+    else {
+        StateKind::Normal
+    };
+
+    (id, display, kind, has_block)
+}
+
+fn parse_named_header(word_len: usize, text: &str) -> (String, Option<String>, Option<String>, bool) {
+    let rest = text[word_len..].trim();
+    let has_block = rest.ends_with('{');
+    let rest = rest.trim_end_matches('{').trim_end();
+
+    let (display, rest) = if let Some(after) = rest.strip_prefix('"') {
+        match after.find('"') {
+            Some(end) => (Some(after[..end].to_string()), after[end + 1..].trim()),
+            None => (None, rest),
+        }
+    }
+    else {
+        (None, rest)
+    };
+
+    let mut name = String::new();
+    let mut alias = None;
+    let mut tokens = rest.split_whitespace();
+
+    if display.is_some() {
+        if tokens.next() == Some("as") {
+            if let Some(value) = tokens.next() {
+                alias = Some(value.to_string());
+                name = value.to_string();
+            }
+        }
+    }
+    else if let Some(first) = tokens.next() {
+        if first == "as" {
+            if let Some(value) = tokens.next() {
+                alias = Some(value.to_string());
+                name = value.to_string();
+            }
+        }
+        else {
+            name = first.to_string();
+            if tokens.next() == Some("as") {
+                if let Some(value) = tokens.next() {
+                    alias = Some(value.to_string());
+                    name = value.to_string();
+                }
+            }
+        }
+    }
+
+    (name, display, alias, has_block)
+}
+
+fn parse_bracket_header(text: &str) -> (String, Option<String>, Option<String>, bool) {
+    let rest = text.trim();
+    let (name, remainder) = if let Some(after) = rest.strip_prefix('[') {
+        match after.find(']') {
+            Some(end) => (after[..end].trim().to_string(), after[end + 1..].trim()),
+            None => (rest.to_string(), ""),
+        }
+    }
+    else {
+        (rest.to_string(), "")
+    };
+
+    let mut tokens = remainder.split_whitespace();
+    let alias = if tokens.next() == Some("as") { tokens.next().map(str::to_string) } else { None };
+    let resolved = alias.clone().unwrap_or(name.clone());
+    (resolved, None, alias, false)
+}
+
+fn take_endpoint(rest: &mut &str) -> Option<String> {
+    let trimmed = rest.trim_start();
+    if trimmed.is_empty() {
+        return None;
+    }
+
+    if let Some(after) = trimmed.strip_prefix('"') {
+        let mut escaped = false;
+        let mut end = None;
+        for (offset, ch) in after.char_indices() {
+            if escaped {
+                escaped = false;
+                continue;
+            }
+            if ch == '\\' {
+                escaped = true;
+            }
+            else if ch == '"' {
+                end = Some(offset);
+                break;
+            }
+        }
+        let Some(end) = end
+        else {
+            *rest = "";
+            return Some(after.to_string());
+        };
+        *rest = &after[end + 1..];
+        return Some(after[..end].to_string());
+    }
+
+    if let Some(after) = trimmed.strip_prefix('[') {
+        let Some(end) = after.find(']')
+        else {
+            *rest = "";
+            return Some(after.trim().to_string());
+        };
+        *rest = &after[end + 1..];
+        return Some(after[..end].trim().to_string());
+    }
+
+    let mut split = trimmed.len();
+    for (offset, ch) in trimmed.char_indices() {
+        if ch.is_whitespace() {
+            split = offset;
+            break;
+        }
+    }
+    *rest = &trimmed[split..];
+    Some(trimmed[..split].to_string())
+}
+
+fn take_multiplicity(rest: &mut &str) -> Option<String> {
+    let trimmed = rest.trim_start();
+    let after = trimmed.strip_prefix('"')?;
+    let end = after.find('"')?;
+    *rest = &after[end + 1..];
+    Some(after[..end].to_string())
+}
+
+fn find_arrow(text: &str) -> Option<&'static str> {
+    const ARROWS: &[&str] = &["-->>", "->>", "-->", "->", "<|--", "--|>", "--*", "*--", "--o", "o--", "<..", "..>", "<--", "--", ".."];
+    ARROWS.iter().copied().find(|arrow| text.starts_with(arrow))
+}
+
+fn split_label(text: &str) -> (&str, Option<String>) {
+    let mut in_quotes = false;
+    let mut escaped = false;
+    for (offset, ch) in text.char_indices() {
+        if escaped {
+            escaped = false;
+            continue;
+        }
+        match ch {
+            '\\' => escaped = true,
+            '"' => in_quotes = !in_quotes,
+            ':' if !in_quotes => {
+                let label = text[offset + 1..].trim();
+                return (text[..offset].trim(), if label.is_empty() { None } else { Some(label.to_string()) });
+            }
+            _ => {}
+        }
+    }
+    (text.trim(), None)
 }
 
 fn significant_leaves(node: &RedNode<PlantUmlLanguage>) -> Vec<RedLeaf<PlantUmlLanguage>> {

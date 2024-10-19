@@ -56,6 +56,38 @@ fn lexes_all_arrows_as_single_tokens() {
 }
 
 #[test]
+fn lexes_activity_state_and_component_statement_tokens() {
+    let tokens = lex("(*) --> \"First\"\n:Do;\nif (x) then\n|Lane|\n[*] --> Idle\n[Web] --> [API]\n");
+
+    let pairs: Vec<_> = tokens.iter().map(|(text, kind)| (text.as_str(), *kind)).collect();
+    assert_eq!(
+        pairs,
+        vec![
+            ("(", PlantUmlTokenType::LeftParen),
+            ("*", PlantUmlTokenType::Text),
+            (")", PlantUmlTokenType::RightParen),
+            ("-->", PlantUmlTokenType::Arrow),
+            ("\"First\"", PlantUmlTokenType::String),
+            (":", PlantUmlTokenType::Colon),
+            ("Do", PlantUmlTokenType::Identifier),
+            (";", PlantUmlTokenType::Text),
+            ("if", PlantUmlTokenType::Identifier),
+            ("(", PlantUmlTokenType::LeftParen),
+            ("x", PlantUmlTokenType::Identifier),
+            (")", PlantUmlTokenType::RightParen),
+            ("then", PlantUmlTokenType::Identifier),
+            ("|Lane|", PlantUmlTokenType::Text),
+            ("[*]", PlantUmlTokenType::Text),
+            ("-->", PlantUmlTokenType::Arrow),
+            ("Idle", PlantUmlTokenType::Identifier),
+            ("[Web]", PlantUmlTokenType::Text),
+            ("-->", PlantUmlTokenType::Arrow),
+            ("[API]", PlantUmlTokenType::Text),
+        ]
+    );
+}
+
+#[test]
 fn lexes_line_comments_and_strings() {
     let tokens = lex("' a note\nclass \"Display Name\" as Alias\n");
 

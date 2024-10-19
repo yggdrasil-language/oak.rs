@@ -56,6 +56,42 @@ fn groups_sequence_elements() {
 }
 
 #[test]
+fn groups_activity_state_and_component_statement_elements() {
+    let language = PlantUmlLanguage::new();
+    let parser = PlantUmlParser::new(&language);
+
+    let activity = "@startuml\nstart\n:Go;\nif (ok?) then (yes)\n:Yes;\nelse\n:No;\nendif\nstop\n@enduml\n";
+    let mut cache = ParseSession::<PlantUmlLanguage>::default();
+    let output = parser.parse(activity, &[], &mut cache);
+    assert!(output.diagnostics.is_empty(), "unexpected diagnostics: {:?}", output.diagnostics);
+    let root = output.result.expect("parsing should succeed");
+    let mut kinds = Vec::new();
+    collect_elements(RedNode::new(root, 0), &mut kinds);
+    assert_eq!(count(&kinds, PlantUmlElementType::ActivityDiagram), 1);
+    assert_eq!(count(&kinds, PlantUmlElementType::ActivityStatement), 8);
+
+    let state = "@startuml\n[*] --> Idle\nstate Idle\nstate Processing {\n  [*] --> Work\n}\n@enduml\n";
+    let mut cache = ParseSession::<PlantUmlLanguage>::default();
+    let output = parser.parse(state, &[], &mut cache);
+    assert!(output.diagnostics.is_empty(), "unexpected diagnostics: {:?}", output.diagnostics);
+    let root = output.result.expect("parsing should succeed");
+    let mut kinds = Vec::new();
+    collect_elements(RedNode::new(root, 0), &mut kinds);
+    assert_eq!(count(&kinds, PlantUmlElementType::StateDiagram), 1);
+    assert_eq!(count(&kinds, PlantUmlElementType::StateStatement), 5);
+
+    let component = "@startuml\npackage P {\n  component A\n  port p\n}\nA --> B\n@enduml\n";
+    let mut cache = ParseSession::<PlantUmlLanguage>::default();
+    let output = parser.parse(component, &[], &mut cache);
+    assert!(output.diagnostics.is_empty(), "unexpected diagnostics: {:?}", output.diagnostics);
+    let root = output.result.expect("parsing should succeed");
+    let mut kinds = Vec::new();
+    collect_elements(RedNode::new(root, 0), &mut kinds);
+    assert_eq!(count(&kinds, PlantUmlElementType::ComponentDiagram), 1);
+    assert_eq!(count(&kinds, PlantUmlElementType::ComponentStatement), 5);
+}
+
+#[test]
 fn reports_unsupported_statements_instead_of_dropping_them() {
     let source = "@startuml\nskinparam monochrome true\n@enduml\n";
     let language = PlantUmlLanguage::new();

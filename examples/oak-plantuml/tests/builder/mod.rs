@@ -1,7 +1,7 @@
 use oak_core::{Builder, parser::session::ParseSession};
 use oak_plantuml::{
     PlantUmlBuilder, PlantUmlLanguage,
-    ast::{ClassKeyword, ClassRelationKind, MemberVisibility, MessageArrow, ParticipantKind, PlantUmlDiagram},
+    ast::{ActivityBranchKind, ActivityEndpoint, ActivityNode, ClassKeyword, ClassRelationKind, ComponentElement, MemberVisibility, MessageArrow, ParticipantKind, PlantUmlDiagram, PortDirection, StateElement, StateEndpoint, StateKind},
 };
 
 fn build(source: &str) -> oak_plantuml::PlantUmlRoot {
@@ -141,4 +141,209 @@ fn builds_sequence_diagram_with_activation_span() {
     assert_eq!(activation.participant, "DB");
     assert_eq!(activation.from_message, 1);
     assert_eq!(activation.to_message, 1);
+}
+
+#[test]
+fn builds_new_activity_syntax_with_decision_and_fork() {
+    let source = "@startuml\nstart\n:Collect input;\nif (valid?) then (yes)\n:Store;\nelse (no)\n:Reject;\nendif\nfork\n:Path A;\nfork again\n:Path B;\nend fork\nstop\n@enduml\n";
+    let root = build(source);
+
+    let PlantUmlDiagram::Activity(diagram) = &root.diagrams[0]
+    else {
+        panic!("expected an activity diagram");
+    };
+
+    assert_eq!(diagram.nodes.len(), 5, "start, action, decision, fork and stop: {:?}", diagram.nodes);
+    assert!(matches!(diagram.nodes[0], ActivityNode::Start));
+
+    let ActivityNode::Action(action) = &diagram.nodes[1]
+    else {
+        panic!("expected the collect action");
+    };
+    assert_eq!(action.text, "Collect input");
+    assert_eq!(action.span.start, source.find(":Collect input;").unwrap());
+
+    let ActivityNode::Decision(decision) = &diagram.nodes[2]
+    else {
+        panic!("expected a decision");
+    };
+    assert_eq!(decision.branches.len(), 2);
+    assert_eq!(decision.branches[0].kind, ActivityBranchKind::Then);
+    assert_eq!(decision.branches[0].condition.as_deref(), Some("valid?"));
+    assert_eq!(decision.branches[0].label.as_deref(), Some("yes"));
+    assert!(matches!(decision.branches[0].nodes[0], ActivityNode::Action(_)));
+    assert_eq!(decision.branches[1].kind, ActivityBranchKind::Else);
+    assert_eq!(decision.branches[1].condition, None);
+    assert_eq!(decision.branches[1].label.as_deref(), Some("no"));
+
+    let ActivityNode::Fork(fork) = &diagram.nodes[3]
+    else {
+        panic!("expected a fork");
+    };
+    assert_eq!(fork.branches.len(), 2);
+    assert_eq!(fork.branches[0].nodes.len(), 1);
+    assert_eq!(fork.branches[1].nodes.len(), 1);
+
+    assert!(matches!(diagram.nodes[4], ActivityNode::Stop));
+}
+
+#[test]
+fn builds_activity_swimlanes() {
+    let source = "@startuml\n|Customer|\n:Order;\n|Warehouse|\n:Ship;\n@enduml\n";
+    let root = build(source);
+
+    let PlantUmlDiagram::Activity(diagram) = &root.diagrams[0]
+    else {
+        panic!("expected an activity diagram");
+    };
+
+    assert_eq!(diagram.nodes.len(), 2);
+    let ActivityNode::Swimlane(customer) = &diagram.nodes[0]
+    else {
+        panic!("expected the customer swimlane");
+    };
+    assert_eq!(customer.name, "Customer");
+    assert_eq!(customer.color, None);
+    assert_eq!(customer.nodes.len(), 1);
+
+    let ActivityNode::Swimlane(warehouse) = &diagram.nodes[1]
+    else {
+        panic!("expected the warehouse swimlane");
+    };
+    assert_eq!(warehouse.name, "Warehouse");
+    assert_eq!(warehouse.nodes.len(), 1);
+}
+
+#[test]
+fn builds_legacy_activity_arrows() {
+    let source = "@startuml\n(*) --> \"First\"\n\"First\" --> \"Second\" : next\n\"Second\" --> (*)\n@enduml\n";
+    let root = build(source);
+
+    let PlantUmlDiagram::Activity(diagram) = &root.diagrams[0]
+    else {
+        panic!("expected an activity diagram");
+    };
+
+    assert_eq!(diagram.nodes.len(), 3);
+    let ActivityNode::Transition(first) = &diagram.nodes[0]
+    else {
+        panic!("expected the first transition");
+    };
+    assert_eq!(first.from, ActivityEndpoint::Start);
+    assert_eq!(first.to, ActivityEndpoint::Named("First".to_string()));
+    assert_eq!(first.label, None);
+
+    let ActivityNode::Transition(second) = &diagram.nodes[1]
+    else {
+        panic!("expected the second transition");
+    };
+    assert_eq!(second.from, ActivityEndpoint::Named("First".to_string()));
+    assert_eq!(second.to, ActivityEndpoint::Named("Second".to_string()));
+    assert_eq!(second.label.as_deref(), Some("next"));
+
+    let ActivityNode::Transition(third) = &diagram.nodes[2]
+    else {
+        panic!("expected the closing transition");
+    };
+    assert_eq!(third.to, ActivityEndpoint::Stop);
+}
+
+#[test]
+fn builds_state_diagram_with_composite_regions_and_stereotypes() {
+    let source = "@startuml\n[*] --> Idle\nstate Idle\nstate Processing {\n  [*] --> Reading\n  Reading --> Writing\n  --\n  [*] --> Retrying\n}\nProcessing --> Idle : done\nstate Forked <<fork>>\n@enduml\n";
+    let root = build(source);
+
+    let PlantUmlDiagram::State(diagram) = &root.diagrams[0]
+    else {
+        panic!("expected a state diagram");
+    };
+
+    assert_eq!(diagram.elements.len(), 5, "start transition, two states, one transition and a stereotype state: {:?}", diagram.elements);
+
+    let StateElement::Transition(start) = &diagram.elements[0]
+    else {
+        panic!("expected the initial transition");
+    };
+    assert_eq!(start.from, StateEndpoint::Start);
+    assert_eq!(start.to, StateEndpoint::State("Idle".to_string()));
+
+    let StateElement::State(idle) = &diagram.elements[1]
+    else {
+        panic!("expected the idle state");
+    };
+    assert_eq!(idle.id, "Idle");
+    assert_eq!(idle.kind, StateKind::Normal);
+    assert!(idle.regions.is_empty(), "a simple state has no regions");
+
+    let StateElement::State(processing) = &diagram.elements[2]
+    else {
+        panic!("expected the composite state");
+    };
+    assert_eq!(processing.id, "Processing");
+    assert_eq!(processing.regions.len(), 2);
+    assert_eq!(processing.regions[0].elements.len(), 2);
+    assert_eq!(processing.regions[1].elements.len(), 1);
+
+    let StateElement::Transition(done) = &diagram.elements[3]
+    else {
+        panic!("expected the completion transition");
+    };
+    assert_eq!(done.label.as_deref(), Some("done"));
+
+    let StateElement::State(forked) = &diagram.elements[4]
+    else {
+        panic!("expected the forked state");
+    };
+    assert_eq!(forked.id, "Forked");
+    assert_eq!(forked.kind, StateKind::Fork);
+}
+
+#[test]
+fn builds_component_diagram_with_package_ports_and_relations() {
+    let source = "@startuml\npackage \"Backend\" as B {\n  component \"API Gateway\" as API\n  component Service\n  port http\n  portout metrics\n  interface Repository\n}\nAPI --> Repository : calls\nB.Service --> DB : reads\n@enduml\n";
+    let root = build(source);
+
+    let PlantUmlDiagram::Component(diagram) = &root.diagrams[0]
+    else {
+        panic!("expected a component diagram");
+    };
+
+    assert_eq!(diagram.elements.len(), 1, "the package owns every declaration");
+    let ComponentElement::Package(package) = &diagram.elements[0]
+    else {
+        panic!("expected the backend package");
+    };
+    assert_eq!(package.alias.as_deref(), Some("B"));
+    assert_eq!(package.display.as_deref(), Some("Backend"));
+    assert_eq!(package.elements.len(), 5);
+
+    let ComponentElement::Component(api) = &package.elements[0]
+    else {
+        panic!("expected the api component");
+    };
+    assert_eq!(api.name, "API");
+    assert_eq!(api.display.as_deref(), Some("API Gateway"));
+
+    let ComponentElement::Port(http) = &package.elements[2]
+    else {
+        panic!("expected the http port");
+    };
+    assert_eq!(http.name, "http");
+    assert_eq!(http.direction, PortDirection::InOut);
+
+    let ComponentElement::Port(metrics) = &package.elements[3]
+    else {
+        panic!("expected the metrics port");
+    };
+    assert_eq!(metrics.direction, PortDirection::Out);
+
+    assert!(matches!(package.elements[4], ComponentElement::Interface(_)));
+
+    assert_eq!(diagram.relations.len(), 2);
+    assert_eq!(diagram.relations[0].left, "API");
+    assert_eq!(diagram.relations[0].right, "Repository");
+    assert_eq!(diagram.relations[0].label.as_deref(), Some("calls"));
+    assert_eq!(diagram.relations[1].left, "B.Service");
+    assert_eq!(diagram.relations[1].right, "DB");
+    assert_eq!(diagram.relations[1].label.as_deref(), Some("reads"));
 }

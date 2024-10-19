@@ -34,6 +34,7 @@ impl Parser<PlantUmlLanguage> for PlantUmlParser<'_> {
             let mut seen_start = false;
             let mut ended = false;
             let mut active = Vec::new();
+            let mut container: Option<((usize, usize), PlantUmlElementType)> = None;
 
             while state.not_at_end() {
                 let Some(kind) = state.peek_kind()
@@ -66,6 +67,7 @@ impl Parser<PlantUmlLanguage> for PlantUmlParser<'_> {
                         if ended {
                             state.syntax_error("duplicate @enduml marker");
                         }
+                        close_container(state, &mut container);
                         let checkpoint = state.checkpoint();
                         state.bump();
                         skip_to_line_end(state);
@@ -83,16 +85,27 @@ impl Parser<PlantUmlLanguage> for PlantUmlParser<'_> {
                         match diagram {
                             DiagramKind::Class => parse_class_line(state),
                             DiagramKind::Sequence => parse_sequence_line(state, &mut active),
+                            DiagramKind::Activity => {
+                                ensure_container(state, &mut container, PlantUmlElementType::ActivityDiagram);
+                                parse_statement_line(state, PlantUmlElementType::ActivityStatement);
+                            }
+                            DiagramKind::State => {
+                                ensure_container(state, &mut container, PlantUmlElementType::StateDiagram);
+                                parse_statement_line(state, PlantUmlElementType::StateStatement);
+                            }
+                            DiagramKind::Component => {
+                                ensure_container(state, &mut container, PlantUmlElementType::ComponentDiagram);
+                                parse_statement_line(state, PlantUmlElementType::ComponentStatement);
+                            }
                             DiagramKind::Mixed { conflict } => {
-                                return Err(state.source.syntax_error(
-                                    "PlantUML source mixes class and sequence declarations, one diagram family per source is required".to_string(),
-                                    conflict,
-                                ));
+                                return Err(state.source.syntax_error("PlantUML source mixes class and sequence declarations, one diagram family per source is required".to_string(), conflict));
                             }
                         }
                     }
                 }
             }
+
+            close_container(state, &mut container);
 
             if !seen_start {
                 state.syntax_error("missing @startuml marker");
@@ -106,14 +119,20 @@ impl Parser<PlantUmlLanguage> for PlantUmlParser<'_> {
     }
 }
 
-/// The two supported diagram families.
+/// The supported diagram families.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum DiagramKind {
     /// Class diagrams.
     Class,
     /// Sequence diagrams.
     Sequence,
-    /// Both families are authored, so no single diagram can represent the source.
+    /// Activity diagrams, including the legacy arrow syntax.
+    Activity,
+    /// State diagrams.
+    State,
+    /// Component diagrams.
+    Component,
+    /// Class and sequence declarations are both authored, so no single diagram can represent the source.
     Mixed {
         /// Byte offset of the marker that contradicts the earlier family.
         conflict: usize,
@@ -122,16 +141,19 @@ enum DiagramKind {
 
 /// Decide the diagram family from authored markers.
 ///
-/// Family keywords outrank arrow spelling: a `class` / `interface` / `enum` /
-/// `abstract` declaration or a `participant` / `actor` / `activate` /
-/// `deactivate` statement names its family explicitly, while `A --> B` is
-/// ambiguous between a class association and a sequence message. Scanning the
-/// whole document means a class-looking relation before the first `participant`
-/// no longer locks the source into the class family.
+/// Family keywords outrank arrow spelling: a `class` / `enum` / `abstract`
+/// declaration names its family explicitly. Line-leading words such as
+/// `component`, `state` or `if` name the other families. `interface` alone
+/// stays in the class family because component sources always carry
+/// `component`, `package`, `port` or a `[bracket]` node.
 fn detect_diagram<S: Source + ?Sized>(state: &ParserState<'_, PlantUmlLanguage, S>) -> DiagramKind {
     let mut index = 0;
+    let mut at_line_start = true;
     let mut class_marker: Option<usize> = None;
     let mut sequence_marker: Option<usize> = None;
+    let mut activity_marker: Option<usize> = None;
+    let mut state_marker: Option<usize> = None;
+    let mut component_marker: Option<usize> = None;
     let mut sequence_arrow = false;
     let mut class_arrow = false;
 
@@ -139,7 +161,56 @@ fn detect_diagram<S: Source + ?Sized>(state: &ParserState<'_, PlantUmlLanguage, 
         let offset = state.peek_at(index).map(|token| token.span.start).unwrap_or(0);
         match kind {
             PlantUmlTokenType::Eof => break,
-            PlantUmlTokenType::Class | PlantUmlTokenType::Interface | PlantUmlTokenType::Enum | PlantUmlTokenType::Abstract => {
+            PlantUmlTokenType::Newline => {
+                at_line_start = true;
+                index += 1;
+                continue;
+            }
+            PlantUmlTokenType::Whitespace | PlantUmlTokenType::Comment => {
+                index += 1;
+                continue;
+            }
+            _ => {}
+        }
+
+        if at_line_start {
+            at_line_start = false;
+            let text = state.peek_at(index).map(|token| state.source.get_text_in(token.span).into_owned()).unwrap_or_default();
+            let head = text.to_ascii_lowercase();
+
+            if matches!(head.as_str(), "component" | "package" | "port" | "portin" | "portout" | "database" | "node" | "cloud" | "artifact" | "folder" | "frame" | "rectangle" | "queue" | "storage") {
+                component_marker.get_or_insert(offset);
+            }
+            else if kind == PlantUmlTokenType::Text && text.starts_with('[') && text.ends_with(']') {
+                if text == "[*]" {
+                    state_marker.get_or_insert(offset);
+                }
+                else {
+                    component_marker.get_or_insert(offset);
+                }
+            }
+            else if head == "state" && !next_is_arrow(state, index + 1) {
+                state_marker.get_or_insert(offset);
+            }
+            else if matches!(head.as_str(), "start" | "stop" | "if" | "elseif" | "else" | "endif" | "fork" | "repeat" | "while" | "endwhile" | "partition" | "detach" | "kill") {
+                activity_marker.get_or_insert(offset);
+            }
+            else if kind == PlantUmlTokenType::Colon || kind == PlantUmlTokenType::LeftParen {
+                activity_marker.get_or_insert(offset);
+            }
+            else if kind == PlantUmlTokenType::Text && text.starts_with('|') {
+                activity_marker.get_or_insert(offset);
+            }
+            else if head == "end" && !next_significant_is_left_brace(state, index + 1) {
+                activity_marker.get_or_insert(offset);
+            }
+        }
+
+        match kind {
+            PlantUmlTokenType::Class | PlantUmlTokenType::Enum | PlantUmlTokenType::Abstract => {
+                class_marker.get_or_insert(offset);
+            }
+            PlantUmlTokenType::Interface => {
                 class_marker.get_or_insert(offset);
             }
             PlantUmlTokenType::Participant | PlantUmlTokenType::Actor | PlantUmlTokenType::Activate | PlantUmlTokenType::Deactivate => {
@@ -161,6 +232,16 @@ fn detect_diagram<S: Source + ?Sized>(state: &ParserState<'_, PlantUmlLanguage, 
         index += 1;
     }
 
+    if component_marker.is_some() {
+        return DiagramKind::Component;
+    }
+    if state_marker.is_some() {
+        return DiagramKind::State;
+    }
+    if activity_marker.is_some() {
+        return DiagramKind::Activity;
+    }
+
     match (class_marker, sequence_marker) {
         (Some(class), Some(sequence)) => DiagramKind::Mixed { conflict: class.max(sequence) },
         (None, Some(_)) => DiagramKind::Sequence,
@@ -168,6 +249,44 @@ fn detect_diagram<S: Source + ?Sized>(state: &ParserState<'_, PlantUmlLanguage, 
         (None, None) if sequence_arrow && !class_arrow => DiagramKind::Sequence,
         (None, None) => DiagramKind::Class,
     }
+}
+
+fn next_is_arrow<S: Source + ?Sized>(state: &ParserState<'_, PlantUmlLanguage, S>, mut index: usize) -> bool {
+    loop {
+        match state.peek_kind_at(index) {
+            Some(PlantUmlTokenType::Whitespace) => index += 1,
+            Some(PlantUmlTokenType::Arrow) => return true,
+            _ => return false,
+        }
+    }
+}
+
+fn next_significant_is_left_brace<S: Source + ?Sized>(state: &ParserState<'_, PlantUmlLanguage, S>, mut index: usize) -> bool {
+    loop {
+        match state.peek_kind_at(index) {
+            Some(PlantUmlTokenType::Whitespace) => index += 1,
+            Some(PlantUmlTokenType::LeftBrace) => return true,
+            _ => return false,
+        }
+    }
+}
+
+fn ensure_container<S: Source + ?Sized>(state: &mut ParserState<'_, PlantUmlLanguage, S>, container: &mut Option<((usize, usize), PlantUmlElementType)>, kind: PlantUmlElementType) {
+    if container.is_none() {
+        *container = Some((state.checkpoint(), kind));
+    }
+}
+
+fn close_container<S: Source + ?Sized>(state: &mut ParserState<'_, PlantUmlLanguage, S>, container: &mut Option<((usize, usize), PlantUmlElementType)>) {
+    if let Some((checkpoint, kind)) = container.take() {
+        state.finish_at(checkpoint, kind);
+    }
+}
+
+fn parse_statement_line<S: Source + ?Sized>(state: &mut ParserState<'_, PlantUmlLanguage, S>, kind: PlantUmlElementType) {
+    let checkpoint = state.checkpoint();
+    skip_to_line_end(state);
+    state.finish_at(checkpoint, kind);
 }
 
 fn parse_class_line<S: Source + ?Sized>(state: &mut ParserState<'_, PlantUmlLanguage, S>) {
@@ -297,10 +416,7 @@ fn parse_member_block<S: Source + ?Sized>(state: &mut ParserState<'_, PlantUmlLa
 fn parse_class_member<S: Source + ?Sized>(state: &mut ParserState<'_, PlantUmlLanguage, S>) {
     let checkpoint = state.checkpoint();
 
-    if !matches!(
-        state.peek_kind(),
-        Some(PlantUmlTokenType::Plus | PlantUmlTokenType::Minus | PlantUmlTokenType::Hash | PlantUmlTokenType::Tilde)
-    ) {
+    if !matches!(state.peek_kind(), Some(PlantUmlTokenType::Plus | PlantUmlTokenType::Minus | PlantUmlTokenType::Hash | PlantUmlTokenType::Tilde)) {
         state.syntax_error("class member must start with `+`, `-`, `#` or `~`");
         skip_to_line_end(state);
         state.finish_at(checkpoint, PlantUmlElementType::Error);
