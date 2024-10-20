@@ -1,0 +1,5 @@
+digraph G {
+  R [shape=record, label="<f0> left|<f1> mid|<f2> right"]
+  M [shape=mrecord, label="head|{a|b}|tail"]
+  R:f0 -> M:a
+}
