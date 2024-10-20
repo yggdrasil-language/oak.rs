@@ -118,3 +118,35 @@ fn parser_keeps_structure_after_fenced_block_with_angle_bracket() {
     assert_eq!(elements.first(), Some(&MarkdownElementType::CodeBlock), "the fence must close: {elements:?}");
     assert_eq!(elements.get(1), Some(&MarkdownElementType::Blockquote), "the quote after the fence must remain: {elements:?}");
 }
+
+/// MDX component tags may span lines, so their scan must still reject a `<`
+/// that is not a JSX tag start, such as a comparison operator.
+#[test]
+fn mdx_mode_does_not_swallow_comparison_angle() {
+    let source = "a < b\n\n> This is a simple blockquote.\n";
+    let tokens = lex_tokens(source, MarkdownLanguage::new(true));
+
+    assert!(!tokens.iter().any(|(kind, ..)| *kind == MarkdownTokenType::MdxComponent), "a comparison `<` must not open a JSX tag: {tokens:#?}");
+    assert!(tokens.iter().any(|(kind, text, ..)| *kind == MarkdownTokenType::BlockquoteMarker && text == ">"));
+}
+
+#[test]
+fn mdx_mode_fenced_block_keeps_its_closing_fence() {
+    let source = "```python\nif n <= 1:\n    return n\n```\n\n> quote\n";
+    let tokens = lex_tokens(source, MarkdownLanguage::new(true));
+
+    let fences: Vec<_> = tokens.iter().filter(|(kind, ..)| *kind == MarkdownTokenType::CodeFence).collect();
+    assert_eq!(fences.len(), 2, "both fences must stay separate tokens: {tokens:#?}");
+    assert!(tokens.iter().any(|(kind, text, ..)| *kind == MarkdownTokenType::BlockquoteMarker && text == ">"));
+}
+
+/// A real multi-line JSX component still lexes as one MDX component.
+#[test]
+fn mdx_mode_keeps_multiline_jsx_component() {
+    let source = "<Card\n  title=\"Hello\"\n/>\n";
+    let tokens = lex_tokens(source, MarkdownLanguage::new(true));
+
+    let components: Vec<_> = tokens.iter().filter(|(kind, ..)| *kind == MarkdownTokenType::MdxComponent).collect();
+    assert_eq!(components.len(), 1, "multi-line JSX must stay a single component: {tokens:#?}");
+    assert_eq!(components[0].1, "<Card\n  title=\"Hello\"\n/>");
+}

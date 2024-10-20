@@ -302,35 +302,43 @@ impl<'config> MarkdownLexer<'config> {
         }
 
         if remaining.starts_with("<") && !remaining.starts_with("<!--") {
-            let mut end_pos = 0;
-            let mut depth = 0;
-            let mut in_string = None;
+            // A JSX tag starts with a name character, a fragment `<>` or a
+            // closing `</`. Anything else, such as the `<` of `a < b` or
+            // `n <= 1`, is ordinary text. Without this guard the tag scan would
+            // run across the next lines until some unrelated `>`.
+            let starts_jsx = remaining[1..].chars().next().is_some_and(|ch| ch.is_ascii_alphabetic() || matches!(ch, '_' | '$' | '>' | '/'));
 
-            for (i, ch) in remaining.char_indices() {
-                if let Some(quote) = in_string {
-                    if ch == quote {
-                        in_string = None;
+            if starts_jsx {
+                let mut end_pos = 0;
+                let mut depth = 0;
+                let mut in_string = None;
+
+                for (i, ch) in remaining.char_indices() {
+                    if let Some(quote) = in_string {
+                        if ch == quote {
+                            in_string = None;
+                        }
+                    }
+                    else if ch == '"' || ch == '\'' {
+                        in_string = Some(ch);
+                    }
+                    else if ch == '<' {
+                        depth += 1;
+                    }
+                    else if ch == '>' {
+                        depth -= 1;
+                        if depth == 0 {
+                            end_pos = i + 1;
+                            break;
+                        }
                     }
                 }
-                else if ch == '"' || ch == '\'' {
-                    in_string = Some(ch);
-                }
-                else if ch == '<' {
-                    depth += 1;
-                }
-                else if ch == '>' {
-                    depth -= 1;
-                    if depth == 0 {
-                        end_pos = i + 1;
-                        break;
-                    }
-                }
-            }
 
-            if end_pos > 0 {
-                state.set_position(start_pos + end_pos);
-                state.add_token(MarkdownTokenType::MdxComponent, start_pos, start_pos + end_pos);
-                return true;
+                if end_pos > 0 {
+                    state.set_position(start_pos + end_pos);
+                    state.add_token(MarkdownTokenType::MdxComponent, start_pos, start_pos + end_pos);
+                    return true;
+                }
             }
         }
 
