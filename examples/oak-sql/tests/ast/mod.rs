@@ -3,7 +3,6 @@ use oak_core::{ParseSession, SourceText, builder::Builder, source::ToSource};
 use oak_pretty_print::AsDocument;
 use oak_sql::{SqlBuilder, SqlLanguage};
 
-#[ignore = "SQL builder/AST round-trip tests are out of date"]
 #[test]
 fn test_sql_to_source() {
     let config = SqlLanguage::default();
@@ -159,7 +158,6 @@ fn test_sql_create_unique_index_to_source() {
     assert!(generated.contains("CREATE UNIQUE INDEX idx_email ON users(email)"));
 }
 
-#[ignore = "SQL builder/AST round-trip tests are out of date"]
 #[test]
 fn test_sql_database_to_source() {
     let config = SqlLanguage::default();
@@ -177,7 +175,8 @@ fn test_sql_database_to_source() {
     // DROP DATABASE
     let input_drop = "DROP DATABASE test_db;";
     let source_drop = SourceText::new(input_drop);
-    let result_drop = builder.build(&source_drop, &[], &mut session);
+    let mut session_drop = ParseSession::<SqlLanguage>::default();
+    let result_drop = builder.build(&source_drop, &[], &mut session_drop);
     assert!(result_drop.result.is_ok());
     let generated_drop = result_drop.result.unwrap().to_source_string();
     assert!(generated_drop.contains("DROP DATABASE test_db"));

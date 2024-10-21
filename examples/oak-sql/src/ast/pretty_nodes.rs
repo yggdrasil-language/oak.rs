@@ -248,6 +248,23 @@ impl AsDocument for Expression {
             Expression::Exists { query, negated, .. } => {
                 doc!(if *negated { doc!("NOT", soft_space) } else { nil }, "EXISTS", "(", query.as_document(&()), ")")
             }
+            Expression::Case { branches, else_branch, .. } => {
+                let mut parts = vec![Document::text("CASE")];
+                for (when, then) in branches {
+                    parts.push(line);
+                    parts.push(doc!("WHEN", soft_space, when.as_document(&()), soft_space, "THEN", soft_space, then.as_document(&())));
+                }
+                if let Some(else_branch) = else_branch {
+                    parts.push(line);
+                    parts.push(doc!("ELSE", soft_space, else_branch.as_document(&())));
+                }
+                parts.push(line);
+                parts.push(Document::text("END"));
+                Document::group(Document::Concat(parts))
+            }
+            Expression::Cast { expr, target, .. } => {
+                doc!("CAST", "(", expr.as_document(&()), soft_space, "AS", soft_space, target.as_ref(), ")")
+            }
             Expression::Error { .. } => nil,
             Expression::Vector { elements, .. } => {
                 doc!("[", Document::join(elements.iter().map(|it| it.as_document(&())), doc!(",", soft_space)), "]")
@@ -376,6 +393,16 @@ impl AsDocument for GroupByItem {
             GroupByItem::Column(identifier) => identifier.as_document(&()),
             GroupByItem::Position { index, .. } => Document::text(index.to_string()),
             GroupByItem::Expression(expr) => expr.as_document(&()),
+            GroupByItem::GroupingSets(groups) => {
+                let sets = Document::join(groups.iter().map(|group| doc!("(", Document::join(group.iter().map(|item| item.as_document(&())), doc!(",", soft_space)), ")")), doc!(",", soft_space));
+                doc!("GROUPING", soft_space, "SETS", soft_space, "(", sets, ")")
+            }
+            GroupByItem::Rollup(items) => {
+                doc!("ROLLUP", "(", Document::join(items.iter().map(|item| item.as_document(&())), doc!(",", soft_space)), ")")
+            }
+            GroupByItem::Cube(items) => {
+                doc!("CUBE", "(", Document::join(items.iter().map(|item| item.as_document(&())), doc!(",", soft_space)), ")")
+            }
         }
     }
 }
