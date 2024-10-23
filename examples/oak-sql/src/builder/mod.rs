@@ -229,7 +229,9 @@ impl<'config> SqlBuilder<'config> {
         let mut operators = Vec::new();
         let mut order_by = None;
         let mut limit = None;
-        let mut union_all_pending = false;
+        // `ALL` may follow any of the three operators, so remember that the last
+        // pushed operator is still waiting for its quantifier.
+        let mut all_pending = false;
 
         for child in node.children() {
             match child {
@@ -245,21 +247,26 @@ impl<'config> SqlBuilder<'config> {
                 RedTree::Leaf(t) => match t.kind {
                     SqlTokenType::Union => {
                         operators.push(SetOperator::Union);
-                        union_all_pending = true;
+                        all_pending = true;
                     }
                     SqlTokenType::Intersect => {
                         operators.push(SetOperator::Intersect);
-                        union_all_pending = false;
+                        all_pending = true;
                     }
                     SqlTokenType::Except => {
                         operators.push(SetOperator::Except);
-                        union_all_pending = false;
+                        all_pending = true;
                     }
-                    SqlTokenType::All if union_all_pending => {
+                    SqlTokenType::All if all_pending => {
                         if let Some(last) = operators.last_mut() {
-                            *last = SetOperator::UnionAll;
+                            *last = match &*last {
+                                SetOperator::Union => SetOperator::UnionAll,
+                                SetOperator::Intersect => SetOperator::IntersectAll,
+                                SetOperator::Except => SetOperator::ExceptAll,
+                                other => other.clone(),
+                            };
                         }
-                        union_all_pending = false;
+                        all_pending = false;
                     }
                     _ => {}
                 },
