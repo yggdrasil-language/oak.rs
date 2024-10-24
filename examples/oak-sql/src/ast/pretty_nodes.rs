@@ -625,6 +625,10 @@ impl AsDocument for InsertStatement {
                 parts.push(soft_space);
                 parts.push(Document::join(rows, doc!(",", soft_space)));
             }
+            InsertSource::DefaultValues => {
+                parts.push(line);
+                parts.push(Document::text("DEFAULT VALUES"));
+            }
             InsertSource::Select(query) => {
                 parts.push(line);
                 parts.push(query.as_document(&()));

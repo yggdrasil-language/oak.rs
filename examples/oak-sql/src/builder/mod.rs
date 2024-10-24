@@ -370,6 +370,7 @@ impl<'config> SqlBuilder<'config> {
         let mut columns = Vec::new();
         let mut rows = Vec::new();
         let mut query = None;
+        let mut default_values = false;
         let mut on_conflict = None;
         let mut returning = None;
 
@@ -413,6 +414,7 @@ impl<'config> SqlBuilder<'config> {
                     SqlElementType::SetOperationStatement => {
                         return Err(OakError::custom_error("`INSERT ... SELECT` does not support set operations"));
                     }
+                    SqlElementType::DefaultValues => default_values = true,
                     SqlElementType::ConflictClause => on_conflict = Some(self.build_on_conflict_clause(n, source)?),
                     SqlElementType::ReturningClause => returning = Some(self.build_returning_clause(n, source)?),
                     _ => {}
@@ -420,10 +422,15 @@ impl<'config> SqlBuilder<'config> {
             }
         }
 
-        let insert_source = match query {
-            Some(query) => InsertSource::Select(query),
-            None if !rows.is_empty() => InsertSource::Values,
-            None => return Err(OakError::custom_error("Missing `VALUES` list or nested `SELECT` in INSERT")),
+        let insert_source = if default_values {
+            InsertSource::DefaultValues
+        }
+        else {
+            match query {
+                Some(query) => InsertSource::Select(query),
+                None if !rows.is_empty() => InsertSource::Values,
+                None => return Err(OakError::custom_error("Missing `VALUES` list, `DEFAULT VALUES` or nested `SELECT` in INSERT")),
+            }
         };
 
         Ok(InsertStatement { table_name: table_name.ok_or_else(|| OakError::custom_error("Missing table name in INSERT"))?, columns, rows, source: insert_source, on_conflict, returning, span: node.span() })

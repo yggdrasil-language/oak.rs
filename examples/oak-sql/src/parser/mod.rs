@@ -1151,7 +1151,12 @@ impl<'config> SqlParser<'config> {
             state.expect(RightParen).ok();
         }
 
-        if state.eat(Values) {
+        if state.eat(Default) {
+            let default_cp = state.checkpoint();
+            state.expect(Values).ok();
+            state.finish_at(default_cp, SqlElementType::DefaultValues);
+        }
+        else if state.eat(Values) {
             let values_cp = state.checkpoint();
             while state.eat(LeftParen) {
                 let value_list_cp = state.checkpoint();

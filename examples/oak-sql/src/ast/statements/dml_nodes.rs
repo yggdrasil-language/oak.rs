@@ -60,6 +60,10 @@ impl ToSource for InsertStatement {
                     buffer.push(")");
                 }
             }
+            InsertSource::DefaultValues => {
+                buffer.push("DEFAULT");
+                buffer.push("VALUES");
+            }
             InsertSource::Select(query) => query.to_source(buffer),
         }
         if let Some(on_conflict) = &self.on_conflict {
@@ -77,6 +81,8 @@ impl ToSource for InsertStatement {
 pub enum InsertSource {
     /// Rows written out in a `VALUES` list.
     Values,
+    /// No rows are written because `DEFAULT VALUES` asks for one row of defaults.
+    DefaultValues,
     /// Rows produced by a nested query.
     Select(Box<SelectStatement>),
 }
