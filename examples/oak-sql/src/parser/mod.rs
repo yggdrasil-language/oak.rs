@@ -1320,6 +1320,102 @@ impl<'config> SqlParser<'config> {
         Ok(())
     }
 
+    /// Parses a table-level constraint of a `CREATE TABLE` body:
+    /// `PRIMARY KEY (...)`, `FOREIGN KEY (...) REFERENCES ...` or `CHECK (...)`.
+    fn parse_table_constraint<'a, S: Source + ?Sized>(&self, state: &mut State<'a, S>) {
+        use crate::lexer::SqlTokenType::*;
+        let cp = state.checkpoint();
+        if state.eat(Primary) {
+            state.expect(Key).ok();
+            self.parse_indexed_columns(state);
+            if state.eat(On) {
+                state.expect(Conflict).ok();
+                self.parse_conflict_resolution(state);
+            }
+        }
+        else if state.eat(Foreign) {
+            state.expect(Key).ok();
+            self.parse_column_list(state);
+            state.expect(References).ok();
+            let table_cp = state.checkpoint();
+            state.expect(Identifier_).ok();
+            state.finish_at(table_cp, SqlElementType::TableName);
+            // The referenced column list is optional: `REFERENCES users` is as
+            // valid as `REFERENCES users (id)`.
+            if state.peek_kind() == Some(LeftParen) {
+                self.parse_column_list(state);
+            }
+        }
+        else if state.eat(Check) {
+            if state.eat(LeftParen) {
+                let expr_cp = state.checkpoint();
+                PrattParser::parse(state, 0, self);
+                state.finish_at(expr_cp, SqlElementType::Expression);
+                state.expect(RightParen).ok();
+            }
+            else {
+                state.errors.push(OakError::custom_error("`CHECK` constraint requires a parenthesized expression"));
+            }
+        }
+        state.finish_at(cp, SqlElementType::TableConstraint);
+    }
+
+    /// Parses a parenthesized identifier list, producing one `Identifier` node
+    /// per column.
+    fn parse_column_list<'a, S: Source + ?Sized>(&self, state: &mut State<'a, S>) {
+        use crate::lexer::SqlTokenType::*;
+        if !state.eat(LeftParen) {
+            return;
+        }
+        while state.not_at_end() && state.peek_kind() != Some(RightParen) {
+            let cp = state.checkpoint();
+            state.expect(Identifier_).ok();
+            state.finish_at(cp, SqlElementType::Identifier);
+            if !state.eat(Comma) {
+                break;
+            }
+        }
+        state.expect(RightParen).ok();
+    }
+
+    /// Parses the parenthesized column list of a table-level `PRIMARY KEY`,
+    /// wrapping each column with its optional `ASC` / `DESC` ordering.
+    fn parse_indexed_columns<'a, S: Source + ?Sized>(&self, state: &mut State<'a, S>) {
+        use crate::lexer::SqlTokenType::*;
+        if !state.eat(LeftParen) {
+            return;
+        }
+        while state.not_at_end() && state.peek_kind() != Some(RightParen) {
+            let cp = state.checkpoint();
+            let name_cp = state.checkpoint();
+            state.expect(Identifier_).ok();
+            state.finish_at(name_cp, SqlElementType::Identifier);
+            if !state.eat(Asc) {
+                state.eat(Desc);
+            }
+            state.finish_at(cp, SqlElementType::IndexedColumn);
+            if !state.eat(Comma) {
+                break;
+            }
+        }
+        state.expect(RightParen).ok();
+    }
+
+    /// Parses the resolution word after `ON CONFLICT`.
+    fn parse_conflict_resolution<'a, S: Source + ?Sized>(&self, state: &mut State<'a, S>) {
+        use crate::lexer::SqlTokenType::*;
+        if state.eat(Rollback) {
+            return;
+        }
+        let known = state.peek_kind() == Some(Identifier_) && state.peek_text().is_some_and(|text| crate::ast::ConflictResolution::from_word(&text).is_some());
+        if known {
+            state.bump();
+        }
+        else {
+            state.errors.push(OakError::custom_error("`ON CONFLICT` requires ROLLBACK, ABORT, FAIL, IGNORE or REPLACE"));
+        }
+    }
+
     fn parse_create<'a, S: Source + ?Sized>(&self, state: &mut State<'a, S>) -> Result<(), OakError> {
         use crate::lexer::SqlTokenType::*;
         let cp = state.checkpoint();
@@ -1336,6 +1432,16 @@ impl<'config> SqlParser<'config> {
 
             if state.eat(LeftParen) {
                 while state.not_at_end() && state.peek_kind() != Some(RightParen) {
+                    // A table-level constraint starts with its own keyword; a
+                    // column definition starts with its name.
+                    if matches!(state.peek_kind(), Some(Primary | Foreign | Check)) {
+                        self.parse_table_constraint(state);
+                        if !state.eat(Comma) {
+                            break;
+                        }
+                        continue;
+                    }
+
                     let col_cp = state.checkpoint();
 
                     let name_cp = state.checkpoint();

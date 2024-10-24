@@ -596,6 +596,7 @@ impl<'config> SqlBuilder<'config> {
         let mut query = None;
         let mut table_name = None;
         let mut index_columns = Vec::new();
+        let mut table_constraints = Vec::new();
         let mut unique = false;
 
         for child in node.children() {
@@ -636,6 +637,9 @@ impl<'config> SqlBuilder<'config> {
                     SqlElementType::ColumnDefinition => {
                         columns.push(self.build_column_definition(n, source)?);
                     }
+                    SqlElementType::TableConstraint => {
+                        table_constraints.push(self.build_table_constraint(n, source)?);
+                    }
                     SqlElementType::SelectStatement => {
                         query = Some(self.build_select_statement(n, source)?);
                     }
@@ -645,7 +649,7 @@ impl<'config> SqlBuilder<'config> {
         }
 
         let body = match object_type {
-            CreateObjectType::Table => CreateBody::Table { columns, span: node.span() },
+            CreateObjectType::Table => CreateBody::Table { columns, constraints: table_constraints, span: node.span() },
             CreateObjectType::View => CreateBody::View { query: Box::new(query.ok_or_else(|| OakError::custom_error("Missing query in CREATE VIEW"))?), span: node.span() },
             CreateObjectType::Index => CreateBody::Index { table_name: table_name.ok_or_else(|| OakError::custom_error("Missing table name in CREATE INDEX"))?, columns: index_columns, unique, span: node.span() },
             CreateObjectType::Database => CreateBody::Database { span: node.span() },
@@ -746,6 +750,90 @@ impl<'config> SqlBuilder<'config> {
         };
 
         Ok(ColumnDefinition { name: name.ok_or_else(|| OakError::custom_error("Missing name in column definition"))?, data_type, constraints, span: node.span() })
+    }
+
+    /// Builds a table-level constraint of a `CREATE TABLE` statement.
+    fn build_table_constraint<'a>(&self, node: RedNode<'a, SqlLanguage>, source: &SourceText) -> Result<TableConstraint, OakError> {
+        let mut is_primary = false;
+        let mut is_foreign = false;
+        let mut is_check = false;
+        let mut columns = Vec::new();
+        let mut indexed_columns = Vec::new();
+        let mut table_name = None;
+        let mut referenced_columns = Vec::new();
+        let mut expr = None;
+        let mut conflict = false;
+        let mut resolution = None;
+
+        for child in node.children() {
+            match child {
+                RedTree::Node(n) => match n.green.kind {
+                    SqlElementType::IndexedColumn => indexed_columns.push(self.build_indexed_column(n, source)?),
+                    SqlElementType::Identifier => {
+                        // Identifiers after the referenced table are its columns;
+                        // the ones before belong to the constrained column list.
+                        if table_name.is_some() {
+                            referenced_columns.push(self.build_identifier(n, source)?);
+                        }
+                        else {
+                            columns.push(self.build_identifier(n, source)?);
+                        }
+                    }
+                    SqlElementType::TableName => table_name = Some(self.build_table_name(n, source)?),
+                    SqlElementType::Expression => expr = Some(self.build_expression(n, source)?),
+                    _ => {}
+                },
+                RedTree::Leaf(t) => match t.kind {
+                    SqlTokenType::Primary => is_primary = true,
+                    SqlTokenType::Foreign => is_foreign = true,
+                    SqlTokenType::Check => is_check = true,
+                    SqlTokenType::Conflict => conflict = true,
+                    SqlTokenType::Rollback => resolution = Some(ConflictResolution::Rollback),
+                    SqlTokenType::Identifier_ if conflict => {
+                        resolution = ConflictResolution::from_word(&self.get_text(t.span.clone(), source));
+                    }
+                    _ => {}
+                },
+            }
+        }
+
+        let span = node.span();
+        if is_primary {
+            if conflict && resolution.is_none() {
+                return Err(OakError::custom_error("Missing resolution in `ON CONFLICT`"));
+            }
+            return Ok(TableConstraint::PrimaryKey { columns: indexed_columns, on_conflict: resolution, span });
+        }
+        if is_foreign {
+            return Ok(TableConstraint::ForeignKey {
+                columns,
+                table_name: table_name.ok_or_else(|| OakError::custom_error("Missing referenced table in `FOREIGN KEY`"))?,
+                referenced_columns,
+                span,
+            });
+        }
+        if is_check {
+            return Ok(TableConstraint::Check { expr: expr.ok_or_else(|| OakError::custom_error("Missing expression in `CHECK`"))?, span });
+        }
+        Err(OakError::custom_error("Unknown table constraint"))
+    }
+
+    /// Builds one column of a table-level `PRIMARY KEY` constraint.
+    fn build_indexed_column<'a>(&self, node: RedNode<'a, SqlLanguage>, source: &SourceText) -> Result<IndexedColumn, OakError> {
+        let mut name = None;
+        let mut direction = None;
+        for child in node.children() {
+            match child {
+                RedTree::Node(n) if matches!(n.green.kind, SqlElementType::Identifier | SqlElementType::ColumnName) => name = Some(self.build_identifier(n, source)?),
+                RedTree::Leaf(t) => match t.kind {
+                    SqlTokenType::Asc => direction = Some(OrderDirection::Asc),
+                    SqlTokenType::Desc => direction = Some(OrderDirection::Desc),
+                    _ => {}
+                },
+                _ => {}
+            }
+        }
+        Ok(IndexedColumn { name: name.ok_or_else(|| OakError::custom_error("Missing column name in `PRIMARY KEY`"))?, direction, span: node.span() })
     }
 
     /// Helper to find the next node of a specific kind after a certain position

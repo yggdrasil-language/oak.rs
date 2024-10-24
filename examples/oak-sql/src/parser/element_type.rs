@@ -64,6 +64,10 @@ pub enum SqlElementType {
     Alias,
     /// Column definition.
     ColumnDefinition,
+    /// Table-level constraint of a `CREATE TABLE` statement.
+    TableConstraint,
+    /// Column of a table-level `PRIMARY KEY` constraint.
+    IndexedColumn,
     /// Value list.
     ValueList,
     /// Assignment.
@@ -128,6 +132,8 @@ impl ElementType for SqlElementType {
             | Self::SelectQuantifier
             | Self::SelectItem
             | Self::ColumnDefinition
+            | Self::TableConstraint
+            | Self::IndexedColumn
             | Self::ValueList
             | Self::Assignment
             | Self::AlterAction
