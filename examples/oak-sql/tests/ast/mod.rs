@@ -175,8 +175,7 @@ fn test_sql_database_to_source() {
     // DROP DATABASE
     let input_drop = "DROP DATABASE test_db;";
     let source_drop = SourceText::new(input_drop);
-    let mut session_drop = ParseSession::<SqlLanguage>::default();
-    let result_drop = builder.build(&source_drop, &[], &mut session_drop);
+    let result_drop = builder.build(&source_drop, &[], &mut session);
     assert!(result_drop.result.is_ok());
     let generated_drop = result_drop.result.unwrap().to_source_string();
     assert!(generated_drop.contains("DROP DATABASE test_db"));

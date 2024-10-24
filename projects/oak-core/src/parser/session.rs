@@ -17,6 +17,25 @@ pub trait ParseCache<L: Language>: LexerCache<L> {
     /// Returns the output of the lexing phase.
     fn lex_output(&self) -> Option<&LexOutput<L>>;
 
+    /// Returns the fingerprint of the source text whose lex output and tree are
+    /// currently cached.
+    ///
+    /// [`parse_with_lexer`](super::parse_with_lexer) compares it with the text it
+    /// is asked to parse: when they differ the cache belongs to another document
+    /// and must not be reused. Implementors that cannot provide a fingerprint
+    /// simply keep the default and every parse re-lexes from scratch.
+    fn source_fingerprint(&self) -> Option<u64> {
+        None
+    }
+
+    /// Records the fingerprint of the source text being parsed.
+    fn set_source_fingerprint(&mut self, _fingerprint: u64) {}
+
+    /// Drops the cached lex output so the next parse lexes the document in full.
+    ///
+    /// This is called when a different document is handed to the same cache.
+    fn clear_lex_output(&mut self) {}
+
     /// Prepares for a new parsing generation (e.g. by swapping arenas).
     fn prepare_generation(&mut self);
 
@@ -37,6 +56,8 @@ pub struct ParseSession<L: Language + Send + Sync> {
     last_root: Cell<Option<NonNull<()>>>,
     /// Full output from the last lexing pass.
     last_lex: Option<LexOutput<L>>,
+    /// Fingerprint of the source text that produced `last_lex` and `last_root`.
+    last_source_fingerprint: Option<u64>,
     /// Cached typed nodes for incremental building.
     pub(crate) typed_nodes: HashMap<NonNull<()>, Box<dyn Any + Send + Sync>>,
 }
@@ -53,7 +74,7 @@ impl<L: Language + Send + Sync> Default for ParseSession<L> {
 impl<L: Language + Send + Sync> ParseSession<L> {
     /// Creates a new parse session.
     pub fn new(capacity: usize) -> Self {
-        Self { arena_active: SyntaxArena::new(capacity), arena_old: None, last_root: Cell::new(None), last_lex: None, typed_nodes: HashMap::new() }
+        Self { arena_active: SyntaxArena::new(capacity), arena_old: None, last_root: Cell::new(None), last_lex: None, last_source_fingerprint: None, typed_nodes: HashMap::new() }
     }
 
     /// Returns the root of the last parsed tree.
@@ -94,11 +115,24 @@ impl<L: Language + Send + Sync> ParseCache<L> for ParseSession<L> {
         self.last_lex.as_ref()
     }
 
+    fn source_fingerprint(&self) -> Option<u64> {
+        self.last_source_fingerprint
+    }
+
+    fn set_source_fingerprint(&mut self, fingerprint: u64) {
+        self.last_source_fingerprint = Some(fingerprint)
+    }
+
+    fn clear_lex_output(&mut self) {
+        self.last_lex = None
+    }
+
     fn prepare_generation(&mut self) {
         // 1. Move active to old. Oldest is dropped.
         self.arena_old = Some(std::mem::replace(&mut self.arena_active, SyntaxArena::new(16)));
         // 2. Clear caches
         self.last_lex = None;
+        self.last_source_fingerprint = None;
         self.typed_nodes.clear();
     }
 
@@ -141,6 +175,18 @@ impl<'a, L: Language, C: ParseCache<L> + ?Sized> ParseCache<L> for &'a mut C {
 
     fn lex_output(&self) -> Option<&LexOutput<L>> {
         (**self).lex_output()
+    }
+
+    fn source_fingerprint(&self) -> Option<u64> {
+        (**self).source_fingerprint()
+    }
+
+    fn set_source_fingerprint(&mut self, fingerprint: u64) {
+        (**self).set_source_fingerprint(fingerprint)
+    }
+
+    fn clear_lex_output(&mut self) {
+        (**self).clear_lex_output()
     }
 
     fn prepare_generation(&mut self) {

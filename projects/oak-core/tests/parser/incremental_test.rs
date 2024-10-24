@@ -1,12 +1,13 @@
 use core::range::Range;
 use oak_core::{
     ElementType, Language, TokenType, UniversalElementRole, UniversalTokenRole,
-    lexer::{LexOutput, Token, Tokens},
+    lexer::{LexOutput, Lexer, LexerCache, Token, Tokens},
     memory::arena::SyntaxArena,
-    parser::state::ParserState,
-    source::TextEdit,
+    parser::{ParseCache, ParseOutput, Parser, parse_with_lexer, state::ParserState},
+    source::{Source, SourceText, TextEdit},
     tree::{GreenNode, GreenTree},
 };
+use std::cell::Cell;
 use triomphe::Arc;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -83,14 +84,21 @@ impl From<MockToken> for MockElement {
     }
 }
 
+thread_local! {
+    /// Number of `Item` nodes the mock parser built from scratch, i.e. that
+    /// could not be taken from the previous tree.
+    static ITEM_BUILDS: Cell<usize> = const { Cell::new(0) };
+}
+
 // Simple parser for the mock language
-fn parse<'a>(state: &mut ParserState<'a, MockLanguage>) -> &'a GreenNode<'a, MockLanguage> {
+fn parse<'a, S: Source + ?Sized>(state: &mut ParserState<'a, MockLanguage, S>) -> &'a GreenNode<'a, MockLanguage> {
     let cp_root = state.checkpoint();
 
     while state.not_at_end() && state.peek_kind() != Some(MockToken::End) {
         if state.peek_kind() == Some(MockToken::Item) {
             // Try to reuse Item node
             if !state.try_reuse(MockElement::Item) {
+                ITEM_BUILDS.with(|count| count.set(count.get() + 1));
                 let cp_item = state.checkpoint();
                 state.bump(); // eat the Item token
                 state.finish_at(cp_item, MockElement::Item);
@@ -158,4 +166,122 @@ fn test_incremental_reuse() {
     // Item3 should be reused
     assert_eq!(item_nodes[2].kind, MockElement::Item);
     assert_eq!(item_nodes[2].text_len(), 5)
+}
+
+/// Counts how often it is asked to lex, so tests can tell a cache hit from a
+/// re-lex.
+#[derive(Default)]
+struct CountingLexer {
+    calls: Cell<usize>,
+}
+
+impl Lexer<MockLanguage> for CountingLexer {
+    fn lex<'a, S: Source + ?Sized>(&self, text: &S, _edits: &[TextEdit], _cache: &'a mut impl LexerCache<MockLanguage>) -> LexOutput<MockLanguage> {
+        self.calls.set(self.calls.get() + 1);
+        mock_lex(&text.get_text_from(0))
+    }
+}
+
+/// Drives the mock parser through [`parse_with_lexer`], i.e. the same
+/// lexing/parsing/caching orchestration real languages use.
+struct MockParser<'a> {
+    lexer: &'a CountingLexer,
+}
+
+impl Parser<MockLanguage> for MockParser<'_> {
+    fn parse<'a, S: Source + ?Sized>(&self, text: &'a S, edits: &[TextEdit], cache: &'a mut impl ParseCache<MockLanguage>) -> ParseOutput<'a, MockLanguage> {
+        parse_with_lexer(self.lexer, text, edits, cache, |state| Ok(parse(state)))
+    }
+}
+
+fn item_nodes<'a>(root: &'a GreenNode<'a, MockLanguage>) -> Vec<&'a GreenNode<'a, MockLanguage>> {
+    root.children
+        .iter()
+        .filter_map(|child| match *child {
+            GreenTree::Node(n) if n.kind == MockElement::Item => Some(n),
+            _ => None,
+        })
+        .collect()
+}
+
+/// The same document parsed twice with the same session must hit the cached
+/// lex output instead of lexing again.
+#[test]
+fn test_unchanged_document_hits_the_cached_lex_output() {
+    let lexer = CountingLexer::default();
+    let parser = MockParser { lexer: &lexer };
+    let mut session = oak_core::parser::ParseSession::<MockLanguage>::default();
+
+    let source = SourceText::new("item1 item2");
+    parser.parse(&source, &[], &mut session).result.expect("first parse");
+    // A distinct source object with the same text is still the same document.
+    let source_again = SourceText::new("item1 item2");
+    parser.parse(&source_again, &[], &mut session).result.expect("second parse");
+
+    assert_eq!(lexer.calls.get(), 1, "an unchanged document must not be lexed again");
+}
+
+/// A different document handed to the same session must never reuse the
+/// previous document's tokens or tree.
+#[test]
+fn test_different_document_does_not_reuse_the_previous_tree() {
+    let lexer = CountingLexer::default();
+    let parser = MockParser { lexer: &lexer };
+    let mut session = oak_core::parser::ParseSession::<MockLanguage>::default();
+
+    let source1 = SourceText::new("item1 item2");
+    parser.parse(&source1, &[], &mut session).result.expect("first parse");
+
+    let source2 = SourceText::new("nothing");
+    let tree2 = parser.parse(&source2, &[], &mut session).result.expect("second parse");
+
+    assert!(item_nodes(tree2).is_empty(), "the second tree must describe the second document");
+    assert_eq!(lexer.calls.get(), 2, "a different document must be lexed again");
+}
+
+/// A new generation with a different document and no edits must skip the old
+/// tree instead of incrementally reusing it.
+#[test]
+fn test_different_document_without_edits_skips_the_old_tree() {
+    let lexer = CountingLexer::default();
+    let parser = MockParser { lexer: &lexer };
+    let mut session = oak_core::parser::ParseSession::<MockLanguage>::default();
+
+    let source1 = SourceText::new("item1 item2");
+    parser.parse(&source1, &[], &mut session).result.expect("first parse");
+
+    session.prepare_generation();
+
+    let source2 = SourceText::new("nothing");
+    let tree2 = parser.parse(&source2, &[], &mut session).result.expect("second parse");
+
+    assert!(item_nodes(tree2).is_empty(), "the old tree of another document must not be reused");
+    assert_eq!(lexer.calls.get(), 2);
+}
+
+/// Edits still take the incremental path: unchanged nodes are reused.
+#[test]
+fn test_edits_reuse_nodes_from_the_previous_tree() {
+    let lexer = CountingLexer::default();
+    let parser = MockParser { lexer: &lexer };
+    let mut session = oak_core::parser::ParseSession::<MockLanguage>::default();
+
+    let first_builds = {
+        let source1 = SourceText::new("item1 item2 item3");
+        let tree1 = parser.parse(&source1, &[], &mut session).result.expect("first parse");
+        assert_eq!(item_nodes(tree1).len(), 3);
+        ITEM_BUILDS.with(|count| count.get())
+    };
+    assert_eq!(first_builds, 3, "all items are built when there is no previous tree");
+
+    session.prepare_generation();
+    ITEM_BUILDS.with(|count| count.set(0));
+
+    let source2 = SourceText::new("item1 itemX item3");
+    let edits = [TextEdit { span: Range { start: 6, end: 11 }, text: "itemX".to_string().into() }];
+    let tree2 = parser.parse(&source2, &edits, &mut session).result.expect("incremental parse");
+
+    let items2 = item_nodes(tree2);
+    assert_eq!(items2.len(), 3, "the parsed tree must still contain all items");
+    assert!(ITEM_BUILDS.with(|count| count.get()) < 3, "at least one item must be reused from the previous tree");
 }
