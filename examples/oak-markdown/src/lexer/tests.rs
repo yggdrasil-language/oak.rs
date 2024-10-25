@@ -140,6 +140,36 @@ fn mdx_mode_fenced_block_keeps_its_closing_fence() {
     assert!(tokens.iter().any(|(kind, text, ..)| *kind == MarkdownTokenType::BlockquoteMarker && text == ">"));
 }
 
+/// A `#` line inside a fenced block is code content, not a heading.
+#[test]
+fn fence_content_keeps_hash_out_of_heading_tokens() {
+    let source = "```markdown\n# Code block with Markdown\nThis is a **code block** that contains Markdown syntax.\n```\n";
+    let tokens = lex_tokens(source, MarkdownLanguage::github_flavored());
+
+    assert!(!tokens.iter().any(|(kind, ..)| is_heading(*kind)), "fence content must not lex as a heading: {tokens:#?}");
+
+    let fences: Vec<_> = tokens.iter().filter(|(kind, ..)| *kind == MarkdownTokenType::CodeFence).collect();
+    assert_eq!(fences.len(), 2, "both fences must stay separate tokens: {tokens:#?}");
+
+    let hash = tokens.iter().find(|(kind, text, ..)| *kind == MarkdownTokenType::Hash && *text == "#").expect("the fence body still lexes its `#`");
+    assert!(hash.2 > fences[0].3 && hash.3 < fences[1].2, "the `#` must stay between the fences: {tokens:#?}");
+}
+
+/// A heading after a blockquote marker is still a heading block.
+#[test]
+fn blockquote_heading_lexes_at_its_marker() {
+    let source = "> ### Heading in Blockquote\n";
+    let tokens = lex_tokens(source, MarkdownLanguage::github_flavored());
+
+    let heading = tokens.iter().find(|(kind, ..)| *kind == MarkdownTokenType::Heading3).expect("`> ### ...` must keep a `Heading3` token");
+    assert_eq!(heading.1, "###");
+    assert_eq!(heading.2, 2, "the heading marker starts after the `> ` prefix: {tokens:#?}");
+}
+
+fn is_heading(kind: MarkdownTokenType) -> bool {
+    matches!(kind, MarkdownTokenType::Heading1 | MarkdownTokenType::Heading2 | MarkdownTokenType::Heading3 | MarkdownTokenType::Heading4 | MarkdownTokenType::Heading5 | MarkdownTokenType::Heading6)
+}
+
 /// A real multi-line JSX component still lexes as one MDX component.
 #[test]
 fn mdx_mode_keeps_multiline_jsx_component() {

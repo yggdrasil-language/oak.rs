@@ -6,12 +6,8 @@ impl<'config> MarkdownLexer<'config> {
     pub fn lex_heading<S: Source + ?Sized>(&self, state: &mut State<S>) -> bool {
         let start_pos = state.get_position();
 
-        if start_pos > 0 {
-            if let Some(prev_char) = state.source().get_char_at(start_pos - 1) {
-                if prev_char != '\n' && prev_char != '\r' {
-                    return false;
-                }
-            }
+        if !is_heading_line_start(state, start_pos) {
+            return false;
         }
 
         if let Some('#') = state.peek() {
@@ -304,4 +300,27 @@ impl<'config> MarkdownLexer<'config> {
             false
         }
     }
+}
+
+/// Returns `true` when `pos` can open an ATX heading.
+///
+/// A heading marker either starts the physical line or follows the blockquote prefix
+/// (`>` markers plus optional spaces). Indentation of four or more spaces is an
+/// indented code block, not a heading.
+fn is_heading_line_start<S: Source + ?Sized>(state: &State<S>, pos: usize) -> bool {
+    let mut index = pos;
+    let mut indent = 0;
+
+    while index > 0 {
+        index -= 1;
+        match state.source().get_char_at(index) {
+            Some(' ') => indent += 1,
+            Some('\t') => indent += 4,
+            Some('>') => indent = 0,
+            Some('\n') | Some('\r') => return indent < 4,
+            _ => return false,
+        }
+    }
+
+    indent < 4
 }

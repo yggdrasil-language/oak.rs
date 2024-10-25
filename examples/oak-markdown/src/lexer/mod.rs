@@ -26,6 +26,10 @@ impl<'config> MarkdownLexer<'config> {
     }
 
     fn run<S: Source + ?Sized>(&self, state: &mut State<S>) -> Result<(), OakError> {
+        // A fenced block body is code, so block-level rules such as ATX headings
+        // must not fire between the opening and closing fence lines.
+        let mut in_fence = false;
+
         while state.not_at_end() {
             let safe_point = state.get_position();
 
@@ -53,13 +57,14 @@ impl<'config> MarkdownLexer<'config> {
                         self.lex_special_char(state);
                     }
                     '#' => {
-                        if self.config.allow_headings && self.lex_heading(state) {
+                        if !in_fence && self.config.allow_headings && self.lex_heading(state) {
                             continue;
                         }
                         self.lex_special_char(state);
                     }
                     '`' => {
                         if self.config.allow_fenced_code_blocks && self.lex_code_block(state) {
+                            in_fence = !in_fence;
                             continue;
                         }
                         if self.lex_inline_code(state) {
@@ -69,6 +74,7 @@ impl<'config> MarkdownLexer<'config> {
                     }
                     '~' => {
                         if self.lex_code_block(state) {
+                            in_fence = !in_fence;
                             continue;
                         }
                         if self.config.allow_strikethrough && self.lex_strikethrough(state) {
