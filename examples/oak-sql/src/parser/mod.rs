@@ -332,7 +332,9 @@ impl<'config> Pratt<SqlLanguage> for SqlParser<'config> {
             Or => (1, Associativity::Left),
             And => (2, Associativity::Left),
             Equal | NotEqual | Less | Greater | LessEqual | GreaterEqual | Like => (4, Associativity::Left),
-            Concat => (6, Associativity::Left),
+            // SQLite puts `||` above `*`/`/`/`%` and below `COLLATE`/unary;
+            // see `select 1 || 2 * 3` -> 36 (i.e. `(1 || 2) * 3`).
+            Concat => (12, Associativity::Left),
             Plus | Minus => (10, Associativity::Left),
             Star | Slash | Percent => (11, Associativity::Left),
             DoubleColon => (15, Associativity::Left),

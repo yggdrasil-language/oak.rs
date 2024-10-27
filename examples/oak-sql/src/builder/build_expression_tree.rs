@@ -520,7 +520,7 @@ impl<'config> SqlBuilder<'config> {
             SqlTokenType::And => 2,
             SqlTokenType::Equal | SqlTokenType::NotEqual | SqlTokenType::Less | SqlTokenType::Greater | SqlTokenType::LessEqual | SqlTokenType::GreaterEqual | SqlTokenType::Like => 4,
             SqlTokenType::Between | SqlTokenType::In | SqlTokenType::Is => 5,
-            SqlTokenType::Concat => 6,
+            SqlTokenType::Concat => 12,
             SqlTokenType::Plus | SqlTokenType::Minus => 10,
             SqlTokenType::Star | SqlTokenType::Slash | SqlTokenType::Percent => 11,
             _ => 0,

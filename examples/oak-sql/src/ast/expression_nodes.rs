@@ -398,6 +398,8 @@ pub enum BinaryOperator {
     GreaterEqual,
     /// Pattern matching (LIKE).
     Like,
+    /// String concatenation (`||`).
+    Concat,
 }
 
 impl ToSource for BinaryOperator {
@@ -417,6 +419,7 @@ impl ToSource for BinaryOperator {
             BinaryOperator::LessEqual => buffer.push("<="),
             BinaryOperator::GreaterEqual => buffer.push(">="),
             BinaryOperator::Like => buffer.push("LIKE"),
+            BinaryOperator::Concat => buffer.push("||"),
         }
     }
 }
