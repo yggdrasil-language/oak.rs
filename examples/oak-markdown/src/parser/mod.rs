@@ -227,6 +227,12 @@ impl<'config> Parser<MarkdownLanguage> for MarkdownParser<'config> {
                                         self.parse_heading_block(state, next_kind);
                                         continue;
                                     }
+                                    if next_kind == MarkdownTokenType::CodeFence {
+                                        let fence_checkpoint = state.checkpoint();
+                                        self.parse_fenced_code_block(state);
+                                        state.finish_at(fence_checkpoint, ET::CodeBlock);
+                                        continue;
+                                    }
                                     if next_kind == MarkdownTokenType::Newline {
                                         state.bump();
                                         if let Some(after_nl) = state.peek_kind() {
@@ -241,6 +247,12 @@ impl<'config> Parser<MarkdownLanguage> for MarkdownParser<'config> {
                                                             self.parse_heading_block(state, nested_next_kind);
                                                             continue;
                                                         }
+                                                        if nested_next_kind == MarkdownTokenType::CodeFence {
+                                                            let fence_checkpoint = state.checkpoint();
+                                                            self.parse_fenced_code_block(state);
+                                                            state.finish_at(fence_checkpoint, ET::CodeBlock);
+                                                            continue;
+                                                        }
                                                         if nested_next_kind == MarkdownTokenType::Newline {
                                                             state.bump();
                                                             if let Some(nested_after_nl) = state.peek_kind() {
@@ -253,6 +265,12 @@ impl<'config> Parser<MarkdownLanguage> for MarkdownParser<'config> {
                                                                         if let Some(deeper_nested_next_kind) = state.peek_kind() {
                                                                             if Self::is_heading(deeper_nested_next_kind) {
                                                                                 self.parse_heading_block(state, deeper_nested_next_kind);
+                                                                                continue;
+                                                                            }
+                                                                            if deeper_nested_next_kind == MarkdownTokenType::CodeFence {
+                                                                                let fence_checkpoint = state.checkpoint();
+                                                                                self.parse_fenced_code_block(state);
+                                                                                state.finish_at(fence_checkpoint, ET::CodeBlock);
                                                                                 continue;
                                                                             }
                                                                             if deeper_nested_next_kind == MarkdownTokenType::Newline {
@@ -316,19 +334,7 @@ impl<'config> Parser<MarkdownLanguage> for MarkdownParser<'config> {
                             state.finish_at(blockquote_checkpoint, ET::Blockquote);
                         }
                         MarkdownTokenType::CodeFence => {
-                            state.bump();
-                            if let Some(MarkdownTokenType::CodeLanguage) = state.peek_kind() {
-                                state.bump();
-                            }
-                            while state.not_at_end() {
-                                if let Some(next_kind) = state.peek_kind() {
-                                    if next_kind == MarkdownTokenType::CodeFence {
-                                        state.bump();
-                                        break;
-                                    }
-                                }
-                                state.bump();
-                            }
+                            self.parse_fenced_code_block(state);
                             state.finish_at(item_checkpoint, ET::CodeBlock);
                         }
                         MarkdownTokenType::HorizontalRule => {
@@ -486,6 +492,25 @@ impl<'config> MarkdownParser<'config> {
         state.bump();
         self.parse_inlines_until_newline(state);
         state.finish_at(checkpoint, ET::from(kind));
+    }
+
+    /// Consumes a fenced code block from its opening fence to its closing fence.
+    ///
+    /// The body tokens are opaque, so they are bumped without block-level
+    /// classification. The same routine serves top-level fences and fences
+    /// nested in a blockquote.
+    fn parse_fenced_code_block<'a, S: Source + ?Sized>(&self, state: &mut ParserState<'a, MarkdownLanguage, S>) {
+        state.bump();
+        if let Some(MarkdownTokenType::CodeLanguage) = state.peek_kind() {
+            state.bump();
+        }
+        while state.not_at_end() {
+            if let Some(MarkdownTokenType::CodeFence) = state.peek_kind() {
+                state.bump();
+                break;
+            }
+            state.bump();
+        }
     }
 
     fn is_block_start(&self, kind: MarkdownTokenType) -> bool {

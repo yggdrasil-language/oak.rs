@@ -26,12 +26,19 @@ impl<'config> MarkdownLexer<'config> {
     }
 
     fn run<S: Source + ?Sized>(&self, state: &mut State<S>) -> Result<(), OakError> {
-        // A fenced block body is code, so block-level rules such as ATX headings
-        // must not fire between the opening and closing fence lines.
-        let mut in_fence = false;
+        // While a fenced block is open, its body is opaque code. The lexer
+        // consumes whole lines and emits only container markers plus `CodeBlock`
+        // tokens, so no block-level rule can fire inside the fence.
+        let mut fence: Option<block::FenceSpec> = None;
 
         while state.not_at_end() {
             let safe_point = state.get_position();
+
+            if let Some(spec) = fence {
+                if self.lex_fence_body_line(state, &spec, &mut fence) {
+                    continue;
+                }
+            }
 
             if let Some(ch) = state.peek() {
                 match ch {
@@ -57,15 +64,17 @@ impl<'config> MarkdownLexer<'config> {
                         self.lex_special_char(state);
                     }
                     '#' => {
-                        if !in_fence && self.config.allow_headings && self.lex_heading(state) {
+                        if self.config.allow_headings && self.lex_heading(state) {
                             continue;
                         }
                         self.lex_special_char(state);
                     }
                     '`' => {
-                        if self.config.allow_fenced_code_blocks && self.lex_code_block(state) {
-                            in_fence = !in_fence;
-                            continue;
+                        if self.config.allow_fenced_code_blocks {
+                            if let Some(spec) = self.lex_code_block(state) {
+                                fence = Some(spec);
+                                continue;
+                            }
                         }
                         if self.lex_inline_code(state) {
                             continue;
@@ -73,8 +82,8 @@ impl<'config> MarkdownLexer<'config> {
                         self.lex_special_char(state);
                     }
                     '~' => {
-                        if self.lex_code_block(state) {
-                            in_fence = !in_fence;
+                        if let Some(spec) = self.lex_code_block(state) {
+                            fence = Some(spec);
                             continue;
                         }
                         if self.config.allow_strikethrough && self.lex_strikethrough(state) {

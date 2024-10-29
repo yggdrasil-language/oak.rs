@@ -151,8 +151,85 @@ fn fence_content_keeps_hash_out_of_heading_tokens() {
     let fences: Vec<_> = tokens.iter().filter(|(kind, ..)| *kind == MarkdownTokenType::CodeFence).collect();
     assert_eq!(fences.len(), 2, "both fences must stay separate tokens: {tokens:#?}");
 
-    let hash = tokens.iter().find(|(kind, text, ..)| *kind == MarkdownTokenType::Hash && *text == "#").expect("the fence body still lexes its `#`");
-    assert!(hash.2 > fences[0].3 && hash.3 < fences[1].2, "the `#` must stay between the fences: {tokens:#?}");
+    for (kind, text, start, end) in &tokens {
+        if *start >= fences[0].3 && *end <= fences[1].2 {
+            assert!(matches!(*kind, MarkdownTokenType::CodeBlock | MarkdownTokenType::CodeLanguage), "the fence body must only contain code tokens, found {kind:?} {text:?}: {tokens:#?}");
+        }
+    }
+}
+
+/// A fence behind a blockquote marker is a real fence, not a `Backtick` run.
+#[test]
+fn blockquote_fence_opens_at_its_marker() {
+    let source = "> ```\n> code\n> ```\n";
+    let tokens = lex_tokens(source, MarkdownLanguage::github_flavored());
+
+    let fences: Vec<_> = tokens.iter().filter(|(kind, ..)| *kind == MarkdownTokenType::CodeFence).collect();
+    assert_eq!(fences.len(), 2, "the quoted fence must open and close: {tokens:#?}");
+    assert_eq!((fences[0].1.as_str(), fences[0].2, fences[0].3), ("```", 2, 5), "the opening fence starts after `> `: {tokens:#?}");
+    assert_eq!((fences[1].1.as_str(), fences[1].2, fences[1].3), ("```", 15, 18), "the closing fence starts after `> `: {tokens:#?}");
+
+    let body: Vec<_> = tokens.iter().filter(|(kind, ..)| *kind == MarkdownTokenType::CodeBlock).collect();
+    assert_eq!(body.len(), 1, "the quoted body must be one code token: {tokens:#?}");
+    assert_eq!(body[0].1, "code", "the container prefix must not enter the code text: {tokens:#?}");
+}
+
+/// A `>` at the start of a top-level fence body is code, not a container marker.
+#[test]
+fn top_level_fence_body_keeps_greater_than_as_code() {
+    let source = "```\n> not a quote\n```\n";
+    let tokens = lex_tokens(source, MarkdownLanguage::github_flavored());
+
+    assert!(!tokens.iter().any(|(kind, ..)| *kind == MarkdownTokenType::BlockquoteMarker), "a top-level fence body must keep `>` as code: {tokens:#?}");
+
+    let body: Vec<_> = tokens.iter().filter(|(kind, ..)| *kind == MarkdownTokenType::CodeBlock).collect();
+    assert_eq!(body.len(), 1, "the body must stay one code token: {tokens:#?}");
+    assert_eq!(body[0].1, "> not a quote", "the `>` must stay in the code text: {tokens:#?}");
+}
+
+/// Every block-level rule must stop at the fence body boundary.
+#[test]
+fn fence_body_emits_no_block_level_tokens() {
+    let source = "```\n# heading\n- item\n---\n**strong**\n<div>\n```\n";
+    let tokens = lex_tokens(source, MarkdownLanguage::github_flavored());
+
+    let fences: Vec<_> = tokens.iter().filter(|(kind, ..)| *kind == MarkdownTokenType::CodeFence).collect();
+    assert_eq!(fences.len(), 2, "both fences must stay separate tokens: {tokens:#?}");
+
+    let body: Vec<_> = tokens.iter().filter(|(kind, ..)| *kind == MarkdownTokenType::CodeBlock).collect();
+    assert_eq!(body.len(), 5, "each non-empty body line must be one code token: {tokens:#?}");
+    assert_eq!(body.iter().map(|(_, text, ..)| text.as_str()).collect::<Vec<_>>(), vec!["# heading", "- item", "---", "**strong**", "<div>"], "the body must stay verbatim: {tokens:#?}");
+
+    for (kind, text, start, end) in &tokens {
+        if *start >= fences[0].3 && *end <= fences[1].2 {
+            assert!(matches!(*kind, MarkdownTokenType::CodeBlock | MarkdownTokenType::CodeLanguage), "block rule escaped the fence: {kind:?} {text:?} in {tokens:#?}");
+        }
+    }
+}
+
+/// A shorter closing run does not close a longer opening fence.
+#[test]
+fn shorter_fence_line_stays_in_the_body() {
+    let source = "````\n```\n````\n";
+    let tokens = lex_tokens(source, MarkdownLanguage::github_flavored());
+
+    let fences: Vec<_> = tokens.iter().filter(|(kind, ..)| *kind == MarkdownTokenType::CodeFence).collect();
+    assert_eq!(fences.len(), 2, "only the four-backtick fence may close: {tokens:#?}");
+    assert_eq!(fences[0].1, "````", "the opener keeps four backticks: {tokens:#?}");
+    assert_eq!(fences[1].1, "````", "the closer keeps four backticks: {tokens:#?}");
+
+    let body: Vec<_> = tokens.iter().filter(|(kind, ..)| *kind == MarkdownTokenType::CodeBlock).collect();
+    assert_eq!(body.len(), 1, "the three-backtick line must stay code: {tokens:#?}");
+    assert_eq!(body[0].1, "```", "a short run is content: {tokens:#?}");
+}
+
+/// A quoted fence is a child of the blockquote, not a sibling block.
+#[test]
+fn blockquote_fence_stays_inside_the_quote() {
+    let source = "## Blockquotes\n> ```\n> Code block in blockquote\n> ```\n\n## Tables\n";
+    let elements = top_level_elements(source, MarkdownLanguage::github_flavored());
+
+    assert_eq!(&elements[..3], &[MarkdownElementType::Heading2, MarkdownElementType::Blockquote, MarkdownElementType::Heading2], "the code block must stay inside the quote: {elements:?}");
 }
 
 /// A heading after a blockquote marker is still a heading block.
