@@ -18,10 +18,11 @@ pub(crate) fn build_document<'a>(green_tree: &'a oak_core::GreenNode<'a, HtmlLan
 }
 
 fn build_top_level_node(tree: RedTree<HtmlLanguage>, source: &SourceText) -> Vec<HtmlNode> {
-    match tree {
-        RedTree::Node(node) if node.element_type() == HtmlElementType::Element => flatten_element(build_element_node(node, source)),
-        _ => Vec::new(),
-    }
+    // Text, entities, and comments also live at the document root, so a
+    // top-level node goes through the same lowering as an element child.
+    // Dropping non-element roots used to lose trailing text such as
+    // `<div></div>after`.
+    build_element_child(tree, source)
 }
 
 fn flatten_element(built: Option<(HtmlNode, Vec<HtmlNode>)>) -> Vec<HtmlNode> {

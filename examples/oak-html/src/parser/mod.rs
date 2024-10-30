@@ -58,25 +58,39 @@ impl<'config> HtmlParser<'config> {
             }
         }
 
-        if state.eat(TagSelfClose) {
-            // Self-closing tag
+        if is_void_element(&tag_name) {
+            if !state.eat(TagSelfClose) {
+                state.eat(TagClose);
+            }
         }
-        else if state.eat(TagClose) && !is_void_element(&tag_name) {
-            loop {
-                if !state.not_at_end() {
-                    break;
-                }
-                if Self::peek_closing_tag_name(state).as_deref() == Some(tag_name.as_str()) {
-                    state.eat(TagSlashOpen);
-                    state.eat(TagName);
-                    state.expect(TagClose).ok();
-                    break;
-                }
-                if state.at(TagOpen) {
-                    self.parse_tag(state)?;
-                }
-                else if state.not_at_end() {
-                    state.bump();
+        else {
+            let closed = if state.at(TagSelfClose) {
+                // HTML ignores a self-closing slash on a non-void element, so
+                // `<div/>after` stays one element whose content is `after`
+                // instead of an empty element followed by stray text.
+                state.bump();
+                true
+            }
+            else {
+                state.eat(TagClose)
+            };
+            if closed {
+                loop {
+                    if !state.not_at_end() {
+                        break;
+                    }
+                    if Self::peek_closing_tag_name(state).as_deref() == Some(tag_name.as_str()) {
+                        state.eat(TagSlashOpen);
+                        state.eat(TagName);
+                        state.expect(TagClose).ok();
+                        break;
+                    }
+                    if state.at(TagOpen) {
+                        self.parse_tag(state)?;
+                    }
+                    else if state.not_at_end() {
+                        state.bump();
+                    }
                 }
             }
         }
