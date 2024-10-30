@@ -12,6 +12,19 @@ use std::{simd::prelude::*, sync::LazyLock};
 
 pub(crate) type State<'a, S> = LexerState<'a, S, HtmlLanguage>;
 
+/// Elements whose content is raw text rather than markup.
+const RAW_TEXT_ELEMENTS: &[&str] = &["script", "style", "textarea", "title"];
+
+/// Reads the tag name at the current position when it names a raw text element.
+fn raw_text_element_name<'a, S: Source + ?Sized>(state: &mut State<'a, S>) -> Option<String> {
+    let rest = state.rest();
+    let end = rest
+        .find(|ch: char| !(ch.is_ascii_alphanumeric() || matches!(ch, '_' | '-' | '.' | ':')))
+        .unwrap_or(rest.len());
+    let name = rest[..end].to_ascii_lowercase();
+    RAW_TEXT_ELEMENTS.contains(&name.as_str()).then_some(name)
+}
+
 // HTML static configuration
 
 static HTML_STRING: LazyLock<StringConfig> = LazyLock::new(|| StringConfig { quotes: &['"', '\''], escape: None });
@@ -50,6 +63,12 @@ impl<'config> HtmlLexer<'config> {
         // state the `/` in `<a href=/x>` lexes as a self-closing slash and the
         // remainder of the tag turns into text.
         let mut expecting_attribute_value = false;
+        // `script`, `style`, `textarea` and `title` hold raw text: a `<` inside
+        // them is data, not the start of a tag. The flag records the element of
+        // the open start tag so the raw text state begins after its `>`.
+        let mut raw_text_tag: Option<String> = None;
+        let mut tag_name_seen = false;
+        let mut closing_tag = false;
         while state.not_at_end() {
             let safe_point = state.get_position();
             let mut handled = false;
@@ -88,22 +107,22 @@ impl<'config> HtmlLexer<'config> {
                                         self.lex_cdata(state);
                                     }
                                     else if !self.lex_doctype(state) {
-                                        self.apply_tag_operator(state, &mut in_markup);
+                                        self.apply_tag_operator(state, &mut in_markup, &mut raw_text_tag, &mut tag_name_seen, &mut closing_tag);
                                     }
                                 }
                                 else if next == '?' {
                                     self.lex_processing_instruction(state);
                                 }
                                 else {
-                                    self.apply_tag_operator(state, &mut in_markup);
+                                    self.apply_tag_operator(state, &mut in_markup, &mut raw_text_tag, &mut tag_name_seen, &mut closing_tag);
                                 }
                             }
                             else {
-                                self.apply_tag_operator(state, &mut in_markup);
+                                self.apply_tag_operator(state, &mut in_markup, &mut raw_text_tag, &mut tag_name_seen, &mut closing_tag);
                             }
                         }
                         '/' | '>' if in_markup => {
-                            self.apply_tag_operator(state, &mut in_markup);
+                            self.apply_tag_operator(state, &mut in_markup, &mut raw_text_tag, &mut tag_name_seen, &mut closing_tag);
                         }
                         '&' => {
                             self.lex_entity_reference(state);
@@ -112,6 +131,10 @@ impl<'config> HtmlLexer<'config> {
                             self.lex_string_literal(state);
                         }
                         'a'..='z' | 'A'..='Z' | '_' | ':' if in_markup => {
+                            if !tag_name_seen && !closing_tag {
+                                tag_name_seen = true;
+                                raw_text_tag = raw_text_element_name(state);
+                            }
                             self.lex_identifier(state);
                         }
                         '=' if in_markup => {
@@ -141,14 +164,57 @@ impl<'config> HtmlLexer<'config> {
         Ok(())
     }
 
-    fn apply_tag_operator<'a, S: Source + ?Sized>(&self, state: &mut State<'a, S>, in_markup: &mut bool) {
-        if let Some(kind) = self.lex_tag_operators(state) {
-            match kind {
-                HtmlTokenType::TagOpen | HtmlTokenType::TagSlashOpen => *in_markup = true,
-                HtmlTokenType::TagClose | HtmlTokenType::TagSelfClose => *in_markup = false,
-                _ => {}
+    fn apply_tag_operator<'a, S: Source + ?Sized>(
+        &self,
+        state: &mut State<'a, S>,
+        in_markup: &mut bool,
+        raw_text_tag: &mut Option<String>,
+        tag_name_seen: &mut bool,
+        closing_tag: &mut bool,
+    ) {
+        let Some(kind) = self.lex_tag_operators(state)
+        else {
+            return;
+        };
+        match kind {
+            HtmlTokenType::TagOpen | HtmlTokenType::TagSlashOpen => {
+                *in_markup = true;
+                *closing_tag = matches!(kind, HtmlTokenType::TagSlashOpen);
+                *tag_name_seen = false;
+                *raw_text_tag = None;
             }
+            HtmlTokenType::TagSelfClose => {
+                *in_markup = false;
+                *closing_tag = false;
+                *tag_name_seen = false;
+                *raw_text_tag = None;
+            }
+            HtmlTokenType::TagClose => {
+                *in_markup = false;
+                let raw = if *closing_tag { None } else { raw_text_tag.take() };
+                *closing_tag = false;
+                *tag_name_seen = false;
+                if let Some(name) = raw {
+                    self.lex_raw_text(state, &name);
+                }
+            }
+            _ => {}
         }
+    }
+
+    /// Consumes the raw text of `name` up to its closing tag as a single text
+    /// token, so markup-looking content stays data.
+    fn lex_raw_text<'a, S: Source + ?Sized>(&self, state: &mut State<'a, S>, name: &str) {
+        let start = state.get_position();
+        let rest = state.rest();
+        let lower = rest.to_ascii_lowercase();
+        let needle = format!("</{name}");
+        let len = lower.find(&needle).unwrap_or(rest.len());
+        if len == 0 {
+            return;
+        }
+        state.advance(len);
+        state.add_token(HtmlTokenType::Text, start, state.get_position());
     }
 
     fn skip_whitespace<'a, S: Source + ?Sized>(&self, state: &mut State<'a, S>) -> bool {
