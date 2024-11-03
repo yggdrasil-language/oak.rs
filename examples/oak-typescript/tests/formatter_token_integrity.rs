@@ -182,6 +182,15 @@ fn type_arguments_stay_tight_next_to_comparisons() {
     }
 }
 
+#[test]
+fn shifts_inside_parenthesised_operands_are_not_type_argument_closes() {
+    // A `>>`/`>>>` cannot close more angle brackets than the scan has opened, so
+    // it must reject instead of subtracting below zero.
+    for (source, expected) in [("if (a<(b>>>c)) { run(); }", "if (a < (b >>> c)) { run(); }"), ("if (a<(b>>c)) { run(); }", "if (a < (b >> c)) { run(); }")] {
+        assert_eq!(format(source), expected, "shift inside brackets: {source:?}");
+    }
+}
+
 // --- Bug 6: `!` gained a space before a regex literal ---
 #[test]
 fn logical_not_binds_to_regex_literals() {

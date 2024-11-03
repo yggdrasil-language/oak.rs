@@ -499,11 +499,13 @@ fn looks_like_type_arguments(significant: &[&oak_core::Token<TypeScriptTokenType
                 let after = significant.iter().skip_while(|candidate| candidate.span.start <= token.span.start).find_map(|candidate| source.get(candidate.span.clone()));
                 return after.is_none_or(|next| next.is_empty() || matches!(next, "=" | "," | ";" | ")" | "]" | "[" | "}" | "." | "(" | "{" | "|" | "&" | "=>" | "?" | ":" | "-" | "+" | "*" | "%" | "==" | "===" | "!=" | "!==" | "&&" | "||"));
             }
+            ">>>" if depth < 3 => return false,
             ">>>" => depth -= 3,
             ">>" if depth <= 2 && delimiters == 0 => {
                 let after = significant.iter().skip_while(|candidate| candidate.span.start <= token.span.start).find_map(|candidate| source.get(candidate.span.clone()));
                 return after.is_none_or(|next| next.is_empty() || matches!(next, "=" | "," | ";" | ")" | "]" | "[" | "}" | "." | "(" | "{" | "|" | "&" | "=>" | "?" | ":" | "-" | "+" | "*" | "%" | "==" | "===" | "!=" | "!==" | "&&" | "||"));
             }
+            ">>" if depth < 2 => return false,
             ">>" => depth -= 2,
             ";" | "?" | ":" if depth == 0 && delimiters == 0 => return false,
             _ => {}
