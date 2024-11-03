@@ -99,6 +99,8 @@ pub enum ValkyrieTokenType {
     Dot,
     /// Range operator `..`.
     DotDot,
+    /// Inclusive range operator `..=`.
+    DotDotEq,
     /// Assignment operator `=`.
     Eq,
     /// Equality operator `==`.

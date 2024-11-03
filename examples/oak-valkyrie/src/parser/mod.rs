@@ -808,3 +808,141 @@ mod trait_template_tests {
         assert!(output.diagnostics[0].to_string().contains("unexpected template boundary directive"), "diagnostics: {:?}", output.diagnostics);
     }
 }
+
+#[cfg(test)]
+mod inclusive_range_and_member_attribute_tests {
+    use super::*;
+    use crate::{
+        ValkyrieBuilder, ValkyrieRoot,
+        ast::{ClassDeclaration, Statement, StatementNode, TermExpression},
+    };
+    use oak_core::{Builder, GreenTree, OakDiagnostics, SourceText, parser::ParseSession};
+
+    fn build(source: &str) -> OakDiagnostics<ValkyrieRoot> {
+        let language = ValkyrieLanguage::default();
+        let builder = ValkyrieBuilder::new(&language);
+        let text = SourceText::new(source);
+        let mut session = ParseSession::<ValkyrieLanguage>::default();
+        builder.build(&text, &[], &mut session)
+    }
+
+    fn build_root(source: &str) -> ValkyrieRoot {
+        let output = build(source);
+        assert!(output.diagnostics.is_empty(), "diagnostics: {:?}", output.diagnostics);
+        output.result.unwrap_or_else(|error| panic!("source must build, got {error:?}"))
+    }
+
+    fn leaves(source: &str) -> Vec<(ValkyrieTokenType, u32)> {
+        let language = ValkyrieLanguage::default();
+        let parser = ValkyrieParser::new(&language);
+        let text = SourceText::new(source);
+        let mut session = ParseSession::<ValkyrieLanguage>::default();
+        let output = parser.parse(&text, &[], &mut session);
+        assert!(output.diagnostics.is_empty(), "diagnostics: {:?}", output.diagnostics);
+        let green = output.result.unwrap_or_else(|error| panic!("lexing must succeed, got {error:?}"));
+
+        fn walk(tree: &GreenTree<ValkyrieLanguage>, out: &mut Vec<(ValkyrieTokenType, u32)>) {
+            match tree {
+                GreenTree::Leaf(leaf) => out.push((leaf.kind, leaf.length)),
+                GreenTree::Node(node) => {
+                    for child in node.children {
+                        walk(child, out);
+                    }
+                }
+            }
+        }
+
+        let mut kinds = Vec::new();
+        for child in green.children {
+            walk(child, &mut kinds);
+        }
+        kinds
+    }
+
+    fn single_micro_body_expr(source: &str) -> TermExpression {
+        let root = build_root(source);
+        let micro = root
+            .items
+            .iter()
+            .find_map(|item| match item {
+                StatementNode::Micro(micro) => Some(micro),
+                _ => None,
+            })
+            .expect("expected a micro item");
+        let statement = micro.body.statements.first().expect("expected one body statement");
+        match statement {
+            Statement::Expression(expr) => expr.expr.clone(),
+            other => panic!("expected expression statement, got {other:?}"),
+        }
+    }
+
+    fn class_of<'root>(root: &'root ValkyrieRoot, name: &str) -> &'root ClassDeclaration {
+        root.items
+            .iter()
+            .find_map(|item| match item {
+                StatementNode::Class(class) if class.name.name == name => Some(class.as_ref()),
+                _ => None,
+            })
+            .unwrap_or_else(|| panic!("expected class {name}"))
+    }
+
+    /// 正例：`..=` 紧邻合并为单个三字节 token，不再拆成 `..` + `=`。
+    #[test]
+    fn inclusive_range_lexes_as_one_token() {
+        let kinds = leaves("micro f() { 0..=5 }\n");
+        let lengths: Vec<u32> = kinds.iter().filter(|(kind, _)| *kind == ValkyrieTokenType::DotDotEq).map(|(_, length)| *length).collect();
+        assert_eq!(lengths, [3], "`..=` must be one three-byte token, leaves: {kinds:?}");
+        assert!(!kinds.iter().any(|(kind, _)| *kind == ValkyrieTokenType::DotDot), "`..=` must not leave a `DotDot` remnant: {kinds:?}");
+    }
+
+    /// 反例：`..` 与 `=` 之间有空白时不合并，仍是 `DotDot` + `Eq`。
+    #[test]
+    fn spaced_inclusive_range_stays_two_tokens() {
+        let kinds = leaves("micro f() { a .. b = c }\n");
+        assert!(!kinds.iter().any(|(kind, _)| *kind == ValkyrieTokenType::DotDotEq), "spaced `.. =` must not merge: {kinds:?}");
+        assert_eq!(kinds.iter().filter(|(kind, _)| *kind == ValkyrieTokenType::DotDot).count(), 1, "leaves: {kinds:?}");
+        assert_eq!(kinds.iter().filter(|(kind, _)| *kind == ValkyrieTokenType::Eq).count(), 1, "leaves: {kinds:?}");
+    }
+
+    /// 正例：`..=` 在表达式头里产生同级 BinaryExpression，且优先级低于相等。
+    #[test]
+    fn inclusive_range_parses_as_binary_operator() {
+        let expr = single_micro_body_expr("micro f() { a..=b }\n");
+        let TermExpression::Binary(node) = &expr
+        else {
+            panic!("expected binary expression, got {expr:?}")
+        };
+        assert_eq!(node.operator, ValkyrieTokenType::DotDotEq, "operator: {expr:?}");
+    }
+
+    /// 反例：区间运算符非结合，`a..b..c` 必须报结构化语法错误而不是静默套叠。
+    #[test]
+    fn chained_range_reports_structured_error() {
+        let output = build("micro f() { a..b..c }\n");
+        assert!(!output.diagnostics.is_empty(), "chained range must fail, root: {:?}", output.result);
+    }
+
+    /// 正例：类成员前的 `[export(case: "...")]` 落在字段注解上，不并进类注解。
+    #[test]
+    fn class_member_bracket_attribute_attaches_to_member() {
+        let root = build_root("class Sample {\n    [export(case: \"camelCase\")]\n    value: i32\n}\n");
+        let class = class_of(&root, "Sample");
+        assert!(class.annotations.iter().all(|attribute| attribute.name.name != "export"), "class annotations: {:?}", class.annotations);
+        assert_eq!(class.body.fields.len(), 1, "fields: {:?}", class.body.fields);
+        let field = &class.body.fields[0];
+        assert_eq!(field.annotations.len(), 1, "field annotations: {:?}", field.annotations);
+        assert_eq!(field.annotations[0].name.name, "export", "field annotations: {:?}", field.annotations);
+        assert_eq!(field.annotations[0].args.len(), 1, "attribute args: {:?}", field.annotations[0].args);
+        assert_eq!(field.annotations[0].args[0].key.as_ref().map(|key| key.name.as_str()), Some("case"), "attribute args: {:?}", field.annotations[0].args);
+    }
+
+    /// 正例：`@export` 成员属性同样只落到成员，不并进类注解。
+    #[test]
+    fn class_member_at_attribute_attaches_to_member() {
+        let root = build_root("class Sample {\n    @export\n    value: i32\n}\n");
+        let class = class_of(&root, "Sample");
+        assert!(class.annotations.iter().all(|attribute| attribute.name.name != "export"), "class annotations: {:?}", class.annotations);
+        assert_eq!(class.body.fields.len(), 1, "fields: {:?}", class.body.fields);
+        assert_eq!(class.body.fields[0].annotations[0].name.name, "export", "field annotations: {:?}", class.body.fields[0].annotations);
+    }
+}

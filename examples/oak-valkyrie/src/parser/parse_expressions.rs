@@ -64,7 +64,8 @@ fn parse_and_expression_with_options<S: oak_core::Source + ?Sized>(state: &mut S
 /// 范围保留普通运算符节点，不在 parser 中展开迭代行为。
 fn parse_range_expression<S: oak_core::Source + ?Sized>(state: &mut State<'_, S>, allow_object_literal: bool) -> Result<(), oak_core::OakError> {
     parse_equality_expression_with_options(state, allow_object_literal)?;
-    while state.at(ValkyrieTokenType::DotDot) {
+    // 区间运算符非结合：同一层只接受一个 `..` / `..=`，`a..b..c` 不构造成立。
+    if state.at(ValkyrieTokenType::DotDot) || state.at(ValkyrieTokenType::DotDotEq) {
         let cp = state.sink.last_node_checkpoint();
         state.bump();
         parse_equality_expression_with_options(state, allow_object_literal)?;

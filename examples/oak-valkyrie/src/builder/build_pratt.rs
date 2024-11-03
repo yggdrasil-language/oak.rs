@@ -65,10 +65,13 @@ impl<'config> ValkyrieBuilder<'config> {
         // 运算符优先级表
         let precedence = |op: &ValkyrieTokenType| -> u8 {
             match op {
-                ValkyrieTokenType::Star | ValkyrieTokenType::Slash | ValkyrieTokenType::Percent => 10,
-                ValkyrieTokenType::Plus | ValkyrieTokenType::Minus => 9,
-                ValkyrieTokenType::LessThan | ValkyrieTokenType::GreaterThan | ValkyrieTokenType::LessEq | ValkyrieTokenType::GreaterEq | ValkyrieTokenType::LessEqGreater => 8,
-                ValkyrieTokenType::EqEq | ValkyrieTokenType::NotEq => 7,
+                ValkyrieTokenType::Star | ValkyrieTokenType::Slash | ValkyrieTokenType::Percent => 11,
+                ValkyrieTokenType::Plus | ValkyrieTokenType::Minus => 10,
+                ValkyrieTokenType::LessThan | ValkyrieTokenType::GreaterThan | ValkyrieTokenType::LessEq | ValkyrieTokenType::GreaterEq | ValkyrieTokenType::LessEqGreater => 9,
+                ValkyrieTokenType::EqEq | ValkyrieTokenType::NotEq => 8,
+                // 区间低于相等、高于 `&&`；与 parser 的层序一致。非结合由 parser 只接受
+                // 单个区间运算符保证，`a..b..c` 不会进入 Pratt 表。
+                ValkyrieTokenType::DotDot | ValkyrieTokenType::DotDotEq => 7,
                 ValkyrieTokenType::AndAnd => 6,
                 ValkyrieTokenType::OrOr => 5,
                 _ => 0,
