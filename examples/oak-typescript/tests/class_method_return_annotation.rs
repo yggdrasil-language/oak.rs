@@ -20,7 +20,8 @@ fn class_members(source: &str) -> Vec<ClassMember> {
     let output = parse(source);
     assert!(output.diagnostics.is_empty(), "{source}: {:#?}", output.diagnostics);
     let root = output.result.expect("source should parse");
-    let Some(Statement::ClassDeclaration(declaration)) = root.statements.first().cloned() else {
+    let Some(Statement::ClassDeclaration(declaration)) = root.statements.first().cloned()
+    else {
         panic!("expected class declaration in {source}");
     };
     declaration.body

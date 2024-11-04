@@ -20,7 +20,8 @@ fn build(source: &str) -> TypeScriptRoot {
 
 fn variable_declaration(source: &str) -> oak_typescript::ast::VariableDeclaration {
     let root = build(source);
-    let Some(Statement::VariableDeclaration(declaration)) = root.statements.first() else {
+    let Some(Statement::VariableDeclaration(declaration)) = root.statements.first()
+    else {
         panic!("expected a variable declaration: {:#?}", root.statements)
     };
     declaration.clone()
@@ -51,7 +52,8 @@ fn multiple_declarators_keep_their_own_bindings_and_initializers() {
     let declaration = variable_declaration(source);
 
     assert_eq!(declaration.declarators.len(), 2, "both declarators must survive: {declaration:#?}");
-    let [first, second] = declaration.declarators.as_slice() else {
+    let [first, second] = declaration.declarators.as_slice()
+    else {
         panic!("two declarators expected")
     };
     assert_eq!(first.binding_names, vec!["a".to_string()]);
@@ -112,10 +114,12 @@ fn exported_destructuring_declaration_reaches_the_root() {
     let source = "export const { a } = x;";
     let root = build(source);
 
-    let Some(Statement::ExportDeclaration(export)) = root.statements.first() else {
+    let Some(Statement::ExportDeclaration(export)) = root.statements.first()
+    else {
         panic!("expected an export declaration: {:#?}", root.statements)
     };
-    let Some(Statement::VariableDeclaration(declaration)) = export.declaration.as_deref() else {
+    let Some(Statement::VariableDeclaration(declaration)) = export.declaration.as_deref()
+    else {
         panic!("exported declaration must be a variable declaration: {export:#?}")
     };
     assert_eq!(declaration.declarators.len(), 1);

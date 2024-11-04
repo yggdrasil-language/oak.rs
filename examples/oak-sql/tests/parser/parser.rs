@@ -56,37 +56,55 @@ fn test_sql_builder_session_statements() {
 fn test_sql_builder_savepoint_round_trip() {
     // SAVEPOINT name
     let (statement, source) = build_statement("SAVEPOINT sp1;");
-    let SqlStatement::Transaction(t) = &statement else { panic!("Expected Transaction, got {statement:?}"); };
+    let SqlStatement::Transaction(t) = &statement
+    else {
+        panic!("Expected Transaction, got {statement:?}");
+    };
     assert!(matches!(&t.action, TransactionAction::Savepoint(name) if name.as_ref() == "sp1"));
     assert_eq!(source, "SAVEPOINT sp1;");
 
     // ROLLBACK TO SAVEPOINT name
     let (statement, source) = build_statement("ROLLBACK TO SAVEPOINT sp1;");
-    let SqlStatement::Transaction(t) = &statement else { panic!("Expected Transaction, got {statement:?}"); };
+    let SqlStatement::Transaction(t) = &statement
+    else {
+        panic!("Expected Transaction, got {statement:?}");
+    };
     assert!(matches!(&t.action, TransactionAction::RollbackToSavepoint(name) if name.as_ref() == "sp1"));
     assert_eq!(source, "ROLLBACK TO SAVEPOINT sp1;");
 
     // ROLLBACK TO name (short form) — parser 接受，ToSource 输出标准全拼
     let (statement, source) = build_statement("ROLLBACK TO sp2;");
-    let SqlStatement::Transaction(t) = &statement else { panic!("Expected Transaction, got {statement:?}"); };
+    let SqlStatement::Transaction(t) = &statement
+    else {
+        panic!("Expected Transaction, got {statement:?}");
+    };
     assert!(matches!(&t.action, TransactionAction::RollbackToSavepoint(name) if name.as_ref() == "sp2"));
     assert_eq!(source, "ROLLBACK TO SAVEPOINT sp2;");
 
     // RELEASE SAVEPOINT name
     let (statement, source) = build_statement("RELEASE SAVEPOINT sp3;");
-    let SqlStatement::Transaction(t) = &statement else { panic!("Expected Transaction, got {statement:?}"); };
+    let SqlStatement::Transaction(t) = &statement
+    else {
+        panic!("Expected Transaction, got {statement:?}");
+    };
     assert!(matches!(&t.action, TransactionAction::ReleaseSavepoint(name) if name.as_ref() == "sp3"));
     assert_eq!(source, "RELEASE SAVEPOINT sp3;");
 
     // RELEASE name (short form)
     let (statement, source) = build_statement("RELEASE sp4;");
-    let SqlStatement::Transaction(t) = &statement else { panic!("Expected Transaction, got {statement:?}"); };
+    let SqlStatement::Transaction(t) = &statement
+    else {
+        panic!("Expected Transaction, got {statement:?}");
+    };
     assert!(matches!(&t.action, TransactionAction::ReleaseSavepoint(name) if name.as_ref() == "sp4"));
     assert_eq!(source, "RELEASE SAVEPOINT sp4;");
 
     // plain ROLLBACK still round-trips
     let (statement, source) = build_statement("ROLLBACK;");
-    let SqlStatement::Transaction(t) = &statement else { panic!("Expected Transaction, got {statement:?}"); };
+    let SqlStatement::Transaction(t) = &statement
+    else {
+        panic!("Expected Transaction, got {statement:?}");
+    };
     assert_eq!(t.action, TransactionAction::Rollback);
     assert_eq!(source, "ROLLBACK;");
 }

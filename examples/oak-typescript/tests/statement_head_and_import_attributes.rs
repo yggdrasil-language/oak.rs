@@ -26,7 +26,8 @@ fn assignment_to_variable_named_type_is_an_expression() {
 #[test]
 fn single_statement_if_body_can_assign_to_type() {
     let root = build("if (c) type = strat.slice(6);");
-    let Some(Statement::IfStatement(if_stmt)) = root.statements.first() else {
+    let Some(Statement::IfStatement(if_stmt)) = root.statements.first()
+    else {
         panic!("expected an if statement: {:?}", root.statements)
     };
     assert!(matches!(*if_stmt.consequent, Statement::ExpressionStatement(_)), "{:?}", if_stmt.consequent);
@@ -41,7 +42,8 @@ fn type_alias_head_still_parses_as_alias() {
 #[test]
 fn import_with_attributes_keeps_specifier() {
     let root = build("import { data } from './m.json' with { type: 'json' };");
-    let Some(Statement::ImportDeclaration(import)) = root.statements.first() else {
+    let Some(Statement::ImportDeclaration(import)) = root.statements.first()
+    else {
         panic!("expected an import declaration: {:?}", root.statements)
     };
     assert_eq!(import.module_specifier.value, "./m.json");
@@ -53,14 +55,16 @@ fn import_with_attributes_keeps_specifier() {
 #[test]
 fn bare_and_assert_imports_keep_attributes() {
     let root = build("import './m.json' assert { type: 'json' };");
-    let Some(Statement::ImportDeclaration(import)) = root.statements.first() else {
+    let Some(Statement::ImportDeclaration(import)) = root.statements.first()
+    else {
         panic!("expected an import declaration: {:?}", root.statements)
     };
     assert_eq!(import.module_specifier.value, "./m.json");
     assert!(import.attributes.as_deref().is_some_and(|text| text.starts_with("assert")), "{:?}", import.attributes);
 
     let root = build("import def, { named } from './m.ts' with { type: 'module' };");
-    let Some(Statement::ImportDeclaration(import)) = root.statements.first() else {
+    let Some(Statement::ImportDeclaration(import)) = root.statements.first()
+    else {
         panic!("expected an import declaration: {:?}", root.statements)
     };
     assert_eq!(import.module_specifier.value, "./m.ts");
@@ -71,7 +75,8 @@ fn bare_and_assert_imports_keep_attributes() {
 #[test]
 fn export_from_with_attributes_keeps_source() {
     let root = build("export { a } from './m.json' with { type: 'json' };");
-    let Some(Statement::ExportDeclaration(export)) = root.statements.first() else {
+    let Some(Statement::ExportDeclaration(export)) = root.statements.first()
+    else {
         panic!("expected an export declaration: {:?}", root.statements)
     };
     assert_eq!(export.source.as_ref().expect("source").value, "./m.json");

@@ -74,7 +74,8 @@ impl<'config> TypeScriptBuilder<'config> {
                                 }
                                 TypeScriptElementType::IdentifierName => {
                                     let (name, name_span) = crate::builder::build_binding::binding_identifier_text(&child_node, source);
-                                    let mut declarator = current.take().unwrap_or(VariableDeclarator { binding_names: Vec::new(), binding_spans: Vec::new(), binding_pattern_keys: Vec::new(), pattern_text: None, ty: None, value: None, span: child_span.clone() });
+                                    let mut declarator =
+                                        current.take().unwrap_or(VariableDeclarator { binding_names: Vec::new(), binding_spans: Vec::new(), binding_pattern_keys: Vec::new(), pattern_text: None, ty: None, value: None, span: child_span.clone() });
                                     declarator.binding_names.push(name);
                                     declarator.binding_spans.push(name_span);
                                     declarator.binding_pattern_keys.push(false);
@@ -821,7 +822,8 @@ impl<'config> TypeScriptBuilder<'config> {
                                                                             if imported.is_empty() {
                                                                                 imported = name;
                                                                                 imported_span = Some(name_span);
-                                                                            } else {
+                                                                            }
+                                                                            else {
                                                                                 local = name;
                                                                                 local_span = Some(name_span);
                                                                             }
@@ -893,7 +895,10 @@ impl<'config> TypeScriptBuilder<'config> {
                                                             if local.is_empty() {
                                                                 local = name;
                                                                 local_span = Some(name_span);
-                                                            } else { exported = name }
+                                                            }
+                                                            else {
+                                                                exported = name
+                                                            }
                                                         }
                                                     }
                                                     else if let RedTree::Leaf(leaf) = spec_child {

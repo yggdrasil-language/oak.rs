@@ -24,7 +24,8 @@ fn first_stmt(source: &str) -> Statement {
 }
 
 fn assert_sequence(kind: &ExpressionKind, expected: usize, label: &str) {
-    let ExpressionKind::SequenceExpression(expressions) = kind else {
+    let ExpressionKind::SequenceExpression(expressions) = kind
+    else {
         panic!("expected sequence for {label}, got {kind:?}");
     };
     assert_eq!(expressions.len(), expected, "element count for {label}");
@@ -33,7 +34,8 @@ fn assert_sequence(kind: &ExpressionKind, expected: usize, label: &str) {
 #[test]
 fn switch_head_comma_sequence() {
     let stmt = first_stmt("switch(t.nextIndex++,u.type){case \"A\":break}");
-    let Statement::SwitchStatement(switch) = stmt else {
+    let Statement::SwitchStatement(switch) = stmt
+    else {
         panic!("expected switch, got {stmt:?}");
     };
     assert_sequence(&switch.discriminant.kind, 2, "switch discriminant");
@@ -43,7 +45,8 @@ fn switch_head_comma_sequence() {
 #[test]
 fn if_head_comma_sequence() {
     let stmt = first_stmt("if (a, b) x()");
-    let Statement::IfStatement(if_stmt) = stmt else {
+    let Statement::IfStatement(if_stmt) = stmt
+    else {
         panic!("expected if, got {stmt:?}");
     };
     assert_sequence(&if_stmt.test.kind, 2, "if test");
@@ -52,7 +55,8 @@ fn if_head_comma_sequence() {
 #[test]
 fn while_head_comma_sequence() {
     let stmt = first_stmt("while (i++, i < n) {}");
-    let Statement::WhileStatement(while_stmt) = stmt else {
+    let Statement::WhileStatement(while_stmt) = stmt
+    else {
         panic!("expected while, got {stmt:?}");
     };
     assert_sequence(&while_stmt.test.kind, 2, "while test");
@@ -61,7 +65,8 @@ fn while_head_comma_sequence() {
 #[test]
 fn do_while_head_comma_sequence() {
     let stmt = first_stmt("do {} while (a, b);");
-    let Statement::DoWhileStatement(do_stmt) = stmt else {
+    let Statement::DoWhileStatement(do_stmt) = stmt
+    else {
         panic!("expected do…while, got {stmt:?}");
     };
     assert_sequence(&do_stmt.test.kind, 2, "do…while test");
@@ -70,7 +75,8 @@ fn do_while_head_comma_sequence() {
 #[test]
 fn for_test_slot_comma_sequence() {
     let stmt = first_stmt("for (; a, b; ) {}");
-    let Statement::ForStatement(for_stmt) = stmt else {
+    let Statement::ForStatement(for_stmt) = stmt
+    else {
         panic!("expected for, got {stmt:?}");
     };
     assert!(for_stmt.initializer.is_none());
@@ -80,7 +86,8 @@ fn for_test_slot_comma_sequence() {
 #[test]
 fn three_part_head_sequence() {
     let stmt = first_stmt("if (a(), b(), c()) x()");
-    let Statement::IfStatement(if_stmt) = stmt else {
+    let Statement::IfStatement(if_stmt) = stmt
+    else {
         panic!("expected if, got {stmt:?}");
     };
     assert_sequence(&if_stmt.test.kind, 3, "three-part if test");
@@ -89,7 +96,8 @@ fn three_part_head_sequence() {
 #[test]
 fn grouped_sequence_inside_head_sequence() {
     let stmt = first_stmt("if ((a, b), c) x()");
-    let Statement::IfStatement(if_stmt) = stmt else {
+    let Statement::IfStatement(if_stmt) = stmt
+    else {
         panic!("expected if, got {stmt:?}");
     };
     assert_sequence(&if_stmt.test.kind, 2, "nested grouped if test");
@@ -98,10 +106,12 @@ fn grouped_sequence_inside_head_sequence() {
 #[test]
 fn single_expression_heads_stay_plain() {
     let stmt = first_stmt("if (a) x()");
-    let Statement::IfStatement(if_stmt) = stmt else {
+    let Statement::IfStatement(if_stmt) = stmt
+    else {
         panic!("expected if, got {stmt:?}");
     };
-    let ExpressionKind::Identifier(name) = &*if_stmt.test.kind else {
+    let ExpressionKind::Identifier(name) = &*if_stmt.test.kind
+    else {
         panic!("expected identifier test, got {:?}", if_stmt.test.kind);
     };
     assert_eq!(name, "a");

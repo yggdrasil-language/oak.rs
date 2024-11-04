@@ -263,7 +263,16 @@ fn alignedat_declares_its_column_pairs_as_environment_arguments() {
     else {
         panic!("the column-pair count is a required argument")
     };
-    assert_eq!(root.items.iter().filter_map(|item| match item { TexItem::Text { content, .. } => Some(content.as_str()), _ => None }).collect::<String>(), "2");
+    assert_eq!(
+        root.items
+            .iter()
+            .filter_map(|item| match item {
+                TexItem::Text { content, .. } => Some(content.as_str()),
+                _ => None,
+            })
+            .collect::<String>(),
+        "2"
+    );
     let rows = environment_rows(environment);
     assert_eq!(rows.len(), 1);
     assert_eq!(cell_text(&rows[0].cells[0]), "a", "the declared pair count is not part of the first cell");
@@ -282,7 +291,16 @@ fn starred_alignedat_declares_its_column_pairs_as_environment_arguments() {
     else {
         panic!("the column-pair count is a required argument")
     };
-    assert_eq!(root.items.iter().filter_map(|item| match item { TexItem::Text { content, .. } => Some(content.as_str()), _ => None }).collect::<String>(), "2");
+    assert_eq!(
+        root.items
+            .iter()
+            .filter_map(|item| match item {
+                TexItem::Text { content, .. } => Some(content.as_str()),
+                _ => None,
+            })
+            .collect::<String>(),
+        "2"
+    );
     let rows = environment_rows(environment);
     assert_eq!(rows.len(), 1);
     assert_eq!(cell_text(&rows[0].cells[0]), "a", "the declared pair count is not part of the first cell");

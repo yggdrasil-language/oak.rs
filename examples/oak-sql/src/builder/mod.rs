@@ -283,13 +283,7 @@ impl<'config> SqlBuilder<'config> {
             return Err(OakError::custom_error("Missing operand in set operation"));
         }
 
-        Ok(SetOperationStatement {
-            operands,
-            operators,
-            order_by,
-            limit,
-            span: node.span(),
-        })
+        Ok(SetOperationStatement { operands, operators, order_by, limit, span: node.span() })
     }
 
     /// Builds the explicit `ALL` / `DISTINCT` quantifier of a `SELECT` statement.
@@ -812,12 +806,7 @@ impl<'config> SqlBuilder<'config> {
             return Ok(TableConstraint::PrimaryKey { columns: indexed_columns, on_conflict: resolution, span });
         }
         if is_foreign {
-            return Ok(TableConstraint::ForeignKey {
-                columns,
-                table_name: table_name.ok_or_else(|| OakError::custom_error("Missing referenced table in `FOREIGN KEY`"))?,
-                referenced_columns,
-                span,
-            });
+            return Ok(TableConstraint::ForeignKey { columns, table_name: table_name.ok_or_else(|| OakError::custom_error("Missing referenced table in `FOREIGN KEY`"))?, referenced_columns, span });
         }
         if is_check {
             return Ok(TableConstraint::Check { expr: expr.ok_or_else(|| OakError::custom_error("Missing expression in `CHECK`"))?, span });
@@ -1164,8 +1153,10 @@ impl<'config> SqlBuilder<'config> {
     }
 
     fn build_group_by_clause<'a>(&self, node: RedNode<'a, SqlLanguage>, source: &SourceText) -> Result<crate::ast::GroupByClause, OakError> {
-        use crate::lexer::SqlTokenType::{Comma, Cube, Grouping, LeftParen, RightParen, Rollup, Sets};
-        use crate::ast::GroupByItem;
+        use crate::{
+            ast::GroupByItem,
+            lexer::SqlTokenType::{Comma, Cube, Grouping, LeftParen, RightParen, Rollup, Sets},
+        };
         let mut items: Vec<GroupByItem> = Vec::new();
         let children: Vec<_> = node.children().collect();
         let mut i = 0usize;

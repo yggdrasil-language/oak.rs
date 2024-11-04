@@ -505,8 +505,40 @@ impl TypeScriptTokenType {
     /// expression position (`require('./m')`, `map.get(k)`, `obj.type`).
     pub fn is_contextual_keyword(&self) -> bool {
         use TypeScriptTokenType::*;
-        matches!(self,
-            Abstract | Any | As | Asserts | Async | Boolean | Constructor | Declare | From | Get | Global | Implements | Infer | Is | Keyof | Namespace | Never | Number | Object | Of | Package | Private | Protected | Public | Readonly | Require | Set | String | Symbol | Type | Unique | Unknown
+        matches!(
+            self,
+            Abstract
+                | Any
+                | As
+                | Asserts
+                | Async
+                | Boolean
+                | Constructor
+                | Declare
+                | From
+                | Get
+                | Global
+                | Implements
+                | Infer
+                | Is
+                | Keyof
+                | Namespace
+                | Never
+                | Number
+                | Object
+                | Of
+                | Package
+                | Private
+                | Protected
+                | Public
+                | Readonly
+                | Require
+                | Set
+                | String
+                | Symbol
+                | Type
+                | Unique
+                | Unknown
         )
     }
 

@@ -26,7 +26,8 @@ fn build(source: &str) -> TypeScriptRoot {
 
 fn arrow_initializer(source: &str) -> ExpressionKind {
     let root = build(source);
-    let Some(Statement::VariableDeclaration(decl)) = root.statements.first() else {
+    let Some(Statement::VariableDeclaration(decl)) = root.statements.first()
+    else {
         panic!("expected variable declaration: {:#?}", root.statements)
     };
     let value = decl.declarators.first().and_then(|d| d.value.clone()).expect("declarator value");
@@ -44,7 +45,8 @@ fn declaration_positions_accept_const_type_parameter() {
 #[test]
 fn generic_arrow_with_const_type_parameter() {
     let kind = arrow_initializer("const f = <const T>(x: T) => x;");
-    let ExpressionKind::ArrowFunction { params, .. } = kind else {
+    let ExpressionKind::ArrowFunction { params, .. } = kind
+    else {
         panic!("expected arrow function, got {kind:#?}")
     };
     assert_eq!(params.len(), 1);
@@ -66,7 +68,8 @@ fn generic_arrow_with_const_constraint() {
 #[test]
 fn plain_generic_arrow_still_parses_in_jsx_mode() {
     let kind = arrow_initializer("const f = <T>(x: T): T => x;");
-    let ExpressionKind::ArrowFunction { params, .. } = kind else {
+    let ExpressionKind::ArrowFunction { params, .. } = kind
+    else {
         panic!("expected arrow function, got {kind:#?}")
     };
     assert_eq!(params.len(), 1);

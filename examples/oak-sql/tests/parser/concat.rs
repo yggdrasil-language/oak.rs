@@ -1,9 +1,10 @@
-use oak_core::source::ToSource;
-use oak_core::{Builder, Lexer, ParseSession, SourceText, TokenType};
+use oak_core::{Builder, Lexer, ParseSession, SourceText, TokenType, source::ToSource};
 #[cfg(feature = "oak-pretty-print")]
 use oak_pretty_print::AsDocument;
-use oak_sql::ast::{BinaryOperator, Expression, Identifier, Literal, SelectItem, SqlStatement};
-use oak_sql::{SqlBuilder, SqlLanguage, SqlLexer, SqlTokenType};
+use oak_sql::{
+    SqlBuilder, SqlLanguage, SqlLexer, SqlTokenType,
+    ast::{BinaryOperator, Expression, Identifier, Literal, SelectItem, SqlStatement},
+};
 
 fn build_expression(sql: &str) -> Expression {
     let language = SqlLanguage::default();
@@ -168,18 +169,7 @@ fn shape(expr: &Expression) -> String {
 #[cfg(feature = "oak-pretty-print")]
 #[test]
 fn test_concat_pretty_round_trip() {
-    for sql in [
-        "select 1 || 'x'",
-        "select 'a' || 'b' || 'c'",
-        "select a || b from t",
-        "select a || 'x' || 1",
-        "select 1 || 2 * 3",
-        "select 3 + 4 || 5",
-        "select (a + b) || c",
-        "select a || (b || c)",
-        "select (a || b) * 2",
-        "select 'a' || 'b' = 'ab'",
-    ] {
+    for sql in ["select 1 || 'x'", "select 'a' || 'b' || 'c'", "select a || b from t", "select a || 'x' || 1", "select 1 || 2 * 3", "select 3 + 4 || 5", "select (a + b) || c", "select a || (b || c)", "select (a || b) * 2", "select 'a' || 'b' = 'ab'"] {
         let expression = build_expression(sql);
         let rendered = expression.as_document(&()).render();
         assert!(rendered.contains("||"), "{sql} rendered without `||`: {rendered}");

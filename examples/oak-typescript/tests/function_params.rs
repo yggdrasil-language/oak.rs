@@ -19,7 +19,8 @@ fn build(source: &str) -> TypeScriptRoot {
 
 fn params_of(source: &str) -> Vec<FunctionParam> {
     let root = build(source);
-    let Some(Statement::FunctionDeclaration(declaration)) = root.statements.first() else {
+    let Some(Statement::FunctionDeclaration(declaration)) = root.statements.first()
+    else {
         panic!("expected a function declaration: {:#?}", root.statements)
     };
     declaration.params.clone()

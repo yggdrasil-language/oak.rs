@@ -50,25 +50,20 @@ fn regex_literal_expressions_survive_into_ast() {
     let output = parse("export default /abc/;\nconst x = /re/g;\n");
     assert!(output.diagnostics.is_empty(), "{:#?}", output.diagnostics);
     let root = output.result.expect("source should parse");
-    let Statement::ExportDeclaration(export) = &root.statements[0] else {
+    let Statement::ExportDeclaration(export) = &root.statements[0]
+    else {
         panic!("expected export declaration");
     };
     let inner = export.declaration.as_ref().expect("default payload");
-    let Statement::ExpressionStatement(expr) = &**inner else {
+    let Statement::ExpressionStatement(expr) = &**inner
+    else {
         panic!("expected expression statement, got {inner:?}");
     };
-    assert!(
-        matches!(*expr.expression.kind, ExpressionKind::RegexLiteral(ref text) if text == "/abc/"),
-        "{:?}",
-        expr.expression.kind
-    );
-    let Statement::VariableDeclaration(var) = &root.statements[1] else {
+    assert!(matches!(*expr.expression.kind, ExpressionKind::RegexLiteral(ref text) if text == "/abc/"), "{:?}", expr.expression.kind);
+    let Statement::VariableDeclaration(var) = &root.statements[1]
+    else {
         panic!("expected variable declaration");
     };
     let value = var.declarators[0].value.as_ref().expect("initializer kept");
-    assert!(
-        matches!(*value.kind, ExpressionKind::RegexLiteral(ref text) if text == "/re/g"),
-        "{:?}",
-        value.kind
-    );
+    assert!(matches!(*value.kind, ExpressionKind::RegexLiteral(ref text) if text == "/re/g"), "{:?}", value.kind);
 }

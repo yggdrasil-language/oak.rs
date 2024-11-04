@@ -20,7 +20,8 @@ fn root_of(source: &str, erase_types: bool) -> TypeScriptRoot {
 
 fn class_declaration(source: &str) -> oak_typescript::ast::ClassDeclaration {
     let root = root_of(source, false);
-    let Some(Statement::ClassDeclaration(declaration)) = root.statements.first().cloned() else {
+    let Some(Statement::ClassDeclaration(declaration)) = root.statements.first().cloned()
+    else {
         panic!("expected class declaration in {source}");
     };
     declaration
@@ -84,7 +85,8 @@ fn dotted_and_generic_heritage_keep_the_expression_shape() {
 #[test]
 fn type_erasure_keeps_extends_and_drops_implements() {
     let root = root_of("class D extends Base implements I { }", true);
-    let Some(Statement::ClassDeclaration(declaration)) = root.statements.first().cloned() else {
+    let Some(Statement::ClassDeclaration(declaration)) = root.statements.first().cloned()
+    else {
         panic!("expected class declaration");
     };
     assert_eq!(reference_name(&declaration.extends.expect("extends survives erasure")), "Base");
@@ -94,21 +96,25 @@ fn type_erasure_keeps_extends_and_drops_implements() {
 #[test]
 fn exported_and_default_class_declarations_resolve_heritage() {
     let root = root_of("export class Exported extends Base { }", false);
-    let Some(Statement::ExportDeclaration(export)) = root.statements.first().cloned() else {
+    let Some(Statement::ExportDeclaration(export)) = root.statements.first().cloned()
+    else {
         panic!("expected export declaration");
     };
     let inner = export.declaration.expect("exported payload");
-    let Statement::ClassDeclaration(declaration) = *inner else {
+    let Statement::ClassDeclaration(declaration) = *inner
+    else {
         panic!("expected class declaration, got {inner:?}");
     };
     assert_eq!(reference_name(&declaration.extends.expect("extends fact")), "Base");
 
     let root = root_of("export default class Named extends Other { }", false);
-    let Some(Statement::ExportDeclaration(export)) = root.statements.first().cloned() else {
+    let Some(Statement::ExportDeclaration(export)) = root.statements.first().cloned()
+    else {
         panic!("expected export declaration");
     };
     let inner = export.declaration.expect("default payload");
-    let Statement::ClassDeclaration(declaration) = *inner else {
+    let Statement::ClassDeclaration(declaration) = *inner
+    else {
         panic!("expected class declaration, got {inner:?}");
     };
     assert_eq!(declaration.name, "Named");

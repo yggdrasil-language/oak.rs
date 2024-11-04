@@ -14,7 +14,8 @@ fn build(source: &str) -> oak_typescript::ast::TypeScriptRoot {
 
 fn single_init(source: &str) -> oak_typescript::ast::Expression {
     let root = build(source);
-    let Some(Statement::VariableDeclaration(decl)) = root.statements.first() else {
+    let Some(Statement::VariableDeclaration(decl)) = root.statements.first()
+    else {
         panic!("{source}: expected variable declaration, got {:?}", root.statements);
     };
     match decl.declarators[0].value.clone() {
@@ -28,18 +29,37 @@ fn single_init(source: &str) -> oak_typescript::ast::Expression {
 #[test]
 fn contextual_keywords_parse_as_identifier_references() {
     for name in [
-        "as", "of", "from", "is", "infer", "keyof", "unique", "asserts", "abstract",
-        "declare", "namespace", "async", "get", "set", "type", "readonly", "constructor",
-        "global", "require", "any", "boolean", "number", "object", "string", "symbol",
-        "unknown", "never",
+        "as",
+        "of",
+        "from",
+        "is",
+        "infer",
+        "keyof",
+        "unique",
+        "asserts",
+        "abstract",
+        "declare",
+        "namespace",
+        "async",
+        "get",
+        "set",
+        "type",
+        "readonly",
+        "constructor",
+        "global",
+        "require",
+        "any",
+        "boolean",
+        "number",
+        "object",
+        "string",
+        "symbol",
+        "unknown",
+        "never",
     ] {
         let source = format!("const value = {name};");
         let init = single_init(&source);
-        assert!(
-            matches!(&*init.kind, ExpressionKind::Identifier(actual) if actual == name),
-            "{source}: expected identifier, got {:?}",
-            init.kind
-        );
+        assert!(matches!(&*init.kind, ExpressionKind::Identifier(actual) if actual == name), "{source}: expected identifier, got {:?}", init.kind);
     }
 }
 
@@ -47,10 +67,12 @@ fn contextual_keywords_parse_as_identifier_references() {
 fn contextual_keywords_parse_in_call_and_member_positions() {
     let root = build("register(as, of);\nobj.as;\nobj.of;");
     assert_eq!(root.statements.len(), 3, "{:?}", root.statements);
-    let Some(Statement::ExpressionStatement(stmt)) = root.statements.first() else {
+    let Some(Statement::ExpressionStatement(stmt)) = root.statements.first()
+    else {
         panic!("expected expression statement");
     };
-    let ExpressionKind::CallExpression { args, .. } = &*stmt.expression.kind else {
+    let ExpressionKind::CallExpression { args, .. } = &*stmt.expression.kind
+    else {
         panic!("expected call, got {:?}", stmt.expression.kind);
     };
     assert_eq!(args.len(), 2);

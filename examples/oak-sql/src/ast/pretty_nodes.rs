@@ -592,12 +592,7 @@ impl AsDocument for TableConstraint {
             }
             TableConstraint::ForeignKey { columns, table_name, referenced_columns, .. } => {
                 let columns = Document::join(columns.iter().map(|it| it.as_document(&())), doc!(",", soft_space));
-                let referenced = if referenced_columns.is_empty() {
-                    nil
-                }
-                else {
-                    doc!(soft_space, "(", Document::join(referenced_columns.iter().map(|it| it.as_document(&())), doc!(",", soft_space)), ")")
-                };
+                let referenced = if referenced_columns.is_empty() { nil } else { doc!(soft_space, "(", Document::join(referenced_columns.iter().map(|it| it.as_document(&())), doc!(",", soft_space)), ")") };
                 doc!("FOREIGN", soft_space, "KEY", soft_space, "(", columns, ")", soft_space, "REFERENCES", soft_space, table_name.as_document(&()), referenced)
             }
             TableConstraint::Check { expr, .. } => doc!("CHECK", soft_space, "(", expr.as_document(&()), ")"),

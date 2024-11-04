@@ -18,11 +18,13 @@ fn build(source: &str) -> TypeScriptRoot {
 
 fn arrow_params(source: &str) -> Vec<FunctionParam> {
     let root = build(source);
-    let Some(Statement::VariableDeclaration(decl)) = root.statements.first() else {
+    let Some(Statement::VariableDeclaration(decl)) = root.statements.first()
+    else {
         panic!("expected variable declaration: {:#?}", root.statements)
     };
     let value = decl.declarators.first().and_then(|d| d.value.clone()).expect("declarator value");
-    let ExpressionKind::ArrowFunction { params, .. } = *value.kind else {
+    let ExpressionKind::ArrowFunction { params, .. } = *value.kind
+    else {
         panic!("expected arrow function, got {:#?}", value.kind)
     };
     params

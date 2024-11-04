@@ -145,10 +145,7 @@ fn top_level_element_texts(text: &str) -> Vec<String> {
 fn self_closing_svg_children_do_not_swallow_following_siblings() {
     const SVG: &str = r#"<svg viewBox="0 0 10 10"><rect width="4" height="4"/><text>label</text></svg>"#;
     let source = format!("<p>before</p>{SVG}<p>after</p>");
-    assert_eq!(
-        top_level_element_texts(&source),
-        vec!["<p>before</p>".to_string(), SVG.to_string(), "<p>after</p>".to_string()]
-    );
+    assert_eq!(top_level_element_texts(&source), vec!["<p>before</p>".to_string(), SVG.to_string(), "<p>after</p>".to_string()]);
 }
 
 #[test]
@@ -166,11 +163,5 @@ fn self_closing_svg_root_does_not_swallow_following_siblings() {
 #[test]
 fn self_closing_math_children_do_not_swallow_following_siblings() {
     const SOURCE: &str = r#"<p>a<math><mi>x</mi><mspace width="1em"/></math>b</p><p>c</p>"#;
-    assert_eq!(
-        top_level_element_texts(SOURCE),
-        vec![
-            r#"<p>a<math><mi>x</mi><mspace width="1em"/></math>b</p>"#.to_string(),
-            "<p>c</p>".to_string()
-        ]
-    );
+    assert_eq!(top_level_element_texts(SOURCE), vec![r#"<p>a<math><mi>x</mi><mspace width="1em"/></math>b</p>"#.to_string(), "<p>c</p>".to_string()]);
 }

@@ -26,7 +26,10 @@ fn stalled<S: oak_core::Source + ?Sized>(state: &State<'_, S>, before: usize) ->
 /// `type` is a type-name head like any other: `type<T>` is a generic type application
 /// on the builtin `type` alias, not a distinct syntax form.
 fn is_type_name_token(kind: &ValkyrieTokenType) -> bool {
-    matches!(kind, ValkyrieTokenType::Identifier | ValkyrieTokenType::Keyword(ValkyrieKeywords::SelfType) | ValkyrieTokenType::Keyword(ValkyrieKeywords::Micro) | ValkyrieTokenType::Keyword(ValkyrieKeywords::Mezzo) | ValkyrieTokenType::Keyword(ValkyrieKeywords::Type))
+    matches!(
+        kind,
+        ValkyrieTokenType::Identifier | ValkyrieTokenType::Keyword(ValkyrieKeywords::SelfType) | ValkyrieTokenType::Keyword(ValkyrieKeywords::Micro) | ValkyrieTokenType::Keyword(ValkyrieKeywords::Mezzo) | ValkyrieTokenType::Keyword(ValkyrieKeywords::Type)
+    )
 }
 
 /// 解析类型名路径：`std.text.utf16` / `core::primitive::usize` / `Self`。
