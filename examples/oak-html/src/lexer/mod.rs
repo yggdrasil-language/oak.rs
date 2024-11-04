@@ -15,6 +15,10 @@ pub(crate) type State<'a, S> = LexerState<'a, S, HtmlLanguage>;
 /// Elements whose content is raw text rather than markup.
 const RAW_TEXT_ELEMENTS: &[&str] = &["script", "style", "textarea", "title"];
 
+/// Elements whose content is text (`RCDATA`): markup stays data, but `&` still
+/// starts a character reference that the builder decodes.
+const RCDATA_ELEMENTS: &[&str] = &["textarea", "title"];
+
 /// Reads the tag name at the current position when it names a raw text element.
 fn raw_text_element_name<'a, S: Source + ?Sized>(state: &mut State<'a, S>) -> Option<String> {
     let rest = state.rest();
@@ -186,7 +190,12 @@ impl<'config> HtmlLexer<'config> {
                 *closing_tag = false;
                 *tag_name_seen = false;
                 if let Some(name) = raw {
-                    self.lex_raw_text(state, &name);
+                    if RCDATA_ELEMENTS.contains(&name.as_str()) {
+                        self.lex_rcdata(state, &name);
+                    }
+                    else {
+                        self.lex_raw_text(state, &name);
+                    }
                 }
             }
             _ => {}
@@ -206,6 +215,32 @@ impl<'config> HtmlLexer<'config> {
         }
         state.advance(len);
         state.add_token(HtmlTokenType::Text, start, state.get_position());
+    }
+
+    /// Consumes `RCDATA` content: everything up to the closing tag stays data, but
+    /// `&` still emits a character reference token so the builder can decode it.
+    fn lex_rcdata<'a, S: Source + ?Sized>(&self, state: &mut State<'a, S>, name: &str) {
+        let needle = format!("</{name}");
+        loop {
+            let rest = state.rest();
+            let lower = rest.to_ascii_lowercase();
+            let closing = lower.find(&needle).unwrap_or(rest.len());
+            let Some(ampersand) = rest[..closing].find('&')
+            else {
+                if closing > 0 {
+                    let start = state.get_position();
+                    state.advance(closing);
+                    state.add_token(HtmlTokenType::Text, start, state.get_position());
+                }
+                return;
+            };
+            if ampersand > 0 {
+                let start = state.get_position();
+                state.advance(ampersand);
+                state.add_token(HtmlTokenType::Text, start, state.get_position());
+            }
+            self.lex_entity_reference(state);
+        }
     }
 
     fn skip_whitespace<'a, S: Source + ?Sized>(&self, state: &mut State<'a, S>) -> bool {
