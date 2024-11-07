@@ -98,6 +98,17 @@ fn single_line_html_tag_still_lexes() {
     assert_eq!(tags[1].1, "</div>");
 }
 
+/// An underscore inside a word is literal text, not an emphasis delimiter.
+#[test]
+fn intraword_underscore_stays_text() {
+    let source = "snake_case_name\n";
+    let tokens = lex_tokens(source, MarkdownLanguage::common_mark());
+
+    assert!(!tokens.iter().any(|(kind, ..)| matches!(kind, MarkdownTokenType::Emphasis | MarkdownTokenType::Strong)), "an intraword underscore must not become a delimiter: {tokens:#?}");
+    let text: String = tokens.iter().map(|(_, text, ..)| text.as_str()).collect();
+    assert_eq!(text.trim_end(), "snake_case_name", "the underscores must stay literal: {tokens:#?}");
+}
+
 /// A candidate tag that crosses a newline is rejected even when a `>` appears on the next line.
 #[test]
 fn multiline_tag_candidate_is_not_a_tag() {
