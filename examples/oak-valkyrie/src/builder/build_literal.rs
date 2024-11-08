@@ -1,57 +1,22 @@
 use crate::{
     ValkyrieLanguage,
     ast::*,
-    builder::{ValkyrieBuilder, text, utils},
+    builder::{ValkyrieBuilder, text},
     lexer::{keywords::ValkyrieKeywords, token_type::ValkyrieTokenType},
-    parser::{parse_string_segments, parse_string_segments::parse_string_segments},
 };
 use oak_core::{OakError, RedNode, RedTree, Source};
 
-/// Counts the number of leading double quotes in a string.
-fn count_leading_quotes(text: &str) -> u8 {
-    let mut count = 0u8;
-    for ch in text.chars() {
-        if ch == '"' {
-            count += 1;
-        }
-        else {
-            break;
-        }
-    }
-    count
-}
-
-/// Counts the number of leading single quotes in a capture.
-fn count_leading_single_quotes(text: &str) -> u8 {
-    let mut count = 0u8;
-    for ch in text.chars() {
-        if ch == '\'' {
-            count += 1;
-        }
-        else {
-            break;
-        }
-    }
-    count
-}
-
-/// Extracts the content of a string literal by removing leading and trailing quotes.
-fn extract_content(text: &str, quote_count: u8) -> &str {
-    let start = quote_count as usize;
-    let end = text.len().saturating_sub(quote_count as usize);
-    if start >= end {
-        return "";
-    }
-    &text[start..end]
+/// Extracts the raw content of a quote capture by removing both delimiter runs.
+fn strip_delimiters(raw: &str, quote_count: usize) -> String {
+    let end = raw.len().saturating_sub(quote_count);
+    if quote_count >= end { String::new() } else { raw[quote_count..end].to_string() }
 }
 
 impl<'config> ValkyrieBuilder<'config> {
     pub(crate) fn build_literal<S: Source + ?Sized>(&self, node: RedNode<ValkyrieLanguage>, source: &S) -> Result<TermExpression, OakError> {
         let span = node.span();
         let mut prefix: Option<Identifier> = None;
-        let mut string_value: Option<String> = None;
-        let mut string_span: Option<oak_core::Range<usize>> = None;
-        let mut single_quote_value: Option<String> = None;
+        let mut quote_capture: Option<(QuoteKind, oak_core::Range<usize>)> = None;
 
         for child in node.children() {
             if let RedTree::Leaf(t) = child {
@@ -63,11 +28,10 @@ impl<'config> ValkyrieBuilder<'config> {
                         prefix = Some(Identifier { name: prefix_text, span: t.span });
                     }
                     ValkyrieTokenType::StringLiteral => {
-                        string_value = Some(text(source, t.span));
-                        string_span = Some(t.span);
+                        quote_capture = Some((QuoteKind::Double, t.span));
                     }
                     ValkyrieTokenType::CharLiteral => {
-                        single_quote_value = Some(text(source, t.span));
+                        quote_capture = Some((QuoteKind::Single, t.span));
                     }
                     ValkyrieTokenType::IntegerLiteral => {
                         return Ok(TermExpression::IntegerLiteral { value: text(source, t.span), span });
@@ -84,24 +48,20 @@ impl<'config> ValkyrieBuilder<'config> {
             }
         }
 
-        if let Some(raw_text) = single_quote_value {
-            let quote_count = count_leading_single_quotes(&raw_text);
-            let content = extract_content(&raw_text, quote_count);
-            return Ok(TermExpression::SingleQuoteLiteral { prefix, quote_count, content: content.to_string(), span });
-        }
-
-        if let (Some(raw_text), Some(str_span)) = (string_value, string_span) {
-            let quote_count = count_leading_quotes(&raw_text);
-            let content = extract_content(&raw_text, quote_count);
-            let is_raw = prefix.as_ref().map(|p| p.name == "r").unwrap_or(false);
-            let content_start = str_span.start + quote_count as usize;
-            let segments = parse_string_segments(content, content_start, is_raw);
-
-            Ok(TermExpression::StringLiteral(StringLiteral { prefix, quote_count, segments, span }))
-        }
+        let Some((quote, token_span)) = quote_capture
         else {
-            Err(source.syntax_error("Missing literal value".to_string(), span.start))
-        }
+            return Err(source.syntax_error("Missing literal value".to_string(), span.start));
+        };
+
+        // 单双引号走同一条捕获路径：只记录定界形状与原始内容，
+        // 不区分引号种类做语义分流，也不解释前缀或转义。
+        let raw_text = text(source, token_span);
+        let quote_char = quote.character();
+        let quote_count = raw_text.chars().take_while(|c| *c == quote_char).count();
+        let content = strip_delimiters(&raw_text, quote_count);
+        let content_span = Span { start: token_span.start + quote_count, end: token_span.end - quote_count };
+
+        Ok(TermExpression::QuoteLiteral(QuoteLiteral { prefix, quote, quote_count: quote_count as u8, content, content_span, span }))
     }
 
     pub(crate) fn build_bool_literal<S: Source + ?Sized>(&self, node: RedNode<ValkyrieLanguage>, source: &S) -> Result<TermExpression, OakError> {
@@ -120,16 +80,86 @@ impl<'config> ValkyrieBuilder<'config> {
 
     pub(crate) fn build_identifier_expr<S: Source + ?Sized>(&self, node: RedNode<ValkyrieLanguage>, source: &S) -> Result<TermExpression, OakError> {
         let span = node.span();
-        let identifier = utils::build_identifier(&node, source, span)?;
+        let identifier = crate::builder::utils::build_identifier(&node, source, span)?;
         Ok(TermExpression::NamePath(Box::new(NamePath { parts: vec![identifier.clone()], span: identifier.span })))
     }
 
     pub(crate) fn build_path_expr<S: Source + ?Sized>(&self, node: RedNode<ValkyrieLanguage>, source: &S) -> Result<TermExpression, OakError> {
-        let path = utils::build_name_path(&node, source)?;
+        let path = crate::builder::utils::build_name_path(&node, source)?;
         Ok(TermExpression::NamePath(Box::new(path)))
     }
 
     pub(crate) fn build_name_path<S: Source + ?Sized>(&self, node: RedNode<ValkyrieLanguage>, source: &S) -> Result<NamePath, OakError> {
-        utils::build_name_path(&node, source)
+        crate::builder::utils::build_name_path(&node, source)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{ValkyrieBuilder, ValkyrieLanguage};
+    use oak_core::{Builder, SourceText, parser::ParseSession};
+
+    fn build(source: &str) -> oak_core::OakDiagnostics<ValkyrieRoot> {
+        let language = ValkyrieLanguage::default();
+        let builder = ValkyrieBuilder::new(&language);
+        let text = SourceText::new(source);
+        let mut session = ParseSession::<ValkyrieLanguage>::default();
+        builder.build(&text, &[], &mut session)
+    }
+
+    fn literal_of(source: &str) -> QuoteLiteral {
+        let output = build(source);
+        let root = output.result.expect("source builds");
+        let StatementNode::Let(let_node) = &root.items[0]
+        else {
+            panic!("let statement expected")
+        };
+        match let_node.expr.as_ref().expect("initializer") {
+            TermExpression::QuoteLiteral(literal) => literal.clone(),
+            other => panic!("quote literal expected, got {other:?}"),
+        }
+    }
+
+    /// 单双引号产出同一节点形状：只有定界种类不同，内容一律未解码。
+    #[test]
+    fn both_quote_kinds_produce_the_unified_capture_node() {
+        let double = literal_of("let a = \"x\\ny\"");
+        assert_eq!(double.quote, QuoteKind::Double);
+        assert_eq!(double.quote_count, 1);
+        assert_eq!(double.content, "x\\ny");
+        assert_eq!(double.content_span, Span { start: 9, end: 13 });
+
+        let single = literal_of("let a = 'x\\ny'");
+        assert_eq!(single.quote, QuoteKind::Single);
+        assert_eq!(single.quote_count, 1);
+        assert_eq!(single.content, "x\\ny");
+    }
+
+    /// 反斜杠不救定界符：`"\""` 在第二个引号处闭合，悬挂引号是结构化错误。
+    #[test]
+    fn backslash_does_not_protect_the_delimiter() {
+        let output = build("let a = \"\\\"\"");
+        assert!(!output.diagnostics.is_empty(), "dangling quote must produce a structured error");
+    }
+
+    /// 前缀只是携带者：builder 不识别 `r`，不解析模板。
+    #[test]
+    fn prefix_is_carried_without_semantics() {
+        let raw = literal_of("let a = r\"{x}\"");
+        assert_eq!(raw.prefix.as_ref().expect("prefix").name, "r");
+        assert_eq!(raw.content, "{x}");
+    }
+
+    /// 多引号只改变定界形状，捕获后内容与单引号同形。
+    #[test]
+    fn multi_quote_run_only_changes_the_delimiter() {
+        let triple = literal_of("let a = \"\"\"x\"\"\"");
+        assert_eq!(triple.quote_count, 3);
+        assert_eq!(triple.content, "x");
+
+        let empty = literal_of("let a = \"\"");
+        assert_eq!(empty.quote_count, 2);
+        assert_eq!(empty.content, "");
     }
 }

@@ -10,7 +10,7 @@
 //! - Blocks and lambda expressions
 //! - Object and class expressions
 
-use super::{Identifier, LoopKind, MatchArm, NamePath, Param, Pattern, Span, StringLiteral, TypeExpression};
+use super::{Identifier, LoopKind, MatchArm, NamePath, Param, Pattern, QuoteLiteral, Span, TypeExpression};
 use crate::{
     ast::{class_nodes::AnonymousClass, structure_nodes::AnonymousStructure},
     lexer::token_type::ValkyrieTokenType,
@@ -67,29 +67,18 @@ pub enum TermExpression {
     /// let result = true || false // Logical OR
     /// ```
     Binary(Box<TermBinaryNode>),
-    /// A string literal expression.
+    /// 引号捕获字面量：词法只按等量引号串捕获原始文本，不解释转义与前缀。
+    ///
+    /// 引号种类（单/双）、前缀与引号串长度都是语法元数据；字符/文本归属、
+    /// 转义解码与模板解释全部由消费方在捕获之后判定，本节点只携带捕获事实。
     ///
     /// # V Language Example
     /// ```v
     /// let name = "John"
-    /// let message = "Hello, world!"
+    /// let letter = 'x'
+    /// let json = r'{"a": 1}'
     /// ```
-    StringLiteral(StringLiteral),
-    /// 单引号捕获字面量：词法只按等量引号串捕获原始文本，不解释转义与前缀。
-    ///
-    /// 字符字面量、字节字面量（前缀 `b`）与 raw 形式（前缀 `r`）的语义归属
-    /// 由编译器在捕获之后结合前缀与内容判定，本节点只携带捕获事实。
-    SingleQuoteLiteral {
-        /// 紧邻的前缀标识符（如 `r`、`b`），无语义预设。
-        prefix: Option<Identifier>,
-        /// 定界引号串长度（`''` 为空捕获，引号串长度为 2）。
-        quote_count: u8,
-        /// 未解码转义的原始内容（不含两侧引号串）。
-        content: String,
-        /// 单文件源码位置。
-        #[cfg_attr(feature = "serde", serde(with = "oak_core::serde_range"))]
-        span: Span,
-    },
+    QuoteLiteral(QuoteLiteral),
     /// An integer literal preserving its lexical text and source span.
     IntegerLiteral {
         /// The literal text as written in source.
@@ -704,8 +693,7 @@ impl TermExpression {
     pub fn span(&self) -> Span {
         match self {
             TermExpression::NamePath(path) => path.span,
-            TermExpression::StringLiteral(string) => string.span,
-            TermExpression::SingleQuoteLiteral { span, .. } => *span,
+            TermExpression::QuoteLiteral(literal) => literal.span,
             TermExpression::IntegerLiteral { span, .. } => *span,
             TermExpression::FloatLiteral { span, .. } => *span,
             TermExpression::BooleanLiteral { span, .. } | TermExpression::ArrayLiteral { span, .. } | TermExpression::TupleLiteral { span, .. } => *span,

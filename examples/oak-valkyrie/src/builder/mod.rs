@@ -13,6 +13,7 @@ mod build_micro;
 mod build_namespace;
 mod build_object;
 mod build_pratt;
+mod build_quote_template;
 mod build_root;
 mod build_stmt;
 mod build_template;

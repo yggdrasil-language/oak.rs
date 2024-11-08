@@ -39,7 +39,7 @@ pub mod control_nodes;
 
 pub use self::{
     class_nodes::{AnonymousClass, ClassDeclaration},
-    common_nodes::{Attribute, AttributeArgument, EnumVariant, InterpolationSegment, Modifier, StringLiteral, StringSegment, TextSegment, VariantCase},
+    common_nodes::{Attribute, AttributeArgument, EnumVariant, InterpolationSegment, Modifier, QuoteKind, QuoteLiteral, StringSegment, TextSegment, VariantCase},
     ecs_nodes::{ComponentDeclaration, EventDeclaration, SystemDeclaration},
     items_nodes::{Effect, Enums, Flags, MicroDeclaration, Parent, StatementNode, TypeAliasDeclaration, TypeFunction, Variant},
     namespace_nodes::{NamespaceDeclaration, UsingDeclaration},
