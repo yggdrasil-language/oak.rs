@@ -66,7 +66,7 @@ impl<'config> ValkyrieBuilder<'config> {
         let precedence = |op: &ValkyrieTokenType| -> u8 {
             match op {
                 ValkyrieTokenType::Star | ValkyrieTokenType::Slash | ValkyrieTokenType::Percent => 11,
-                ValkyrieTokenType::Plus | ValkyrieTokenType::Minus => 10,
+                ValkyrieTokenType::Plus | ValkyrieTokenType::PlusPlus | ValkyrieTokenType::Minus => 10,
                 ValkyrieTokenType::LessThan | ValkyrieTokenType::GreaterThan | ValkyrieTokenType::LessEq | ValkyrieTokenType::GreaterEq | ValkyrieTokenType::LessEqGreater => 9,
                 ValkyrieTokenType::EqEq | ValkyrieTokenType::NotEq => 8,
                 // 区间低于相等、高于 `&&`；与 parser 的层序一致。非结合由 parser 只接受
@@ -85,6 +85,7 @@ impl<'config> ValkyrieBuilder<'config> {
                 | ValkyrieTokenType::Slash
                 | ValkyrieTokenType::Percent
                 | ValkyrieTokenType::Plus
+                | ValkyrieTokenType::PlusPlus
                 | ValkyrieTokenType::Minus
                 | ValkyrieTokenType::LessThan
                 | ValkyrieTokenType::GreaterThan

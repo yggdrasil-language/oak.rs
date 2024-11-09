@@ -595,6 +595,32 @@ mod spaceship_operator_tests {
         assert!(!kinds.iter().any(|(kind, _)| *kind == ValkyrieTokenType::LessEqGreater), "`<<` must not merge into spaceship: {kinds:?}");
     }
 
+    /// `++` 整体成两字节拼接 token；单个 `+` 保持算术加号。
+    #[test]
+    fn concat_operator_lexes_as_a_single_two_byte_token() {
+        let kinds = leaves("micro f() { a ++ b }\n");
+        let concat_lengths: Vec<u32> = kinds.iter().filter(|(kind, _)| *kind == ValkyrieTokenType::PlusPlus).map(|(_, length)| *length).collect();
+        assert_eq!(concat_lengths, [2], "`++` must be one two-byte token, leaves: {kinds:?}");
+        assert!(!kinds.iter().any(|(kind, _)| *kind == ValkyrieTokenType::Plus), "`++` must not leave an arithmetic plus: {kinds:?}");
+
+        let arithmetic = leaves("micro f() { a + b }\n");
+        assert!(arithmetic.iter().any(|(kind, _)| *kind == ValkyrieTokenType::Plus), "`+` must stay arithmetic addition: {arithmetic:?}");
+        assert!(!arithmetic.iter().any(|(kind, _)| *kind == ValkyrieTokenType::PlusPlus), "`+` must not become concat: {arithmetic:?}");
+    }
+
+    /// `++` 与 `+` 同处加法层且左结合：`a ++ b + c` 解析为 `(a ++ b) + c`。
+    #[test]
+    fn concat_binds_at_the_additive_level_and_is_left_associative() {
+        let expr = single_micro_body_expr("micro f() { a ++ b + c }\n");
+        assert_eq!(operator_of(&expr), Some(ValkyrieTokenType::Plus), "expression: {expr:?}");
+        let TermExpression::Binary(node) = &expr
+        else {
+            panic!("expected binary expression, got {expr:?}")
+        };
+        assert_eq!(name_of(&node.rhs), Some("c"), "outer rhs must be the last operand: {:?}", node.rhs);
+        assert_eq!(operator_of(&node.lhs), Some(ValkyrieTokenType::PlusPlus), "concat must nest first: {:?}", node.lhs);
+    }
+
     /// 正例：`<=>` 与算术优先级正确 —— 算术先结合，三向比较取比较层。
     #[test]
     fn spaceship_binds_below_arithmetic() {
