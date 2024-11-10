@@ -338,6 +338,21 @@ impl crate::lexer::ValkyrieLexer<'_> {
                 }
 
                 let kind = if has_fraction || has_exponent { ValkyrieTokenType::FloatLiteral } else { ValkyrieTokenType::IntegerLiteral };
+                // 数字类型后缀与数字同属一个 token：浮点只接受 `f64`、整数只接受 `i64`
+                // （当前字面量载体只有这两种）。后缀后若仍是标识符继续字符，则不属于
+                // 后缀，按旧行为留给后续 token。
+                let suffix: Option<&str> = match kind {
+                    ValkyrieTokenType::FloatLiteral => Some("f64"),
+                    ValkyrieTokenType::IntegerLiteral => Some("i64"),
+                    _ => None,
+                };
+                if let Some(suffix) = suffix {
+                    let matches_suffix = suffix.chars().enumerate().all(|(offset, expected)| state.peek_next_n(offset).is_some_and(|ch| ch.eq_ignore_ascii_case(&expected)))
+                        && state.peek_next_n(suffix.len()).map_or(true, |ch| !is_xid_continue(ch));
+                    if matches_suffix {
+                        state.advance(suffix.len());
+                    }
+                }
                 state.add_token(kind, start, state.get_position());
                 return true;
             }
