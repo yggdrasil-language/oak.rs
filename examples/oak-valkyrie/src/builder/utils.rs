@@ -210,7 +210,8 @@ pub(crate) fn build_field_expr<S: Source + ?Sized>(node: &RedNode<ValkyrieLangua
 
         match child {
             RedTree::Leaf(t) => {
-                if t.kind.is_soft_identifier() && receiver.is_some() && field.is_none() {
+                // 成员名 token：软标识符，或元组位置索引的整数字面量（`pair.0`）。
+                if (t.kind.is_soft_identifier() || t.kind == ValkyrieTokenType::IntegerLiteral) && receiver.is_some() && field.is_none() {
                     field = Some(Identifier { name: crate::builder::text(source, t.span), span: t.span });
                 }
             }

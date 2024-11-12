@@ -219,7 +219,9 @@ fn parse_postfix_expression_with_options<S: oak_core::Source + ?Sized>(state: &m
         if state.at(ValkyrieTokenType::Dot) || (state.at(ValkyrieTokenType::ColonColon) && state.peek_non_trivia_kind_at(1) != Some(ValkyrieTokenType::LessThan) && state.peek_non_trivia_kind_at(1) != Some(ValkyrieTokenType::BracketL)) {
             let cp = state.sink.last_node_checkpoint();
             state.bump();
-            if at_identifier_like(state) {
+            // 成员名可以是软标识符，也可以是元组位置索引的整数字面量（`pair.0`）；
+            // 越界与类型合法性留给语义层，语法层不判 arity。
+            if at_identifier_like(state) || state.at(ValkyrieTokenType::IntegerLiteral) {
                 state.bump();
             }
             else {
