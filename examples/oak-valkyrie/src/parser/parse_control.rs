@@ -110,8 +110,26 @@ pub(crate) fn parse_match_expression<S: oak_core::Source + ?Sized>(state: &mut S
     Ok(())
 }
 
-/// 解析 match 模式：`Some(value)` / `None` / `_` / `[head, ...tail]`。
+/// 解析 match 模式，允许顶层备选：`case A | B | C: …`。
+///
+/// 备选只允许出现在 arm 顶层；子模式（构造/数组/字段内）仍是单一模式，
+/// 深处的 `A | B` 由原子解析失败暴露为语法错误，不做隐式分组猜测。
 fn parse_match_pattern<S: oak_core::Source + ?Sized>(state: &mut State<'_, S>) -> Result<(), oak_core::OakError> {
+    let pcp = state.sink.checkpoint();
+    parse_match_pattern_atom(state)?;
+    if state.at(ValkyrieTokenType::Pipe) {
+        while state.at(ValkyrieTokenType::Pipe) {
+            state.bump();
+            state.skip_trivia();
+            parse_match_pattern_atom(state)?;
+        }
+        state.sink.finish_node(pcp, ValkyrieElementType::AlternativePattern);
+    }
+    Ok(())
+}
+
+/// 解析 match 模式原子：`Some(value)` / `None` / `_` / `[head, ...tail]`。
+fn parse_match_pattern_atom<S: oak_core::Source + ?Sized>(state: &mut State<'_, S>) -> Result<(), oak_core::OakError> {
     let pcp = state.sink.checkpoint();
     // 字面量原子：完整模式或构造/数组子模式的单个 token，直接消费进当前 Pattern 节点；
     // builder 按叶节点映射 `Pattern::Literal`，不经零消费的递归调用产生空节点。
@@ -145,13 +163,13 @@ fn parse_match_pattern<S: oak_core::Source + ?Sized>(state: &mut State<'_, S>) -
                 }
                 state.skip_trivia();
                 let rest_before = state.checkpoint().0;
-                parse_match_pattern(state)?;
+                parse_match_pattern_atom(state)?;
                 if state.checkpoint().0 == rest_before {
                     return Err(state.source.syntax_error("数组模式的 ... 后必须跟绑定模式".into(), state.current_offset()));
                 }
             }
             else {
-                parse_match_pattern(state)?;
+                parse_match_pattern_atom(state)?;
             }
             if state.checkpoint().0 == before {
                 state.bump();
@@ -183,7 +201,7 @@ fn parse_match_pattern<S: oak_core::Source + ?Sized>(state: &mut State<'_, S>) -
                 // （由 rusty-valkyrie 的源码恢复修补），但必须消费一个 token，
                 // 否则 `case Some(60)` / `case Some('<')` 会原地死循环。
                 let before = state.checkpoint().0;
-                parse_match_pattern(state)?;
+                parse_match_pattern_atom(state)?;
                 if state.checkpoint().0 == before {
                     state.bump();
                 }
@@ -208,11 +226,11 @@ fn parse_match_pattern<S: oak_core::Source + ?Sized>(state: &mut State<'_, S>) -
                     state.bump();
                     if state.at(ValkyrieTokenType::Colon) {
                         state.bump();
-                        parse_match_pattern(state)?;
+                        parse_match_pattern_atom(state)?;
                     }
                 }
                 else {
-                    parse_match_pattern(state)?;
+                    parse_match_pattern_atom(state)?;
                 }
                 if state.checkpoint().0 == before {
                     state.bump();

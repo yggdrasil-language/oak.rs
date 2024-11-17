@@ -179,6 +179,8 @@ pub enum ValkyrieElementType {
     // Others
     /// Pattern node.
     Pattern,
+    /// 备选模式节点：`case A | B: …`，子节点为若干 `Pattern`。
+    AlternativePattern,
     /// Argument list node.
     ArgList,
     /// Generic parameter list node.
