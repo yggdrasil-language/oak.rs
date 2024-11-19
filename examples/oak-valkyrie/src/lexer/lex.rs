@@ -200,15 +200,65 @@ impl crate::lexer::ValkyrieLexer<'_> {
         true
     }
 
+    /// 引号是否紧跟 raw 前缀 `r`（`r'…'` / `r"…"`）。
+    ///
+    /// 前缀必须与引号紧邻，且 `r` 前面不是标识符延续字符（`bar'…'` 的前缀是 `bar`，
+    /// 不是 raw）。捕获阶段的 `\` 保护只对 cooked 字面量生效，raw 字面量按逐字闭合。
+    fn quote_follows_raw_prefix<S: Source + ?Sized>(&self, state: &State<'_, S>, start: usize) -> bool {
+        if start == 0 {
+            return false;
+        }
+        if !state.get_text_in((start - 1..start).into()).eq_ignore_ascii_case("r") {
+            return false;
+        }
+        if start == 1 {
+            return true;
+        }
+        !state.get_text_in((start - 2..start - 1).into()).chars().next().is_some_and(|c| c == '_' || is_xid_continue(c))
+    }
+
+    /// 字符字面量 `'c'` / `'\''` / `'\u{27}'`。
+    ///
+    /// 与字符串捕获不同，单引号字面量必须能表达单引号本身；捕获阶段对 `\`
+    /// 只做“跳过下一字符”的定界保护，不解释转义值。`\` 后无字符时按未闭合失败。
+    /// 空字面量 `''` 保持既有空 token 形态，内容合法性仍由后续阶段拒绝。
     fn lex_char_literal<S: Source + ?Sized>(&self, state: &mut State<'_, S>) -> bool {
-        self.lex_quote_capture(state, '\'', ValkyrieTokenType::CharLiteral)
+        if state.current() != Some('\'') {
+            return false;
+        }
+        // 连续引号 `''` / `'''…'''` 与 raw 前缀保持既有等量引号串捕获语义
+        // （空字面量、引号捕获与 raw 逐字闭合）；其余单引号字面量按“反斜杠保护定界符”扫描。
+        if state.peek_next() == Some('\'') || self.quote_follows_raw_prefix(state, state.get_position()) {
+            return self.lex_quote_capture(state, '\'', ValkyrieTokenType::CharLiteral);
+        }
+        let start = state.get_position();
+        state.advance('\''.len_utf8());
+        while let Some(c) = state.current() {
+            if c == '\\' {
+                state.advance('\\'.len_utf8());
+                if let Some(next) = state.current() {
+                    state.advance(next.len_utf8());
+                }
+                continue;
+            }
+            if c == '\'' {
+                state.advance('\''.len_utf8());
+                state.add_token(ValkyrieTokenType::CharLiteral, start, state.get_position());
+                return true;
+            }
+            state.advance(c.len_utf8());
+        }
+        state.add_token(ValkyrieTokenType::Error, start, state.get_position());
+        state.add_error(oak_core::OakError::syntax_error("unterminated quoted literal: opening run of 1 `'` requires a closing run of 1".to_string(), start, None));
+        true
     }
 
     /// 按"等量引号串"配对捕获被引号包住的原始文本：
     ///
     /// - 开头连续 `N` 个引号必须由连续 `N` 个引号闭合；`""` / `''` 特判为空字面量。
-    /// - 捕获阶段不解释反斜杠：`\` 无法"救"定界符，`"\""` 在第二个 `"` 处闭合，
-    ///   内容里的悬挂 `\` 由后续编译阶段按结构化错误拒绝。
+    /// - 单引号串（`N == 1`）里 `\` 保护下一个字符，使 `"\""` / `'\''` 可捕获；
+    ///   多引号串不解释转义，按逐字内容闭合。
+    /// - 捕获阶段不解释转义值：内容里的转义在后续编译阶段按结构化错误拒绝或解码。
     /// - 找不到等量闭合串时产出 `Error` token 并附精确诊断（未闭合），
     ///   与"捕获成功但内容非法"的后续错误区分。
     fn lex_quote_capture<S: Source + ?Sized>(&self, state: &mut State<'_, S>, quote: char, kind: ValkyrieTokenType) -> bool {
@@ -237,8 +287,21 @@ impl crate::lexer::ValkyrieLexer<'_> {
         }
 
         let mut current_consecutive = 0usize;
+        // raw 前缀由 lexer 就地识别：raw 字面量不解释 `\`，按逐字内容寻找闭合引号。
+        let escape_aware = !self.quote_follows_raw_prefix(state, start);
 
         while let Some(c) = state.current() {
+            // cooked 单引号串允许 `\` 保护下一个字符（`'\''`、`"\""`、`"\\"`）：
+            // 捕获阶段不解释转义值，只保证转义字符不会提前闭合定界符。
+            // 多引号串（`"""…"""`）保持既有逐字捕获语义。
+            if c == '\\' && quote_count == 1 && escape_aware {
+                state.advance('\\'.len_utf8());
+                if let Some(next) = state.current() {
+                    state.advance(next.len_utf8());
+                }
+                current_consecutive = 0;
+                continue;
+            }
             if c == quote {
                 current_consecutive += 1;
                 state.advance(c.len_utf8());
