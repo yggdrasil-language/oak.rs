@@ -100,4 +100,22 @@ impl<'config> ValkyrieBuilder<'config> {
         let ty = ty.ok_or_else(|| source.syntax_error("Missing cast target type".to_string(), span.start))?;
         Ok(TermExpression::Cast { expr, ty, span })
     }
+
+    /// `expr?`：后缀传播节点的子表达式是唯一操作数，`?` 本身不产生子节点。
+    pub(crate) fn build_try_propagate<S: Source + ?Sized>(&self, node: RedNode<ValkyrieLanguage>, source: &S) -> Result<TermExpression, OakError> {
+        let span = node.span();
+        let mut operand = None;
+        for child in node.children() {
+            if utils::should_skip_node(&child) {
+                continue;
+            }
+            if let RedTree::Node(n) = child
+                && operand.is_none()
+            {
+                operand = Some(Box::new(self.build_expr(n, source)?));
+            }
+        }
+        let expr = operand.ok_or_else(|| source.syntax_error("`?` 缺少操作数".to_string(), span.start))?;
+        Ok(TermExpression::TryPropagate { expr, span })
+    }
 }

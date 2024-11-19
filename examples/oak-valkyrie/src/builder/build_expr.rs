@@ -35,6 +35,7 @@ impl<'config> ValkyrieBuilder<'config> {
             crate::parser::element_type::ValkyrieElementType::OffsetExpression => self.build_offset(node, source),
             crate::parser::element_type::ValkyrieElementType::ParenthesizedExpression => self.build_paren(node, source),
             crate::parser::element_type::ValkyrieElementType::CastExpression => self.build_cast(node, source),
+            crate::parser::element_type::ValkyrieElementType::TryExpression => self.build_try_propagate(node, source),
             crate::parser::element_type::ValkyrieElementType::BlockExpression => Ok(TermExpression::Block(self.build_block(node, source)?)),
             crate::parser::element_type::ValkyrieElementType::LambdaExpression => Ok(TermExpression::Micro(self.build_lambda_expr(node, source)?)),
             crate::parser::element_type::ValkyrieElementType::ObjectExpression => self.build_object(node, source),
