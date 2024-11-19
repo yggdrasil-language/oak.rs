@@ -71,7 +71,10 @@ pub(crate) fn parse_if_expression<S: oak_core::Source + ?Sized>(state: &mut Stat
     // 条件统一按“禁止对象字面量后缀”的完整表达式解析，`{` 留给 then 分支。
     crate::parser::parse_expressions::parse_condition_expression(state)?;
     parse_block_expression(state)?;
-    if state.at(ValkyrieTokenType::Keyword(ValkyrieKeywords::Else)) {
+    // `else` 同时是 match 臂标记（`else:`）。只有后随 `{` 或 `if` 时才是 if 的 else 分支，
+    // 后随 `:` 时属于外层 match 臂，不得被 if 贪婪吞掉。
+    let else_starts_if_branch = state.peek_non_trivia_kind_at(1).is_some_and(|kind| matches!(kind, ValkyrieTokenType::BraceL) || matches!(kind, ValkyrieTokenType::Keyword(ValkyrieKeywords::If)));
+    if state.at(ValkyrieTokenType::Keyword(ValkyrieKeywords::Else)) && else_starts_if_branch {
         state.bump();
         if state.at(ValkyrieTokenType::Keyword(ValkyrieKeywords::If)) {
             parse_if_expression(state)?;
