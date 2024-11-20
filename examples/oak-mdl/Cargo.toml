@@ -1,0 +1,26 @@
+[package]
+name = "oak-mdl"
+version.workspace = true
+authors.workspace = true
+description = "MDL molfile and SDF connection-table parser for the oak ecosystem."
+edition.workspace = true
+license.workspace = true
+homepage.workspace = true
+repository = "https://github.com/yggdrasil-language/oak.rs/tree/master/examples/oak-mdl"
+categories = ["parsing"]
+keywords = ["parser", "mdl", "molfile", "sdf", "cheminformatics"]
+
+[dependencies]
+oak-core = { workspace = true }
+serde = { workspace = true, optional = true }
+
+[features]
+default = ["serde"]
+serde = ["dep:serde", "oak-core/serde"]
+
+[package.metadata.docs.rs]
+all-features = true
+
+[[test]]
+name = "main"
+required-features = ["serde"]

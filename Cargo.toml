@@ -77,6 +77,9 @@ oak-dhall = { path = "examples/oak-dhall", version = "0.0.12" }
 oak-django = { path = "examples/oak-django", version = "0.0.12" }
 oak-dockerfile = { path = "examples/oak-dockerfile", version = "0.0.12" }
 oak-dot = { path = "examples/oak-dot", version = "0.0.12" }
+oak-abc = { path = "examples/oak-abc", version = "0.0.12" }
+oak-mdl = { path = "examples/oak-mdl", version = "0.0.12" }
+oak-smiles = { path = "examples/oak-smiles", version = "0.0.12" }
 oak-dsv = { path = "examples/oak-dsv", version = "0.0.12" }
 oak-elixir = { path = "examples/oak-elixir", version = "0.0.12" }
 oak-elm = { path = "examples/oak-elm", version = "0.0.12" }
