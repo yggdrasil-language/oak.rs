@@ -3,7 +3,7 @@ use crate::{
     lexer::{keywords::ValkyrieKeywords, token_type::ValkyrieTokenType},
     parser::{
         element_type::ValkyrieElementType,
-        parse_modifiers::{dispatch_prefixed_declaration, is_declaration_keyword, is_member_name_token, is_raw_id_follower, parse_field_modifiers, parse_modifiers, parse_modifiers_followed_by},
+        parse_modifiers::{at_identifier_like, dispatch_prefixed_declaration, is_declaration_keyword, is_member_name_token, is_raw_id_follower, parse_field_modifiers, parse_modifiers, parse_modifiers_followed_by},
     },
 };
 use oak_core::parser::ParserState;
@@ -275,7 +275,7 @@ pub(crate) fn parse_class_member<S: oak_core::Source + ?Sized>(state: &mut State
         parse_attribute(state)?;
         state.skip_trivia();
     }
-    if state.at(ValkyrieTokenType::Identifier) {
+    if at_identifier_like(state) {
         let next = state.peek_non_trivia_kind_at(1);
         if next.is_some_and(|kind| is_declaration_keyword(&kind)) {
             return dispatch_prefixed_declaration(state);
@@ -383,7 +383,7 @@ pub(crate) fn parse_struct<S: oak_core::Source + ?Sized>(state: &mut State<'_, S
             let fcp = state.sink.checkpoint();
             let before = state.tokens.index();
             parse_field_modifiers(state)?;
-            if state.at(ValkyrieTokenType::Identifier) {
+            if at_identifier_like(state) {
                 state.bump();
             }
             if state.at(ValkyrieTokenType::Colon) {
@@ -532,7 +532,7 @@ pub(crate) fn parse_variant<S: oak_core::Source + ?Sized>(state: &mut State<'_, 
             }
             let fcp = state.sink.checkpoint();
             parse_field_modifiers(state)?;
-            if state.at(ValkyrieTokenType::Identifier) {
+            if at_identifier_like(state) {
                 state.bump();
             }
             if state.at(ValkyrieTokenType::Colon) {
@@ -832,7 +832,7 @@ pub(crate) fn parse_union<S: oak_core::Source + ?Sized>(state: &mut State<'_, S>
             let fcp = state.sink.checkpoint();
             let before = state.tokens.index();
             parse_field_modifiers(state)?;
-            if state.at(ValkyrieTokenType::Identifier) {
+            if at_identifier_like(state) {
                 state.bump();
             }
             if state.at(ValkyrieTokenType::Colon) {

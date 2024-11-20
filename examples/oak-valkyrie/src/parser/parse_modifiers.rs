@@ -8,9 +8,10 @@ use oak_core::parser::ParserState;
 type State<'a, S> = ParserState<'a, ValkyrieLanguage, S>;
 
 /// 成员名 token：成员产生式是“修饰符列表 + 名字”，这里只判 token 类别，不读文本。
-/// `get`、`set`、`getset`、`asjisdsf` 与 raw id 在语法上一律等价。
+/// `get`、`set`、`getset`、`asjisdsf` 与 raw id 在语法上一律等价；
+/// `union` / `flags` / `by` / `when` 只在声明锚点才是关键字，名字位置仍是标识符。
 pub(crate) fn is_member_name_token(kind: &ValkyrieTokenType) -> bool {
-    matches!(kind, ValkyrieTokenType::Identifier)
+    kind.is_soft_identifier()
 }
 
 /// 当前 token 是否可作为名字使用（标识符或 `union` / `flags` / `by` / `when` 等软关键字）。
