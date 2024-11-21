@@ -4,7 +4,7 @@
 //! - Between `<%` and `%>` → normal Valkyrie tokens (keywords, identifiers, etc.)
 //! - Between `%>` and the next `<%` in template regions → always `TemplateText` (includes `aaa` and `micro fx() { ... }`, etc.)
 
-use crate::lexer::{State, token_type::ValkyrieTokenType};
+use crate::lexer::{State, ValkyrieKeywords, token_type::ValkyrieTokenType};
 use oak_core::{TokenType, source::Source};
 
 const TG_CONTROL_L: &str = "<%";
@@ -58,12 +58,18 @@ fn lex_tgrammar_control<S: Source + ?Sized>(lexer: &crate::lexer::ValkyrieLexer<
 
     let content_start = state.get_position();
     let content_end = scan_control_end(state);
-    let mut closes_template_region = false;
+    let mut boundary_keyword = None;
     if content_start < content_end {
         let mut sub_state = state.sub_state(content_start, content_end);
         let _ = lexer.run_template_directive_programming(&mut sub_state);
         let directive_tokens = sub_state.get_tokens();
-        closes_template_region = directive_tokens.iter().find(|token| !token.kind.is_ignored()).is_some_and(|token| token.kind == ValkyrieTokenType::Keyword(crate::lexer::ValkyrieKeywords::End));
+        boundary_keyword = directive_tokens
+            .iter()
+            .find(|token| !token.kind.is_ignored())
+            .and_then(|token| match token.kind {
+                ValkyrieTokenType::Keyword(keyword) => Some(keyword),
+                _ => None,
+            });
         for token in directive_tokens {
             state.add_token(token.kind, token.span.start, token.span.end);
         }
@@ -74,10 +80,18 @@ fn lex_tgrammar_control<S: Source + ?Sized>(lexer: &crate::lexer::ValkyrieLexer<
         let end_start = state.get_position();
         state.advance(TG_CONTROL_R.len());
         state.add_token(ValkyrieTokenType::TemplateR, end_start, state.get_position());
-        // `<% end %>` closes the interleaved template region.  The following
-        // source must be lexed as ordinary Valkyrie again; otherwise the whole
-        // remainder of the file becomes TemplateText and cannot form items.
-        mode.region = !closes_template_region;
+        // 模板区域只由块指令（`if` / `loop` / `match`）开启，并由 `<% end %>` 关闭。
+        // 单行片段（如 `<% arch %>`）是一次性指令：它之后的源码必须继续按普通
+        // Valkyrie 词法处理，否则函数体剩余部分会被吞成 `TemplateText`。
+        mode.region = match boundary_keyword {
+            Some(ValkyrieKeywords::End) => false,
+            Some(ValkyrieKeywords::If | ValkyrieKeywords::Loop | ValkyrieKeywords::Match) => true,
+            // 区域内部边界：继续保持模板区域，避免错误指令后把剩余源码挤出
+            // 同一诊断面（例如游离 `<% case %>` 只报一条结构化边界错误）。
+            Some(ValkyrieKeywords::Else | ValkyrieKeywords::Case) => true,
+            // 单行片段或无法识别的指令：不延续模板区域。
+            _ => false,
+        };
     }
     else {
         state.add_token(ValkyrieTokenType::Error, block_start, state.get_position());
