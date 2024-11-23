@@ -86,6 +86,7 @@ oak-elm = { path = "examples/oak-elm", version = "0.0.12" }
 oak-erlang = { path = "examples/oak-erlang", version = "0.0.12" }
 oak-fortran = { path = "examples/oak-fortran", version = "0.0.12" }
 oak-fsharp = { path = "examples/oak-fsharp", version = "0.0.12" }
+oak-glsl = { path = "examples/oak-glsl", version = "0.0.12" }
 oak-go = { path = "examples/oak-go", version = "0.0.12" }
 oak-graphql = { path = "examples/oak-graphql", version = "0.0.12" }
 oak-groovy = { path = "examples/oak-groovy", version = "0.0.12" }

@@ -1,0 +1,27 @@
+[package]
+name = "oak-glsl"
+version.workspace = true
+authors.workspace = true
+description = "GLSL language parser with support for modern OpenGL and Vulkan shader programming."
+edition.workspace = true
+license.workspace = true
+homepage.workspace = true
+repository = "https://github.com/yggdrasil-language/oak.rs/tree/master/examples/oak-glsl"
+documentation = "https://docs.rs/oak-glsl"
+categories = ["parsing"]
+keywords = ["parser", "glsl", "shader", "opengl"]
+
+[dependencies]
+oak-core = { workspace = true }
+serde = { workspace = true, optional = true }
+
+[features]
+default = ["serde"]
+serde = ["dep:serde", "oak-core/serde"]
+
+[package.metadata.docs.rs]
+all-features = true
+
+[[test]]
+name = "main"
+required-features = ["serde"]
