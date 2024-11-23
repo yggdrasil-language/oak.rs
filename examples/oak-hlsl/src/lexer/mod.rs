@@ -472,6 +472,9 @@ impl<'config> HlslLexer<'config> {
                     "tbuffer" => HlslTokenType::Tbuffer,
                     "interface" => HlslTokenType::Interface,
                     "class" => HlslTokenType::Class,
+                    "typedef" => HlslTokenType::Typedef,
+                    "using" => HlslTokenType::Using,
+                    "namespace" => HlslTokenType::Namespace,
 
                     // Boolean literals
                     "true" | "false" => HlslTokenType::BooleanLiteral,
