@@ -64,7 +64,7 @@ impl<'config> HlslParser<'config> {
 
         match state.peek_kind() {
             Some(HlslTokenType::Struct) => self.parse_struct(state, cp),
-            Some(HlslTokenType::Cbuffer) | Some(HlslTokenType::Tbuffer) => self.skip_block_declaration(state),
+            Some(HlslTokenType::Cbuffer) | Some(HlslTokenType::Tbuffer) => self.parse_buffer_block(state, cp),
             Some(HlslTokenType::Typedef) => self.parse_typedef(state, cp),
             Some(HlslTokenType::Using) => self.parse_using_alias(state, cp),
             Some(HlslTokenType::Include)
@@ -91,41 +91,32 @@ impl<'config> HlslParser<'config> {
         }
     }
 
-    /// Parses a `cbuffer` or `tbuffer` block. These buffer blocks are outside
-    /// the current frontend surface, so only their tokens are consumed.
-    fn skip_block_declaration<'a, S: Source + ?Sized>(&self, state: &mut State<'a, S>) {
-        while state.not_at_end() && !state.at(HlslTokenType::LeftBrace) && !state.at(HlslTokenType::Semicolon) && !state.at(HlslTokenType::Eof) {
-            state.bump();
+    /// Parses a `cbuffer` or `tbuffer` block, including its members.
+    fn parse_buffer_block<'a, S: Source + ?Sized>(&self, state: &mut State<'a, S>, cp: (usize, usize)) {
+        state.bump(); // cbuffer / tbuffer
+        if state.at(HlslTokenType::Identifier) {
+            self.parse_name(state);
         }
-        if state.at(HlslTokenType::LeftBrace) {
-            self.skip_balanced_braces(state);
-            state.eat(HlslTokenType::Semicolon);
+        if state.eat(HlslTokenType::Colon) {
+            self.parse_colon_tail(state);
         }
-        else if state.at(HlslTokenType::Semicolon) {
-            state.bump();
+        if !state.eat(HlslTokenType::LeftBrace) {
+            state.record_expected("LeftBrace");
         }
-    }
-
-    /// Consumes a balanced `{ ... }` group.
-    fn skip_balanced_braces<'a, S: Source + ?Sized>(&self, state: &mut State<'a, S>) {
-        let mut depth = 0usize;
-        while state.not_at_end() {
-            match state.peek_kind() {
-                Some(HlslTokenType::LeftBrace) => {
-                    depth += 1;
-                    state.bump();
-                }
-                Some(HlslTokenType::RightBrace) => {
-                    state.bump();
-                    depth = depth.saturating_sub(1);
-                    if depth == 0 {
-                        return;
-                    }
-                }
-                Some(HlslTokenType::Eof) | None => return,
-                Some(_) => state.bump(),
+        while state.not_at_end() && !state.at(HlslTokenType::RightBrace) {
+            let before = state.checkpoint().0;
+            self.parse_struct_member(state);
+            if state.checkpoint().0 == before {
+                state.bump();
             }
         }
+        if !state.eat(HlslTokenType::RightBrace) {
+            state.record_expected("RightBrace");
+        }
+        if !state.eat(HlslTokenType::Semicolon) {
+            state.record_expected("Semicolon");
+        }
+        state.finish_at(cp, HlslElementType::BufferBlock);
     }
 
     /// Parses a legacy `typedef Type Name;` alias.

@@ -45,7 +45,22 @@ fn type_args<'a>(ty: &'a oak_hlsl::ast::HlslType) -> Vec<&'a str> {
 fn parses_compute_kernel() {
     let (root, diagnostics) = build(include_str!("compute.hlsl"));
     assert!(diagnostics.is_empty(), "unexpected diagnostics: {diagnostics:?}");
-    assert_eq!(root.items.len(), 2, "`cbuffer` blocks do not produce items: {:?}", root.items.len());
+    assert_eq!(root.items.len(), 3, "unexpected items: {:?}", root.items.len());
+
+    let params = match &root.items[1] {
+        HlslItem::Cbuffer(buffer) => buffer,
+        other => panic!("expected the `Params` constant buffer, got {other:?}"),
+    };
+    assert_eq!(params.kind, "cbuffer");
+    assert_eq!(params.name, "Params");
+    let register = params.register.as_ref().expect("the constant buffer should have a register");
+    assert_eq!(register.class.as_deref(), Some("b"));
+    assert_eq!(register.index, Some(0));
+    assert_eq!(params.members.len(), 2);
+    assert_eq!(params.members[0].name, "tint");
+    assert_eq!(params.members[0].ty.name, "float4");
+    assert_eq!(params.members[1].name, "exposure");
+    assert_eq!(params.members[1].ty.name, "float");
 
     let output = global_var(&root, "output");
     let ty = output.ty.as_ref().expect("the buffer should have a type");
