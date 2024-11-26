@@ -152,7 +152,12 @@ impl<'config> VueLexer<'config> {
                 }
             }
             '!' => {
-                if state.peek_next_n(1) == Some('=') {
+                if state.peek_next_n(1) == Some('=') && state.peek_next_n(2) == Some('=') {
+                    state.advance(3);
+                    state.add_token(VueTokenType::NotEqEq, start_pos, start_pos + 3);
+                    VueTokenType::NotEqEq
+                }
+                else if state.peek_next_n(1) == Some('=') {
                     state.advance(2);
                     state.add_token(VueTokenType::NotEq, start_pos, start_pos + 2);
                     VueTokenType::NotEq
@@ -265,6 +270,11 @@ impl<'config> VueLexer<'config> {
                     state.advance(2);
                     state.add_token(VueTokenType::Arrow, start_pos, start_pos + 2);
                     VueTokenType::Arrow
+                }
+                else if state.peek_next_n(1) == Some('=') && state.peek_next_n(2) == Some('=') {
+                    state.advance(3);
+                    state.add_token(VueTokenType::EqEqEq, start_pos, start_pos + 3);
+                    VueTokenType::EqEqEq
                 }
                 else if state.peek_next_n(1) == Some('=') {
                     state.advance(2);
