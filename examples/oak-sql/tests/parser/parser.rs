@@ -1093,6 +1093,25 @@ fn test_sql_builder_insert_multiple_rows() {
 }
 
 #[test]
+fn test_sql_builder_insert_function_call_and_subquery_values() {
+    // A top-level call or scalar subquery in a VALUES cell is a bare
+    // `FunctionCall` / `Subquery` node, not wrapped in `Expression`; the row
+    // builder must keep it instead of dropping the cell and desyncing the count.
+    let (statement, _source) = build_statement("INSERT INTO users (id, created_at, tag) VALUES (next_id('u'), now(), (SELECT 1));");
+
+    let SqlStatement::Insert(insert) = &statement
+    else {
+        panic!("Expected Insert statement, got {statement:?}");
+    };
+    assert_eq!(insert.columns.len(), 3);
+    assert_eq!(insert.rows.len(), 1);
+    assert_eq!(insert.rows[0].len(), 3, "each VALUES cell must survive into the row");
+    assert!(matches!(&insert.rows[0][0], Expression::FunctionCall { .. }));
+    assert!(matches!(&insert.rows[0][1], Expression::FunctionCall { .. }));
+    assert!(matches!(&insert.rows[0][2], Expression::Subquery { .. }));
+}
+
+#[test]
 fn test_sql_builder_insert_select() {
     let (statement, source) = build_statement("INSERT INTO archive (id, name) SELECT id, name FROM users;");
 
