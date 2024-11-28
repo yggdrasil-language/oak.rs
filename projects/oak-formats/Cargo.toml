@@ -1,0 +1,24 @@
+[package]
+name = "oak-formats"
+version.workspace = true
+authors.workspace = true
+edition.workspace = true
+description = "Cross-language text formatting and AST pretty-printer registry"
+homepage.workspace = true
+repository.workspace = true
+license.workspace = true
+
+[lib]
+crate-type = ["lib"]
+path = "src/lib.rs"
+
+[dependencies]
+oak-core = { workspace = true }
+oak-formatter = { workspace = true }
+oak-awsl = { workspace = true }
+oak-von = { workspace = true }
+serde = { workspace = true, optional = true, features = ["derive"] }
+
+[features]
+default = []
+serde = ["dep:serde", "oak-von/serde"]
