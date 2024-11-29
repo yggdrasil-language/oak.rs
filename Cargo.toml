@@ -34,7 +34,6 @@ oak-resolver = { path = "projects/oak-resolver", version = "0.0.12" }
 oak-highlight = { path = "projects/oak-highlight", version = "0.0.12" }
 oak-pretty-print = { path = "projects/oak-pretty-print", version = "0.0.12" }
 oak-formatter = { path = "projects/oak-formatter", version = "0.0.12" }
-oak-formats = { path = "projects/oak-formats", version = "0.0.12" }
 oak-lsp = { path = "projects/oak-lsp", version = "0.0.12" }
 oak-folding = { path = "projects/oak-folding", version = "0.0.12" }
 oak-hover = { path = "projects/oak-hover", version = "0.0.12" }
