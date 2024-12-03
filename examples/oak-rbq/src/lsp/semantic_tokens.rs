@@ -2,10 +2,9 @@ use crate::{language::RbqLanguage, lexer::token_type::RbqTokenType, parser::elem
 use oak_core::{
     TokenType,
     language::UniversalTokenRole,
-    source::Source,
+    source::{LineMap, Source},
     tree::{RedNode, RedTree},
 };
-use oak_lsp::LineMap;
 use oak_semantic_tokens::{SemanticToken, SemanticTokensProvider};
 
 /// RBQ semantic tokens provider.
