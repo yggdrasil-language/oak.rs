@@ -41,9 +41,7 @@ fn property_names(source: &str) -> Vec<String> {
 
 #[test]
 fn typed_property_keeps_its_name_when_initializer_is_an_identifier() {
-    let names = property_names(
-        "type Row = { id: string };\nclass C {\n  rows: Row[] = SEED;\n  label = 'x';\n}",
-    );
+    let names = property_names("type Row = { id: string };\nclass C {\n  rows: Row[] = SEED;\n  label = 'x';\n}");
     assert_eq!(names, vec!["rows".to_string(), "label".to_string()]);
 }
 
@@ -56,13 +54,10 @@ fn untyped_property_keeps_its_name_when_initializer_is_an_identifier() {
 #[test]
 fn property_initializer_is_still_captured() {
     let members = class_members("class C {\n  rows: Row[] = SEED;\n}");
-    let [ClassMember::Property { name, initializer, ty, .. }] = members.as_slice() else {
+    let [ClassMember::Property { name, initializer, ty, .. }] = members.as_slice()
+    else {
         panic!("expected one property, got {members:?}")
     };
     assert_eq!(name, "rows");
-    assert!(
-        initializer.is_some(),
-        "initializer must be kept (has_ty={})",
-        ty.is_some()
-    );
+    assert!(initializer.is_some(), "initializer must be kept (has_ty={})", ty.is_some());
 }

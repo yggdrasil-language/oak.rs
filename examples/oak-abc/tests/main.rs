@@ -43,17 +43,29 @@ fn octave_marks_and_accidentals_are_recorded() {
     let root = parse_abc(source).expect("parses");
     let events = &root.tunes[0].voices[0].measures[0].events;
 
-    let AbcEvent::Note(first) = &events[0] else { panic!("note") };
+    let AbcEvent::Note(first) = &events[0]
+    else {
+        panic!("note")
+    };
     assert_eq!(first.pitch.accidental, Some(AbcAccidental::Sharp));
     assert_eq!(first.pitch.octave, 3, "a trailing comma drops an octave");
 
-    let AbcEvent::Note(second) = &events[1] else { panic!("note") };
+    let AbcEvent::Note(second) = &events[1]
+    else {
+        panic!("note")
+    };
     assert_eq!(second.pitch.octave, 5, "an apostrophe raises an octave");
 
-    let AbcEvent::Note(third) = &events[2] else { panic!("note") };
+    let AbcEvent::Note(third) = &events[2]
+    else {
+        panic!("note")
+    };
     assert_eq!(third.pitch.accidental, Some(AbcAccidental::Flat));
 
-    let AbcEvent::Note(fourth) = &events[3] else { panic!("note") };
+    let AbcEvent::Note(fourth) = &events[3]
+    else {
+        panic!("note")
+    };
     assert_eq!(fourth.pitch.accidental, Some(AbcAccidental::Natural));
 }
 
@@ -94,14 +106,23 @@ fn tie_slur_and_decorations_attach_to_the_note() {
     let root = parse_abc(source).expect("parses");
     let events = &root.tunes[0].voices[0].measures[0].events;
 
-    let AbcEvent::Note(first) = &events[0] else { panic!("note") };
+    let AbcEvent::Note(first) = &events[0]
+    else {
+        panic!("note")
+    };
     assert_eq!(first.slur, AbcSlur::Start);
     assert!(first.tie, "the hyphen marks a tie");
 
-    let AbcEvent::Note(second) = &events[1] else { panic!("note") };
+    let AbcEvent::Note(second) = &events[1]
+    else {
+        panic!("note")
+    };
     assert_eq!(second.slur, AbcSlur::Stop);
 
-    let AbcEvent::Note(third) = &events[2] else { panic!("note") };
+    let AbcEvent::Note(third) = &events[2]
+    else {
+        panic!("note")
+    };
     assert!(third.decorations.contains(&AbcDecoration::Staccato));
 }
 
@@ -110,11 +131,17 @@ fn tuplet_compresses_the_next_notes() {
     let source = "X:1\nM:4/4\nL:1/8\nK:C\n(3CDE F2|\n";
     let root = parse_abc(source).expect("parses");
     let events = &root.tunes[0].voices[0].measures[0].events;
-    let AbcEvent::Note(first) = &events[0] else { panic!("note") };
+    let AbcEvent::Note(first) = &events[0]
+    else {
+        panic!("note")
+    };
     assert_eq!(first.tuplet.map(|tuplet| tuplet.actual), Some(3));
     assert_eq!(first.length, AbcFraction::new(1, 12), "3:2 over an eighth note");
 
-    let AbcEvent::Note(fourth) = &events[3] else { panic!("note") };
+    let AbcEvent::Note(fourth) = &events[3]
+    else {
+        panic!("note")
+    };
     assert!(fourth.tuplet.is_none(), "the tuplet covers only three notes");
 }
 
@@ -204,7 +231,10 @@ fn note_spans_select_the_authored_text() {
     let source = "X:1\nM:4/4\nL:1/4\nK:C\n^C,D'|\n";
     let root = parse_abc(source).expect("parses");
     let events = &root.tunes[0].voices[0].measures[0].events;
-    let AbcEvent::Note(first) = &events[0] else { panic!("note") };
+    let AbcEvent::Note(first) = &events[0]
+    else {
+        panic!("note")
+    };
     let text = &source[first.span.start..first.span.end];
     assert_eq!(text, "^C,");
 }

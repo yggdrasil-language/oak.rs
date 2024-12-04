@@ -15,9 +15,7 @@ pub mod lexer;
 /// Parser producing the green tree.
 pub mod parser;
 
-pub use crate::{
-    ast::SmilesRoot, builder::SmilesBuilder, language::SmilesLanguage, lexer::SmilesLexer, parser::SmilesParser,
-};
+pub use crate::{ast::SmilesRoot, builder::SmilesBuilder, language::SmilesLanguage, lexer::SmilesLexer, parser::SmilesParser};
 
 /// Parse a SMILES or reaction-SMILES source into its typed AST.
 ///

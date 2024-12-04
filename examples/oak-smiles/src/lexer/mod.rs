@@ -13,20 +13,13 @@ use crate::{language::SmilesLanguage, lexer::token_type::SmilesTokenType};
 const TWO_LETTER_ATOMS: &[&str] = &["Cl", "Br"];
 
 /// One-letter organic-subset symbols, including aromatic lowercase forms.
-const ONE_LETTER_ATOMS: &[char] = &[
-    'B', 'C', 'N', 'O', 'P', 'S', 'F', 'I', 'b', 'c', 'n', 'o', 'p', 's', 'H', 'h', '*',
-];
+const ONE_LETTER_ATOMS: &[char] = &['B', 'C', 'N', 'O', 'P', 'S', 'F', 'I', 'b', 'c', 'n', 'o', 'p', 's', 'H', 'h', '*'];
 
 /// Lexer for SMILES.
 pub struct SmilesLexer;
 
 impl Lexer<SmilesLanguage> for SmilesLexer {
-    fn lex<'a, S: Source + ?Sized>(
-        &self,
-        text: &S,
-        _edits: &[TextEdit],
-        cache: &'a mut impl LexerCache<SmilesLanguage>,
-    ) -> LexOutput<SmilesLanguage> {
+    fn lex<'a, S: Source + ?Sized>(&self, text: &S, _edits: &[TextEdit], cache: &'a mut impl LexerCache<SmilesLanguage>) -> LexOutput<SmilesLanguage> {
         let mut state = LexerState::new_with_cache(text, text.length(), cache);
 
         while state.not_at_end() {
@@ -103,10 +96,7 @@ impl Lexer<SmilesLanguage> for SmilesLexer {
                 _ => {
                     let rest_start = state.get_position();
                     let mut matched = 0usize;
-                    if let Some(symbol) = TWO_LETTER_ATOMS
-                        .iter()
-                        .find(|symbol| peek_starts_with(text, rest_start, symbol))
-                    {
+                    if let Some(symbol) = TWO_LETTER_ATOMS.iter().find(|symbol| peek_starts_with(text, rest_start, symbol)) {
                         matched = symbol.len();
                     }
                     else if ONE_LETTER_ATOMS.contains(&current) {

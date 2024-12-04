@@ -2,17 +2,10 @@
 
 use core::range::Range;
 
-use oak_core::{
-    Builder, BuilderCache, GreenNode, GreenTree, OakDiagnostics, OakError, Parser, SourceText, TextEdit,
-    parser::session::ParseSession,
-    source::Source,
-};
+use oak_core::{Builder, BuilderCache, GreenNode, GreenTree, OakDiagnostics, OakError, Parser, SourceText, TextEdit, parser::session::ParseSession, source::Source};
 
 use crate::{
-    ast::{
-        AbcAccidental, AbcBarline, AbcChord, AbcClef, AbcDecoration, AbcEvent, AbcFraction, AbcHeader, AbcKey, AbcMeasure,
-        AbcMeter, AbcNote, AbcPitch, AbcRest, AbcRoot, AbcSlur, AbcTune, AbcTuplet, AbcUnsupported, AbcVoice,
-    },
+    ast::{AbcAccidental, AbcBarline, AbcChord, AbcClef, AbcDecoration, AbcEvent, AbcFraction, AbcHeader, AbcKey, AbcMeasure, AbcMeter, AbcNote, AbcPitch, AbcRest, AbcRoot, AbcSlur, AbcTune, AbcTuplet, AbcUnsupported, AbcVoice},
     language::AbcLanguage,
     parser::{AbcParser, element_type::AbcElementType},
 };
@@ -22,12 +15,7 @@ use crate::{
 pub struct AbcBuilder;
 
 impl Builder<AbcLanguage> for AbcBuilder {
-    fn build<'a, S: Source + ?Sized>(
-        &self,
-        source: &S,
-        edits: &[TextEdit],
-        _cache: &'a mut impl BuilderCache<AbcLanguage>,
-    ) -> OakDiagnostics<AbcRoot> {
+    fn build<'a, S: Source + ?Sized>(&self, source: &S, edits: &[TextEdit], _cache: &'a mut impl BuilderCache<AbcLanguage>) -> OakDiagnostics<AbcRoot> {
         let parser = AbcParser;
         let mut cache = ParseSession::<AbcLanguage>::default();
         let parse_result = parser.parse(source, edits, &mut cache);
@@ -62,11 +50,7 @@ struct MeasureBuild {
 
 impl MeasureBuild {
     fn into_ast(self) -> AbcMeasure {
-        AbcMeasure {
-            events: self.events,
-            barline: self.barline,
-            span: (self.start..self.end.max(self.start)).into(),
-        }
+        AbcMeasure { events: self.events, barline: self.barline, span: (self.start..self.end.max(self.start)).into() }
     }
 }
 
@@ -113,7 +97,6 @@ impl AbcBuilder {
         let mut lyric_targets: Vec<(usize, usize, usize)> = Vec::new();
         let mut document_end = 0usize;
         let mut offset = 0usize;
-
 
         for child in green_tree.children {
             let GreenTree::Node(node) = child
@@ -203,15 +186,7 @@ impl AbcBuilder {
             }
             let index = voice_index.unwrap_or(0).min(tune.voices.len().saturating_sub(1));
             lyric_targets.clear();
-            self.parse_music_line(
-                body,
-                start,
-                &header,
-                tune,
-                index,
-                &mut lyric_targets,
-                source,
-            )?;
+            self.parse_music_line(body, start, &header, tune, index, &mut lyric_targets, source)?;
             tune.end = end;
         }
 
@@ -226,16 +201,7 @@ impl AbcBuilder {
 
     /// Parse one music line into the voice's measures.
     #[allow(clippy::too_many_arguments)]
-    fn parse_music_line(
-        &self,
-        body: &str,
-        base: usize,
-        header: &AbcHeader,
-        tune: &mut TuneBuild,
-        voice_index: usize,
-        lyric_targets: &mut Vec<(usize, usize, usize)>,
-        _source: &SourceText,
-    ) -> Result<(), OakError> {
+    fn parse_music_line(&self, body: &str, base: usize, header: &AbcHeader, tune: &mut TuneBuild, voice_index: usize, lyric_targets: &mut Vec<(usize, usize, usize)>, _source: &SourceText) -> Result<(), OakError> {
         let unit = header.unit_note_length.unwrap_or_else(|| default_unit(header.meter));
         let bytes = body.as_bytes();
         let mut index = 0usize;
@@ -313,11 +279,7 @@ impl AbcBuilder {
                     for note in &mut notes {
                         note.length = length;
                     }
-                    let chord = AbcChord {
-                        notes,
-                        length,
-                        span: (base + chord_start..base + index).into(),
-                    };
+                    let chord = AbcChord { notes, length, span: (base + chord_start..base + index).into() };
                     let chord_len = chord.notes.len();
                     push_event(tune, voice_index, AbcEvent::Chord(chord), base, chord_start, index);
                     if chord_len > 0 {
@@ -447,12 +409,7 @@ impl AbcBuilder {
     }
 
     /// Attach a `w:` lyric line to the notes of the preceding music line.
-    fn attach_lyrics(
-        &self,
-        current: &mut Option<TuneBuild>,
-        targets: &[(usize, usize, usize)],
-        value: &str,
-    ) {
+    fn attach_lyrics(&self, current: &mut Option<TuneBuild>, targets: &[(usize, usize, usize)], value: &str) {
         let Some(tune) = current.as_mut()
         else {
             return;
@@ -467,9 +424,18 @@ impl AbcBuilder {
                 continue;
             }
             let syllable = syllable.trim_end_matches('-').to_string();
-            let Some(voice) = tune.voices.get_mut(voice) else { continue };
-            let Some(measure) = voice.measures.get_mut(measure) else { continue };
-            let Some(event) = measure.events.get_mut(event) else { continue };
+            let Some(voice) = tune.voices.get_mut(voice)
+            else {
+                continue;
+            };
+            let Some(measure) = voice.measures.get_mut(measure)
+            else {
+                continue;
+            };
+            let Some(event) = measure.events.get_mut(event)
+            else {
+                continue;
+            };
             match event {
                 AbcEvent::Note(note) => note.lyric = Some(syllable),
                 AbcEvent::Chord(chord) => {
@@ -496,33 +462,15 @@ impl TuneBuild {
                 {
                     voice.measures.pop();
                 }
-                AbcVoice {
-                    id: voice.id,
-                    clef: voice.clef,
-                    measures: voice.measures.drain(..).map(MeasureBuild::into_ast).collect(),
-                    span: (voice.start..voice.end.max(voice.start)).into(),
-                }
+                AbcVoice { id: voice.id, clef: voice.clef, measures: voice.measures.drain(..).map(MeasureBuild::into_ast).collect(), span: (voice.start..voice.end.max(voice.start)).into() }
             })
             .collect();
-        AbcTune {
-            index: self.index,
-            voices,
-            unsupported: self.unsupported,
-            span: (self.start..self.end.max(self.start)).into(),
-        }
+        AbcTune { index: self.index, voices, unsupported: self.unsupported, span: (self.start..self.end.max(self.start)).into() }
     }
 }
 
 /// Append a refused construct to the tune as an event in the current measure.
-fn push_unsupported(
-    tune: &mut TuneBuild,
-    voice_index: usize,
-    construct: &str,
-    text: &str,
-    base: usize,
-    start: usize,
-    end: usize,
-) {
+fn push_unsupported(tune: &mut TuneBuild, voice_index: usize, construct: &str, text: &str, base: usize, start: usize, end: usize) {
     let record = unsupported(construct, text, base + start, base + end);
     push_event(tune, voice_index, AbcEvent::Unsupported(record), base, start, end);
 }
@@ -543,14 +491,7 @@ fn push_event(tune: &mut TuneBuild, voice_index: usize, event: AbcEvent, base: u
 }
 
 /// Close the current measure at a bar line.
-fn close_measure(
-    tune: &mut TuneBuild,
-    voice_index: usize,
-    barline: AbcBarline,
-    base: usize,
-    start: usize,
-    end: usize,
-) {
+fn close_measure(tune: &mut TuneBuild, voice_index: usize, barline: AbcBarline, base: usize, start: usize, end: usize) {
     let Some(voice) = tune.voices.get_mut(voice_index)
     else {
         return;
@@ -584,8 +525,14 @@ fn last_event_position(tune: &TuneBuild, voice_index: usize) -> (usize, usize) {
 }
 
 fn mark_tie(tune: &mut TuneBuild, voice_index: usize) {
-    let Some(voice) = tune.voices.get_mut(voice_index) else { return };
-    let Some(measure) = voice.measures.last_mut() else { return };
+    let Some(voice) = tune.voices.get_mut(voice_index)
+    else {
+        return;
+    };
+    let Some(measure) = voice.measures.last_mut()
+    else {
+        return;
+    };
     match measure.events.last_mut() {
         Some(AbcEvent::Note(note)) => note.tie = true,
         Some(AbcEvent::Chord(chord)) => {
@@ -598,8 +545,14 @@ fn mark_tie(tune: &mut TuneBuild, voice_index: usize) {
 }
 
 fn mark_slur_stop(tune: &mut TuneBuild, voice_index: usize) {
-    let Some(voice) = tune.voices.get_mut(voice_index) else { return };
-    let Some(measure) = voice.measures.last_mut() else { return };
+    let Some(voice) = tune.voices.get_mut(voice_index)
+    else {
+        return;
+    };
+    let Some(measure) = voice.measures.last_mut()
+    else {
+        return;
+    };
     match measure.events.last_mut() {
         Some(AbcEvent::Note(note)) => {
             note.slur = if note.slur == AbcSlur::Start { AbcSlur::Both } else { AbcSlur::Stop };
@@ -614,13 +567,7 @@ fn mark_slur_stop(tune: &mut TuneBuild, voice_index: usize) {
 }
 
 /// Parse one note; returns the note and how many bytes it consumed.
-fn parse_note(
-    body: &str,
-    start: usize,
-    base: usize,
-    state: &mut LineState,
-    unit: AbcFraction,
-) -> Result<Option<(AbcNote, usize)>, OakError> {
+fn parse_note(body: &str, start: usize, base: usize, state: &mut LineState, unit: AbcFraction) -> Result<Option<(AbcNote, usize)>, OakError> {
     let bytes = body.as_bytes();
     let mut index = start;
     let mut accidental = state.accidental.take();
@@ -683,10 +630,7 @@ fn parse_note(
 
     let mut tuplet = None;
     if let Some((declaration, used)) = state.tuplet.as_mut() {
-        length = AbcFraction::new(
-            length.numerator * u32::from(declaration.normal.max(1)),
-            length.denominator * u32::from(declaration.actual.max(1)),
-        );
+        length = AbcFraction::new(length.numerator * u32::from(declaration.normal.max(1)), length.denominator * u32::from(declaration.actual.max(1)));
         tuplet = Some(*declaration);
         *used += 1;
         if *used >= declaration.actual {
@@ -777,9 +721,7 @@ fn scale(unit: AbcFraction, multiplier: AbcFraction) -> AbcFraction {
 /// The default unit note length implied by the meter.
 fn default_unit(meter: Option<AbcMeter>) -> AbcFraction {
     match meter {
-        Some(AbcMeter::Explicit { beats, unit }) if u32::from(beats) * 4 < u32::from(unit) * 3 => {
-            AbcFraction::new(1, 16)
-        }
+        Some(AbcMeter::Explicit { beats, unit }) if u32::from(beats) * 4 < u32::from(unit) * 3 => AbcFraction::new(1, 16),
         _ => AbcFraction::new(1, 8),
     }
 }

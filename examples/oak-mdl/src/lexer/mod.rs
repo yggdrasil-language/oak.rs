@@ -13,12 +13,7 @@ use crate::{language::MdlLanguage, lexer::token_type::MdlTokenType};
 pub struct MdlLexer;
 
 impl Lexer<MdlLanguage> for MdlLexer {
-    fn lex<'a, S: Source + ?Sized>(
-        &self,
-        text: &S,
-        _edits: &[TextEdit],
-        cache: &'a mut impl LexerCache<MdlLanguage>,
-    ) -> LexOutput<MdlLanguage> {
+    fn lex<'a, S: Source + ?Sized>(&self, text: &S, _edits: &[TextEdit], cache: &'a mut impl LexerCache<MdlLanguage>) -> LexOutput<MdlLanguage> {
         let mut state = LexerState::new_with_cache(text, text.length(), cache);
 
         while state.not_at_end() {
