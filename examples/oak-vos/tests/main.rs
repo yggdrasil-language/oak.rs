@@ -1,4 +1,4 @@
-use oak_vos::parse;
+use oak_vos::{VosDeclarationKind, parse};
 
 #[test]
 fn parses_vos_schema_through_oak() {
@@ -8,6 +8,8 @@ fn parses_vos_schema_through_oak() {
     .expect("Oak parses the VOS surface");
 
     assert!(root.source.contains("table User"));
+    assert_eq!(root.declarations.iter().filter(|item| item.kind == VosDeclarationKind::Table).count(), 1);
+    assert_eq!(root.declarations.iter().find(|item| item.kind == VosDeclarationKind::Table).and_then(|item| item.name.as_deref()), Some("User"));
 }
 
 #[test]
@@ -15,6 +17,7 @@ fn preserves_current_vos_micro_authoring_surface() {
     let source = "micro normalize_name(value: utf8) -> utf8 { let name = value.trim() name.lower() }";
     let root = parse(source).expect("Oak preserves the current micro surface");
     assert_eq!(root.source, source);
+    assert_eq!(root.declarations[0].kind, VosDeclarationKind::Micro);
 }
 
 #[test]
