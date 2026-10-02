@@ -21,6 +21,19 @@ fn preserves_current_vos_micro_authoring_surface() {
 }
 
 #[test]
+fn classifies_query_and_udf_declarations() {
+    let root = parse(
+        "query active_users() { table User } udf normalize(value: utf8) -> utf8 { value }",
+    )
+    .expect("Oak recognizes VOS query and udf declarations");
+
+    assert_eq!(root.declarations[0].kind, VosDeclarationKind::Query);
+    assert_eq!(root.declarations[0].name.as_deref(), Some("active_users"));
+    assert_eq!(root.declarations[1].kind, VosDeclarationKind::Udf);
+    assert_eq!(root.declarations[1].name.as_deref(), Some("normalize"));
+}
+
+#[test]
 fn rejects_lexical_errors_before_vos_semantic_lowering() {
     let error = parse("table User { name: utf8; \0 }").expect_err("Oak rejects NUL");
     assert!(!error.is_empty());
