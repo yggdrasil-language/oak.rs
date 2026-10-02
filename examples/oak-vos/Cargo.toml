@@ -1,0 +1,18 @@
+[package]
+name = "oak-vos"
+version.workspace = true
+authors.workspace = true
+description = "Oak CST frontend for the VOS schema and query language."
+edition.workspace = true
+license.workspace = true
+homepage.workspace = true
+repository = "https://github.com/yggdrasil-language/oaks/tree/dev/examples/oak-vos"
+documentation = "https://docs.rs/oak-vos"
+categories = ["parsing"]
+keywords = ["parser", "vos", "schema", "query"]
+
+[dependencies]
+oak-core = { workspace = true }
+
+[dev-dependencies]
+oak-testing = { workspace = true }
