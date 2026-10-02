@@ -24,7 +24,10 @@ pub struct VosRoot {
     pub source: String,
 }
 
-/// Parses VOS through Oak's lexer and parser pipeline.
+/// Builds a structural VOS CST through Oak's lexer and parser pipeline.
+///
+/// This entry rejects lexical errors and malformed delimiters. It does not
+/// establish full VOS grammar validity or produce a resolved VOS contract.
 pub fn parse(source: &str) -> Result<VosRoot, String> {
     use oak_core::{Parser, SourceText, parser::session::ParseSession};
 
@@ -33,5 +36,8 @@ pub fn parse(source: &str) -> Result<VosRoot, String> {
     let source_text = SourceText::new(source.to_owned());
     let mut cache = ParseSession::<VosLanguage>::default();
     let result = parser.parse(&source_text, &[], &mut cache);
+    if let Some(error) = result.diagnostics.first() {
+        return Err(format!("{error:?}"));
+    }
     result.result.map(|_| VosRoot { source: source.to_owned() }).map_err(|error| format!("{error:?}"))
 }

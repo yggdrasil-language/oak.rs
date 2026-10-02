@@ -33,8 +33,6 @@ impl VosLexer {
             "const" => VosTokenType::Const,
             "service" => VosTokenType::Service,
             "micro" => VosTokenType::Micro,
-            "query" => VosTokenType::Query,
-            "udf" => VosTokenType::Udf,
             "let" => VosTokenType::Let,
             "return" => VosTokenType::Return,
             "true" | "false" => VosTokenType::BooleanLiteral,
@@ -55,9 +53,11 @@ impl VosLexer {
                     state.advance(escaped.len_utf8());
                 }
             } else if ch == quote {
-                break;
+                state.add_token(VosTokenType::StringLiteral, start, state.get_position());
+                return;
             }
         }
+        state.add_error(oak_core::OakError::unexpected_eof(state.get_position(), None));
         state.add_token(VosTokenType::StringLiteral, start, state.get_position());
     }
 }
@@ -115,8 +115,12 @@ impl Lexer<VosLanguage> for VosLexer {
                     '<' => VosTokenType::Less,
                     '>' => VosTokenType::Greater,
                     '.' => VosTokenType::Dot,
+                    '@' | '&' | '+' | '-' | '*' | '/' | '!' | '|' | '%' | '^' => VosTokenType::Operator,
                     _ => VosTokenType::Error,
                 };
+                if kind == VosTokenType::Error {
+                    state.add_error(oak_core::OakError::expected_token("valid VOS character", start, None));
+                }
                 state.add_token(kind, start, state.get_position());
             }
         }
