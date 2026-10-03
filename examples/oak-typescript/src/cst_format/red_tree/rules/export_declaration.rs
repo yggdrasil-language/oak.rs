@@ -121,7 +121,7 @@ mod tests {
 
     #[test]
     fn exported_class_members_are_separated_and_idempotent() {
-        let options = FormatOptions { indent_width: 4, line_width: 120 };
+        let options = FormatOptions { indent_width: 4, line_width: 120, ..FormatOptions::default() };
         let input = "export default class Foo{count=0;inc(){this.count++}}";
         let output = format_source(input, &options).unwrap();
         assert_eq!(output, "export default class Foo {\n    count=0;\n    inc(){this.count++}\n}");

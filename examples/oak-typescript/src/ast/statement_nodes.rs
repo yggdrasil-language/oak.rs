@@ -493,6 +493,8 @@ pub struct VariableDeclaration {
     pub is_declare: bool,
     /// The name of the variable.
     pub name: String,
+    /// The JavaScript declaration keyword.
+    pub kind: VariableKind,
     /// The type annotation of the variable.
     pub ty: Option<TypeAnnotation>,
     /// The initial value of the variable.
@@ -500,6 +502,18 @@ pub struct VariableDeclaration {
     /// Source span of the declaration.
     #[cfg_attr(feature = "serde", serde(with = "oak_core::serde_range"))]
     pub span: Range<usize>,
+}
+
+/// A JavaScript variable declaration keyword.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub enum VariableKind {
+    /// `const` declaration.
+    Const,
+    /// `let` declaration.
+    Let,
+    /// `var` declaration.
+    Var,
 }
 
 /// Represents a function declaration.
