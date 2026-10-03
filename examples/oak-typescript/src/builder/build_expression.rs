@@ -303,9 +303,21 @@ impl<'config> TypeScriptBuilder<'config> {
                                 }
                             }
                             if name.is_empty() {
-                                let raw = source.get_text_in(child_span.into()).trim().to_string();
-                                if let Some((key, _)) = raw.split_once(':') {
-                                    name = key.trim().trim_matches(['"', '\'']).to_string();
+                                for key_child in child_node.children() {
+                                    if let RedTree::Leaf(key) = key_child {
+                                        match key.kind {
+                                            TypeScriptTokenType::IdentifierName => {
+                                                name = source.get_text_in(key.span.into()).to_string();
+                                                break;
+                                            }
+                                            TypeScriptTokenType::StringLiteral => {
+                                                name = decode_string_literal_text(&source.get_text_in(key.span.into()));
+                                                break;
+                                            }
+                                            TypeScriptTokenType::Colon => break,
+                                            _ => {}
+                                        }
+                                    }
                                 }
                             }
                             if let Some(v) = value {
