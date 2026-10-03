@@ -1,5 +1,5 @@
 use crate::{
-    ast::{VosDeclaration, VosDeclarationKind, VosRoot, VosSyntaxElement, VosSyntaxNode, VosSyntaxToken},
+    ast::{VosDeclaration, VosDeclarationKind, VosField, VosFieldAttribute, VosRoot, VosSyntaxElement, VosSyntaxNode, VosSyntaxSlice, VosSyntaxToken},
     language::VosLanguage,
     lexer::VosLexer,
     parser::{VosElementType, VosParser},
@@ -60,7 +60,118 @@ impl VosBuilder {
             VosDeclarationKind::Namespace | VosDeclarationKind::Using => Some(path),
             _ => None,
         };
-        Ok(VosDeclaration { kind, name, path, span })
+        let mut fields = Vec::new();
+        if matches!(kind, VosDeclarationKind::Table | VosDeclarationKind::Class) {
+            self.collect_fields(node, offset, source, &mut fields)?;
+        }
+        Ok(VosDeclaration { kind, name, path, fields, span })
+    }
+
+    fn collect_fields<'a>(&self, tree: &GreenNode<'a, VosLanguage>, offset: usize, source: &SourceText, fields: &mut Vec<VosField>) -> Result<(), OakError> {
+        let mut child_offset = offset;
+        for child in tree.children {
+            match child {
+                GreenTree::Node(node) if node.kind == VosElementType::Field => {
+                    fields.push(self.build_field(node, child_offset, source)?);
+                }
+                GreenTree::Node(node) => self.collect_fields(node, child_offset, source, fields)?,
+                GreenTree::Leaf(_) => {}
+            }
+            child_offset += match child {
+                GreenTree::Node(node) => node.byte_length as usize,
+                GreenTree::Leaf(leaf) => leaf.length as usize,
+            };
+        }
+        Ok(())
+    }
+
+    fn build_field<'a>(&self, node: &GreenNode<'a, VosLanguage>, offset: usize, source: &SourceText) -> Result<VosField, OakError> {
+        let span = offset..offset + node.byte_length as usize;
+        let mut child_offset = offset;
+        let mut name = None;
+        let mut name_span = None;
+        let mut attributes = Vec::new();
+        let mut type_syntax = None;
+        let mut default_value = None;
+        for child in node.children {
+            match child {
+                GreenTree::Leaf(leaf) => {
+                    if leaf.kind == crate::lexer::VosTokenType::Identifier && name.is_none() {
+                        let token_span = child_offset..child_offset + leaf.length as usize;
+                        name = Some(source.get_text_in(token_span.clone().into()).into_owned());
+                        name_span = Some(token_span.into());
+                    }
+                }
+                GreenTree::Node(child_node) => {
+                    match child_node.kind {
+                        VosElementType::FieldAttribute => attributes.push(self.build_attribute(child_node, child_offset, source)),
+                        VosElementType::TypeSyntax => type_syntax = Some(self.slice(child_node, child_offset, source)),
+                        VosElementType::DefaultValue => default_value = Some(self.slice(child_node, child_offset, source)),
+                        _ => {}
+                    }
+                }
+            }
+            child_offset += match child {
+                GreenTree::Node(node) => node.byte_length as usize,
+                GreenTree::Leaf(leaf) => leaf.length as usize,
+            };
+        }
+        let name = name.ok_or_else(|| OakError::expected_token("VOS field name", offset, None))?;
+        let name_span = name_span.expect("field name has a span");
+        let type_syntax = type_syntax.ok_or_else(|| OakError::expected_token("VOS field type", offset, None))?;
+        Ok(VosField { name, name_span, attributes, type_syntax, default_value, span: span.into() })
+    }
+
+    fn build_attribute<'a>(&self, node: &GreenNode<'a, VosLanguage>, offset: usize, source: &SourceText) -> VosFieldAttribute {
+        let raw_span = offset..offset + node.byte_length as usize;
+        let raw_text = source.get_text_in(raw_span.clone().into()).into_owned();
+        let text = raw_text.trim_end().to_owned();
+        let span = offset..offset + text.len();
+        let mut child_offset = offset;
+        let mut name = None;
+        for child in node.children {
+            if let GreenTree::Node(inner) = child {
+                let inner_attribute = self.build_attribute(inner, child_offset, source);
+                if name.is_none() { name = inner_attribute.name; }
+            }
+            if let GreenTree::Leaf(leaf) = child {
+                if leaf.kind == crate::lexer::VosTokenType::Identifier && name.is_none() {
+                    name = Some(source.get_text_in((child_offset..child_offset + leaf.length as usize).into()).into_owned());
+                }
+            }
+            child_offset += match child {
+                GreenTree::Node(node) => node.byte_length as usize,
+                GreenTree::Leaf(leaf) => leaf.length as usize,
+            };
+        }
+        VosFieldAttribute { name, text, span: span.into() }
+    }
+
+    fn slice<'a>(&self, node: &GreenNode<'a, VosLanguage>, offset: usize, source: &SourceText) -> VosSyntaxSlice {
+        let mut start = None;
+        let mut end = offset;
+        let mut child_offset = offset;
+        for child in node.children {
+            match child {
+                GreenTree::Node(inner) => {
+                    let inner_slice = self.slice(inner, child_offset, source);
+                    start.get_or_insert(inner_slice.span.start);
+                    end = inner_slice.span.end;
+                }
+                GreenTree::Leaf(leaf) if !matches!(leaf.kind, crate::lexer::VosTokenType::Whitespace | crate::lexer::VosTokenType::Comment) => {
+                    start.get_or_insert(child_offset);
+                    end = child_offset + leaf.length as usize;
+                }
+                _ => {}
+            }
+            child_offset += match child {
+                GreenTree::Node(node) => node.byte_length as usize,
+                GreenTree::Leaf(leaf) => leaf.length as usize,
+            };
+        }
+        let span = start.unwrap_or(offset)..end;
+        let text = source.get_text_in(span.clone().into()).into_owned();
+        VosSyntaxSlice { text, span: span.into() }
     }
 
     fn build_syntax<'a>(&self, tree: &GreenTree<'a, VosLanguage>, offset: usize, source: &SourceText) -> VosSyntaxElement {

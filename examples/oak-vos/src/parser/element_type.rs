@@ -29,6 +29,14 @@ pub enum VosElementType {
     Udf,
     /// Session-local micro declaration.
     Micro,
+    /// Table or class field declaration.
+    Field,
+    /// Field attribute syntax.
+    FieldAttribute,
+    /// Field type syntax.
+    TypeSyntax,
+    /// Field default value syntax.
+    DefaultValue,
     /// Structurally balanced block.
     Block,
     /// Structurally balanced parentheses.

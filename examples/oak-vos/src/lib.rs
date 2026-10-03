@@ -16,7 +16,7 @@ pub mod lexer;
 pub mod parser;
 
 pub use crate::{
-    ast::{VosDeclaration, VosDeclarationKind, VosRoot, VosSyntaxElement, VosSyntaxNode, VosSyntaxToken},
+    ast::{VosDeclaration, VosDeclarationKind, VosField, VosFieldAttribute, VosRoot, VosSyntaxElement, VosSyntaxNode, VosSyntaxSlice, VosSyntaxToken},
     builder::VosBuilder,
     language::VosLanguage,
     lexer::{VosLexer, VosToken, VosTokenType},

@@ -95,3 +95,82 @@ fn builder_exposes_using_path_without_reparsing_tokens() {
     assert_eq!(root.declarations[0].kind, VosDeclarationKind::Using);
     assert_eq!(root.declarations[0].path.as_deref(), Some(["shared".to_owned(), "UserId".to_owned()].as_slice()));
 }
+
+#[test]
+fn builder_projects_fields_with_exact_syntax_spans() {
+    let source = "table User { @@id: uuid, [unique] email: utf8 = \"anonymous\", manager: &shared::User? = null, tags: [utf8]?, embedding: vec<3>, asset: file, }";
+    let root = parse(source).expect("Oak builds field syntax");
+    let fields = &root.declarations[0].fields;
+    assert_eq!(fields.iter().map(|field| field.name.as_str()).collect::<Vec<_>>(), ["id", "email", "manager", "tags", "embedding", "asset"]);
+    assert_eq!(fields[0].attributes[0].text, "@@");
+    assert_eq!(fields[1].attributes[0].text, "[unique]");
+    assert_eq!(fields[1].attributes[0].name.as_deref(), Some("unique"));
+    assert_eq!(fields[1].default_value.as_ref().unwrap().text, "\"anonymous\"");
+    assert_eq!(fields[2].type_syntax.text, "&shared::User?");
+    assert_eq!(fields[2].default_value.as_ref().unwrap().text, "null");
+    assert_eq!(fields[3].type_syntax.text, "[utf8]?");
+    assert_eq!(fields[4].type_syntax.text, "vec<3>");
+    assert_eq!(fields[5].type_syntax.text, "file");
+    for field in fields {
+        assert_eq!(&source[field.name_span.clone()], field.name);
+        assert_eq!(&source[field.type_syntax.span.clone()], field.type_syntax.text);
+        assert!(field.span.start <= field.name_span.start && field.span.end >= field.type_syntax.span.end);
+        for attribute in &field.attributes {
+            assert_eq!(&source[attribute.span.clone()], attribute.text);
+        }
+        if let Some(default) = &field.default_value {
+            assert_eq!(&source[default.span.clone()], default.text);
+        }
+    }
+}
+
+#[test]
+fn builder_preserves_attribute_groups_and_custom_arguments() {
+    let source = "table Account { [primary, wire] [backfill(\"legacy, value\")] id: utf8 = \"\", @email: utf8 }";
+    let root = parse(source).unwrap();
+    let fields = &root.declarations[0].fields;
+    assert_eq!(fields[0].attributes.len(), 2);
+    assert_eq!(fields[0].attributes[0].text, "[primary, wire]");
+    assert_eq!(fields[0].attributes[1].text, "[backfill(\"legacy, value\")]");
+    assert_eq!(fields[1].attributes[0].text, "@");
+}
+
+#[test]
+fn class_fields_support_newlines_comments_and_nested_types() {
+    let source = "class 数据 {\n [primary] 标识: uuid # trailing type comment\n entries: list<&shared::User?>\n values: [[utf8]?]?\n number: i64 = -42\n active: bool = true\n }";
+    let root = parse(source).unwrap();
+    let fields = &root.declarations[0].fields;
+    assert_eq!(fields.len(), 5);
+    assert_eq!(fields[0].name, "标识");
+    assert_eq!(fields[0].type_syntax.text, "uuid");
+    assert_eq!(fields[1].type_syntax.text, "list<&shared::User?>");
+    assert_eq!(fields[2].type_syntax.text, "[[utf8]?]?");
+    assert_eq!(fields[3].default_value.as_ref().unwrap().text, "-42");
+    assert_eq!(fields[4].default_value.as_ref().unwrap().text, "true");
+    assert_eq!(&source[fields[0].name_span.clone()], "标识");
+}
+
+#[test]
+fn rejects_incomplete_field_syntax() {
+    for source in ["table T { id uuid }", "table T { id: }", "class T { [primary] : uuid }", "class T { id: utf8 = }", "table T { id: vec<> }", "table T { id: list<utf8 }", "table T { id: & }", "table T { id: uuid = -true }"] {
+        assert!(parse(source).is_err(), "accepted incomplete field: {source}");
+    }
+}
+
+#[test]
+fn typed_fields_do_not_change_lossless_cst() {
+    fn append_text(node: &oak_vos::VosSyntaxNode, text: &mut String) {
+        for child in &node.children {
+            match child {
+                VosSyntaxElement::Node(inner) => append_text(inner, text),
+                VosSyntaxElement::Token(token) => text.push_str(&token.text),
+            }
+        }
+    }
+    let source = "# schema\ntable T {\n [primary] id: uuid, # key\n value: [utf8]? = null;\n}\n";
+    let root = parse(source).unwrap();
+    let mut restored = String::new();
+    append_text(&root.syntax, &mut restored);
+    assert_eq!(restored, source);
+    assert_eq!(root.declarations[0].fields.len(), 2);
+}

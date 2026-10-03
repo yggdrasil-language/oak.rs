@@ -71,7 +71,46 @@ pub struct VosDeclaration {
     pub name: Option<String>,
     /// Qualified path for namespace and using declarations.
     pub path: Option<Vec<String>>,
+    /// Typed field syntax for table and class declarations.
+    pub fields: Vec<VosField>,
     /// Byte span in the original source.
+    pub span: Range<usize>,
+}
+
+/// A field declaration projected by Oak without assigning VOS semantics.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct VosField {
+    /// Field name as written in the source.
+    pub name: String,
+    /// Source span of the field name.
+    pub name_span: Range<usize>,
+    /// Field attributes in source order.
+    pub attributes: Vec<VosFieldAttribute>,
+    /// Exact type syntax and its source span.
+    pub type_syntax: VosSyntaxSlice,
+    /// Exact default value syntax when present.
+    pub default_value: Option<VosSyntaxSlice>,
+    /// Source span covering the field declaration.
+    pub span: Range<usize>,
+}
+
+/// A field attribute preserved as syntax for VOS semantic resolution.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct VosFieldAttribute {
+    /// First identifier in the attribute syntax when one is present.
+    pub name: Option<String>,
+    /// Exact attribute source text.
+    pub text: String,
+    /// Source span of the attribute.
+    pub span: Range<usize>,
+}
+
+/// A source slice exposed by the Oak Builder.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct VosSyntaxSlice {
+    /// Exact source text.
+    pub text: String,
+    /// Source span in the original document.
     pub span: Range<usize>,
 }
 
