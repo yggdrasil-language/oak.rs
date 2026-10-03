@@ -88,10 +88,63 @@ pub struct VosField {
     pub attributes: Vec<VosFieldAttribute>,
     /// Exact type syntax and its source span.
     pub type_syntax: VosSyntaxSlice,
+    /// Structured type syntax projected by Oak.
+    pub type_expr: VosTypeSyntax,
     /// Exact default value syntax when present.
     pub default_value: Option<VosSyntaxSlice>,
     /// Source span covering the field declaration.
     pub span: Range<usize>,
+}
+
+/// Structured VOS type syntax with no name resolution or builtin semantics.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum VosTypeSyntax {
+    /// A named type or builtin path.
+    Named {
+        /// Path segments as written.
+        path: Vec<String>,
+        /// Source span of the named syntax.
+        span: Range<usize>,
+    },
+    /// A reference wrapper such as `&User`.
+    Reference {
+        /// Referenced type syntax.
+        target: Box<VosTypeSyntax>,
+        /// Source span including the ampersand.
+        span: Range<usize>,
+    },
+    /// An optional wrapper such as `User?`.
+    Optional {
+        /// Inner type syntax.
+        inner: Box<VosTypeSyntax>,
+        /// Source span including the question mark.
+        span: Range<usize>,
+    },
+    /// A list wrapper such as `[User]`.
+    List {
+        /// Element type syntax.
+        element: Box<VosTypeSyntax>,
+        /// Source span including both brackets.
+        span: Range<usize>,
+    },
+    /// A generic type such as `vector<3>` or `list<User>`.
+    Generic {
+        /// Generic name path.
+        path: Vec<String>,
+        /// Generic arguments in source order.
+        arguments: Vec<VosTypeArgument>,
+        /// Source span including the angle brackets.
+        span: Range<usize>,
+    },
+}
+
+/// An Oak-owned generic type argument.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum VosTypeArgument {
+    /// Nested type syntax argument.
+    Type(VosTypeSyntax),
+    /// Literal argument preserved as text and source span.
+    Literal(VosSyntaxSlice),
 }
 
 /// A field attribute preserved as syntax for VOS semantic resolution.

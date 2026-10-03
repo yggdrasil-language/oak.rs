@@ -1,5 +1,5 @@
 use crate::{
-    ast::{VosDeclaration, VosDeclarationKind, VosField, VosFieldAttribute, VosRoot, VosSyntaxElement, VosSyntaxNode, VosSyntaxSlice, VosSyntaxToken},
+    ast::{VosDeclaration, VosDeclarationKind, VosField, VosFieldAttribute, VosRoot, VosSyntaxElement, VosSyntaxNode, VosSyntaxSlice, VosSyntaxToken, VosTypeArgument, VosTypeSyntax},
     language::VosLanguage,
     lexer::VosLexer,
     parser::{VosElementType, VosParser},
@@ -119,7 +119,145 @@ impl VosBuilder {
         let name = name.ok_or_else(|| OakError::expected_token("VOS field name", offset, None))?;
         let name_span = name_span.expect("field name has a span");
         let type_syntax = type_syntax.ok_or_else(|| OakError::expected_token("VOS field type", offset, None))?;
-        Ok(VosField { name, name_span, attributes, type_syntax, default_value, span: span.into() })
+        let type_expr = self.build_type_expr(node, offset, source)?;
+        Ok(VosField { name, name_span, attributes, type_syntax, type_expr, default_value, span: span.into() })
+    }
+
+    fn build_type_expr(&self, field: &GreenNode<'_, VosLanguage>, field_offset: usize, source: &SourceText) -> Result<VosTypeSyntax, OakError> {
+        let mut child_offset = field_offset;
+        for child in field.children {
+            if let GreenTree::Node(node) = child {
+                if node.kind == VosElementType::TypeSyntax {
+                    let mut tokens = Vec::new();
+                    let mut token_offset = child_offset;
+                    for type_child in node.children {
+                        if let GreenTree::Leaf(leaf) = type_child {
+                            if !matches!(leaf.kind, crate::lexer::VosTokenType::Whitespace | crate::lexer::VosTokenType::Comment) {
+                                tokens.push((leaf.kind, (token_offset..token_offset + leaf.length as usize).into()));
+                            }
+                        }
+                        token_offset += match type_child {
+                            GreenTree::Node(inner) => inner.byte_length as usize,
+                            GreenTree::Leaf(leaf) => leaf.length as usize,
+                        };
+                    }
+                    let mut index = 0;
+                    let type_expr = self.parse_type_tokens(&tokens, &mut index, source)?;
+                    if let Some((_, span)) = tokens.get(index) {
+                        return Err(OakError::expected_token("end of VOS type", span.start, None));
+                    }
+                    return Ok(type_expr);
+                }
+            }
+            child_offset += match child {
+                GreenTree::Node(node) => node.byte_length as usize,
+                GreenTree::Leaf(leaf) => leaf.length as usize,
+            };
+        }
+        Err(OakError::expected_token("VOS type syntax", field_offset, None))
+    }
+
+    fn parse_type_tokens(&self, tokens: &[(crate::lexer::VosTokenType, core::range::Range<usize>)], index: &mut usize, source: &SourceText) -> Result<VosTypeSyntax, OakError> {
+        let Some((kind, span)) = tokens.get(*index) else {
+            return Err(OakError::expected_token("VOS type syntax", 0, None));
+        };
+        let start = span.start;
+        let mut value = if *kind == crate::lexer::VosTokenType::Operator && self.token_text(span, source) == "&" {
+            *index += 1;
+            let target = self.parse_type_tokens(tokens, index, source)?;
+            let (target, target_optional) = match target {
+                VosTypeSyntax::Optional { inner, span } => (*inner, Some(span.end)),
+                target => (target, None),
+            };
+            let end = self.type_span(&target).end;
+            let reference = VosTypeSyntax::Reference { target: Box::new(target), span: (start..end).into() };
+            if let Some(optional_end) = target_optional {
+                VosTypeSyntax::Optional { inner: Box::new(reference), span: (start..optional_end).into() }
+            } else {
+                reference
+            }
+        } else if *kind == crate::lexer::VosTokenType::LeftBracket {
+            *index += 1;
+            let element = self.parse_type_tokens(tokens, index, source)?;
+            let close = tokens.get(*index).ok_or_else(|| OakError::unexpected_eof(start, None))?;
+            if close.0 != crate::lexer::VosTokenType::RightBracket {
+                return Err(OakError::expected_token("]", close.1.start, None));
+            }
+            *index += 1;
+            VosTypeSyntax::List { element: Box::new(element), span: (start..close.1.end).into() }
+        } else if *kind == crate::lexer::VosTokenType::Identifier {
+            let mut path = vec![self.token_text(span, source).into_owned()];
+            let mut end = span.end;
+            *index += 1;
+            while *index + 1 < tokens.len() && tokens[*index].0 == crate::lexer::VosTokenType::Colon && tokens[*index + 1].0 == crate::lexer::VosTokenType::Colon {
+                *index += 2;
+                let segment = tokens.get(*index).ok_or_else(|| OakError::unexpected_eof(end, None))?;
+                if segment.0 != crate::lexer::VosTokenType::Identifier {
+                    return Err(OakError::expected_token("type path segment", segment.1.start, None));
+                }
+                path.push(self.token_text(&segment.1, source).into_owned());
+                end = segment.1.end;
+                *index += 1;
+            }
+            if tokens.get(*index).is_some_and(|token| token.0 == crate::lexer::VosTokenType::Less) {
+                *index += 1;
+                let mut arguments = Vec::new();
+                loop {
+                    let argument = tokens.get(*index).ok_or_else(|| OakError::unexpected_eof(end, None))?;
+                    if argument.0 == crate::lexer::VosTokenType::Greater {
+                        return Err(OakError::expected_token("generic argument", argument.1.start, None));
+                    }
+                    let parsed = if matches!(argument.0, crate::lexer::VosTokenType::NumberLiteral | crate::lexer::VosTokenType::StringLiteral | crate::lexer::VosTokenType::BooleanLiteral | crate::lexer::VosTokenType::NullLiteral) {
+                        *index += 1;
+                        VosTypeArgument::Literal(self.raw_slice(argument.1.start, argument.1.end, source))
+                    } else {
+                        VosTypeArgument::Type(self.parse_type_tokens(tokens, index, source)?)
+                    };
+                    end = match &parsed {
+                        VosTypeArgument::Type(value) => self.type_span(value).end,
+                        VosTypeArgument::Literal(value) => value.span.end,
+                    };
+                    arguments.push(parsed);
+                    let separator = tokens.get(*index).ok_or_else(|| OakError::unexpected_eof(end, None))?;
+                    if separator.0 == crate::lexer::VosTokenType::Greater {
+                        end = separator.1.end;
+                        *index += 1;
+                        break;
+                    }
+                    if separator.0 != crate::lexer::VosTokenType::Comma {
+                        return Err(OakError::expected_token(", or >", separator.1.start, None));
+                    }
+                    *index += 1;
+                }
+                VosTypeSyntax::Generic { path, arguments, span: (start..end).into() }
+            } else {
+                VosTypeSyntax::Named { path, span: (start..end).into() }
+            }
+        } else {
+            return Err(OakError::expected_token("VOS type syntax", span.start, None));
+        };
+        if tokens.get(*index).is_some_and(|token| token.0 == crate::lexer::VosTokenType::Question) {
+            let question = &tokens[*index].1;
+            *index += 1;
+            value = VosTypeSyntax::Optional { inner: Box::new(value), span: (start..question.end).into() };
+        }
+        Ok(value)
+    }
+
+    fn token_text<'a>(&self, span: &core::range::Range<usize>, source: &'a SourceText) -> std::borrow::Cow<'a, str> {
+        source.get_text_in(span.clone().into())
+    }
+
+    fn type_span<'a>(&self, value: &'a VosTypeSyntax) -> &'a core::range::Range<usize> {
+        match value {
+            VosTypeSyntax::Named { span, .. } | VosTypeSyntax::Reference { span, .. } | VosTypeSyntax::Optional { span, .. } | VosTypeSyntax::List { span, .. } | VosTypeSyntax::Generic { span, .. } => span,
+        }
+    }
+
+    fn raw_slice(&self, start: usize, end: usize, source: &SourceText) -> VosSyntaxSlice {
+        let span: core::range::Range<usize> = (start..end).into();
+        let text = source.get_text_in(span.clone()).into_owned();
+        VosSyntaxSlice { text, span }
     }
 
     fn build_attribute<'a>(&self, node: &GreenNode<'a, VosLanguage>, offset: usize, source: &SourceText) -> VosFieldAttribute {
