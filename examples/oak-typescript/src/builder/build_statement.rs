@@ -22,11 +22,15 @@ impl<'config> TypeScriptBuilder<'config> {
                 let mut ty = None;
                 let mut value = None;
                 let mut is_declare = false;
+                let mut in_initializer = false;
                 for child in node.children() {
                     match child {
                         RedTree::Node(child_node) => {
                             let child_kind = child_node.green.kind;
-                            if child_kind == TypeScriptElementType::IdentifierName {
+                            if child_kind == TypeScriptElementType::BindingPattern {
+                                name = source.get_text_in(child_node.span().into()).trim().to_string();
+                            }
+                            else if child_kind == TypeScriptElementType::IdentifierName && !in_initializer {
                                 if name.is_empty() {
                                     for c in child_node.children() {
                                         if let RedTree::Leaf(l) = c {
@@ -59,6 +63,7 @@ impl<'config> TypeScriptBuilder<'config> {
                                 }
                             }
                             TypeScriptTokenType::Declare => is_declare = true,
+                            TypeScriptTokenType::Equal => in_initializer = true,
                             _ => {}
                         },
                     }

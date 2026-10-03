@@ -153,8 +153,12 @@ impl<'config> TypeScriptParser<'config> {
         use TypeScriptTokenType::*;
         state.bump(); // var, let, or const
         self.skip_trivia(state);
-        while state.at(IdentifierName.into()) {
-            self.expect(state, IdentifierName).ok();
+        while state.at(IdentifierName.into()) || state.at(LeftBrace.into()) || state.at(LeftBracket.into()) {
+            if state.at(IdentifierName.into()) {
+                self.expect(state, IdentifierName).ok();
+            } else {
+                self.parse_binding_pattern(state);
+            }
             if self.eat(state, Equal) {
                 PrattParser::parse(state, 0, self);
             }
@@ -165,6 +169,27 @@ impl<'config> TypeScriptParser<'config> {
         }
         self.eat(state, Semicolon);
         Ok(())
+    }
+
+    fn parse_binding_pattern<'a, S: Source + ?Sized>(&self, state: &mut State<'a, S>) {
+        use TypeScriptTokenType::*;
+        let checkpoint = state.checkpoint();
+        let (open, close) = if state.at(LeftBrace.into()) {
+            (LeftBrace, RightBrace)
+        } else {
+            (LeftBracket, RightBracket)
+        };
+        state.bump();
+        let mut depth = 1usize;
+        while state.not_at_end() && depth > 0 {
+            if state.at(open.into()) {
+                depth += 1;
+            } else if state.at(close.into()) {
+                depth -= 1;
+            }
+            state.bump();
+        }
+        state.finish_at(checkpoint, crate::parser::element_type::TypeScriptElementType::BindingPattern);
     }
 
     pub(crate) fn parse_function_declaration<'a, S: Source + ?Sized>(&self, state: &mut State<'a, S>) -> Result<(), OakError> {
