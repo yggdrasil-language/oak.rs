@@ -303,7 +303,7 @@ impl<'config> TypeScriptBuilder<'config> {
                                 }
                             }
                             if name.is_empty() {
-                                let raw = source.get_text_in(child_span.into()).trim();
+                                let raw = source.get_text_in(child_span.into()).trim().to_string();
                                 if let Some((key, _)) = raw.split_once(':') {
                                     name = key.trim().trim_matches(['"', '\'']).to_string();
                                 }
