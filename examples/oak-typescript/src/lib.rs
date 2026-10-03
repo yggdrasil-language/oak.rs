@@ -64,6 +64,21 @@ mod type_erasure_printer_unit {
     }
 }
 
+#[cfg(test)]
+mod control_flow_printer_unit {
+    use crate::{format_source, FormatOptions};
+
+    #[test]
+    fn prints_minimal_control_flow_statements() {
+        let source = "do { tick(); } while (ready); try { run(); } catch { recover(); } finally { cleanup(); }";
+        let output = format_source(source, &FormatOptions::default()).unwrap();
+        assert_eq!(
+            output,
+            "do { tick() } while (ready)\ntry { run() } catch { recover() } finally { cleanup() }"
+        );
+    }
+}
+
 #[cfg(feature = "lsp")]
 pub use crate::lsp::{TypeScriptLanguageService, formatter::TypeScriptFormatter, highlighter::TypeScriptHighlighter};
 
