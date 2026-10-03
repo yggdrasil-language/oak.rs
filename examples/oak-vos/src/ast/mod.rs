@@ -69,6 +69,8 @@ pub struct VosDeclaration {
     pub kind: VosDeclarationKind,
     /// First declaration name when the syntax has one.
     pub name: Option<String>,
+    /// Qualified path for namespace and using declarations.
+    pub path: Option<Vec<String>>,
     /// Byte span in the original source.
     pub span: Range<usize>,
 }
