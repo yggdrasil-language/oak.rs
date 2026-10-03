@@ -1,6 +1,6 @@
 //! Oak TypeScript statement → canonical text.
 
-use crate::ast::{BlockStatement, ExportDeclaration, FunctionDeclaration, ImportDeclaration, ImportSpecifier, Statement, VariableDeclaration};
+use crate::ast::{BlockStatement, ClassDeclaration, ClassMember, ExportDeclaration, FunctionDeclaration, ImportDeclaration, ImportSpecifier, Statement, VariableDeclaration};
 
 use super::expr::{print_expression, print_string};
 
@@ -46,8 +46,8 @@ pub fn print_statement(stmt: &Statement) -> Option<String> {
             Some(label) => format!("continue {label}"),
             None => "continue".into(),
         }),
-        Statement::ClassDeclaration(_)
-        | Statement::Interface(_)
+        Statement::ClassDeclaration(d) => print_class(d),
+        Statement::Interface(_)
         | Statement::TypeAlias(_)
         | Statement::Enum(_)
         | Statement::DoWhileStatement(_)
@@ -133,6 +133,50 @@ fn print_function_params(params: &[crate::ast::FunctionParam]) -> Option<String>
         parts.push(format!("{}{}{}", p.name, opt, ty));
     }
     Some(format!("({})", parts.join(", ")))
+}
+
+
+fn print_class(d: &ClassDeclaration) -> Option<String> {
+    if !d.decorators.is_empty() || d.is_declare || d.is_abstract || !d.type_params.is_empty() || !d.implements.is_empty() {
+        return None;
+    }
+    let extends = match d.extends.as_ref() {
+        Some(ty) => format!(" extends {}", super::expr::print_type_annotation(ty)?),
+        None => String::new(),
+    };
+    let mut members = Vec::with_capacity(d.body.len());
+    for member in &d.body {
+        members.push(print_class_member(member)?);
+    }
+    let body = if members.is_empty() { String::new() } else { format!(" {} ", members.join(" ")) };
+    Some(format!("class {}{} {{{body}}}", d.name, extends))
+}
+
+fn print_class_member(member: &ClassMember) -> Option<String> {
+    match member {
+        ClassMember::Property { decorators, name, initializer, is_static, is_readonly, is_abstract, is_optional, .. } => {
+            if !decorators.is_empty() || *is_readonly || *is_abstract || *is_optional {
+                return None;
+            }
+            let static_kw = if *is_static { "static " } else { "" };
+            let initializer = match initializer.as_ref() {
+                Some(expr) => format!(" = {}", print_expression(expr)?),
+                None => String::new(),
+            };
+            Some(format!("{static_kw}{name}{initializer};"))
+        }
+        ClassMember::Method { decorators, name, params, body, is_static, is_abstract, is_async, is_getter, is_setter, is_optional, type_params, .. } => {
+            if !decorators.is_empty() || *is_abstract || *is_optional || !type_params.is_empty() {
+                return None;
+            }
+            let static_kw = if *is_static { "static " } else { "" };
+            let async_kw = if *is_async { "async " } else { "" };
+            let accessor = if *is_getter { "get " } else if *is_setter { "set " } else { "" };
+            let params = print_function_params(params)?;
+            let body = print_block_body(body)?;
+            Some(format!("{static_kw}{async_kw}{accessor}{name}{params} {body}"))
+        }
+    }
 }
 
 fn print_block(b: &BlockStatement) -> Option<String> {
