@@ -1,4 +1,4 @@
-use oak_vos::{VosDeclarationKind, parse};
+use oak_vos::{VosDeclarationKind, VosSyntaxElement, VosTokenType, parse};
 
 #[test]
 fn parses_vos_schema_through_oak() {
@@ -70,4 +70,20 @@ fn obsolete_table_does_not_become_a_table_declaration() {
     assert_eq!(root.declarations.len(), 1);
     assert_eq!(root.declarations[0].kind, VosDeclarationKind::Obsolete);
     assert_eq!(root.declarations[0].name.as_deref(), Some("Dealer"));
+}
+
+#[test]
+fn builder_exposes_lossless_cst_tokens_and_spans() {
+    let source = "using shared::UserId;\ntable User { @@id: uuid, }";
+    let root = parse(source).expect("Oak parses the VOS surface");
+    assert_eq!(root.syntax.span, (0..source.len()).into());
+    let using = root.syntax.children.iter().find_map(|element| match element {
+        VosSyntaxElement::Node(node) if node.kind == oak_vos::VosElementType::Using => Some(node),
+        _ => None,
+    }).expect("using CST node");
+    assert_eq!(&source[using.span.clone()], "using shared::UserId;\n");
+    assert!(using.children.iter().any(|element| matches!(
+        element,
+        VosSyntaxElement::Token(token) if token.kind == VosTokenType::Identifier && token.text == "shared"
+    )));
 }
