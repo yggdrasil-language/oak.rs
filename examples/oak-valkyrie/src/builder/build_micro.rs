@@ -1,7 +1,7 @@
 use crate::{
     ValkyrieLanguage,
     ast::{
-        type_nodes::{ApplyType, AssociatedType, FunctionType, OptionalType, TypeUnaryNode},
+        type_nodes::{ApplyType, AssociatedType, FunctionType, OptionalType, TupleType, TupleTypeElement, TypeUnaryNode},
         *,
     },
     builder::{ValkyrieBuilder, text},
@@ -185,6 +185,9 @@ impl<'config> ValkyrieBuilder<'config> {
         if node.children().any(|child| matches!(child, RedTree::Leaf(t) if t.kind == ValkyrieTokenType::BracketL)) {
             return self.build_bracket_type(node, source);
         }
+        if node.children().any(|child| matches!(child, RedTree::Leaf(t) if t.kind == ValkyrieTokenType::ParenthesisL)) {
+            return self.build_paren_tuple_type(node, source);
+        }
         let mut base_ident: Option<Identifier> = None;
         let mut base_namepath: Option<NamePath> = None;
         let mut has_double_colon = false;
@@ -267,6 +270,34 @@ impl<'config> ValkyrieBuilder<'config> {
             return Ok(wrap_optional_type(inner, nullable, span));
         }
         Ok(wrap_optional_type(TypeExpression::Namepath(Box::new(NamePath { parts: Vec::new(), span })), nullable, span))
+    }
+
+    fn build_paren_tuple_type<S: Source + ?Sized>(&self, node: RedNode<ValkyrieLanguage>, source: &S) -> Result<TypeExpression, OakError> {
+        let span = node.span();
+        let mut elements = Vec::new();
+        let mut pending_name: Option<Identifier> = None;
+        for child in node.children() {
+            match child {
+                RedTree::Leaf(t) => match t.kind {
+                    ValkyrieTokenType::Whitespace | ValkyrieTokenType::Newline | ValkyrieTokenType::LineComment | ValkyrieTokenType::BlockComment | ValkyrieTokenType::ParenthesisL | ValkyrieTokenType::ParenthesisR | ValkyrieTokenType::Comma | ValkyrieTokenType::Colon => continue,
+                    ValkyrieTokenType::Identifier => {
+                        pending_name = Some(Identifier { name: text(source, t.span), span: t.span });
+                    }
+                    _ => {}
+                },
+                RedTree::Node(n) => match n.green.kind {
+                    ValkyrieElementType::Whitespace | ValkyrieElementType::Newline | ValkyrieElementType::LineComment | ValkyrieElementType::BlockComment => continue,
+                    ValkyrieElementType::Type => {
+                        let element_span = n.span();
+                        let ty = self.build_type(n, source)?;
+                        elements.push(TupleTypeElement { name: pending_name, ty, span: element_span });
+                        pending_name = None;
+                    }
+                    _ => {}
+                },
+            }
+        }
+        Ok(TypeExpression::Tuple(Box::new(TupleType { elements, span })))
     }
 
     fn build_bracket_type<S: Source + ?Sized>(&self, node: RedNode<ValkyrieLanguage>, source: &S) -> Result<TypeExpression, OakError> {
