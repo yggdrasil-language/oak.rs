@@ -7,6 +7,10 @@ use oak_core::parser::ParserState;
 
 type State<'a, S> = ParserState<'a, ValkyrieLanguage, S>;
 
+fn at_default_arm_keyword<S: oak_core::Source + ?Sized>(state: &State<'_, S>) -> bool {
+    state.at(ValkyrieTokenType::Identifier) && state.peek_text().as_deref() == Some("default")
+}
+
 fn brace_balance_between<S: oak_core::Source + ?Sized>(state: &mut State<'_, S>, from: usize, to: usize) -> i32 {
     let restore = state.checkpoint();
     state.tokens.set_index(from);
@@ -31,7 +35,10 @@ fn parse_implicit_match_arm_body<S: oak_core::Source + ?Sized>(state: &mut State
     while state.not_at_end() {
         state.skip_trivia();
         if depth == 0 {
-            if state.at(ValkyrieTokenType::Keyword(ValkyrieKeywords::Case)) || state.at(ValkyrieTokenType::Keyword(ValkyrieKeywords::Else)) {
+            if state.at(ValkyrieTokenType::Keyword(ValkyrieKeywords::Case))
+                || state.at(ValkyrieTokenType::Keyword(ValkyrieKeywords::Else))
+                || at_default_arm_keyword(state)
+            {
                 break;
             }
             if state.at(ValkyrieTokenType::BraceR) {
@@ -172,7 +179,7 @@ pub(crate) fn parse_match_arm<S: oak_core::Source + ?Sized>(state: &mut State<'_
         state.skip_trivia();
         parse_match_pattern(state)?;
     }
-    else if state.at(ValkyrieTokenType::Keyword(ValkyrieKeywords::Else)) {
+    else if state.at(ValkyrieTokenType::Keyword(ValkyrieKeywords::Else)) || at_default_arm_keyword(state) {
         state.bump();
     }
     else {
@@ -254,12 +261,15 @@ fn can_start_return_value<S: oak_core::Source + ?Sized>(state: &State<'_, S>) ->
     {
         return false;
     }
-    !matches!(
+    if matches!(
         state.current().map(|token| &token.kind),
         Some(ValkyrieTokenType::Keyword(
             ValkyrieKeywords::Case | ValkyrieKeywords::Else | ValkyrieKeywords::Let | ValkyrieKeywords::Return | ValkyrieKeywords::Break | ValkyrieKeywords::Continue
         ))
-    )
+    ) {
+        return false;
+    }
+    !at_default_arm_keyword(state)
 }
 
 /// 解析 return 表达式
