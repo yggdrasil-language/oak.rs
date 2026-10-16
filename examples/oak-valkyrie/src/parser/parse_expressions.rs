@@ -357,10 +357,22 @@ pub(crate) fn parse_primary_expression<S: oak_core::Source + ?Sized>(state: &mut
                 }
                 else {
                     parse_expression(state)?;
-                    if state.at(ValkyrieTokenType::ParenthesisR) {
-                        state.bump();
+                    if state.at(ValkyrieTokenType::Comma) {
+                        while state.at(ValkyrieTokenType::Comma) {
+                            state.bump();
+                            parse_expression(state)?;
+                        }
+                        if state.at(ValkyrieTokenType::ParenthesisR) {
+                            state.bump();
+                        }
+                        state.sink.finish_node(cp, ValkyrieElementType::TupleExpression);
                     }
-                    state.sink.finish_node(cp, ValkyrieElementType::ParenthesizedExpression);
+                    else {
+                        if state.at(ValkyrieTokenType::ParenthesisR) {
+                            state.bump();
+                        }
+                        state.sink.finish_node(cp, ValkyrieElementType::ParenthesizedExpression);
+                    }
                 }
                 Ok(())
             }
