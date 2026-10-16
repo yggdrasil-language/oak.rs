@@ -30,6 +30,14 @@ pub enum TermExpression {
         #[cfg_attr(feature = "serde", serde(with = "oak_core::serde_range"))]
         span: Span,
     },
+    /// 元组字面量：`(a, b, ...)`。
+    TupleLiteral {
+        /// 源码顺序的元素。
+        items: Vec<TermExpression>,
+        /// 单文件源码位置。
+        #[cfg_attr(feature = "serde", serde(with = "oak_core::serde_range"))]
+        span: Span,
+    },
     /// A unary operation expression.
     ///
     /// # V Language Example
@@ -684,7 +692,7 @@ impl TermExpression {
             TermExpression::StringLiteral(string) => string.span,
             TermExpression::IntegerLiteral { span, .. } => *span,
             TermExpression::FloatLiteral { span, .. } => *span,
-            TermExpression::BooleanLiteral { span, .. } | TermExpression::ArrayLiteral { span, .. } => *span,
+            TermExpression::BooleanLiteral { span, .. } | TermExpression::ArrayLiteral { span, .. } | TermExpression::TupleLiteral { span, .. } => *span,
             TermExpression::Binary(node) => node.span,
             TermExpression::Unary(node) => node.span,
             TermExpression::Turbofish { span, .. } => *span,

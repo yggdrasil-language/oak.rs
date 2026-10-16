@@ -1,6 +1,6 @@
 use crate::{
     ValkyrieLanguage,
-    ast::{NamePath, NamespaceDeclaration, StatementNode},
+    ast::{NamePath, NamespaceDeclaration, Span, StatementNode, root_nodes::ProgramBody},
     builder::ValkyrieBuilder,
     lexer::token_type::ValkyrieTokenType,
     parser::element_type::ValkyrieElementType,
@@ -13,11 +13,17 @@ impl<'config> ValkyrieBuilder<'config> {
         let mut name = NamePath { parts: Vec::new(), span: Default::default() };
         let mut annotations = Vec::new();
         let mut items = Vec::new();
+        let mut has_body = false;
+        let mut body_span: Option<Span> = None;
 
         for child in node.children() {
             match child {
                 RedTree::Leaf(t) => match t.kind {
                     ValkyrieTokenType::Whitespace | ValkyrieTokenType::Newline | ValkyrieTokenType::LineComment | ValkyrieTokenType::BlockComment => continue,
+                    ValkyrieTokenType::BraceL => {
+                        has_body = true;
+                        body_span = Some(t.span);
+                    }
                     _ => {}
                 },
                 RedTree::Node(n) => match n.green.kind {
@@ -72,18 +78,21 @@ impl<'config> ValkyrieBuilder<'config> {
                         items.push(StatementNode::ExprStmt(Box::new(stmt)));
                     }
                     ValkyrieElementType::BlockExpression => {
+                        has_body = true;
+                        // Body of `namespace X { ... }`: item build errors must propagate.
+                        // Swallowing them made a declaration exist in the grammar but vanish from
+                        // the AST, so the missing declaration could only surface far downstream.
                         for inner_child in n.children() {
                             if let RedTree::Node(inner_n) = inner_child {
-                                if let Ok(item) = self.build_item(inner_n, source) {
-                                    items.push(item);
-                                }
+                                items.push(self.build_item(inner_n, source)?);
                             }
                         }
                     }
-                    _ => {}
+                    _ => items.push(self.build_item(n, source)?),
                 },
             }
         }
-        Ok(NamespaceDeclaration { name, annotations, items, span })
+        let body = if has_body { Some(ProgramBody { items, span: body_span.unwrap_or_else(|| span.clone()) }) } else { None };
+        Ok(NamespaceDeclaration { name, annotations, body, span })
     }
 }

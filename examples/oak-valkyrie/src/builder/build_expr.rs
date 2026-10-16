@@ -14,6 +14,15 @@ impl<'config> ValkyrieBuilder<'config> {
                 }
                 Ok(TermExpression::ArrayLiteral { items, span })
             }
+            crate::parser::element_type::ValkyrieElementType::TupleExpression => {
+                let mut items = Vec::new();
+                for child in node.children() {
+                    if let RedTree::Node(child) = child {
+                        items.push(self.build_expr(child, source)?);
+                    }
+                }
+                Ok(TermExpression::TupleLiteral { items, span })
+            }
             crate::parser::element_type::ValkyrieElementType::LiteralExpression => self.build_literal(node, source),
             crate::parser::element_type::ValkyrieElementType::BooleanLiteral => self.build_bool_literal(node, source),
             crate::parser::element_type::ValkyrieElementType::BinaryExpression => self.build_binary(node, source),

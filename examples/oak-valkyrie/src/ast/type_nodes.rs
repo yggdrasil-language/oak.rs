@@ -105,12 +105,25 @@ pub struct GenericType {
     pub span: Span,
 }
 
+/// One element of a tuple type, optionally carrying a field name.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct TupleTypeElement {
+    /// Optional field name for named tuple types such as `(ordinal: usize, value: T)`.
+    pub name: Option<Identifier>,
+    /// The element type.
+    pub ty: TypeExpression,
+    /// The source code span covering this element.
+    #[cfg_attr(feature = "serde", serde(with = "oak_core::serde_range"))]
+    pub span: Span,
+}
+
 /// A tuple type node.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct TupleType {
-    /// The element types.
-    pub elements: Vec<TypeExpression>,
+    /// Tuple elements in source order.
+    pub elements: Vec<TupleTypeElement>,
     /// The source code span.
     #[cfg_attr(feature = "serde", serde(with = "oak_core::serde_range"))]
     pub span: Span,

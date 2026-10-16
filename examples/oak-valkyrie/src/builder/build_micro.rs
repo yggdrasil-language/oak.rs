@@ -1,7 +1,7 @@
 use crate::{
     ValkyrieLanguage,
     ast::{
-        type_nodes::{ApplyType, AssociatedType, FunctionType, OptionalType, TypeUnaryNode},
+        type_nodes::{ApplyType, AssociatedType, FunctionType, OptionalType, TupleType, TupleTypeElement, TypeUnaryNode},
         *,
     },
     builder::{ValkyrieBuilder, text},
@@ -185,6 +185,18 @@ impl<'config> ValkyrieBuilder<'config> {
         if node.children().any(|child| matches!(child, RedTree::Leaf(t) if t.kind == ValkyrieTokenType::BracketL)) {
             return self.build_bracket_type(node, source);
         }
+        let is_micro_function_type = node.children().any(|child| {
+            matches!(
+                child,
+                RedTree::Leaf(t) if matches!(
+                    t.kind,
+                    ValkyrieTokenType::Keyword(ValkyrieKeywords::Micro) | ValkyrieTokenType::Keyword(ValkyrieKeywords::Mezzo)
+                )
+            )
+        });
+        if !is_micro_function_type && node.children().any(|child| matches!(child, RedTree::Leaf(t) if t.kind == ValkyrieTokenType::ParenthesisL)) {
+            return self.build_paren_tuple_type(node, source);
+        }
         let mut base_ident: Option<Identifier> = None;
         let mut base_namepath: Option<NamePath> = None;
         let mut has_double_colon = false;
@@ -266,7 +278,45 @@ impl<'config> ValkyrieBuilder<'config> {
             };
             return Ok(wrap_optional_type(inner, nullable, span));
         }
-        Ok(wrap_optional_type(TypeExpression::Namepath(Box::new(NamePath { parts: Vec::new(), span })), nullable, span))
+        // A type node without any base name or path must not be completed with an empty
+        // `NamePath`: an empty type name is fabricated and lets downstream compile an
+        // unresolved type as if it were a declared one.
+        Err(source.syntax_error(format!("Type node has no base type at {span:?}"), span.start))
+    }
+
+    fn build_paren_tuple_type<S: Source + ?Sized>(&self, node: RedNode<ValkyrieLanguage>, source: &S) -> Result<TypeExpression, OakError> {
+        let span = node.span();
+        let mut elements = Vec::new();
+        let mut pending_name: Option<Identifier> = None;
+        for child in node.children() {
+            match child {
+                RedTree::Leaf(t) => match t.kind {
+                    ValkyrieTokenType::Whitespace
+                    | ValkyrieTokenType::Newline
+                    | ValkyrieTokenType::LineComment
+                    | ValkyrieTokenType::BlockComment
+                    | ValkyrieTokenType::ParenthesisL
+                    | ValkyrieTokenType::ParenthesisR
+                    | ValkyrieTokenType::Comma
+                    | ValkyrieTokenType::Colon => continue,
+                    ValkyrieTokenType::Identifier => {
+                        pending_name = Some(Identifier { name: text(source, t.span), span: t.span });
+                    }
+                    _ => {}
+                },
+                RedTree::Node(n) => match n.green.kind {
+                    ValkyrieElementType::Whitespace | ValkyrieElementType::Newline | ValkyrieElementType::LineComment | ValkyrieElementType::BlockComment => continue,
+                    ValkyrieElementType::Type => {
+                        let element_span = n.span();
+                        let ty = self.build_type(n, source)?;
+                        elements.push(TupleTypeElement { name: pending_name, ty, span: element_span });
+                        pending_name = None;
+                    }
+                    _ => {}
+                },
+            }
+        }
+        Ok(TypeExpression::Tuple(Box::new(TupleType { elements, span })))
     }
 
     fn build_bracket_type<S: Source + ?Sized>(&self, node: RedNode<ValkyrieLanguage>, source: &S) -> Result<TypeExpression, OakError> {
@@ -283,15 +333,16 @@ impl<'config> ValkyrieBuilder<'config> {
                     ValkyrieElementType::Whitespace | ValkyrieElementType::Newline | ValkyrieElementType::LineComment | ValkyrieElementType::BlockComment => continue,
                     ValkyrieElementType::Type => element_type = Some(self.build_type(n, source)?),
                     ValkyrieElementType::LiteralExpression | ValkyrieElementType::IdentifierExpression | ValkyrieElementType::BinaryExpression | ValkyrieElementType::UnaryExpression => {
-                        if let Ok(expr) = self.build_expr(n, source) {
-                            length = Some(expr);
-                        }
+                        // Array length expression errors must propagate; swallowing them left an
+                        // array type without a length that no consumer could report.
+                        length = Some(self.build_expr(n, source)?);
                     }
                     _ => {}
                 },
             }
         }
-        let base = element_type.unwrap_or_else(|| TypeExpression::Namepath(Box::new(NamePath { parts: Vec::new(), span })));
+        // A `[...]` without an element type must not fall back to an empty `NamePath` default.
+        let base = element_type.ok_or_else(|| source.syntax_error(format!("Missing element type in bracket type at {span:?}"), span.start))?;
         Ok(TypeExpression::Unary(Box::new(TypeUnaryNode { operator: ValkyrieTokenType::BracketL, base, length, span })))
     }
 

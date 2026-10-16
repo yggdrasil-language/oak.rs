@@ -150,7 +150,7 @@ fn extract_let_binding(source: &str, let_stmt: &Let, abi: &mut ComponentAbi, iss
         return;
     };
 
-    let init_expr = Some(slice_span(source, std_range(&let_stmt.expr.span())));
+    let init_expr = let_stmt.expr.as_ref().map(|expr| slice_span(source, std_range(&expr.span())));
     let type_hint = let_stmt.ty.as_ref().map(|ty| slice_span(source, type_expression_span(ty)));
 
     if has_property {

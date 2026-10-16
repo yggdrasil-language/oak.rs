@@ -12,6 +12,7 @@ use crate::ast::template_nodes::TemplateNode;
 /// ```v
 /// micro demo() {
 ///     let count: i32 = 0
+///     let handle: i32;
 ///     let (x, y) = (1, 2)
 ///     let Point { x: px, y: py } = point
 /// }
@@ -21,8 +22,8 @@ use crate::ast::template_nodes::TemplateNode;
 pub struct Let {
     /// The pattern to bind to.
     pub pattern: Pattern,
-    /// The expression being bound.
-    pub expr: TermExpression,
+    /// The initializer expression, if any (`let x: T;` has none).
+    pub expr: Option<TermExpression>,
     /// Optional type annotation.
     pub ty: Option<TypeExpression>,
     /// Annotations applied to the statement.

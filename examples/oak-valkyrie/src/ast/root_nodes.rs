@@ -156,3 +156,17 @@ pub struct ValkyrieRoot {
     /// The collection of top-level items in the Valkyrie module.
     pub items: Vec<StatementNode>,
 }
+
+/// 花括号作用域或模块根的 body 载荷。
+///
+/// `namespace name { ... }` 与 `namespace name {}` 都产出 body；分号式
+/// `namespace name;` 的 body 为 `None`。
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct ProgramBody {
+    /// The collection of top-level items in the Valkyrie module.
+    pub items: Vec<StatementNode>,
+    /// The source code span where this identifier appears.
+    #[cfg_attr(feature = "serde", serde(with = "oak_core::serde_range"))]
+    pub span: Span,
+}

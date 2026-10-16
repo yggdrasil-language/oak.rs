@@ -2,7 +2,7 @@ use crate::{
     ValkyrieLanguage,
     ast::*,
     builder::{ValkyrieBuilder, text, utils},
-    lexer::token_type::ValkyrieTokenType,
+    lexer::{keywords::ValkyrieKeywords, token_type::ValkyrieTokenType},
     parser::{parse_string_segments, parse_string_segments::parse_string_segments},
 };
 use oak_core::{OakError, RedNode, RedTree, Source};
@@ -55,6 +55,10 @@ impl<'config> ValkyrieBuilder<'config> {
                     }
                     ValkyrieTokenType::FloatLiteral => {
                         return Ok(TermExpression::FloatLiteral { value: text(source, t.span), span });
+                    }
+                    ValkyrieTokenType::Keyword(ValkyrieKeywords::Null) => {
+                        let name = Identifier { name: "null".to_string(), span: t.span };
+                        return Ok(TermExpression::NamePath(Box::new(NamePath { parts: vec![name], span: t.span })));
                     }
                     _ => {}
                 }

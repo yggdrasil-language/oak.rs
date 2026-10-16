@@ -120,6 +120,10 @@ pub(crate) fn parse_type<S: oak_core::Source + ?Sized>(state: &mut State<'_, S>)
         state.bump();
         parse_type(state)?;
     }
+    // 后缀可空：`i64?` / `utf8?`（与 builder 中 `Question` → Optional 对齐）。
+    if state.at(ValkyrieTokenType::Question) {
+        state.bump();
+    }
     state.sink.finish_node(cp, ValkyrieElementType::Type);
     Ok(())
 }

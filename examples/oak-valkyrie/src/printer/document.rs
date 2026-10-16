@@ -28,10 +28,11 @@ fn item_document(item: &StatementNode) -> Result<Document<'static>, PrintError> 
 
 fn namespace_document(namespace: &NamespaceDeclaration) -> Result<Document<'static>, PrintError> {
     let name = namespace_name(namespace);
-    if namespace.items.is_empty() {
+    let Some(body) = &namespace.body
+    else {
         return Ok(doc!("namespace ", name, ";"));
-    }
-    let items = join_result_documents(&namespace.items, item_document, doc!(soft_line))?;
+    };
+    let items = join_result_documents(&body.items, item_document, doc!(soft_line))?;
     Ok(Document::group(doc!("namespace ", name, " {", indent(doc!(soft_line, items)), "}")))
 }
 
@@ -87,8 +88,17 @@ fn let_document(let_stmt: &Let) -> Result<Document<'static>, PrintError> {
         parts.push(Document::text("mut "));
     }
     parts.push(pattern_document(&let_stmt.pattern)?);
-    parts.push(Document::text("="));
-    parts.push(term_document(&let_stmt.expr)?);
+    if let Some(ty) = &let_stmt.ty {
+        parts.push(Document::text(":"));
+        parts.push(type_document(ty)?);
+    }
+    if let Some(expr) = &let_stmt.expr {
+        parts.push(Document::text("="));
+        parts.push(term_document(expr)?);
+    }
+    else {
+        parts.push(Document::text(";"));
+    }
     Ok(Document::concat(parts))
 }
 
