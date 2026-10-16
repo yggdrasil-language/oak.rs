@@ -185,7 +185,16 @@ impl<'config> ValkyrieBuilder<'config> {
         if node.children().any(|child| matches!(child, RedTree::Leaf(t) if t.kind == ValkyrieTokenType::BracketL)) {
             return self.build_bracket_type(node, source);
         }
-        if node.children().any(|child| matches!(child, RedTree::Leaf(t) if t.kind == ValkyrieTokenType::ParenthesisL)) {
+        let is_micro_function_type = node.children().any(|child| {
+            matches!(
+                child,
+                RedTree::Leaf(t) if matches!(
+                    t.kind,
+                    ValkyrieTokenType::Keyword(ValkyrieKeywords::Micro) | ValkyrieTokenType::Keyword(ValkyrieKeywords::Mezzo)
+                )
+            )
+        });
+        if !is_micro_function_type && node.children().any(|child| matches!(child, RedTree::Leaf(t) if t.kind == ValkyrieTokenType::ParenthesisL)) {
             return self.build_paren_tuple_type(node, source);
         }
         let mut base_ident: Option<Identifier> = None;
