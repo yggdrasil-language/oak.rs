@@ -85,9 +85,8 @@ impl<V: Vfs + Send + Sync + 'static + oak_vfs::WritableVfs> LanguageService for 
         }
     }
 
-    fn hover(&self, uri: &str, range: Range<usize>) -> impl Future<Output = Option<oak_lsp::Hover>> + Send + '_ {
-        let uri = uri.to_string();
-        async move { self.with_root(&uri, |root| self.hover_provider.hover(&root, range).map(|h| oak_lsp::Hover { contents: h.contents, range: h.range })).await.flatten() }
+    fn hover_provider(&self) -> Option<&(dyn HoverProvider<ActionScriptLanguage> + Send + Sync)> {
+        Some(&self.hover_provider)
     }
 
     fn completion(&self, _uri: &str, _offset: usize) -> impl Future<Output = Vec<oak_lsp::types::CompletionItem>> + Send + '_ {
