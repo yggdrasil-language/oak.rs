@@ -26,6 +26,7 @@ serde = { version = "1.0.229", features = ["derive", "rc"] }
 serde_json = { version = "1.0.149" }
 schemars = { version = "1.2.1", features = ["derive"] }
 logger = { git = "https://github.com/oovm/rust-boost", branch = "dev" }
+fs-tools = { git = "https://github.com/oovm/rust-boost", branch = "dev" }
 serial_test = { version = "4.0.1" }
 unicode-ident = { version = "1.0.24" }
 url = { version = "2.5.8", features = ["serde"] }
@@ -42,7 +43,6 @@ anyhow = "1.0.102"
 thiserror = "2.0.18"
 itertools = "0.15.0"
 chrono = "0.4.44"
-notify = "8.2.0"
 crossterm = "0.29.0"
 unicode-width = "0.2.2"
 clap = { version = "4.5.60", features = ["derive"] }

@@ -16,4 +16,4 @@ pub mod watch;
 pub use disk::DiskVfs;
 pub use memory::MemoryVfs;
 #[cfg(feature = "disk")]
-pub use watch::{DiskWatcher, VfsEvent, VfsWatcher};
+pub use watch::{DiskWatcher, VfsEvent, VfsRescanReason, VfsWatchError, VfsWatcher};

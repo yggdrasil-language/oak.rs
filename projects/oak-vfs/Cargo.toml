@@ -13,11 +13,10 @@ keywords = ["vfs", "filesystem", "virtual"]
 [dependencies]
 serde = { workspace = true, optional = true }
 url = { workspace = true }
-walkdir = { workspace = true, optional = true }
 oak-core = { workspace = true }
-notify = { workspace = true, optional = true }
+fs-tools = { workspace = true }
 
 [features]
 default = ["disk", "serde"]
-disk = ["dep:walkdir", "dep:notify"]
+disk = []
 serde = ["dep:serde", "oak-core/serde"]
