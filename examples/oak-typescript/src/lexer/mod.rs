@@ -228,60 +228,60 @@ impl<'config> TypeScriptLexer<'config> {
     fn lex_numeric_literal<'a, S: Source + ?Sized>(&self, state: &mut State<'a, S>) -> bool {
         let start = state.get_position();
 
-        if let Some(ch) = state.peek() {
-            if ch.is_ascii_digit() {
-                state.advance(1);
+        let Some(first) = state.peek()
+        else {
+            return false;
+        };
+        if !first.is_ascii_digit() {
+            return false;
+        }
 
-                // Handle hexadecimal
-                if ch == '0' && (state.peek() == Some('x') || state.peek() == Some('X')) {
+        // Radix prefixes consume their own marker before the digit loop, and
+        // each radix keeps accepting `_` separators between its own digits.
+        let radix: Option<fn(char) -> bool> = if first == '0' {
+            match state.peek_next_n(1) {
+                Some('x' | 'X') => Some(|ch: char| ch.is_ascii_hexdigit()),
+                Some('b' | 'B') => Some(|ch: char| matches!(ch, '0' | '1')),
+                Some('o' | 'O') => Some(|ch: char| matches!(ch, '0'..='7')),
+                _ => None,
+            }
+        }
+        else {
+            None
+        };
+
+        match radix {
+            Some(is_digit) => {
+                state.advance(2);
+                consume_digits(state, is_digit);
+            }
+            None => {
+                consume_digits(state, |ch: char| ch.is_ascii_digit());
+                if state.peek() == Some('.') && state.peek_next_n(1).is_some_and(|ch| ch.is_ascii_digit()) {
                     state.advance(1);
-                    while let Some(ch) = state.peek() {
-                        if ch.is_ascii_hexdigit() {
-                            state.advance(1);
-                        }
-                        else {
-                            break;
-                        }
+                    consume_digits(state, |ch: char| ch.is_ascii_digit());
+                }
+                if matches!(state.peek(), Some('e' | 'E')) {
+                    let sign = matches!(state.peek_next_n(1), Some('+' | '-'));
+                    let digit_offset = if sign { 2 } else { 1 };
+                    if state.peek_next_n(digit_offset).is_some_and(|ch| ch.is_ascii_digit()) {
+                        state.advance(1 + digit_offset as usize);
+                        consume_digits(state, |ch: char| ch.is_ascii_digit());
                     }
                 }
-                else {
-                    // Handle decimal
-                    while let Some(ch) = state.peek() {
-                        if ch.is_ascii_digit() {
-                            state.advance(1);
-                        }
-                        else if ch == '.' && state.peek_next_n(1).map_or(false, |c| c.is_ascii_digit()) {
-                            state.advance(1);
-                            while let Some(ch) = state.peek() {
-                                if ch.is_ascii_digit() {
-                                    state.advance(1);
-                                }
-                                else {
-                                    break;
-                                }
-                            }
-                            break;
-                        }
-                        else {
-                            break;
-                        }
-                    }
-                }
-
-                // Check BigInt suffix
-                if state.peek() == Some('n') {
-                    state.advance(1);
-                    state.add_token(TypeScriptTokenType::BigIntLiteral, start, state.get_position());
-                }
-                else {
-                    state.add_token(TypeScriptTokenType::NumericLiteral, start, state.get_position());
-                }
-
-                return true;
             }
         }
 
-        false
+        // Check BigInt suffix
+        if state.peek() == Some('n') {
+            state.advance(1);
+            state.add_token(TypeScriptTokenType::BigIntLiteral, start, state.get_position());
+        }
+        else {
+            state.add_token(TypeScriptTokenType::NumericLiteral, start, state.get_position());
+        }
+
+        true
     }
 
     fn lex_identifier_or_keyword<'a, S: Source + ?Sized>(&self, state: &mut State<'a, S>) -> bool {
@@ -472,6 +472,21 @@ impl<'config> TypeScriptLexer<'config> {
         }
 
         false
+    }
+}
+
+/// Consume a run of digits in `is_digit`, allowing `_` only between two digits.
+fn consume_digits<S: Source + ?Sized>(state: &mut State<'_, S>, is_digit: fn(char) -> bool) {
+    let mut consumed = false;
+    loop {
+        match state.peek() {
+            Some('_') if consumed && state.peek_next_n(1).is_some_and(is_digit) => state.advance(1),
+            Some(ch) if is_digit(ch) => {
+                state.advance(1);
+                consumed = true;
+            }
+            _ => break,
+        }
     }
 }
 
