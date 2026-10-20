@@ -294,6 +294,11 @@ fn looks_like_type_arguments(significant: &[&oak_core::Token<TypeScriptTokenType
             }
             ">" if depth == 0 => return false,
             ">" => depth -= 1,
+            ">>>" if depth <= 2 && delimiters == 0 => {
+                let after = significant.iter().skip_while(|candidate| candidate.span.start <= token.span.start).find_map(|candidate| source.get(candidate.span.clone()));
+                return after.is_none_or(|next| matches!(next, "=" | "," | ";" | ")" | "]" | "}" | "." | "(" | "{" | "|" | "&" | "=>" | "?" | ":"));
+            }
+            ">>>" => depth -= 3,
             ">>" if depth <= 2 && delimiters == 0 => {
                 let after = significant.iter().skip_while(|candidate| candidate.span.start <= token.span.start).find_map(|candidate| source.get(candidate.span.clone()));
                 return after.is_none_or(|next| matches!(next, "=" | "," | ";" | ")" | "]" | "}" | "." | "(" | "{" | "|" | "&" | "=>" | "?" | ":"));
@@ -314,6 +319,8 @@ fn is_type_argument_close(significant: &[&oak_core::Token<TypeScriptTokenType>],
             None => return false,
         };
         match text {
+            ">>>" => depth += 3,
+            ">>" => depth += 2,
             ">" => depth += 1,
             "<" if depth == 0 => return looks_like_type_arguments(significant, index, source),
             "<" => depth -= 1,
