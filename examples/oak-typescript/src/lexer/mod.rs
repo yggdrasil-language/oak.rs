@@ -502,13 +502,41 @@ fn consume_template<S: Source + ?Sized>(state: &mut State<'_, S>) {
 /// Consume an interpolation body up to and including its closing `}`.
 fn consume_template_expression<S: Source + ?Sized>(state: &mut State<'_, S>) {
     let mut depth = 0usize;
+    let mut previous: Option<char> = None;
     while let Some(ch) = state.peek() {
         match ch {
-            '\'' | '"' => consume_quoted(state, ch),
-            '`' => consume_template(state),
+            '\'' | '"' => {
+                consume_quoted(state, ch);
+                previous = Some(ch);
+            }
+            '`' => {
+                consume_template(state);
+                previous = Some('`');
+            }
+            '/' if state.peek_next_n(1) == Some('/') => {
+                state.advance(2);
+                while let Some(ch) = state.peek() {
+                    if ch == '\n' || ch == '\r' {
+                        break;
+                    }
+                    state.advance(ch.len_utf8());
+                }
+            }
+            '/' if state.peek_next_n(1) == Some('*') => {
+                state.advance(2);
+                while let Some(ch) = state.peek() {
+                    if ch == '*' && state.peek_next_n(1) == Some('/') {
+                        state.advance(2);
+                        break;
+                    }
+                    state.advance(ch.len_utf8());
+                }
+            }
+            '/' if template_regex_can_start(previous) => consume_regex(state),
             '{' => {
                 state.advance(1);
                 depth += 1;
+                previous = Some('{');
             }
             '}' => {
                 state.advance(1);
@@ -516,8 +544,68 @@ fn consume_template_expression<S: Source + ?Sized>(state: &mut State<'_, S>) {
                     return;
                 }
                 depth -= 1;
+                previous = Some('}');
             }
+            ch => {
+                state.advance(ch.len_utf8());
+                if !ch.is_whitespace() {
+                    previous = Some(ch);
+                }
+            }
+        }
+    }
+}
+
+/// A `/` inside `${ ... }` starts a regex literal only after an operator or an
+/// opening delimiter, mirroring `regex_can_start_after`.
+fn template_regex_can_start(previous: Option<char>) -> bool {
+    match previous {
+        None => true,
+        Some(ch) => matches!(ch, '(' | '[' | '{' | ',' | ';' | ':' | '=' | '!' | '&' | '|' | '?' | '+' | '-' | '*' | '%' | '<' | '>' | '~' | '^'),
+    }
+}
+
+/// Consume a regex literal including escapes, character classes and flags.
+fn consume_regex<S: Source + ?Sized>(state: &mut State<'_, S>) {
+    let start = state.get_position();
+    state.advance(1);
+    let mut in_class = false;
+    let mut closed = false;
+    while let Some(ch) = state.peek() {
+        match ch {
+            '\\' => {
+                state.advance(1);
+                if state.peek().is_some() {
+                    state.advance(1);
+                }
+            }
+            '[' => {
+                in_class = true;
+                state.advance(1);
+            }
+            ']' => {
+                in_class = false;
+                state.advance(1);
+            }
+            '/' if !in_class => {
+                state.advance(1);
+                closed = true;
+                break;
+            }
+            '\n' | '\r' => break,
             _ => state.advance(ch.len_utf8()),
+        }
+    }
+    if !closed {
+        state.set_position(start);
+        return;
+    }
+    while let Some(ch) = state.peek() {
+        if ch.is_alphabetic() {
+            state.advance(ch.len_utf8());
+        }
+        else {
+            break;
         }
     }
 }
