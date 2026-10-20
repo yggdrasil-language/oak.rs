@@ -6,6 +6,8 @@ use crate::{
 };
 use oak_core::{Builder, BuilderCache, GreenNode, GreenTree, Lexer, OakDiagnostics, OakError, Parser, SourceText, TextEdit, parser::session::ParseSession, source::Source};
 
+mod program;
+
 /// Oak Builder for the initial VOS declaration AST.
 #[derive(Clone, Debug, Default)]
 pub struct VosBuilder;
@@ -66,6 +68,7 @@ impl VosBuilder {
         let mut signature = None;
         let mut parameters = Vec::new();
         let mut body = None;
+        let mut body_program = None;
         let mut return_type = None;
         let mut return_type_expr = None;
         let mut child_offset = offset;
@@ -78,6 +81,7 @@ impl VosBuilder {
                     }
                     VosElementType::Block => {
                         body = Some(self.slice(child_node, child_offset, source));
+                        body_program = self.build_block_program(child_node, child_offset, source);
                     }
                     VosElementType::ReturnType => {
                         return_type = Some(self.slice(child_node, child_offset, source));
@@ -95,7 +99,7 @@ impl VosBuilder {
         if matches!(kind, VosDeclarationKind::Table | VosDeclarationKind::Class) {
             self.collect_fields(node, offset, source, &mut fields)?;
         }
-        Ok(VosDeclaration { kind, name, path, signature, parameters, body, return_type, return_type_expr, fields, span })
+        Ok(VosDeclaration { kind, name, path, signature, parameters, body, body_program, return_type, return_type_expr, fields, span })
     }
 
     fn build_parameters(&self, node: &GreenNode<'_, VosLanguage>, offset: usize, source: &SourceText) -> Result<Vec<VosParameter>, OakError> {

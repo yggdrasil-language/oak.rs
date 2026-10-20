@@ -16,7 +16,10 @@ pub mod lexer;
 pub mod parser;
 
 pub use crate::{
-    ast::{VosDeclaration, VosDeclarationKind, VosField, VosFieldAttribute, VosParameter, VosRoot, VosSyntaxElement, VosSyntaxNode, VosSyntaxSlice, VosSyntaxToken, VosTypeArgument, VosTypeSyntax},
+    ast::{
+        VosBinaryOp, VosDeclaration, VosDeclarationKind, VosExpr, VosField, VosFieldAttribute, VosFieldInit, VosFnDecl, VosFnKind, VosLambda, VosLet, VosLiteral, VosParameter, VosPathSep, VosProgram, VosProjItem, VosRoot, VosStmt, VosSyntaxElement,
+        VosSyntaxNode, VosSyntaxSlice, VosSyntaxToken, VosTypeArgument, VosTypeSyntax, VosUnaryOp,
+    },
     builder::VosBuilder,
     language::VosLanguage,
     lexer::{VosLexer, VosToken, VosTokenType},
@@ -39,4 +42,14 @@ pub fn parse(source: &str) -> Result<VosRoot, String> {
         return Err(format!("{error:?}"));
     }
     result.result.map_err(|error| format!("{error:?}"))
+}
+
+/// Parses a VOS expression program (statements, `micro` declarations and an
+/// optional trailing result expression) from Oak tokens.
+///
+/// This is the structured program projection consumed by hosts that execute
+/// VOS operations. It performs no name resolution or type checking.
+pub fn parse_program(source: &str) -> Result<VosProgram, String> {
+    let root = parse(source)?;
+    VosBuilder::default().project_program(&root).map_err(|error| format!("{error:?}"))
 }
