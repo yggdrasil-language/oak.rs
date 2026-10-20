@@ -34,7 +34,7 @@ oak-macros = { workspace = true }
 default = ["serde"]
 serde = ["dep:serde", "oak-core/serde"]
 oak-pretty-print = ["dep:oak-pretty-print"]
-lsp = ["dep:oak-lsp", "dep:oak-hover", "dep:oak-vfs", "oak-highlight", "oak-pretty-print", "dep:futures"]
+lsp = ["dep:oak-lsp", "dep:oak-hover", "dep:oak-folding", "dep:oak-semantic-tokens", "dep:oak-navigation", "dep:oak-vfs", "dep:dashmap", "oak-highlight", "oak-pretty-print", "dep:futures"]
 mcp = ["lsp", "oak-mcp/io-std"]
 
 [package.metadata.docs.rs]
