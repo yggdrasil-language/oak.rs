@@ -1,6 +1,7 @@
 use oak_core::{Builder, SourceText, parser::ParseSession};
 use oak_typescript::{
     TypeScriptBuilder, TypeScriptLanguage,
+    ast::{ClassMember, Statement},
     formatter::{FormatOptions, format_source},
 };
 
@@ -48,5 +49,47 @@ fn repro_vmz_formatter_fragments() {
     ] {
         let output = format_source(source, &options).expect("format");
         assert_eq!(format_source(&output, &options).expect("idempotent"), output, "source={source:?}");
+    }
+}
+
+fn class_member_names(body: &str) -> (Vec<String>, usize) {
+    let lang = TypeScriptLanguage::standard();
+    let source = format!("export default class Probe {{\n{body}\n}}\n");
+    let mut cache = ParseSession::<TypeScriptLanguage>::new(32);
+    let result = TypeScriptBuilder::new(&lang).build(&SourceText::new(source.as_str()), &[], &mut cache);
+    let root = result.result.expect("root");
+    let mut names = Vec::new();
+    for stmt in &root.statements {
+        let inner = match stmt {
+            Statement::ExportDeclaration(exp) => exp.declaration.as_deref(),
+            _ => None,
+        };
+        let Some(Statement::ClassDeclaration(class)) = inner
+        else {
+            continue;
+        };
+        for member in &class.body {
+            match member {
+                ClassMember::Method { name, .. } | ClassMember::Property { name, .. } => {
+                    names.push(name.clone());
+                }
+            }
+        }
+    }
+    (names, result.diagnostics.len())
+}
+
+#[test]
+fn class_member_spans_stay_aligned_after_parenthesized_initializer() {
+    let cases = [
+        "    a() {\n        const z = (x) + y;\n    }\n    tail() { return 1; }",
+        "    a() {\n        const z = (x) && y;\n    }\n    tail() { return 1; }",
+        "    a(ev) {\n        if ((ev.key === \"ArrowDown\")) return;\n    }\n    tail() { return 1; }",
+        "    a() {\n        if ((x) || y) return;\n    }\n    tail() { return 1; }",
+    ];
+    for body in cases {
+        let (names, diags) = class_member_names(body);
+        assert_eq!(diags, 0, "{body}");
+        assert_eq!(names, vec!["a", "tail"], "{body}");
     }
 }

@@ -64,14 +64,12 @@ impl<'config> TypeScriptParser<'config> {
             Some(LeftParen) => {
                 state.bump();
                 if !self.at(state, RightParen) {
-                    let inner = PrattParser::parse(state, 0, self);
-                    state.push_child(inner);
+                    PrattParser::parse(state, 0, self);
                     if self.eat(state, Colon) {
                         self.parse_type_annotation(state).ok();
                     }
                     while self.eat(state, Comma) {
-                        let param = PrattParser::parse(state, 0, self);
-                        state.push_child(param);
+                        PrattParser::parse(state, 0, self);
                         if self.eat(state, Colon) {
                             self.parse_type_annotation(state).ok();
                         }
