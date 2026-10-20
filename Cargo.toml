@@ -21,7 +21,6 @@ repository = "https://github.com/yggdrasil-language/oak.rs"
 
 [workspace.dependencies]
 # External dependencies removed to achieve architectural independence
-walkdir = { version = "2.5.0" }
 serde = { version = "1.0.229", features = ["derive", "rc"] }
 serde_json = { version = "1.0.149" }
 schemars = { version = "1.2.1", features = ["derive"] }
