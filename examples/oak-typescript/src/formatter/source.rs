@@ -142,6 +142,14 @@ pub(crate) fn format_source(source: &str, options: &FormatOptions) -> Result<Str
                 constraint = oak_formatter::GapConstraint::NoSpace;
             }
         }
+        // `< / div >` closes a JSX tag and binds tightly. Every other `/ name`
+        // pair is division and needs the space on both sides.
+        if left_text == "/" && right_text.chars().next().is_some_and(|ch| ch.is_ascii_alphabetic()) {
+            let previous = index.checked_sub(1).and_then(|previous| significant.get(previous)).and_then(|token| source.get(token.span.clone()));
+            if previous != Some("<") {
+                constraint = oak_formatter::GapConstraint::RequiredSpace;
+            }
+        }
         if gap.contains('\n') || left_text.starts_with("//") || left_text.starts_with("/*") || right_text.starts_with("//") || right_text.starts_with("/*") || (source.starts_with("#!") && left.span.start < source.find('\n').unwrap_or(source.len())) {
             constraint = oak_formatter::GapConstraint::Preserve;
         }
@@ -153,7 +161,7 @@ pub(crate) fn format_source(source: &str, options: &FormatOptions) -> Result<Str
     Ok(formatted)
 }
 fn is_reserved_word(text: &str) -> bool {
-    matches!(text, "if" | "for" | "while" | "switch" | "catch" | "with" | "return" | "throw" | "new" | "typeof" | "void" | "delete" | "await" | "yield" | "as" | "in" | "instanceof")
+    matches!(text, "if" | "for" | "while" | "switch" | "catch" | "with" | "function" | "return" | "throw" | "new" | "typeof" | "void" | "delete" | "await" | "yield" | "as" | "in" | "instanceof")
 }
 fn is_jsx_attribute_gap(significant: &[&oak_core::Token<TypeScriptTokenType>], index: usize, source: &str) -> bool {
     let mut nesting = 0usize;
