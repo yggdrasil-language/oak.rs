@@ -15,13 +15,14 @@
 ### Using Memory Vfs
 
 ```rust
+use oak_core::source::Source;
 use oak_vfs::{MemoryVfs, Vfs, WritableVfs};
 
 let vfs = MemoryVfs::new();
 vfs.write_file("file:///test.txt", "line 1\nline 2");
 
 if let Some(source) = vfs.get_source("file:///test.txt") {
-    println!("Content: {}", source.get_text());
+    println!("Content: {}", source.get_text_from(0));
 }
 ```
 
