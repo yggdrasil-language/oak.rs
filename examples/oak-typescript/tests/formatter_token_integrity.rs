@@ -37,3 +37,10 @@ fn numeric_separators_stay_inside_one_literal() {
         assert_eq!(format(source), expected, "source={source:?}");
     }
 }
+
+#[test]
+fn regex_literals_start_after_logical_operators() {
+    for source in [r"const a = /x/.test(v) || /\.\.\.]/.test(v);", r"const b = /^a$/.test(v) && /[\]]/.test(v);", r"const c = /a/.test(v) ?? /b/.test(v);", r#"if (/\bfrom\s+['"]\.\/(?!\.\.)/.test(js)) { fail(); }"#] {
+        assert_eq!(format(source), source, "source={source:?}");
+    }
+}

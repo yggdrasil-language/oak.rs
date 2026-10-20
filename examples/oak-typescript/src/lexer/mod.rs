@@ -508,6 +508,9 @@ fn regex_can_start_after(tokens: &[oak_core::Token<TypeScriptTokenType>]) -> boo
             | TypeScriptTokenType::Question
             | TypeScriptTokenType::Exclamation
             | TypeScriptTokenType::Arrow
+            | TypeScriptTokenType::AmpersandAmpersand
+            | TypeScriptTokenType::PipePipe
+            | TypeScriptTokenType::QuestionQuestion
             | TypeScriptTokenType::Return
             | TypeScriptTokenType::Throw
             | TypeScriptTokenType::Case
