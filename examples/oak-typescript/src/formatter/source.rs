@@ -102,17 +102,22 @@ pub(crate) fn format_source(source: &str, options: &FormatOptions) -> Result<Str
                 constraint = oak_formatter::GapConstraint::RequiredSpace;
             }
         }
-        if left_text == "<" || left_text == ">" {
-            let generic_angle = (left_text == "<" && looks_like_type_arguments(&significant, index, source)) || (left_text == ">" && is_type_argument_close(&significant, index, source));
-            let comparison =
-                !generic_angle && significant.get(index.wrapping_sub(1)).and_then(|token| source.get(token.span.clone())).is_some_and(|text| text.chars().last().is_some_and(|ch| ch.is_ascii_alphanumeric() || matches!(ch, '_' | '$' | ')' | ']')));
+        if matches!(left_text, "<" | ">" | ">>" | ">>>") {
+            let generic_angle = (left_text == "<" && looks_like_type_arguments(&significant, index, source)) || (matches!(left_text, ">" | ">>" | ">>>") && is_type_argument_close(&significant, index, source));
+            // A `<` after an operand is a comparison. A postfix `++`/`--`
+            // also ends the left operand, so `guard++ < 64` keeps its spaces.
+            let comparison = !generic_angle
+                && significant
+                    .get(index.wrapping_sub(1))
+                    .and_then(|token| source.get(token.span.clone()))
+                    .is_some_and(|text| matches!(text, "++" | "--") || text.chars().last().is_some_and(|ch| ch.is_ascii_alphanumeric() || matches!(ch, '_' | '$' | ')' | ']')));
             if !right_text.is_empty() && comparison && right_text != "/" {
                 constraint = oak_formatter::GapConstraint::RequiredSpace;
             }
             if generic_angle && left_text == ">" && right_text == "{" {
                 constraint = oak_formatter::GapConstraint::RequiredSpace;
             }
-            else if generic_angle && (left_text == "<" || matches!(right_text, "(" | ")" | "," | ";" | ">" | ">>")) {
+            else if generic_angle && (left_text == "<" || matches!(right_text, "(" | ")" | "," | ";" | ">" | ">>" | "[")) {
                 constraint = oak_formatter::GapConstraint::NoSpace;
             }
         }
@@ -203,6 +208,21 @@ pub(crate) fn format_source(source: &str, options: &FormatOptions) -> Result<Str
         if right_text == "*" && matches!(left_text, "function" | "yield" | "async") {
             constraint = oak_formatter::GapConstraint::NoSpace;
         }
+        // A member call named `of` stays attached, while the `for … of`
+        // keyword keeps its space before a parenthesized iterable.
+        if right_text == "(" && left_text == "of" {
+            let previous = index.checked_sub(1).and_then(|previous| significant.get(previous)).and_then(|token| source.get(token.span.clone()));
+            if matches!(previous, Some("." | "?.")) {
+                constraint = oak_formatter::GapConstraint::NoSpace;
+            }
+        }
+        // `readonly` is a type operator in `readonly [a, b]`, not a member name.
+        if matches!(right_text, "[" | "{" | "(") && left_text == "readonly" {
+            let previous = index.checked_sub(1).and_then(|previous| significant.get(previous)).and_then(|token| source.get(token.span.clone()));
+            if !matches!(previous, Some("." | "?.")) {
+                constraint = oak_formatter::GapConstraint::RequiredSpace;
+            }
+        }
         // A statement body that starts with `(` after a control-flow header
         // needs the space that keeps `if (a)(b)` from reading as a call.
         if right_text == "(" && left_text == ")" {
@@ -290,18 +310,18 @@ fn looks_like_type_arguments(significant: &[&oak_core::Token<TypeScriptTokenType
             "<" => depth += 1,
             ">" if depth == 0 && delimiters == 0 => {
                 let after = significant.iter().skip_while(|candidate| candidate.span.start <= token.span.start).find_map(|candidate| source.get(candidate.span.clone()));
-                return after.is_none_or(|next| matches!(next, "=" | "," | ";" | ")" | "]" | "}" | "." | "(" | "{" | ">" | "|" | "&" | "=>" | "?" | ":"));
+                return after.is_none_or(|next| matches!(next, "=" | "," | ";" | ")" | "]" | "[" | "}" | "." | "(" | "{" | ">" | "|" | "&" | "=>" | "?" | ":"));
             }
             ">" if depth == 0 => return false,
             ">" => depth -= 1,
             ">>>" if depth <= 2 && delimiters == 0 => {
                 let after = significant.iter().skip_while(|candidate| candidate.span.start <= token.span.start).find_map(|candidate| source.get(candidate.span.clone()));
-                return after.is_none_or(|next| matches!(next, "=" | "," | ";" | ")" | "]" | "}" | "." | "(" | "{" | "|" | "&" | "=>" | "?" | ":"));
+                return after.is_none_or(|next| matches!(next, "=" | "," | ";" | ")" | "]" | "[" | "}" | "." | "(" | "{" | "|" | "&" | "=>" | "?" | ":"));
             }
             ">>>" => depth -= 3,
             ">>" if depth <= 2 && delimiters == 0 => {
                 let after = significant.iter().skip_while(|candidate| candidate.span.start <= token.span.start).find_map(|candidate| source.get(candidate.span.clone()));
-                return after.is_none_or(|next| matches!(next, "=" | "," | ";" | ")" | "]" | "}" | "." | "(" | "{" | "|" | "&" | "=>" | "?" | ":"));
+                return after.is_none_or(|next| matches!(next, "=" | "," | ";" | ")" | "]" | "[" | "}" | "." | "(" | "{" | "|" | "&" | "=>" | "?" | ":"));
             }
             ">>" => depth -= 2,
             ";" | "?" | ":" if depth == 0 && delimiters == 0 => return false,
@@ -313,6 +333,7 @@ fn looks_like_type_arguments(significant: &[&oak_core::Token<TypeScriptTokenType
 
 fn is_type_argument_close(significant: &[&oak_core::Token<TypeScriptTokenType>], close_index: usize, source: &str) -> bool {
     let mut depth = 0usize;
+    let mut delimiters = 0usize;
     for index in (0..close_index).rev() {
         let text = match source.get(significant[index].span.clone()) {
             Some(text) => text,
@@ -324,7 +345,10 @@ fn is_type_argument_close(significant: &[&oak_core::Token<TypeScriptTokenType>],
             ">" => depth += 1,
             "<" if depth == 0 => return looks_like_type_arguments(significant, index, source),
             "<" => depth -= 1,
-            ";" | "?" | ":" if depth == 0 => return false,
+            // Scanning backwards, a closing delimiter opens a nested region.
+            "}" | ")" | "]" => delimiters += 1,
+            "{" | "(" | "[" if delimiters > 0 => delimiters -= 1,
+            ";" | "?" | ":" if depth == 0 && delimiters == 0 => return false,
             _ => {}
         }
     }

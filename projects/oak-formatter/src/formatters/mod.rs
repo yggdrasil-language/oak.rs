@@ -89,10 +89,14 @@ fn needs_space(left: &str, right: &str) -> bool {
         || (left == "/" && right.chars().next().is_some_and(|ch| ch.is_ascii_alphabetic()))
         || (left == "!" && right != "=")
         || left == "~"
-        || matches!(left, "++" | "--")
         || matches!(right, "++" | "--")
     {
         return false;
+    }
+    // `++`/`--` prefix the operand they touch but separate from a following
+    // operator, so `guard++ < 64` keeps its spaces while `++i` stays tight.
+    if matches!(left, "++" | "--") {
+        return !(right.chars().next().is_some_and(|ch| ch.is_ascii_alphanumeric() || matches!(ch, '_' | '$')) || matches!(right, "(" | "[" | ")" | "]" | "," | ";" | "." | "?."));
     }
     // Optional properties and parameters use `name?: Type`.
     if left == "?" && right == ":" {
@@ -118,11 +122,11 @@ fn needs_space(left: &str, right: &str) -> bool {
     let right_word = right.chars().next().is_some_and(|ch| ch.is_ascii_alphanumeric() || ch == '_' || ch == '$');
     let left_quote = left.ends_with(['\'', '"', '`']);
     let right_quote = right.starts_with(['\'', '"', '`']);
-    let left_operator = left.ends_with(['=', '+', '-', '*', '/', '%', ':', '&', '|']) || matches!(left, "??" | "??=" | "&&" | "&&=" | "||" | "||=" | "=>" | "<=" | ">=" | "==" | "===" | "<<" | ">>" | ">>>");
-    let right_operator = right.starts_with(['=', '+', '-', '*', '/', '%', ':', '&', '|']) || matches!(right, "??" | "??=" | "&&" | "&&=" | "||" | "||=" | "=>" | "<=" | ">=" | "==" | "===" | "!=" | "!==" | "<<" | ">>" | ">>>");
+    let left_operator = left.ends_with(['=', '+', '-', '*', '/', '%', ':', '&', '|', '^']) || matches!(left, "??" | "??=" | "&&" | "&&=" | "||" | "||=" | "=>" | "<=" | ">=" | "==" | "===" | "<<" | ">>" | ">>>");
+    let right_operator = right.starts_with(['=', '+', '-', '*', '/', '%', ':', '&', '|', '^']) || matches!(right, "??" | "??=" | "&&" | "&&=" | "||" | "||=" | "=>" | "<=" | ">=" | "==" | "===" | "!=" | "!==" | "<<" | ">>" | ">>>");
     let brace_boundary = left.ends_with('{') || right.starts_with('}') || right == "{" || (left_word && right.starts_with('{')) || (left.ends_with('}') && right_word);
 
-    (left_word && (right_word || right_quote))
+    (left_word && (right_word || right_quote || right.starts_with('#')))
         || (left_quote && right_word)
         || left.ends_with(',')
         || left.ends_with(';')
