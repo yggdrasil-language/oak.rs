@@ -22,7 +22,6 @@ The Language Server Protocol (LSP) has become the standard for language tooling 
 | Module | Purpose |
 |--------|---------|
 | `handlers` | LSP request/notification handlers |
-| `server` | LSP server with JSON-RPC |
 | `service` | `LanguageService` trait |
 | `types` | LSP-specific type definitions |
 | `workspace` | File and project management |
