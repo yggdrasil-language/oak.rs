@@ -111,15 +111,15 @@ fn needs_space(left: &str, right: &str) -> bool {
     if matches!(right, "as" | "instanceof" | "in") || matches!(left, "as" | "instanceof" | "in") {
         return true;
     }
-    if matches!(left, "return" | "throw" | "new" | "typeof" | "void" | "delete" | "await" | "yield") && matches!(right, "[" | "{" | "(" | "!" | "~") {
+    if matches!(left, "return" | "throw" | "new" | "typeof" | "void" | "delete" | "await" | "yield" | "of") && matches!(right, "[" | "{" | "(" | "!" | "~") {
         return true;
     }
     let left_word = left.chars().last().is_some_and(|ch| ch.is_ascii_alphanumeric() || ch == '_' || ch == '$');
     let right_word = right.chars().next().is_some_and(|ch| ch.is_ascii_alphanumeric() || ch == '_' || ch == '$');
     let left_quote = left.ends_with(['\'', '"', '`']);
     let right_quote = right.starts_with(['\'', '"', '`']);
-    let left_operator = left.ends_with(['=', '+', '-', '*', '/', '%', ':', '&', '|']) || matches!(left, "??" | "??=" | "&&" | "&&=" | "||" | "||=" | "=>" | "<=" | ">=" | "==" | "===");
-    let right_operator = right.starts_with(['=', '+', '-', '*', '/', '%', ':', '&', '|']) || matches!(right, "??" | "??=" | "&&" | "&&=" | "||" | "||=" | "=>" | "<=" | ">=" | "==" | "===" | "!=" | "!==");
+    let left_operator = left.ends_with(['=', '+', '-', '*', '/', '%', ':', '&', '|']) || matches!(left, "??" | "??=" | "&&" | "&&=" | "||" | "||=" | "=>" | "<=" | ">=" | "==" | "===" | "<<" | ">>" | ">>>");
+    let right_operator = right.starts_with(['=', '+', '-', '*', '/', '%', ':', '&', '|']) || matches!(right, "??" | "??=" | "&&" | "&&=" | "||" | "||=" | "=>" | "<=" | ">=" | "==" | "===" | "!=" | "!==" | "<<" | ">>" | ">>>");
     let brace_boundary = left.ends_with('{') || right.starts_with('}') || right == "{" || (left_word && right.starts_with('{')) || (left.ends_with('}') && right_word);
 
     (left_word && (right_word || right_quote))

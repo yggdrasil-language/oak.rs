@@ -70,3 +70,29 @@ fn nested_template_interpolations_stay_one_token() {
         assert_eq!(format(source), source, "source={source:?}");
     }
 }
+
+#[test]
+fn statement_and_operator_spacing_stays_canonical() {
+    for source in [
+        "for (const id of [...new Set(chain)].reverse()) { run(id); }",
+        "export function* stream(node) { yield* walk(node); }",
+        "async function* pages() { yield* source; }",
+        "const seq = ++mountSeq;",
+        "const offset = value >>> 0;",
+        "const shifted = left << 2;",
+        "if (eq === -1) { reset(); }",
+        "const negated = flag !== -1;",
+    ] {
+        assert_eq!(format(source), source, "source={source:?}");
+    }
+}
+#[test]
+fn generic_defaults_and_statement_bodies_stay_readable() {
+    for (source, expected) in [
+        ("export function readAsync<T = unknown>(file: string): Promise<T> { return load(file) as Promise<T>; }", "export function readAsync<T = unknown>(file: string): Promise<T> { return load(file) as Promise<T>; }"),
+        ("if (ready)(handler)();", "if (ready) (handler)();"),
+        ("const el = <div class=\"x\">text</div>;", "const el = <div class=\"x\">text</div>;"),
+    ] {
+        assert_eq!(format(source), expected, "source={source:?}");
+    }
+}
