@@ -17,6 +17,15 @@ fn inequality_operators_keep_the_space_before_them() {
 }
 
 #[test]
+fn nested_generic_close_stays_one_token_before_assignment() {
+    for (source, expected) in
+        [("const map: Record<string, Record<string, unknown>> = {};", "const map: Record<string, Record<string, unknown>> = {};"), ("const deep: Map<string, Set<number>> = new Map();", "const deep: Map<string, Set<number>> = new Map();")]
+    {
+        assert_eq!(format(source), expected, "source={source:?}");
+    }
+}
+
+#[test]
 fn numeric_separators_stay_inside_one_literal() {
     for (source, expected) in [
         ("const deadline = Date.now() + 60_000;", "const deadline = Date.now() + 60_000;"),

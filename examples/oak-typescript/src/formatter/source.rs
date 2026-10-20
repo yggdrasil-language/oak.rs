@@ -164,6 +164,10 @@ fn is_jsx_attribute_gap(significant: &[&oak_core::Token<TypeScriptTokenType>], i
         };
         match text {
             ">" => nesting += 1,
+            // `A<B<C>>` emits one `>>` token, so a reverse scan must close two
+            // levels at once or it mistakes the generic for an open JSX tag.
+            ">>" => nesting += 2,
+            ">>>" => nesting += 3,
             "<" if nesting == 0 => return true,
             "<" if nesting > 0 => {
                 nesting -= 1;
