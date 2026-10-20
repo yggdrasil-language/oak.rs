@@ -73,7 +73,7 @@ pub(crate) fn format_source(source: &str, options: &FormatOptions) -> Result<Str
                             ternary = true;
                             break;
                         }
-                        Some("}") => break,
+                        Some("}") => nesting += 1,
                         Some(")" | "]") => nesting += 1,
                         Some("(" | "[" | "{") if nesting > 0 => nesting -= 1,
                         Some("(" | "[" | "{") => break,
