@@ -1,4 +1,7 @@
-use crate::types::{CodeAction, CompletionItem, Diagnostic, DocumentHighlight, FoldingRange, Hover, InitializeParams, InlayHint, LocationRange, SemanticTokens, SignatureHelp, StructureItem, TextEdit, WorkspaceEdit, WorkspaceSymbol};
+use crate::{
+    protocol::{InitializeResult, ServerCapabilities},
+    types::{CodeAction, CompletionItem, Diagnostic, DocumentHighlight, FoldingRange, Hover, InitializeParams, InlayHint, LocationRange, SemanticTokens, SignatureHelp, StructureItem, TextEdit, WorkspaceEdit, WorkspaceSymbol},
+};
 use core::range::Range;
 use oak_core::{
     language::{ElementRole, ElementType, Language},
@@ -296,6 +299,38 @@ pub trait LanguageService: Send + Sync {
         async { vec![] }
     }
 
+    /// 返回本服务对外声明的能力集。
+    ///
+    /// 默认由六个能力接缝推导；直接实现额外能力（如补全、诊断）的服务应覆盖本方法，
+    /// 否则这些能力不会出现在 `initialize` 结果中。
+    fn capabilities(&self) -> ServerCapabilities {
+        ServerCapabilities {
+            hover: self.hover_provider().is_some(),
+            definition: self.definition_provider().is_some(),
+            references: self.references_provider().is_some(),
+            document_symbol: self.symbol_provider().is_some(),
+            folding_range: self.folding_provider().is_some(),
+            semantic_tokens: self.semantic_tokens_provider().is_some(),
+            ..ServerCapabilities::default()
+        }
+    }
+
+    /// 文档被打开：把完整文本写入 VFS。
+    fn did_open<'a>(&'a self, uri: &'a str, text: &'a str) -> impl Future<Output = ()> + Send + 'a {
+        async move {
+            self.vfs().write_file(uri, text.into());
+        }
+    }
+
+    /// 文档内容变化：把完整文本写入 VFS。
+    ///
+    /// Oak 定义层只建模全量同步，因此与 [`Self::did_open`] 共用写入路径。
+    fn did_change<'a>(&'a self, uri: &'a str, text: &'a str) -> impl Future<Output = ()> + Send + 'a {
+        async move {
+            self.did_open(uri, text).await;
+        }
+    }
+
     /// Handles an LSP initialize request.
     fn initialize<'a>(&'a self, _params: InitializeParams) -> impl Future<Output = ()> + Send + 'a {
         async {}
@@ -324,5 +359,83 @@ pub trait LanguageService: Send + Sync {
     /// Provides diagnostics for a file.
     fn diagnostics<'a>(&'a self, _uri: &'a str) -> impl Future<Output = Vec<Diagnostic>> + Send + 'a {
         async { vec![] }
+    }
+}
+
+/// LSP 会话生命周期合同。
+///
+/// 这是提供给传输/会话适配层的窄视图：适配层只需要初始化、关闭与能力集，
+/// 不必依赖 [`LanguageService`] 的全部语言能力。任何 `LanguageService` 都通过
+/// 下面的 blanket impl 自动获得本合同。
+pub trait LifecycleService {
+    /// 建立会话并返回协议要求的初始化结果。
+    ///
+    /// 实现的初始化钩子完成后，结果中的能力集来自 [`LanguageService::capabilities`]。
+    fn initialize<'a>(&'a self, params: InitializeParams) -> impl Future<Output = InitializeResult> + Send + 'a;
+
+    /// 客户端确认已收到初始化结果。
+    fn initialized<'a>(&'a self) -> impl Future<Output = ()> + Send + 'a;
+
+    /// 关闭服务。
+    fn shutdown<'a>(&'a self) -> impl Future<Output = ()> + Send + 'a;
+
+    /// 返回服务支持的能力集。
+    fn capabilities(&self) -> ServerCapabilities;
+}
+
+impl<T: LanguageService> LifecycleService for T {
+    fn initialize<'a>(&'a self, params: InitializeParams) -> impl Future<Output = InitializeResult> + Send + 'a {
+        async move {
+            LanguageService::initialize(self, params).await;
+            InitializeResult { capabilities: LanguageService::capabilities(self) }
+        }
+    }
+
+    fn initialized<'a>(&'a self) -> impl Future<Output = ()> + Send + 'a {
+        LanguageService::initialized(self)
+    }
+
+    fn shutdown<'a>(&'a self) -> impl Future<Output = ()> + Send + 'a {
+        LanguageService::shutdown(self)
+    }
+
+    fn capabilities(&self) -> ServerCapabilities {
+        LanguageService::capabilities(self)
+    }
+}
+
+/// 文档同步合同。
+///
+/// 与 [`LifecycleService`] 一样，这是 transport 适配层使用的窄视图；语言实现仍然在
+/// [`LanguageService`] 上覆盖同样的方法，避免要求每个实现重复声明合同。
+pub trait DocumentSync {
+    /// 文档被打开。
+    fn did_open<'a>(&'a self, uri: &'a str, text: &'a str) -> impl Future<Output = ()> + Send + 'a;
+
+    /// 文档内容变化。
+    fn did_change<'a>(&'a self, uri: &'a str, text: &'a str) -> impl Future<Output = ()> + Send + 'a;
+
+    /// 文档被关闭。
+    fn did_close<'a>(&'a self, uri: &'a str) -> impl Future<Output = ()> + Send + 'a;
+
+    /// 文档被保存。
+    fn did_save<'a>(&'a self, uri: &'a str) -> impl Future<Output = ()> + Send + 'a;
+}
+
+impl<T: LanguageService> DocumentSync for T {
+    fn did_open<'a>(&'a self, uri: &'a str, text: &'a str) -> impl Future<Output = ()> + Send + 'a {
+        LanguageService::did_open(self, uri, text)
+    }
+
+    fn did_change<'a>(&'a self, uri: &'a str, text: &'a str) -> impl Future<Output = ()> + Send + 'a {
+        LanguageService::did_change(self, uri, text)
+    }
+
+    fn did_close<'a>(&'a self, uri: &'a str) -> impl Future<Output = ()> + Send + 'a {
+        LanguageService::did_close(self, uri)
+    }
+
+    fn did_save<'a>(&'a self, uri: &'a str) -> impl Future<Output = ()> + Send + 'a {
+        LanguageService::did_save(self, uri)
     }
 }
