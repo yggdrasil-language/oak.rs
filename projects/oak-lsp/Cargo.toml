@@ -22,7 +22,10 @@ oak-symbols = { workspace = true }
 oak-navigation = { workspace = true }
 oak-resolver = { workspace = true }
 oak-folding = { workspace = true }
+oak-hover = { workspace = true }
+oak-semantic-tokens = { workspace = true }
+oak-structural-view = { workspace = true }
 
 [features]
 default = [ "serde"]
-serde = ["dep:serde", "dep:serde_json", "oak-core/serde", "oak-vfs/serde"]
+serde = ["dep:serde", "dep:serde_json", "oak-core/serde", "oak-vfs/serde", "oak-navigation/serde", "oak-hover/serde", "oak-semantic-tokens/serde", "oak-structural-view/serde", "oak-folding/serde"]

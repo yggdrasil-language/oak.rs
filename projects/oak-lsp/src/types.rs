@@ -1,5 +1,9 @@
 use oak_core::{Arc, Range, language::UniversalElementRole};
 pub use oak_folding::FoldingRange;
+pub use oak_hover::Hover;
+pub use oak_navigation::Location as LocationRange;
+pub use oak_semantic_tokens::SemanticToken;
+pub use oak_structural_view::StructureItem;
 
 /// A range in the source code.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -36,17 +40,6 @@ pub struct Location<R = Range<usize>> {
 }
 
 /// A specialized location type for byte-based ranges.
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct LocationRange {
-    /// The URI of the resource.
-    #[cfg_attr(feature = "serde", serde(with = "oak_core::serde_arc_str"))]
-    pub uri: Arc<str>,
-    /// The byte range within the resource.
-    #[cfg_attr(feature = "serde", serde(with = "oak_core::serde_range"))]
-    pub range: Range<usize>,
-}
-
 impl From<LocationRange> for Location<Range<usize>> {
     fn from(loc: LocationRange) -> Self {
         Self { uri: loc.uri, range: loc.range }
@@ -55,18 +48,6 @@ impl From<LocationRange> for Location<Range<usize>> {
 
 impl From<Location<Range<usize>>> for LocationRange {
     fn from(loc: Location<Range<usize>>) -> Self {
-        Self { uri: loc.uri, range: loc.range }
-    }
-}
-
-impl From<oak_navigation::Location> for Location<Range<usize>> {
-    fn from(loc: oak_navigation::Location) -> Self {
-        Self { uri: loc.uri, range: loc.range }
-    }
-}
-
-impl From<oak_navigation::Location> for LocationRange {
-    fn from(loc: oak_navigation::Location) -> Self {
         Self { uri: loc.uri, range: loc.range }
     }
 }
@@ -148,72 +129,6 @@ pub struct ColorInformation {
     pub range: LspRange,
     /// The actual color value for this range.
     pub color: Color,
-}
-
-/// Represents hover information.
-#[derive(Debug, Clone)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct Hover {
-    /// The hover's content as a markdown string.
-    pub contents: String,
-    /// An optional span to which this hover applies.
-    #[cfg_attr(feature = "serde", serde(with = "serde_range_opt"))]
-    pub range: Option<Range<usize>>,
-}
-
-#[cfg(feature = "serde")]
-mod serde_range_opt {
-    use super::*;
-    use serde::{Deserialize, Deserializer, Serializer};
-
-    pub fn serialize<S>(value: &Option<Range<usize>>, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        match value {
-            Some(range) => oak_core::serde_range::serialize(range, serializer),
-            None => serializer.serialize_none(),
-        }
-    }
-
-    #[derive(Deserialize)]
-    struct RangeDef {
-        start: usize,
-        end: usize,
-    }
-
-    pub fn deserialize<'de, D>(deserializer: D) -> Result<Option<Range<usize>>, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        let opt: Option<RangeDef> = Option::deserialize(deserializer)?;
-        Ok(opt.map(|def| Range { start: def.start, end: def.end }))
-    }
-}
-
-/// Represents an item in the document structure (e.g., in an outline or breadcrumbs).
-#[derive(Debug, Clone)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct StructureItem {
-    /// The name of this item (e.g., function name, class name).
-    pub name: String,
-    /// More detail about this item (e.g., function signature, type).
-    pub detail: Option<String>,
-    /// The universal role of this element.
-    pub role: UniversalElementRole,
-    /// The symbol kind.
-    pub kind: SymbolKind,
-    /// The range of the entire element in the source code.
-    #[cfg_attr(feature = "serde", serde(with = "oak_core::serde_range"))]
-    pub range: Range<usize>,
-    /// The range that should be selected when clicking on this item.
-    /// Usually the range of the identifier.
-    #[cfg_attr(feature = "serde", serde(with = "oak_core::serde_range"))]
-    pub selection_range: Range<usize>,
-    /// Whether this item is deprecated.
-    pub deprecated: bool,
-    /// Nested structure items (e.g., methods within a class).
-    pub children: Vec<StructureItem>,
 }
 
 /// Parameters for the `initialize` request.
@@ -444,22 +359,6 @@ pub enum DiagnosticSeverity {
     Hint = 4,
 }
 
-/// Represents a semantic token.
-#[derive(Debug, Clone)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct SemanticToken {
-    /// The line delta relative to the previous token.
-    pub delta_line: u32,
-    /// The start character delta relative to the previous token.
-    pub delta_start: u32,
-    /// The length of the token.
-    pub length: u32,
-    /// The token type index.
-    pub token_type: u32,
-    /// The token modifiers bitset.
-    pub token_modifiers_bitset: u32,
-}
-
 /// Represents semantic tokens.
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
@@ -613,8 +512,7 @@ impl From<oak_symbols::SymbolInformation> for WorkspaceSymbol {
     }
 }
 
-impl From<oak_symbols::SymbolInformation> for StructureItem {
-    fn from(s: oak_symbols::SymbolInformation) -> Self {
-        Self { name: s.name, detail: None, role: s.role, kind: SymbolKind::from(s.role), range: s.range.clone(), selection_range: s.range.clone(), deprecated: false, children: vec![] }
-    }
+/// 把符号信息投影为结构项。
+pub(crate) fn structure_item_from_symbol(s: oak_symbols::SymbolInformation) -> StructureItem {
+    StructureItem { name: s.name, detail: None, role: s.role, range: s.range.clone(), selection_range: s.range, deprecated: false, children: vec![] }
 }
