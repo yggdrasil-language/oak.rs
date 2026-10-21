@@ -48,7 +48,7 @@ impl LanguageService for TailwindLanguageService {
         R: Send,
         F: FnOnce(RedNode<'_, Self::Lang>) -> R + Send,
     {
-        let source = self.vfs().get_source(uri);
+        let source = self.vfs().request_source(uri);
         async move {
             let source = source?;
             let language = TailwindLanguage::default();

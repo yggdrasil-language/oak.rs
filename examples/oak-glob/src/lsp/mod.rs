@@ -15,7 +15,7 @@ use oak_core::tree::RedNode;
 #[cfg(feature = "lsp")]
 use oak_lsp::service::LanguageService;
 #[cfg(feature = "lsp")]
-use oak_vfs::{Vfs, WritableVfs};
+use oak_vfs::{Vfs, DocumentSession};
 #[cfg(feature = "lsp")]
 use std::future::Future;
 
@@ -35,7 +35,7 @@ impl<V: Vfs> GlobLanguageService<V> {
 }
 
 #[cfg(feature = "lsp")]
-impl<V: Vfs + Send + Sync + 'static + WritableVfs> LanguageService for GlobLanguageService<V> {
+impl<V: Vfs + Send + Sync + 'static + DocumentSession> LanguageService for GlobLanguageService<V> {
     type Lang = crate::language::GlobLanguage;
     type Vfs = V;
 

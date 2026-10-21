@@ -50,7 +50,7 @@ impl<V: Vfs> RakuLanguageService<V> {
 }
 
 #[cfg(feature = "lsp")]
-impl<V: Vfs + Send + Sync + 'static + oak_vfs::WritableVfs> LanguageService for RakuLanguageService<V> {
+impl<V: Vfs + Send + Sync + 'static + oak_vfs::DocumentSession> LanguageService for RakuLanguageService<V> {
     type Lang = RakuLanguage;
     type Vfs = V;
 

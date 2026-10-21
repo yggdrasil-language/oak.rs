@@ -3,7 +3,7 @@ use crate::lsp::StylusLanguageService;
 use oak_mcp::McpServer;
 use oak_vfs::Vfs;
 
-pub async fn serve_stylus_mcp<V: Vfs + Send + Sync + 'static + oak_vfs::WritableVfs>(vfs: V) {
+pub async fn serve_stylus_mcp<V: Vfs + Send + Sync + 'static + oak_vfs::DocumentSession>(vfs: V) {
     let service = StylusLanguageService::new(vfs);
     let server = McpServer::new(service);
     let reader = tokio::io::BufReader::new(tokio::io::stdin());

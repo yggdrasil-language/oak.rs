@@ -18,7 +18,7 @@ impl<const LANG: DsvLanguage, V: Vfs> DsvLanguageService<LANG, V> {
         Self { vfs, workspace: oak_lsp::workspace::WorkspaceManager::new() }
     }
 }
-impl<const LANG: DsvLanguage, V: Vfs + Send + Sync + 'static + oak_vfs::WritableVfs> LanguageService for DsvLanguageService<LANG, V> {
+impl<const LANG: DsvLanguage, V: Vfs + Send + Sync + 'static + oak_vfs::DocumentSession> LanguageService for DsvLanguageService<LANG, V> {
     type Lang = Dsv<LANG>;
     type Vfs = V;
     fn vfs(&self) -> &Self::Vfs {

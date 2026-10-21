@@ -65,7 +65,7 @@ impl<V: Vfs> MarkdownLanguageService<V> {
         }
     }
 }
-impl<V: Vfs + Send + Sync + 'static + oak_vfs::WritableVfs> LanguageService for MarkdownLanguageService<V> {
+impl<V: Vfs + Send + Sync + 'static + oak_vfs::DocumentSession> LanguageService for MarkdownLanguageService<V> {
     type Lang = MarkdownLanguage;
     type Vfs = V;
     fn vfs(&self) -> &Self::Vfs {
@@ -79,7 +79,7 @@ impl<V: Vfs + Send + Sync + 'static + oak_vfs::WritableVfs> LanguageService for 
         R: Send,
         F: FnOnce(RedNode<'_, Self::Lang>) -> R + Send,
     {
-        let source = self.vfs().get_source(uri);
+        let source = self.vfs().request_source(uri);
         async move {
             let source = source?;
             let language = MarkdownLanguage::github_flavored();
@@ -95,7 +95,7 @@ impl<V: Vfs + Send + Sync + 'static + oak_vfs::WritableVfs> LanguageService for 
         let uri = uri.to_string();
         async move {
             self.with_root(&uri, |root| {
-                let source = self.vfs().get_source(&uri)?;
+                let source = self.vfs().request_source(&uri)?;
                 let leaf = root.leaf_at_offset(range.start)?;
                 if !TokenType::is_universal(&leaf.kind, oak_core::language::UniversalTokenRole::Name) {
                     return None;
@@ -116,7 +116,7 @@ impl<V: Vfs + Send + Sync + 'static + oak_vfs::WritableVfs> LanguageService for 
         async move {
             let name = self
                 .with_root(&uri, |root| {
-                    let source = self.vfs().get_source(&uri)?;
+                    let source = self.vfs().request_source(&uri)?;
                     let leaf = root.leaf_at_offset(range.start)?;
                     if !TokenType::is_universal(&leaf.kind, oak_core::language::UniversalTokenRole::Name) {
                         return None;
@@ -135,7 +135,7 @@ impl<V: Vfs + Send + Sync + 'static + oak_vfs::WritableVfs> LanguageService for 
                 if let Some(refs) = self
                     .with_root(&file_uri, |file_root| {
                         let mut refs = Vec::new();
-                        if let Some(file_source) = self.vfs().get_source(&file_uri) {
+                        if let Some(file_source) = self.vfs().request_source(&file_uri) {
                             let full_text = file_source.get_text_in(Range { start: 0, end: file_source.length() });
                             let found = oak_navigation::SimpleReferenceFinder::find(&file_root, &name, &full_text, file_uri.clone());
                             refs.extend(found.into_iter().map(|l| oak_lsp::LocationRange { uri: l.uri, range: l.range }));

@@ -4,7 +4,7 @@ use oak_mcp::McpServer;
 use oak_vfs::Vfs;
 
 /// Serves Less MCP.
-pub async fn serve_less_mcp<V: Vfs + Send + Sync + 'static + oak_vfs::WritableVfs>(vfs: V) -> Result<(), Box<dyn std::error::Error + Send + Sync>>
+pub async fn serve_less_mcp<V: Vfs + Send + Sync + 'static + oak_vfs::DocumentSession>(vfs: V) -> Result<(), Box<dyn std::error::Error + Send + Sync>>
 where
     crate::lsp::LessLanguageService<V>: LanguageService,
 {

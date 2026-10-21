@@ -19,7 +19,7 @@ impl<V: Vfs> XmlLanguageService<V> {
         Self { vfs, workspace: oak_lsp::workspace::WorkspaceManager::new() }
     }
 }
-impl<V: Vfs + Send + Sync + 'static + oak_vfs::WritableVfs> LanguageService for XmlLanguageService<V> {
+impl<V: Vfs + Send + Sync + 'static + oak_vfs::DocumentSession> LanguageService for XmlLanguageService<V> {
     type Lang = XmlLanguage;
     type Vfs = V;
     fn vfs(&self) -> &Self::Vfs {
@@ -33,7 +33,7 @@ impl<V: Vfs + Send + Sync + 'static + oak_vfs::WritableVfs> LanguageService for 
         R: Send,
         F: FnOnce(RedNode<'_, Self::Lang>) -> R + Send,
     {
-        let source = self.vfs().get_source(uri);
+        let source = self.vfs().request_source(uri);
         async move {
             let source = source?;
             let language = XmlLanguage::default();

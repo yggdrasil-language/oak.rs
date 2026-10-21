@@ -37,7 +37,7 @@ impl<V: Vfs> RegexLanguageService<V> {
         Self { vfs, workspace: oak_lsp::workspace::WorkspaceManager::default(), hover_provider: RegexHoverProvider }
     }
 }
-impl<V: Vfs + Send + Sync + 'static + oak_vfs::WritableVfs> LanguageService for RegexLanguageService<V> {
+impl<V: Vfs + Send + Sync + 'static + oak_vfs::DocumentSession> LanguageService for RegexLanguageService<V> {
     type Lang = RegexLanguage;
     type Vfs = V;
     fn vfs(&self) -> &Self::Vfs {

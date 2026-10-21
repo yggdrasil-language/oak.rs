@@ -10,7 +10,7 @@ use {
     futures::Future,
     oak_hover::{Hover as HoverInfo, HoverProvider},
     oak_lsp::{service::LanguageService, types::Hover},
-    oak_vfs::{Vfs, WritableVfs},
+    oak_vfs::{Vfs, DocumentSession},
 };
 /// Hover provider implementation for PHP.
 #[cfg(feature = "lsp")]
@@ -43,7 +43,7 @@ impl<V: Vfs> PhpLanguageService<V> {
         Self { vfs, workspace: oak_lsp::workspace::WorkspaceManager::default(), hover_provider: PhpHoverProvider }
     }
 }
-impl<V: WritableVfs + Send + Sync + 'static> LanguageService for PhpLanguageService<V> {
+impl<V: DocumentSession + Send + Sync + 'static> LanguageService for PhpLanguageService<V> {
     type Lang = PhpLanguage;
     type Vfs = V;
     fn vfs(&self) -> &Self::Vfs {
@@ -57,7 +57,7 @@ impl<V: WritableVfs + Send + Sync + 'static> LanguageService for PhpLanguageServ
         R: Send,
         F: FnOnce(RedNode<'_, Self::Lang>) -> R + Send,
     {
-        let source = self.vfs().get_source(uri);
+        let source = self.vfs().request_source(uri);
         async move {
             let source = source?;
             let language = PhpLanguage::default();

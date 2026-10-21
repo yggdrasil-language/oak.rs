@@ -46,7 +46,7 @@ impl<V: Vfs> JLanguageService<V> {
     }
 }
 #[cfg(feature = "lsp")]
-impl<V: Vfs + Send + Sync + 'static + oak_vfs::WritableVfs> LanguageService for JLanguageService<V> {
+impl<V: Vfs + Send + Sync + 'static + oak_vfs::DocumentSession> LanguageService for JLanguageService<V> {
     type Lang = JLanguage;
     type Vfs = V;
     fn vfs(&self) -> &Self::Vfs {
@@ -60,7 +60,7 @@ impl<V: Vfs + Send + Sync + 'static + oak_vfs::WritableVfs> LanguageService for 
         R: Send,
         F: FnOnce(RedNode<'_, Self::Lang>) -> R + Send,
     {
-        let source = self.vfs().get_source(uri);
+        let source = self.vfs().request_source(uri);
         async move {
             let source = source?;
             let language = JLanguage::default();

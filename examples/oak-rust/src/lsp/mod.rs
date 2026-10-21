@@ -90,7 +90,7 @@ impl<V: Vfs> RustLanguageService<V> {
         }
     }
 }
-impl<V: Vfs + Send + Sync + 'static + oak_vfs::WritableVfs> LanguageService for RustLanguageService<V> {
+impl<V: Vfs + Send + Sync + 'static + oak_vfs::DocumentSession> LanguageService for RustLanguageService<V> {
     type Lang = RustLanguage;
     type Vfs = V;
     fn vfs(&self) -> &Self::Vfs {
@@ -104,7 +104,7 @@ impl<V: Vfs + Send + Sync + 'static + oak_vfs::WritableVfs> LanguageService for 
         R: Send,
         F: FnOnce(RedNode<'_, Self::Lang>) -> R + Send,
     {
-        let source = self.vfs().get_source(uri);
+        let source = self.vfs().request_source(uri);
         async move {
             let source = source?;
             let language = RustLanguage::default();
@@ -122,7 +122,7 @@ impl<V: Vfs + Send + Sync + 'static + oak_vfs::WritableVfs> LanguageService for 
             let uri_clone_for_root = uri_clone.clone();
             self.with_root(&uri_clone_for_root, move |root| {
                 let uri_clone = uri_clone.clone();
-                let source = match self.vfs().get_source(&uri_clone) {
+                let source = match self.vfs().request_source(&uri_clone) {
                     Some(s) => s,
                     None => return vec![],
                 };
@@ -140,7 +140,7 @@ impl<V: Vfs + Send + Sync + 'static + oak_vfs::WritableVfs> LanguageService for 
             let uri_clone_for_root = uri_clone.clone();
             self.with_root(&uri_clone_for_root, move |root| {
                 let uri_clone = uri_clone.clone();
-                let source = match self.vfs().get_source(&uri_clone) {
+                let source = match self.vfs().request_source(&uri_clone) {
                     Some(s) => s,
                     None => return vec![],
                 };
