@@ -57,8 +57,6 @@ ordered-float = "5.1.0"
 twox-hash = "2.1.2"
 regex = "1.12"
 base64 = "0.23.1"
-lsp-types = "0.95.0"
-
 # Internal project dependencies
 oak-core = { path = "projects/oak-core", version = "0.0.12" }
 oak-macros = { path = "projects/oak-macros", version = "0.0.12" }

@@ -12,7 +12,6 @@ keywords = ["lsp", "language-server", "types"]
 
 [dependencies]
 boost-diagnostic = { workspace = true, features = ["serde", "terminal"] }
-lsp-types = { workspace = true }
 serde = { workspace = true, optional = true }
 serde_json = { workspace = true, optional = true }
 futures = { workspace = true }

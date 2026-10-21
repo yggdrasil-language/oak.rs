@@ -345,9 +345,76 @@ pub struct Diagnostic {
     pub message: String,
 }
 
-/// Represents a diagnostic severity.
+/// UTF-16 line/character position in protocol wire order (0-based line).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct TextPosition {
+    /// Zero-based line index.
+    pub line: u32,
+    /// Zero-based UTF-16 character offset within the line.
+    pub character: u32,
+}
+
+/// UTF-16 text range for protocol projection.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct TextRange {
+    /// Range start.
+    pub start: TextPosition,
+    /// Range end.
+    pub end: TextPosition,
+}
+
+impl TextRange {
+    /// Creates a zero-width range at the document origin.
+    pub fn empty() -> Self {
+        let origin = TextPosition { line: 0, character: 0 };
+        Self { start: origin, end: origin }
+    }
+}
+
+/// A resource location expressed with UTF-16 text coordinates.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct TextLocation {
+    /// Document URI.
+    #[cfg_attr(feature = "serde", serde(with = "oak_core::serde_arc_str"))]
+    pub uri: Arc<str>,
+    /// Range within the document.
+    pub range: TextRange,
+}
+
+/// Secondary location attached to a structured diagnostic.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct DiagnosticRelatedInformation {
+    /// Related resource location.
+    pub location: TextLocation,
+    /// Related message text.
+    pub message: String,
+}
+
+/// Structured diagnostic projected to UTF-16 text coordinates for protocol consumers.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct StructuredDiagnostic {
+    /// Primary diagnostic range.
+    pub range: TextRange,
+    /// Diagnostic severity.
+    pub severity: Option<DiagnosticSeverity>,
+    /// Stable diagnostic code.
+    pub code: Option<String>,
+    /// Emitting component within the origin namespace.
+    pub source: Option<String>,
+    /// Rendered message text.
+    pub message: String,
+    /// Additional related locations.
+    #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
+    pub related_information: Option<Vec<DiagnosticRelatedInformation>>,
+}
+
+/// Represents a diagnostic severity.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum DiagnosticSeverity {
     /// Reports an error.
     Error = 1,
@@ -357,6 +424,26 @@ pub enum DiagnosticSeverity {
     Information = 3,
     /// Reports a hint.
     Hint = 4,
+}
+
+#[cfg(feature = "serde")]
+impl serde::Serialize for DiagnosticSeverity {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        serializer.serialize_u8(*self as u8)
+    }
+}
+
+#[cfg(feature = "serde")]
+impl<'de> serde::Deserialize<'de> for DiagnosticSeverity {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        match u8::deserialize(deserializer)? {
+            1 => Ok(Self::Error),
+            2 => Ok(Self::Warning),
+            3 => Ok(Self::Information),
+            4 => Ok(Self::Hint),
+            other => Err(serde::de::Error::custom(format!("invalid diagnostic severity: {other}"))),
+        }
+    }
 }
 
 /// Represents semantic tokens.

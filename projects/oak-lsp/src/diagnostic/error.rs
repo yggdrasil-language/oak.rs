@@ -1,6 +1,6 @@
 use core::fmt::{self, Display, Formatter};
 
-/// Failure while converting byte offsets or structured diagnostics to LSP types.
+/// Failure while converting byte offsets or structured diagnostics to protocol text coordinates.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum DiagnosticError {
     /// The provider could not load source text.
