@@ -350,11 +350,11 @@ impl<'config> VueParser<'config> {
             if is_directive {
                 self.parse_directive_value(state, &directive_name);
             }
-            else if state.at(VueTokenType::StringLiteral) {
-                state.bump();
-            }
             else {
-                self.parse_expression(state);
+                // Vue reads an unquoted attribute value as raw text up to whitespace or the
+                // tag terminator. Parsing it as a JavaScript expression here consumes `>` as
+                // an operator and swallows the rest of the element (including its close tag).
+                Self::bump_unquoted_attr_value(state);
             }
             state.finish_at(val_cp, crate::parser::element_type::VueElementType::AttributeValue);
         }
@@ -417,6 +417,7 @@ impl<'config> VueParser<'config> {
 
     fn parse_directive_value<'a, S: Source + ?Sized>(&self, state: &mut State<'a, S>, directive_name: &str) {
         if !state.at(VueTokenType::StringLiteral) {
+            Self::bump_unquoted_attr_value(state);
             return;
         }
         if let Some(text) = state.peek_text() {
@@ -428,6 +429,13 @@ impl<'config> VueParser<'config> {
             }
         }
         state.bump();
+    }
+
+    /// Consume an unquoted attribute value as raw text (Vue `parseAttributeValue`).
+    fn bump_unquoted_attr_value<'a, S: Source + ?Sized>(state: &mut State<'a, S>) {
+        while state.not_at_end() && !state.at(VueTokenType::Gt) && !state.at(VueTokenType::SlashGt) && !state.at(VueTokenType::Whitespace) {
+            state.bump();
+        }
     }
 
     /// Parses a `v-for` expression.
