@@ -14,7 +14,7 @@ keywords = ["vfs", "filesystem", "virtual"]
 serde = { workspace = true, optional = true }
 url = { workspace = true }
 oak-core = { workspace = true }
-fs-tools = { workspace = true }
+boost-fs = { workspace = true }
 
 [features]
 default = ["disk", "serde"]

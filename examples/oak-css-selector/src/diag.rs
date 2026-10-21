@@ -1,4 +1,4 @@
-use diagnostic::{DiagnosticCode, DiagnosticSeverity, Message};
+use boost_diagnostic::{DiagnosticCode, DiagnosticSeverity, Message};
 
 /// CSS selector subset parse failure.
 #[derive(Debug, Clone, PartialEq, Eq)]

@@ -1,9 +1,14 @@
-# Copy to `config.toml` (gitignored) for local overrides.
-# Committed `Cargo.toml` uses git `branch = "dev"` so CI and fresh clones resolve from remote.
+# Copy to `config.toml` (gitignored) and replace `<your-path>` with your local absolute path.
+# Committed `Cargo.toml` pins rust-boost via git `rev`, not `Cargo.lock`.
 
 [registries.crates-io]
 protocol = "sparse"
 
 [patch."https://github.com/oovm/rust-boost"]
-diagnostic = { path = "<your-path>/rust-boost/projects/diagnostic" }
-logger = { path = "<your-path>/rust-boost/projects/logger" }
+boost-diagnostic = { path = "<your-path>/rust-boost/projects/boost-diagnostic" }
+boost-log = { path = "<your-path>/rust-boost/projects/boost-log" }
+boost-fs = { path = "<your-path>/rust-boost/projects/boost-fs" }
+boost-source = { path = "<your-path>/rust-boost/projects/boost-source" }
+boost-terminal = { path = "<your-path>/rust-boost/projects/boost-terminal" }
+boost-console = { path = "<your-path>/rust-boost/projects/boost-console" }
+boost-random = { path = "<your-path>/rust-boost/projects/boost-random" }

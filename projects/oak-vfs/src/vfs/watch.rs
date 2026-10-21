@@ -1,6 +1,6 @@
 //! Disk change observation for [`DiskVfs`](super::DiskVfs).
 //!
-//! [`DiskWatcher`] owns an [`fs_tools`] watcher and converts reported paths into the same URIs
+//! [`DiskWatcher`] owns a [`boost_fs`] watcher and converts reported paths into the same URIs
 //! that [`DiskVfs`](super::DiskVfs) uses. Subscriptions are recursive.
 
 use std::{
@@ -9,7 +9,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use fs_tools::watch::{RescanReason, WatchError, WatchEvent, WatchOptions, Watcher};
+use boost_fs::watch::{RescanReason, WatchError, WatchEvent, WatchOptions, Watcher};
 
 /// An event emitted by a [`DiskWatcher`].
 ///

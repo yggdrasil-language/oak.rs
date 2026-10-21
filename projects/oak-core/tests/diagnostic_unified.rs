@@ -1,4 +1,4 @@
-use diagnostic::{DiagnosticSeverity, MessageArg};
+use boost_diagnostic::{DiagnosticSeverity, MessageArg};
 use oak_core::{
     diagnostic::{OakDiagnosticsExt, diagnostic_set_from_output, from_oak_error, oak_wire_code},
     errors::{OakDiagnostics, OakError},

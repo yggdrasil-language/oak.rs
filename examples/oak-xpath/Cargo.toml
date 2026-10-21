@@ -12,7 +12,7 @@ categories = ["parsing"]
 keywords = ["xpath", "xml", "selector", "query"]
 
 [dependencies]
-diagnostic = { workspace = true, default-features = false, features = ["std", "serde"] }
+boost-diagnostic = { workspace = true, default-features = false, features = ["std", "serde"] }
 oak-core = { workspace = true, features = ["serde"] }
 serde = { workspace = true, optional = true }
 

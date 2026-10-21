@@ -16,19 +16,19 @@ serde = { workspace = true, optional = true }
 triomphe = { workspace = true }
 smallvec = { workspace = true }
 twox-hash.workspace = true
-diagnostic = { workspace = true, optional = true, default-features = false, features = ["std", "serde"] }
-logger = { workspace = true, optional = true }
+boost-diagnostic = { workspace = true, optional = true, default-features = false, features = ["std", "serde"] }
+boost-log = { workspace = true, optional = true }
 
 [dev-dependencies]
 serde_json = { workspace = true }
-logger = { workspace = true }
+boost-log = { workspace = true }
 serial_test = { workspace = true }
 
 [features]
 default = []
 serde = ["dep:serde"]
-diagnostic = ["dep:diagnostic", "serde"]
-logger = ["diagnostic", "diagnostic/logger", "dep:logger"]
+diagnostic = ["dep:boost-diagnostic", "serde"]
+logger = ["diagnostic", "boost-diagnostic/log", "dep:boost-log"]
 
 [[test]]
 name = "diagnostic_unified"

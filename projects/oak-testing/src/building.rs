@@ -20,7 +20,7 @@ use std::{
     path::{Path, PathBuf},
     time::Duration,
 };
-use fs_tools::walk::{ErrorPolicy, Walker};
+use boost_fs::walk::{ErrorPolicy, Walker};
 
 /// A concurrent builder testing utility that can run tests against multiple files with timeout support.
 ///
