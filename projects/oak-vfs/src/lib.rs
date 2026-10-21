@@ -7,8 +7,13 @@ use oak_core::{
     source::{Source, SourceId},
 };
 
+mod document;
 mod line_map;
+mod revision;
+
+pub use document::DocumentSession;
 pub use line_map::LineMap;
+pub use revision::RevisionTracker;
 
 /// Type of a file in the VFS.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
