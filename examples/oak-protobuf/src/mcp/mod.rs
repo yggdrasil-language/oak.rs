@@ -1,7 +1,7 @@
 #![doc = include_str!("readme.md")]
 
 use crate::lsp::ProtobufLanguageService;
-use oak_vfs::MemoryVfs;
+use oak_lsp::MemoryVfs;
 
 /// Starts an MCP server for the Protobuf language.
 pub async fn serve_protobuf_mcp(vfs: MemoryVfs) {

@@ -1,6 +1,6 @@
 //! MCP support for COBOL.
 use crate::lsp::CobolLanguageService;
-use oak_vfs::MemoryVfs;
+use oak_lsp::MemoryVfs;
 
 /// Serves the COBOL Model Context Protocol (MCP) server.
 #[cfg(feature = "mcp")]

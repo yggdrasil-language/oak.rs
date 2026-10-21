@@ -10,7 +10,7 @@ use crate::language::TailwindLanguage;
 use {
     oak_core::tree::RedNode,
     oak_lsp::LanguageService,
-    oak_vfs::{MemoryVfs, Vfs},
+    oak_lsp::{MemoryVfs, Vfs},
     std::future::Future,
 };
 

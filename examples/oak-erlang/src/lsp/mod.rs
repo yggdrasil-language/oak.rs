@@ -3,7 +3,7 @@ use crate::language::ErlangLanguage;
 use core::range::Range;
 use oak_core::tree::RedNode;
 #[cfg(feature = "lsp")]
-use {futures::Future, oak_lsp::service::LanguageService, oak_lsp::types::Hover as LspHover, oak_vfs::Vfs};
+use {futures::Future, oak_lsp::service::LanguageService, oak_lsp::types::Hover as LspHover, oak_lsp::Vfs};
 #[cfg(feature = "lsp")]
 /// Language service for the Erlang language.
 pub struct ErlangLanguageService<V: Vfs> {
@@ -16,7 +16,7 @@ impl<V: Vfs> ErlangLanguageService<V> {
         Self { vfs, workspace: oak_lsp::workspace::WorkspaceManager::new() }
     }
 }
-impl<V: Vfs + Send + Sync + 'static + oak_vfs::DocumentSession> LanguageService for ErlangLanguageService<V> {
+impl<V: Vfs + Send + Sync + 'static + oak_lsp::DocumentSession> LanguageService for ErlangLanguageService<V> {
     type Lang = ErlangLanguage;
     type Vfs = V;
     fn vfs(&self) -> &Self::Vfs {

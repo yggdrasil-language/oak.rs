@@ -6,7 +6,7 @@ use core::range::Range;
 #[cfg(feature = "lsp")]
 use oak_core::tree::RedNode;
 #[cfg(feature = "lsp")]
-use {futures::Future, oak_lsp::service::LanguageService, oak_lsp::types::Hover as LspHover, oak_vfs::Vfs};
+use {futures::Future, oak_lsp::service::LanguageService, oak_lsp::types::Hover as LspHover, oak_lsp::Vfs};
 
 #[cfg(feature = "lsp")]
 /// Language service for the Svelte framework.
@@ -24,7 +24,7 @@ impl<V: Vfs> SvelteLanguageService<V> {
 }
 
 #[cfg(feature = "lsp")]
-impl<V: Vfs + Send + Sync + 'static + oak_vfs::DocumentSession> LanguageService for SvelteLanguageService<V> {
+impl<V: Vfs + Send + Sync + 'static + oak_lsp::DocumentSession> LanguageService for SvelteLanguageService<V> {
     type Lang = SvelteLanguage;
     type Vfs = V;
     fn vfs(&self) -> &Self::Vfs {

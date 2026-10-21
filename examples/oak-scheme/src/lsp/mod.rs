@@ -7,7 +7,7 @@ use {
     futures::Future,
     oak_hover::{Hover, HoverProvider},
     oak_lsp::{service::LanguageService, workspace::WorkspaceManager},
-    oak_vfs::{Vfs, DocumentSession},
+    oak_lsp::{Vfs, DocumentSession},
 };
 #[cfg(feature = "oak-pretty-print")]
 pub mod formatter;
@@ -38,7 +38,7 @@ impl<V: Vfs> SchemeLanguageService<V> {
         Self { vfs, workspace: oak_lsp::workspace::WorkspaceManager::default(), hover_provider: SchemeHoverProvider }
     }
 }
-impl<V: Vfs + Send + Sync + 'static + oak_vfs::DocumentSession> LanguageService for SchemeLanguageService<V> {
+impl<V: Vfs + Send + Sync + 'static + oak_lsp::DocumentSession> LanguageService for SchemeLanguageService<V> {
     type Lang = SchemeLanguage;
     type Vfs = V;
     fn vfs(&self) -> &Self::Vfs {

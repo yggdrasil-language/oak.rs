@@ -7,7 +7,7 @@ use {
     futures::Future,
     oak_hover::{Hover, HoverProvider},
     oak_lsp::service::LanguageService,
-    oak_vfs::Vfs,
+    oak_lsp::Vfs,
 };
 #[cfg(feature = "oak-pretty-print")]
 pub mod formatter;
@@ -43,7 +43,7 @@ impl<V: Vfs> TclLanguageService<V> {
         Self { vfs, workspace: oak_lsp::workspace::WorkspaceManager::default(), hover_provider: TclHoverProvider }
     }
 }
-impl<V: Vfs + Send + Sync + 'static + oak_vfs::DocumentSession> LanguageService for TclLanguageService<V> {
+impl<V: Vfs + Send + Sync + 'static + oak_lsp::DocumentSession> LanguageService for TclLanguageService<V> {
     type Lang = TclLanguage;
     type Vfs = V;
     fn vfs(&self) -> &Self::Vfs {

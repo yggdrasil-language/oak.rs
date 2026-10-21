@@ -9,7 +9,7 @@ use oak_hover::{Hover, HoverProvider};
 #[cfg(feature = "lsp")]
 use oak_lsp::service::LanguageService;
 #[cfg(feature = "lsp")]
-use oak_vfs::Vfs;
+use oak_lsp::Vfs;
 #[cfg(feature = "oak-pretty-print")]
 pub mod formatter;
 use crate::{language::RLanguage, parser::element_type::RElementType};
@@ -39,7 +39,7 @@ impl<V: Vfs> RLanguageService<V> {
         Self { vfs, workspace: oak_lsp::workspace::WorkspaceManager::default(), hover_provider: RHoverProvider }
     }
 }
-impl<V: Vfs + Send + Sync + 'static + oak_vfs::DocumentSession> LanguageService for RLanguageService<V> {
+impl<V: Vfs + Send + Sync + 'static + oak_lsp::DocumentSession> LanguageService for RLanguageService<V> {
     type Lang = RLanguage;
     type Vfs = V;
     fn vfs(&self) -> &Self::Vfs {

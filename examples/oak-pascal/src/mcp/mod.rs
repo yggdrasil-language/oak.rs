@@ -1,6 +1,6 @@
 #![doc = include_str!("readme.md")]
 use crate::lsp::PascalLanguageService;
-use oak_vfs::MemoryVfs;
+use oak_lsp::MemoryVfs;
 
 /// Start an MCP server for Pascal semantics (Stdio).
 pub async fn serve_pascal_mcp(vfs: MemoryVfs) {

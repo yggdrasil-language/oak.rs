@@ -1,6 +1,6 @@
 #![doc = include_str!("readme.md")]
 use crate::lsp::JLanguageService;
-use oak_vfs::MemoryVfs;
+use oak_lsp::MemoryVfs;
 
 /// Starts the MCP server for the J language.
 pub async fn serve_j_mcp(vfs: MemoryVfs) {

@@ -6,7 +6,7 @@ pub mod highlighter;
 use {
     oak_hover::{Hover as ProviderHover, HoverProvider},
     oak_lsp::{service::LanguageService, types::Hover as LspHover},
-    oak_vfs::Vfs,
+    oak_lsp::Vfs,
 };
 
 #[cfg(feature = "oak-pretty-print")]
@@ -46,7 +46,7 @@ impl<V: Vfs> TomlLanguageService<V> {
         Self { vfs, workspace: oak_lsp::workspace::WorkspaceManager::default(), hover_provider: TomlHoverProvider }
     }
 }
-impl<V: Vfs + Send + Sync + 'static + oak_vfs::DocumentSession> LanguageService for TomlLanguageService<V> {
+impl<V: Vfs + Send + Sync + 'static + oak_lsp::DocumentSession> LanguageService for TomlLanguageService<V> {
     type Lang = TomlLanguage;
     type Vfs = V;
     fn vfs(&self) -> &Self::Vfs {

@@ -1,6 +1,6 @@
 #![doc = include_str!("readme.md")]
 use crate::lsp::RustLanguageService;
-use oak_vfs::MemoryVfs;
+use oak_lsp::MemoryVfs;
 
 /// Starts an Model Context Protocol (MCP) server for Rust semantics.
 ///

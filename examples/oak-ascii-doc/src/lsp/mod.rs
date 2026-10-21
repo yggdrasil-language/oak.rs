@@ -3,7 +3,7 @@ use crate::language::AsciiDocLanguage;
 use core::range::Range;
 use oak_core::tree::RedNode;
 #[cfg(feature = "lsp")]
-use {futures::Future, oak_lsp::service::LanguageService, oak_lsp::types::Hover as LspHover, oak_vfs::Vfs};
+use {futures::Future, oak_lsp::service::LanguageService, oak_lsp::types::Hover as LspHover, oak_lsp::Vfs};
 #[cfg(feature = "lsp")]
 /// Language service for AsciiDoc.
 pub struct AsciiDocLanguageService<V: Vfs> {
@@ -16,7 +16,7 @@ impl<V: Vfs> AsciiDocLanguageService<V> {
         Self { vfs, workspace: oak_lsp::workspace::WorkspaceManager::new() }
     }
 }
-impl<V: Vfs + Send + Sync + 'static + oak_vfs::DocumentSession> LanguageService for AsciiDocLanguageService<V> {
+impl<V: Vfs + Send + Sync + 'static + oak_lsp::DocumentSession> LanguageService for AsciiDocLanguageService<V> {
     type Lang = AsciiDocLanguage;
     type Vfs = V;
     fn vfs(&self) -> &Self::Vfs {

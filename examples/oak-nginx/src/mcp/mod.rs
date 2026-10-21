@@ -1,6 +1,6 @@
 #![doc = include_str!("readme.md")]
 use crate::lsp::NginxLanguageService;
-use oak_vfs::MemoryVfs;
+use oak_lsp::MemoryVfs;
 
 /// Start an MCP server for Nginx semantics (Stdio).
 pub async fn serve_nginx_mcp(vfs: MemoryVfs) {

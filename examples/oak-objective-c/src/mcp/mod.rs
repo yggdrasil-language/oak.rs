@@ -1,6 +1,6 @@
 #![doc = include_str!("readme.md")]
 use crate::lsp::ObjectiveCLanguageService;
-use oak_vfs::MemoryVfs;
+use oak_lsp::MemoryVfs;
 
 /// Start an MCP server for Objective-C semantics (Stdio).
 pub async fn serve_objective_c_mcp(vfs: MemoryVfs) {

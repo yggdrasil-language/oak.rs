@@ -1,9 +1,9 @@
 #![doc = include_str!("readme.md")]
 use crate::lsp::StylusLanguageService;
 use oak_mcp::McpServer;
-use oak_vfs::Vfs;
+use oak_lsp::Vfs;
 
-pub async fn serve_stylus_mcp<V: Vfs + Send + Sync + 'static + oak_vfs::DocumentSession>(vfs: V) {
+pub async fn serve_stylus_mcp<V: Vfs + Send + Sync + 'static + oak_lsp::DocumentSession>(vfs: V) {
     let service = StylusLanguageService::new(vfs);
     let server = McpServer::new(service);
     let reader = tokio::io::BufReader::new(tokio::io::stdin());

@@ -2,7 +2,7 @@
 #[cfg(feature = "mcp")]
 use crate::lsp::TypstLanguageService;
 #[cfg(feature = "mcp")]
-use oak_vfs::MemoryVfs;
+use oak_lsp::MemoryVfs;
 
 /// Starts the Typst MCP server (Stdio).
 #[cfg(feature = "mcp")]

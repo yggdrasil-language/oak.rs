@@ -10,7 +10,7 @@ use {
     futures::Future,
     oak_hover::{Hover as HoverInfo, HoverProvider},
     oak_lsp::{service::LanguageService, types::Hover as LspHover},
-    oak_vfs::Vfs,
+    oak_lsp::Vfs,
 };
 /// Hover provider for Python.
 #[cfg(feature = "lsp")]
@@ -45,7 +45,7 @@ impl<V: Vfs> PythonLanguageService<V> {
         Self { vfs, workspace: oak_lsp::workspace::WorkspaceManager::new(), hover_provider: PythonHoverProvider }
     }
 }
-impl<V: Vfs + Send + Sync + 'static + oak_vfs::DocumentSession> LanguageService for PythonLanguageService<V> {
+impl<V: Vfs + Send + Sync + 'static + oak_lsp::DocumentSession> LanguageService for PythonLanguageService<V> {
     type Lang = PythonLanguage;
     type Vfs = V;
     fn vfs(&self) -> &Self::Vfs {

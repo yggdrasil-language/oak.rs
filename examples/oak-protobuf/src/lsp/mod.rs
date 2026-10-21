@@ -8,7 +8,7 @@ use oak_core::{Range, tree::RedNode};
 use {
     oak_hover::{Hover as ProviderHover, HoverProvider},
     oak_lsp::{service::LanguageService, types::Hover as LspHover},
-    oak_vfs::Vfs,
+    oak_lsp::Vfs,
     std::future::Future,
 };
 /// Hover provider implementation for Protobuf.
@@ -41,7 +41,7 @@ impl<V: Vfs> ProtobufLanguageService<V> {
         Self { vfs, workspace: oak_lsp::workspace::WorkspaceManager::default(), hover_provider: ProtobufHoverProvider }
     }
 }
-impl<V: Vfs + Send + Sync + 'static + oak_vfs::DocumentSession> LanguageService for ProtobufLanguageService<V> {
+impl<V: Vfs + Send + Sync + 'static + oak_lsp::DocumentSession> LanguageService for ProtobufLanguageService<V> {
     type Lang = ProtobufLanguage;
     type Vfs = V;
     fn vfs(&self) -> &Self::Vfs {

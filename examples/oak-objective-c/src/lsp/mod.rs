@@ -9,7 +9,7 @@ use oak_core::tree::RedNode;
 use {
     oak_hover::HoverProvider,
     oak_lsp::{service::LanguageService, types::Hover},
-    oak_vfs::Vfs,
+    oak_lsp::Vfs,
     std::future::Future,
 };
 /// Hover provider implementation for Objective-C.
@@ -45,7 +45,7 @@ impl<V: Vfs> ObjectiveCLanguageService<V> {
         Self { vfs, workspace: oak_lsp::workspace::WorkspaceManager::default(), hover_provider: ObjectiveCHoverProvider }
     }
 }
-impl<V: Vfs + Send + Sync + 'static + oak_vfs::DocumentSession> LanguageService for ObjectiveCLanguageService<V> {
+impl<V: Vfs + Send + Sync + 'static + oak_lsp::DocumentSession> LanguageService for ObjectiveCLanguageService<V> {
     type Lang = ObjectiveCLanguage;
     type Vfs = V;
     fn vfs(&self) -> &Self::Vfs {

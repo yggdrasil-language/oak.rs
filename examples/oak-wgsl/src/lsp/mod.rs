@@ -3,7 +3,7 @@ use crate::language::WgslLanguage;
 use core::range::Range;
 use oak_core::tree::RedNode;
 #[cfg(feature = "lsp")]
-use {futures::Future, oak_lsp::service::LanguageService, oak_lsp::types::Hover as LspHover, oak_vfs::Vfs};
+use {futures::Future, oak_lsp::service::LanguageService, oak_lsp::types::Hover as LspHover, oak_lsp::Vfs};
 #[cfg(feature = "lsp")]
 pub struct WgslLanguageService<V: Vfs> {
     vfs: V,
@@ -14,7 +14,7 @@ impl<V: Vfs> WgslLanguageService<V> {
         Self { vfs, workspace: oak_lsp::workspace::WorkspaceManager::new() }
     }
 }
-impl<V: Vfs + Send + Sync + 'static + oak_vfs::DocumentSession> LanguageService for WgslLanguageService<V> {
+impl<V: Vfs + Send + Sync + 'static + oak_lsp::DocumentSession> LanguageService for WgslLanguageService<V> {
     type Lang = WgslLanguage;
     type Vfs = V;
     fn vfs(&self) -> &Self::Vfs {

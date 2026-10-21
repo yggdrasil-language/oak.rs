@@ -10,7 +10,7 @@ use {
     futures::Future,
     oak_hover::{Hover, HoverProvider},
     oak_lsp::service::LanguageService,
-    oak_vfs::Vfs,
+    oak_lsp::Vfs,
 };
 
 use crate::parser::element_type::JsonElementType;
@@ -78,7 +78,7 @@ impl<V: Vfs> JsonLanguageService<V> {
         }
     }
 }
-impl<V: Vfs + Send + Sync + 'static + oak_vfs::DocumentSession> LanguageService for JsonLanguageService<V> {
+impl<V: Vfs + Send + Sync + 'static + oak_lsp::DocumentSession> LanguageService for JsonLanguageService<V> {
     type Lang = JsonLanguage;
     type Vfs = V;
     fn vfs(&self) -> &Self::Vfs {

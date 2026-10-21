@@ -4,7 +4,7 @@
 pub mod highlighter;
 
 #[cfg(feature = "lsp")]
-use {futures::Future, oak_lsp::service::LanguageService, oak_lsp::types::Hover as LspHover, oak_vfs::Vfs};
+use {futures::Future, oak_lsp::service::LanguageService, oak_lsp::types::Hover as LspHover, oak_lsp::Vfs};
 #[cfg(feature = "oak-pretty-print")]
 pub mod formatter;
 use crate::language::JavaScriptLanguage;
@@ -25,7 +25,7 @@ impl<V: Vfs> JavaScriptLanguageService<V> {
         Self { vfs, workspace: oak_lsp::workspace::WorkspaceManager::default() }
     }
 }
-impl<V: Vfs + Send + Sync + 'static + oak_vfs::DocumentSession> LanguageService for JavaScriptLanguageService<V> {
+impl<V: Vfs + Send + Sync + 'static + oak_lsp::DocumentSession> LanguageService for JavaScriptLanguageService<V> {
     type Lang = JavaScriptLanguage;
     type Vfs = V;
     fn vfs(&self) -> &Self::Vfs {

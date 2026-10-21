@@ -1,6 +1,6 @@
 #![doc = include_str!("readme.md")]
 use crate::lsp::RLanguageService;
-use oak_vfs::MemoryVfs;
+use oak_lsp::MemoryVfs;
 
 pub async fn serve_r_mcp(vfs: MemoryVfs) {
     let service = RLanguageService::new(vfs);

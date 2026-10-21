@@ -1,6 +1,6 @@
 #![doc = include_str!("readme.md")]
 use crate::lsp::ValaLanguageService;
-use oak_vfs::MemoryVfs;
+use oak_lsp::MemoryVfs;
 
 /// Starts the Vala MCP service.
 pub async fn serve_vala_mcp(vfs: MemoryVfs) {

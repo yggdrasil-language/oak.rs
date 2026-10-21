@@ -2,7 +2,7 @@
 #[cfg(feature = "lsp")]
 use {
     oak_lsp::service::LanguageService,
-    oak_vfs::Vfs,
+    oak_lsp::Vfs,
     futures::Future,
     oak_lsp::types::Hover as LspHover,
 };
@@ -19,7 +19,7 @@ impl<V: Vfs> VueLanguageService<V> {
         Self { vfs, workspace: oak_lsp::workspace::WorkspaceManager::new() }
     }
 }
-impl<V: Vfs + Send + Sync + 'static + oak_vfs::DocumentSession> LanguageService for VueLanguageService<V> {
+impl<V: Vfs + Send + Sync + 'static + oak_lsp::DocumentSession> LanguageService for VueLanguageService<V> {
     type Lang = VueLanguage;
     type Vfs = V;
     fn vfs(&self) -> &Self::Vfs {

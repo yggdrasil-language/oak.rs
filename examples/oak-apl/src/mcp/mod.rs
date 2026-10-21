@@ -1,6 +1,6 @@
 #![doc = include_str!("readme.md")]
 use crate::lsp::AplLanguageService;
-use oak_vfs::MemoryVfs;
+use oak_lsp::MemoryVfs;
 
 /// Serves the APL MCP (Model Context Protocol) server.
 pub async fn serve_apl_mcp(vfs: MemoryVfs) {

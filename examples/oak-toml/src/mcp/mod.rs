@@ -1,6 +1,6 @@
 #![doc = include_str!("readme.md")]
 use crate::lsp::TomlLanguageService;
-use oak_vfs::MemoryVfs;
+use oak_lsp::MemoryVfs;
 
 /// Starts the MCP server (Stdio) for TOML semantics.
 #[cfg(feature = "mcp")]

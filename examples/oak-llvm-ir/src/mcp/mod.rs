@@ -1,6 +1,6 @@
 #![doc = include_str!("readme.md")]
 use crate::lsp::LLirLanguageService;
-use oak_vfs::MemoryVfs;
+use oak_lsp::MemoryVfs;
 
 /// Start an MCP server for LLVM IR semantics (Stdio).
 pub async fn serve_llir_mcp(vfs: MemoryVfs) {

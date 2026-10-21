@@ -1,6 +1,6 @@
 #![doc = include_str!("readme.md")]
 use crate::lsp::OCamlLanguageService;
-use oak_vfs::MemoryVfs;
+use oak_lsp::MemoryVfs;
 
 /// Start an MCP server for OCaml semantics (Stdio).
 pub async fn serve_ocaml_mcp(vfs: MemoryVfs) {

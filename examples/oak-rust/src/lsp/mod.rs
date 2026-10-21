@@ -7,7 +7,7 @@ use {
     futures::{Future, FutureExt},
     oak_hover::{Hover, HoverProvider},
     oak_lsp::service::LanguageService,
-    oak_vfs::Vfs,
+    oak_lsp::Vfs,
 };
 #[cfg(feature = "oak-pretty-print")]
 pub mod formatter;
@@ -90,7 +90,7 @@ impl<V: Vfs> RustLanguageService<V> {
         }
     }
 }
-impl<V: Vfs + Send + Sync + 'static + oak_vfs::DocumentSession> LanguageService for RustLanguageService<V> {
+impl<V: Vfs + Send + Sync + 'static + oak_lsp::DocumentSession> LanguageService for RustLanguageService<V> {
     type Lang = RustLanguage;
     type Vfs = V;
     fn vfs(&self) -> &Self::Vfs {

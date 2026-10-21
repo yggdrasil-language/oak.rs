@@ -1,6 +1,6 @@
 #![doc = include_str!("readme.md")]
 use crate::lsp::IdlLanguageService;
-use oak_vfs::MemoryVfs;
+use oak_lsp::MemoryVfs;
 
 pub async fn serve_idl_mcp(vfs: MemoryVfs) {
     let service = IdlLanguageService::new(vfs);

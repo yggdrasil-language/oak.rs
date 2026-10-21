@@ -3,7 +3,7 @@
 pub mod highlighter;
 
 #[cfg(feature = "lsp")]
-use {futures::Future, oak_lsp::service::LanguageService, oak_lsp::types::Hover as LspHover, oak_vfs::Vfs};
+use {futures::Future, oak_lsp::service::LanguageService, oak_lsp::types::Hover as LspHover, oak_lsp::Vfs};
 #[cfg(feature = "oak-pretty-print")]
 pub mod formatter;
 use crate::language::DjangoLanguage;
@@ -19,7 +19,7 @@ impl<V: Vfs> DjangoLanguageService<V> {
         Self { vfs, workspace: oak_lsp::workspace::WorkspaceManager::new() }
     }
 }
-impl<V: Vfs + Send + Sync + 'static + oak_vfs::DocumentSession> LanguageService for DjangoLanguageService<V> {
+impl<V: Vfs + Send + Sync + 'static + oak_lsp::DocumentSession> LanguageService for DjangoLanguageService<V> {
     type Lang = DjangoLanguage;
     type Vfs = V;
     fn vfs(&self) -> &Self::Vfs {

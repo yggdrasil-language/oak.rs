@@ -11,7 +11,7 @@ use {
     futures::Future,
     oak_hover::{Hover, HoverProvider},
     oak_lsp::service::LanguageService,
-    oak_vfs::Vfs,
+    oak_lsp::Vfs,
 };
 /// MCP module.
 /// Formatter module.
@@ -36,7 +36,7 @@ impl<V: Vfs> StylusLanguageService<V> {
         Self { vfs, workspace: oak_lsp::workspace::WorkspaceManager::default(), hover_provider: StylusHoverProvider }
     }
 }
-impl<V: Vfs + Send + Sync + 'static + oak_vfs::DocumentSession> LanguageService for StylusLanguageService<V> {
+impl<V: Vfs + Send + Sync + 'static + oak_lsp::DocumentSession> LanguageService for StylusLanguageService<V> {
     type Lang = StylusLanguage;
     type Vfs = V;
     fn vfs(&self) -> &Self::Vfs {

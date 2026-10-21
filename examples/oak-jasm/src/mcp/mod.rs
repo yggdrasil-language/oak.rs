@@ -1,6 +1,6 @@
 #![doc = include_str!("readme.md")]
 use crate::lsp::JasmLanguageService;
-use oak_vfs::MemoryVfs;
+use oak_lsp::MemoryVfs;
 
 /// Serves the Jasm MCP service.
 pub async fn serve_jasm_mcp(vfs: MemoryVfs) {

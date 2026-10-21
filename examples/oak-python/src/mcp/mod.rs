@@ -1,6 +1,6 @@
 #![doc = include_str!("readme.md")]
 use crate::lsp::PythonLanguageService;
-use oak_vfs::MemoryVfs;
+use oak_lsp::MemoryVfs;
 
 /// Start an MCP server for Python semantics (Stdio).
 pub async fn serve_python_mcp(vfs: MemoryVfs) {

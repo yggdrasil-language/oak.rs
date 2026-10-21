@@ -6,7 +6,7 @@ use crate::{language::NotedownLanguage, lexer::token_type::NoteTokenType, parser
 use core::range::Range;
 use oak_core::tree::RedNode;
 #[cfg(feature = "lsp")]
-use {futures::Future, oak_hover::HoverProvider, oak_lsp::service::LanguageService, oak_lsp::types::Hover as LspHover, oak_vfs::Vfs};
+use {futures::Future, oak_hover::HoverProvider, oak_lsp::service::LanguageService, oak_lsp::types::Hover as LspHover, oak_lsp::Vfs};
 /// Hover provider implementation for Notedown.
 #[cfg(feature = "lsp")]
 pub struct NoteHoverProvider;
@@ -37,7 +37,7 @@ impl<V: Vfs> NoteLanguageService<V> {
         Self { vfs, workspace: oak_lsp::workspace::WorkspaceManager::default(), hover_provider: NoteHoverProvider }
     }
 }
-impl<V: Vfs + Send + Sync + 'static + oak_vfs::DocumentSession> LanguageService for NoteLanguageService<V> {
+impl<V: Vfs + Send + Sync + 'static + oak_lsp::DocumentSession> LanguageService for NoteLanguageService<V> {
     type Lang = NotedownLanguage;
     type Vfs = V;
     fn vfs(&self) -> &Self::Vfs {

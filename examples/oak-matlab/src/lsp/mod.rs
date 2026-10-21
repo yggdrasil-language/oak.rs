@@ -6,7 +6,7 @@ use crate::{MatlabLanguage, parser::element_type::MatlabElementType};
 use core::range::Range;
 use oak_core::tree::RedNode;
 #[cfg(feature = "lsp")]
-use {oak_hover::HoverProvider, oak_lsp::service::LanguageService, oak_vfs::Vfs, std::future::Future};
+use {oak_hover::HoverProvider, oak_lsp::service::LanguageService, oak_lsp::Vfs, std::future::Future};
 /// Hover provider implementation for MATLAB.
 #[cfg(feature = "lsp")]
 pub struct MatlabHoverProvider;
@@ -47,7 +47,7 @@ impl<V: Vfs> MatlabLanguageService<V> {
         Self { vfs, workspace: oak_lsp::workspace::WorkspaceManager::default(), hover_provider: MatlabHoverProvider }
     }
 }
-impl<V: Vfs + Send + Sync + 'static + oak_vfs::DocumentSession> LanguageService for MatlabLanguageService<V> {
+impl<V: Vfs + Send + Sync + 'static + oak_lsp::DocumentSession> LanguageService for MatlabLanguageService<V> {
     type Lang = MatlabLanguage;
     type Vfs = V;
     fn vfs(&self) -> &Self::Vfs {

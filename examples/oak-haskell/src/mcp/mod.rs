@@ -1,6 +1,6 @@
 #![doc = include_str!("readme.md")]
 use crate::lsp::HaskellLanguageService;
-use oak_vfs::MemoryVfs;
+use oak_lsp::MemoryVfs;
 
 /// Serves the Haskell Model Context Protocol (MCP) server.
 pub async fn serve_haskell_mcp(vfs: MemoryVfs) {

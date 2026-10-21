@@ -1,6 +1,6 @@
 #![doc = include_str!("readme.md")]
 use crate::lsp::HtmlLanguageService;
-use oak_vfs::MemoryVfs;
+use oak_lsp::MemoryVfs;
 
 /// Starts an MCP server for HTML using the provided virtual file system.
 #[cfg(feature = "mcp")]

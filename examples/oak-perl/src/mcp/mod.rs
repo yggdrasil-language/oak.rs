@@ -1,6 +1,6 @@
 #![doc = include_str!("readme.md")]
 use crate::lsp::PerlLanguageService;
-use oak_vfs::MemoryVfs;
+use oak_lsp::MemoryVfs;
 
 /// Start an MCP server for Perl semantics (Stdio).
 pub async fn serve_perl_mcp(vfs: MemoryVfs) {

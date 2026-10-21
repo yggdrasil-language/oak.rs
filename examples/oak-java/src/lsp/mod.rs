@@ -6,7 +6,7 @@ pub mod highlighter;
 use crate::language::JavaLanguage;
 use oak_core::tree::RedNode;
 #[cfg(feature = "lsp")]
-use {oak_lsp::LanguageService, oak_vfs::Vfs, std::future::Future};
+use {oak_lsp::LanguageService, oak_lsp::Vfs, std::future::Future};
 
 /// Language service for Java.
 #[cfg(feature = "lsp")]
@@ -20,7 +20,7 @@ impl<V: Vfs> JavaLanguageService<V> {
         Self { vfs, workspace: oak_lsp::workspace::WorkspaceManager::default() }
     }
 }
-impl<V: Vfs + Send + Sync + 'static + oak_vfs::DocumentSession> LanguageService for JavaLanguageService<V> {
+impl<V: Vfs + Send + Sync + 'static + oak_lsp::DocumentSession> LanguageService for JavaLanguageService<V> {
     type Lang = JavaLanguage;
     type Vfs = V;
     fn vfs(&self) -> &Self::Vfs {

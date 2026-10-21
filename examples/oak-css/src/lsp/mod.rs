@@ -6,7 +6,7 @@ use oak_core::tree::RedNode;
 pub mod highlighter;
 
 #[cfg(feature = "lsp")]
-use {oak_lsp::service::LanguageService, oak_vfs::Vfs, std::future::Future};
+use {oak_lsp::service::LanguageService, oak_lsp::Vfs, std::future::Future};
 /// MCP module.
 /// Formatter module.
 #[cfg(feature = "lsp")]
@@ -26,7 +26,7 @@ impl<V: Vfs> CssLanguageService<V> {
     }
 }
 #[cfg(feature = "lsp")]
-impl<V: Vfs + Send + Sync + 'static + oak_vfs::DocumentSession> LanguageService for CssLanguageService<V> {
+impl<V: Vfs + Send + Sync + 'static + oak_lsp::DocumentSession> LanguageService for CssLanguageService<V> {
     type Lang = CssLanguage;
     type Vfs = V;
     fn vfs(&self) -> &Self::Vfs {

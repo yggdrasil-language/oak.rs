@@ -6,7 +6,7 @@ use crate::{NixLanguage, parser::element_type::NixElementType};
 use core::range::Range;
 use oak_core::tree::RedNode;
 #[cfg(feature = "lsp")]
-use {oak_hover::HoverProvider, oak_lsp::service::LanguageService, oak_vfs::Vfs, std::future::Future};
+use {oak_hover::HoverProvider, oak_lsp::service::LanguageService, oak_lsp::Vfs, std::future::Future};
 /// Hover provider implementation for Nix.
 #[cfg(feature = "lsp")]
 pub struct NixHoverProvider;
@@ -37,7 +37,7 @@ impl<V: Vfs> NixLanguageService<V> {
         Self { vfs, workspace: oak_lsp::workspace::WorkspaceManager::default(), hover_provider: NixHoverProvider }
     }
 }
-impl<V: Vfs + Send + Sync + 'static + oak_vfs::DocumentSession> LanguageService for NixLanguageService<V> {
+impl<V: Vfs + Send + Sync + 'static + oak_lsp::DocumentSession> LanguageService for NixLanguageService<V> {
     type Lang = NixLanguage;
     type Vfs = V;
     fn vfs(&self) -> &Self::Vfs {

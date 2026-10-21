@@ -7,7 +7,7 @@ use {
     futures::Future,
     oak_lsp::service::LanguageService,
     oak_lsp::types::Hover as LspHover,
-    oak_vfs::{MemoryVfs, Vfs},
+    oak_lsp::{MemoryVfs, Vfs},
 };
 
 #[cfg(feature = "oak-pretty-print")]
@@ -32,7 +32,7 @@ impl<V: Vfs> EjsLanguageService<V> {
 }
 
 #[cfg(feature = "lsp")]
-impl<V: Vfs + Send + Sync + 'static + oak_vfs::DocumentSession> LanguageService for EjsLanguageService<V> {
+impl<V: Vfs + Send + Sync + 'static + oak_lsp::DocumentSession> LanguageService for EjsLanguageService<V> {
     type Lang = EjsLanguage;
     type Vfs = V;
     fn vfs(&self) -> &Self::Vfs {

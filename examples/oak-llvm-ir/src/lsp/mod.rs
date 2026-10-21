@@ -10,7 +10,7 @@ use {
     oak_hover::{Hover, HoverProvider},
     oak_lsp::service::LanguageService,
     oak_lsp::types::Hover as LspHover,
-    oak_vfs::Vfs,
+    oak_lsp::Vfs,
 };
 /// Hover provider implementation for LLVM IR.
 #[cfg(feature = "lsp")]
@@ -38,7 +38,7 @@ impl<V: Vfs> LLirLanguageService<V> {
     }
 }
 #[cfg(feature = "lsp")]
-impl<V: Vfs + Send + Sync + 'static + oak_vfs::DocumentSession> LanguageService for LLirLanguageService<V> {
+impl<V: Vfs + Send + Sync + 'static + oak_lsp::DocumentSession> LanguageService for LLirLanguageService<V> {
     type Lang = LLvmLanguage;
     type Vfs = V;
     fn vfs(&self) -> &Self::Vfs {
@@ -82,7 +82,7 @@ impl<V: Vfs> LLvmLanguageService<V> {
     }
 }
 #[cfg(feature = "lsp")]
-impl<V: Vfs + Send + Sync + 'static + oak_vfs::DocumentSession> LanguageService for LLvmLanguageService<V> {
+impl<V: Vfs + Send + Sync + 'static + oak_lsp::DocumentSession> LanguageService for LLvmLanguageService<V> {
     type Lang = LLvmLanguage;
     type Vfs = V;
     fn vfs(&self) -> &Self::Vfs {

@@ -1,5 +1,5 @@
 #![doc = include_str!("readme.md")]
-use oak_vfs::MemoryVfs;
+use oak_lsp::MemoryVfs;
 
 #[cfg(feature = "io-std")]
 use crate::lsp::MarkdownLanguageService;

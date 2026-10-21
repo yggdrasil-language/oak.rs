@@ -7,7 +7,7 @@ use {
     futures::Future,
     oak_hover::{Hover as ProviderHover, HoverProvider},
     oak_lsp::{service::LanguageService, types::Hover as LspHover},
-    oak_vfs::Vfs,
+    oak_lsp::Vfs,
 };
 #[cfg(feature = "oak-pretty-print")]
 pub mod formatter;
@@ -45,7 +45,7 @@ impl<V: Vfs> SassLanguageService<V> {
         Self { vfs, workspace: oak_lsp::workspace::WorkspaceManager::default(), hover_provider: SassHoverProvider }
     }
 }
-impl<V: Vfs + Send + Sync + 'static + oak_vfs::DocumentSession> LanguageService for SassLanguageService<V> {
+impl<V: Vfs + Send + Sync + 'static + oak_lsp::DocumentSession> LanguageService for SassLanguageService<V> {
     type Lang = SassLanguage;
     type Vfs = V;
     fn vfs(&self) -> &Self::Vfs {

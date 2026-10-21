@@ -15,7 +15,7 @@ use oak_core::tree::RedNode;
 #[cfg(feature = "lsp")]
 use oak_lsp::service::LanguageService;
 #[cfg(feature = "lsp")]
-use oak_vfs::{Vfs, DocumentSession};
+use oak_lsp::{Vfs, DocumentSession};
 #[cfg(feature = "lsp")]
 use std::future::Future;
 

@@ -10,7 +10,7 @@ use oak_hover::HoverProvider;
 #[cfg(feature = "lsp")]
 use oak_lsp::service::LanguageService;
 #[cfg(feature = "lsp")]
-use oak_vfs::Vfs;
+use oak_lsp::Vfs;
 use std::{future::Future, sync::Arc};
 /// Hover provider implementation for Nim.
 #[cfg(feature = "lsp")]
@@ -43,7 +43,7 @@ impl<V: Vfs> NimLanguageService<V> {
         Self { vfs, workspace: oak_lsp::workspace::WorkspaceManager::default(), hover_provider: NimHoverProvider, _cache: Arc::new(DashMap::new()) }
     }
 }
-impl<V: Vfs + Send + Sync + 'static + oak_vfs::DocumentSession> LanguageService for NimLanguageService<V> {
+impl<V: Vfs + Send + Sync + 'static + oak_lsp::DocumentSession> LanguageService for NimLanguageService<V> {
     type Lang = NimLanguage;
     type Vfs = V;
     fn vfs(&self) -> &Self::Vfs {

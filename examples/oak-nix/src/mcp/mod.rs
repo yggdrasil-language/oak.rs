@@ -1,6 +1,6 @@
 #![doc = include_str!("readme.md")]
 use crate::lsp::NixLanguageService;
-use oak_vfs::MemoryVfs;
+use oak_lsp::MemoryVfs;
 
 /// Start an MCP server for Nix semantics (Stdio).
 pub async fn serve_nix_mcp(vfs: MemoryVfs) {

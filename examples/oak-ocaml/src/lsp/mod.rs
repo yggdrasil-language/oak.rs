@@ -12,7 +12,7 @@ use {
         service::LanguageService,
         types::{Hover, Hover as LspHover},
     },
-    oak_vfs::Vfs,
+    oak_lsp::Vfs,
 };
 /// Hover provider implementation for OCaml.
 #[cfg(feature = "lsp")]
@@ -44,7 +44,7 @@ impl<V: Vfs> OCamlLanguageService<V> {
         Self { vfs, workspace: oak_lsp::workspace::WorkspaceManager::default(), hover_provider: OCamlHoverProvider }
     }
 }
-impl<V: Vfs + Send + Sync + 'static + oak_vfs::DocumentSession> LanguageService for OCamlLanguageService<V> {
+impl<V: Vfs + Send + Sync + 'static + oak_lsp::DocumentSession> LanguageService for OCamlLanguageService<V> {
     type Lang = OCamlLanguage;
     type Vfs = V;
     fn vfs(&self) -> &Self::Vfs {

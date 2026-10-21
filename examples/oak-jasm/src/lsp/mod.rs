@@ -14,7 +14,7 @@ use {
     futures::Future,
     oak_hover::{Hover, HoverProvider},
     oak_lsp::service::LanguageService,
-    oak_vfs::Vfs,
+    oak_lsp::Vfs,
 };
 #[cfg(feature = "lsp")]
 /// Hover provider for Jasm.
@@ -45,7 +45,7 @@ impl<V: Vfs> JasmLanguageService<V> {
     }
 }
 #[cfg(feature = "lsp")]
-impl<V: Vfs + Send + Sync + 'static + oak_vfs::DocumentSession> LanguageService for JasmLanguageService<V> {
+impl<V: Vfs + Send + Sync + 'static + oak_lsp::DocumentSession> LanguageService for JasmLanguageService<V> {
     type Lang = JasmLanguage;
     type Vfs = V;
     fn vfs(&self) -> &Self::Vfs {

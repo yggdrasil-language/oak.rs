@@ -10,7 +10,7 @@ use {
     futures::Future,
     oak_hover::{Hover as HoverInfo, HoverProvider},
     oak_lsp::{service::LanguageService, types::Hover as LspHover},
-    oak_vfs::Vfs,
+    oak_lsp::Vfs,
 };
 /// Hover provider for Markdown.
 #[cfg(feature = "lsp")]
@@ -65,7 +65,7 @@ impl<V: Vfs> MarkdownLanguageService<V> {
         }
     }
 }
-impl<V: Vfs + Send + Sync + 'static + oak_vfs::DocumentSession> LanguageService for MarkdownLanguageService<V> {
+impl<V: Vfs + Send + Sync + 'static + oak_lsp::DocumentSession> LanguageService for MarkdownLanguageService<V> {
     type Lang = MarkdownLanguage;
     type Vfs = V;
     fn vfs(&self) -> &Self::Vfs {
