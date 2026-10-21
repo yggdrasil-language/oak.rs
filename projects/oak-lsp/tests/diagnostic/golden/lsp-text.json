@@ -1,0 +1,16 @@
+{
+  "range": {
+    "start": {
+      "line": 0,
+      "character": 4
+    },
+    "end": {
+      "line": 0,
+      "character": 9
+    }
+  },
+  "severity": 1,
+  "code": "oak.syntax.unexpected-token",
+  "source": "oak/xml",
+  "message": "unexpected token"
+}

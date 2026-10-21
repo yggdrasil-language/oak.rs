@@ -3,6 +3,8 @@
 #![warn(missing_docs)]
 #![doc = "Language Server Protocol (LSP) implementation for Oak languages."]
 
+/// Structured diagnostic conversion for LSP clients.
+pub mod diagnostic;
 /// Handlers for LSP requests and notifications.
 pub mod handlers;
 /// `Lsp` contract that dispatches protocol messages to Oak language capabilities.

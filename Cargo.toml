@@ -56,6 +56,8 @@ twox-hash = "2.1.2"
 regex = "1.12"
 base64 = "0.23.1"
 diagnostic = { git = "https://github.com/oovm/rust-boost", branch = "dev", default-features = false, features = ["std", "serde"] }
+lsp-types = "0.95.0"
+boost-diagnostic = { path = "../rust-boost/projects/boost-diagnostic", default-features = false, features = ["std", "serde", "terminal"] }
 
 # Internal project dependencies
 oak-core = { path = "projects/oak-core", version = "0.0.12" }

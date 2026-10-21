@@ -11,6 +11,8 @@ categories = ["development-tools"]
 keywords = ["lsp", "language-server", "types"]
 
 [dependencies]
+boost-diagnostic = { workspace = true, features = ["serde", "terminal"] }
+lsp-types = { workspace = true }
 serde = { workspace = true, optional = true }
 serde_json = { workspace = true, optional = true }
 futures = { workspace = true }
@@ -25,6 +27,9 @@ oak-folding = { workspace = true }
 oak-hover = { workspace = true }
 oak-semantic-tokens = { workspace = true }
 oak-structural-view = { workspace = true }
+
+[dev-dependencies]
+serde_json = { workspace = true }
 
 [features]
 default = [ "serde"]

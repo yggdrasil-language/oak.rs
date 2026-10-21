@@ -6,6 +6,8 @@
 
 use std::fmt;
 
+/// SVG preview rendering for structured diagnostics.
+pub mod diagnostic_preview;
 /// Geometry primitives for visualization.
 pub mod geometry;
 /// Graph-based visualization structures.
