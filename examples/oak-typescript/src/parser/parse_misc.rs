@@ -87,6 +87,69 @@ impl<'config> TypeScriptParser<'config> {
         self.parse_type_annotation_with_arrow(state, true)
     }
 
+    /// Consumes the type that follows `as` inside an expression.
+    ///
+    /// [`Self::parse_type_annotation`] only knows the stop tokens that follow a
+    /// `:` annotation. An assertion can sit anywhere in an expression
+    /// (`items[item.id as keyof typeof items]`), so this scanner tracks its own
+    /// nesting and stops at the first token that cannot continue a type at the
+    /// top level.
+    pub(crate) fn parse_assertion_type<'a, S: Source + ?Sized>(&self, state: &mut State<'a, S>) {
+        use crate::{lexer::token_type::TypeScriptTokenType::*, parser::element_type::TypeScriptElementType};
+
+        self.skip_trivia(state);
+        let cp = state.checkpoint();
+        let mut depth = 0usize;
+        let mut angles = 0usize;
+        let mut consumed = false;
+
+        while state.not_at_end() {
+            let Some(kind) = self.peek_kind(state)
+            else {
+                break;
+            };
+            let top = depth == 0 && angles == 0;
+            if consumed && top && assertion_type_terminator(kind) {
+                break;
+            }
+            match kind {
+                LeftParen | LeftBracket | LeftBrace => depth += 1,
+                RightParen | RightBracket | RightBrace => {
+                    if depth == 0 {
+                        break;
+                    }
+                    depth -= 1;
+                }
+                Less => {
+                    if !angle_group_closes(state) {
+                        break;
+                    }
+                    angles += 1;
+                }
+                Greater => {
+                    if angles == 0 {
+                        break;
+                    }
+                    angles -= 1;
+                }
+                // `Array<Array<string>>` closes two angle groups at once.
+                RightShift => {
+                    if angles < 2 {
+                        break;
+                    }
+                    angles -= 2;
+                }
+                _ => {}
+            }
+            state.bump();
+            consumed = true;
+        }
+
+        if consumed {
+            state.finish_at(cp, TypeScriptElementType::TypeAnnotation);
+        }
+    }
+
     fn parse_type_annotation_with_arrow<'a, S: Source + ?Sized>(&self, state: &mut State<'a, S>, stop_at_arrow: bool) -> Result<(), OakError> {
         use crate::{lexer::token_type::TypeScriptTokenType::*, parser::element_type::TypeScriptElementType};
 
@@ -141,4 +204,87 @@ impl<'config> TypeScriptParser<'config> {
         state.finish_at(cp, crate::parser::element_type::TypeScriptElementType::BlockStatement);
         Ok(())
     }
+}
+
+/// Token kinds that end a type at the top level of an `as` assertion.
+fn assertion_type_terminator(kind: TypeScriptTokenType) -> bool {
+    use TypeScriptTokenType::*;
+    matches!(
+        kind,
+        Comma
+            | Semicolon
+            | Colon
+            | Question
+            | Arrow
+            | As
+            | In
+            | Instanceof
+            | RightParen
+            | RightBracket
+            | RightBrace
+            | Plus
+            | Minus
+            | Star
+            | Slash
+            | Percent
+            | StarStar
+            | PlusPlus
+            | MinusMinus
+            | LessEqual
+            | GreaterEqual
+            | EqualEqual
+            | NotEqual
+            | EqualEqualEqual
+            | NotEqualEqual
+            | AmpersandAmpersand
+            | PipePipe
+            | QuestionQuestion
+            | Equal
+            | PlusEqual
+            | MinusEqual
+            | StarEqual
+            | SlashEqual
+            | PercentEqual
+            | StarStarEqual
+            | LeftShift
+            | LeftShiftEqual
+            | RightShift
+            | RightShiftEqual
+            | UnsignedRightShift
+            | UnsignedRightShiftEqual
+            | AmpersandEqual
+            | PipeEqual
+            | CaretEqual
+            | AmpersandAmpersandEqual
+            | PipePipeEqual
+            | QuestionQuestionEqual
+    )
+}
+
+/// Returns true when the `<` at the current position opens a generic argument
+/// list that closes at the same level before any top-level type terminator.
+fn angle_group_closes<S: Source + ?Sized>(state: &State<'_, S>) -> bool {
+    use TypeScriptTokenType::*;
+    let mut depth = 0usize;
+    let mut offset = 1usize;
+    while let Some(kind) = state.peek_non_trivia_kind_at(offset) {
+        match kind {
+            Less => depth += 1,
+            Greater => {
+                if depth == 0 {
+                    return true;
+                }
+                depth -= 1;
+            }
+            // `Array<Array<string>>` closes two angle groups at once.
+            RightShift => return depth <= 1,
+            _ if depth == 0 && assertion_type_terminator(kind) => return false,
+            _ => {}
+        }
+        offset += 1;
+        if offset > 64 {
+            return false;
+        }
+    }
+    false
 }
