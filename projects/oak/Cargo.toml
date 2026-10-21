@@ -1,0 +1,96 @@
+[package]
+name = "oak"
+version.workspace = true
+authors.workspace = true
+description = "Unified parser combinator library and IDE feature facade."
+edition.workspace = true
+license.workspace = true
+publish = false
+repository = "https://github.com/yggdrasil-language/oak.rs/tree/master/projects/oaks"
+categories = ["parsing", "development-tools"]
+keywords = ["parser", "combinator", "lsp", "ide", "multi-language"]
+
+[dependencies]
+oak-core = { workspace = true }
+oak-lsp = { workspace = true }
+oak-folding = { workspace = true }
+oak-hover = { workspace = true }
+oak-navigation = { workspace = true }
+oak-semantic-tokens = { workspace = true }
+oak-structural-view = { workspace = true }
+oak-vfs = { workspace = true }
+oak-symbols = { workspace = true }
+
+serde = { workspace = true, optional = true }
+
+[dev-dependencies]
+oak-testing = { workspace = true }
+chrono = { workspace = true }
+criterion = { version = "0.8.2" }
+# toml = { version = "1.0.4" } # replaced by oak-toml
+toml_edit = { version = "0.25.4" }
+markdown = { version = "1.0.0" }
+pulldown-cmark = { version = "0.13.1" }
+simd-json = { version = "0.17.0" }
+json = { version = "0.12.4" }
+html5ever = { version = "0.38.0" }
+cssparser = { version = "0.36.0" }
+serde_yaml = { version = "0.9.34" }
+syn = { workspace = true }
+rustpython-parser = { version = "0.4.0" }
+# swc_ecma_parser = { version = "35.0.0" }
+# swc_common = { version = "19.0.0" }
+oxc_parser = { version = "0.116.0" }
+oxc_allocator = { version = "0.116.0" }
+oxc_span = { version = "0.116.0" }
+
+[[bench]]
+name = "compare_json"
+harness = false
+
+[[bench]]
+name = "parse_bench"
+harness = false
+
+[[bench]]
+name = "compare_toml"
+harness = false
+
+[[bench]]
+name = "compare_markdown"
+harness = false
+
+[[bench]]
+name = "compare_html"
+harness = false
+
+[[bench]]
+name = "compare_css"
+harness = false
+
+[[bench]]
+name = "compare_js"
+harness = false
+
+[[bench]]
+name = "compare_yaml"
+harness = false
+
+[[bench]]
+name = "compare_rust"
+harness = false
+
+[[bench]]
+name = "compare_sql"
+harness = false
+
+[[bench]]
+name = "compare_python"
+harness = false
+
+[features]
+default = ["serde"]
+serde = ["dep:serde", "oak-core/serde"]
+
+[package.metadata.docs.rs]
+all-features = true
