@@ -7,6 +7,7 @@ use core::range::Range;
 use std::borrow::Cow;
 mod buffer;
 mod cursor;
+mod line_map;
 mod rope;
 mod simd;
 mod streaming;
@@ -15,6 +16,7 @@ mod text;
 pub use self::{
     buffer::{SourceBuffer, ToSource},
     cursor::SourceCursor,
+    line_map::LineMap,
     rope::{RopeBuffer, RopeSource},
     simd::SimdScanner,
     streaming::{ChunkedBuffer, ChunkedSource},
