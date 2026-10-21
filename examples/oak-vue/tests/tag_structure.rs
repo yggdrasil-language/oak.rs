@@ -83,4 +83,7 @@ fn a_void_element_close_tag_is_ignored() {
     assert_eq!(build("<img></img>"), 0);
     assert_eq!(build("<br></br>"), 0);
     assert_eq!(build("<input></input>"), 0);
+    // Inside `<template>` the stray close tag must not be mistaken for the block close.
+    assert_eq!(build("<template><img></img></template>"), 0);
+    assert_eq!(build("<template><img></img><p>x</p></template>"), 0);
 }

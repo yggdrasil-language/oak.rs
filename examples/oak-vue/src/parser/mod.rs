@@ -116,8 +116,18 @@ impl<'config> VueParser<'config> {
             self.parse_program(state);
         }
         else if recursive {
-            while state.not_at_end() && !state.at(VueTokenType::LtSlash) {
+            // Only the matching `</template>` closes the block. Any other close tag is an
+            // ordinary invalid end tag that Vue reports and keeps parsing, so it must be
+            // consumed as a node instead of being mistaken for the block close.
+            while state.not_at_end() {
+                if state.at(VueTokenType::LtSlash) && Self::close_tag_matches(state, tag_name) {
+                    break;
+                }
+                let before = state.checkpoint().0;
                 self.parse_node(state);
+                if state.checkpoint().0 == before && state.not_at_end() {
+                    state.bump();
+                }
             }
         }
         else {
@@ -294,8 +304,18 @@ impl<'config> VueParser<'config> {
         state.push_child(tag_node);
 
         if !is_self_closing && !is_html_void_tag(&tag_name) {
-            while state.not_at_end() && !state.at(VueTokenType::LtSlash) {
+            // Only the matching `</name>` closes this element. Any other close tag is handled
+            // by `parse_node`, which reports an invalid end tag or ignores a void element's
+            // close tag, matching Vue instead of closing the wrong element.
+            while state.not_at_end() {
+                if state.at(VueTokenType::LtSlash) && Self::close_tag_matches(state, &tag_name) {
+                    break;
+                }
+                let before = state.checkpoint().0;
                 self.parse_node(state);
+                if state.checkpoint().0 == before && state.not_at_end() {
+                    state.bump();
+                }
             }
 
             if state.at(VueTokenType::LtSlash) {
@@ -426,6 +446,15 @@ impl<'config> VueParser<'config> {
         if state.checkpoint().0 == cp.0 && state.not_at_end() {
             state.bump();
         }
+    }
+
+    /// `true` when the `</name>` at the cursor closes the given block tag.
+    fn close_tag_matches<'a, S: Source + ?Sized>(state: &State<'a, S>, tag_name: &str) -> bool {
+        let Some(token) = state.peek_at(1)
+        else {
+            return false;
+        };
+        state.source.get_text_in(token.span).eq_ignore_ascii_case(tag_name)
     }
 
     /// Bump one attribute/directive name token (`Identifier` or keyword used as HTML name).
