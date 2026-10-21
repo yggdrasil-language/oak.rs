@@ -140,7 +140,7 @@ pub struct McpServer<S: LanguageService, E: SemanticSearch = NoSemanticSearch> {
 
 impl<S: LanguageService + 'static> McpServer<S, NoSemanticSearch>
 where
-    S::Vfs: oak_vfs::WritableVfs,
+    S::Vfs: oak_vfs::DocumentSession,
 {
     /// Creates a new `McpServer` wrapping the given language service.
     pub fn new(service: S) -> Self {
@@ -155,7 +155,7 @@ where
 
 impl<S: LanguageService + 'static, E: SemanticSearch + 'static> McpServer<S, E>
 where
-    S::Vfs: oak_vfs::WritableVfs,
+    S::Vfs: oak_vfs::DocumentSession,
 {
     /// Adds a semantic searcher to the MCP server.
     ///
@@ -168,7 +168,7 @@ where
 #[cfg(feature = "serde")]
 impl<S: LanguageService + 'static, E: SemanticSearch + 'static> McpServer<S, E>
 where
-    S::Vfs: oak_vfs::WritableVfs,
+    S::Vfs: oak_vfs::DocumentSession,
 {
     /// Runs the MCP server on the given input and output streams.
     ///

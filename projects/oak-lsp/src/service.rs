@@ -14,8 +14,8 @@ use oak_navigation::{DefinitionProvider, ReferencesProvider};
 use oak_resolver::ModuleResolver;
 use oak_semantic_tokens::SemanticTokensProvider;
 use oak_symbols::SymbolProvider;
-use oak_core::source::LineMap;
-use oak_vfs::{Vfs, WritableVfs};
+use oak_core::source::{DocumentSnapshot, LineMap};
+use oak_vfs::{DocumentSession, Vfs};
 use std::future::Future;
 
 /// A trait that defines the capabilities and behavior of a language-specific service.
@@ -32,7 +32,7 @@ pub trait LanguageService: Send + Sync {
     /// The language type this service supports.
     type Lang: Language;
     /// The VFS type used for source management.
-    type Vfs: WritableVfs;
+    type Vfs: DocumentSession;
 
     /// Returns a reference to the underlying Virtual File System.
     fn vfs(&self) -> &Self::Vfs;
@@ -43,6 +43,16 @@ pub trait LanguageService: Send + Sync {
     /// Retrieves the source content for a given URI from the VFS.
     fn get_source(&self, uri: &str) -> Option<<Self::Vfs as Vfs>::Source> {
         self.vfs().get_source(uri)
+    }
+
+    /// Returns source for language requests, preferring an open document snapshot.
+    fn source_for_uri(&self, uri: &str) -> Option<<Self::Vfs as Vfs>::Source> {
+        self.vfs().request_source(uri)
+    }
+
+    /// Returns the latest document snapshot for `uri`, if the buffer is open.
+    fn document_snapshot(&self, uri: &str) -> Option<DocumentSnapshot> {
+        self.vfs().document_snapshot(uri)
     }
     /// Executes a closure with the root red node of a file.
     ///
@@ -131,7 +141,7 @@ pub trait LanguageService: Send + Sync {
     fn document_symbols<'a>(&'a self, uri: &'a str) -> impl Future<Output = Vec<StructureItem>> + Send + 'a {
         let uri = uri.to_string();
         async move {
-            if let (Some(provider), Some(source)) = (self.symbol_provider(), self.get_source(&uri)) {
+            if let (Some(provider), Some(source)) = (self.symbol_provider(), self.source_for_uri(&uri)) {
                 let symbols = self.with_root(&uri, |root| provider.document_symbols(&uri, &root, &source)).await;
                 if let Some(symbols) = symbols {
                     return symbols.into_iter().map(crate::types::structure_item_from_symbol).collect();
@@ -190,7 +200,7 @@ pub trait LanguageService: Send + Sync {
             }
             let uri_clone = uri.clone();
             self.with_root(&uri, move |root| {
-                let source = match self.get_source(&uri_clone) {
+                let source = match self.source_for_uri(&uri_clone) {
                     Some(s) => s,
                     None => return vec![],
                 };
@@ -247,7 +257,7 @@ pub trait LanguageService: Send + Sync {
         let uri = uri.to_string();
         async move {
             let provider = self.semantic_tokens_provider()?;
-            let source = self.get_source(&uri)?;
+            let source = self.source_for_uri(&uri)?;
             let line_map = LineMap::from_source(&source);
             let data = self.with_root(&uri, |root| provider.semantic_tokens(&root, &source, &line_map)).await?;
             Some(SemanticTokens { result_id: None, data })
@@ -316,10 +326,10 @@ pub trait LanguageService: Send + Sync {
         }
     }
 
-    /// 文档被打开：把完整文本写入 VFS。
+    /// 文档被打开：更新会话缓冲并产生新的源码快照 revision。
     fn did_open<'a>(&'a self, uri: &'a str, text: &'a str) -> impl Future<Output = ()> + Send + 'a {
         async move {
-            self.vfs().write_file(uri, text.into());
+            self.vfs().open_document(uri, text.into());
         }
     }
 
@@ -328,7 +338,7 @@ pub trait LanguageService: Send + Sync {
     /// Oak 定义层只建模全量同步，因此与 [`Self::did_open`] 共用写入路径。
     fn did_change<'a>(&'a self, uri: &'a str, text: &'a str) -> impl Future<Output = ()> + Send + 'a {
         async move {
-            self.did_open(uri, text).await;
+            self.vfs().change_document(uri, text.into());
         }
     }
 
@@ -353,8 +363,10 @@ pub trait LanguageService: Send + Sync {
     }
 
     /// Called when a file is closed in the editor.
-    fn did_close<'a>(&'a self, _uri: &'a str) -> impl Future<Output = ()> + Send + 'a {
-        async {}
+    fn did_close<'a>(&'a self, uri: &'a str) -> impl Future<Output = ()> + Send + 'a {
+        async move {
+            self.vfs().close_document(uri);
+        }
     }
 
     /// Provides diagnostics for a file.
