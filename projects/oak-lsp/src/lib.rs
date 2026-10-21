@@ -22,7 +22,7 @@ pub mod workspace;
 
 pub use handlers::*;
 pub use lsp::Lsp;
-pub use oak_vfs::{DocumentSession, FileMetadata, FileType, MemoryVfs, Vfs};
+pub use oak_core::vfs::{DocumentSession, FileMetadata, FileType, MemoryVfs, Vfs};
 pub use protocol::*;
 pub use service::LanguageService;
 pub use transport::{Driver, DriverError, Inbound, MessageTransport, Outbound, RequestId};

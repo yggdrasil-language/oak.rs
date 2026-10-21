@@ -16,7 +16,6 @@ serde = { workspace = true , optional = true }
 serde_json = { workspace = true, optional = true }
 oak-core = { workspace = true }
 oak-lsp = { workspace = true }
-oak-vfs = { workspace = true }
 oak-symbols = { workspace = true }
 oak-hover = { workspace = true }
 oak-navigation = { workspace = true }
