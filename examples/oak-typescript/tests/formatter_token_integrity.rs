@@ -134,3 +134,48 @@ fn operators_and_type_arguments_stay_separated() {
         assert_eq!(format(source), source, "source={source:?}");
     }
 }
+
+// --- Bug 1: generics get spaces inside ---
+#[test]
+fn deeply_nested_generics_with_bracket_access_keep_tight() {
+    for source in [
+        "type Open = ReturnType<ReturnType<typeof Object>['valueOf']>;",
+        "async query<T = Record<string, unknown>>(source: string): Promise<T[]> {}",
+        "Promise<{ version: number; document: string } | null>",
+    ] {
+        assert_eq!(format(source), source, "generics gained spaces: {source:?}");
+    }
+}
+
+// --- Bug 2: delete reserved-word method gets space ---
+#[test]
+fn async_delete_method_stays_attached() {
+    for source in [
+        "async delete(key: string): Promise<void> { this.native.delete(key); }",
+        "class Store { async delete(key: string): Promise<void> {} }",
+    ] {
+        assert_eq!(format(source), source, "delete method gained a space: {source:?}");
+    }
+}
+
+// --- Bug 3: bitwise shift loses spacing ---
+#[test]
+fn bitwise_shift_operators_keep_spaces() {
+    for source in [
+        "return (value >> 8) & 0xff;",
+        "pushU32(out, version >>> 0);",
+        "out.push(value & 0xff, (value >> 8) & 0xff, (value >> 16) & 0xff, (value >> 24) & 0xff);",
+    ] {
+        assert_eq!(format(source), source, "shift lost spaces: {source:?}");
+    }
+}
+
+// --- Bug 4: non-null assertion glued to !== ---
+#[test]
+fn non_null_assertion_stays_separate_from_inequality() {
+    // 真正的 discussion case：两个相邻的 ! — non-null assertion + inequality 前导 !
+    // 输入里 body[n]!!== 应该变成 body[n]! !==（中间加空格把两个 ! token 分开）
+    let source = "function read(body: Uint8Array, n: number) { return body[n]!!== 0; }";
+    let expected = "function read(body: Uint8Array, n: number) { return body[n]! !== 0; }";
+    assert_eq!(format(source), expected);
+}
