@@ -210,6 +210,7 @@ impl<'config> TypeScriptParser<'config> {
         if self.at(state, IdentifierName) {
             self.expect(state, IdentifierName).ok();
         }
+        self.parse_type_parameters(state)?;
         self.parse_parameters(state)?;
         if self.eat(state, Colon) {
             self.parse_return_type_annotation(state)?;
@@ -234,6 +235,15 @@ impl<'config> TypeScriptParser<'config> {
         use crate::lexer::token_type::TypeScriptTokenType::*;
         state.bump(); // interface
         self.expect(state, IdentifierName).ok();
+        self.parse_type_parameters(state)?;
+        if self.eat(state, Extends) {
+            loop {
+                self.parse_type_reference(state)?;
+                if !self.eat(state, Comma) {
+                    break;
+                }
+            }
+        }
         self.parse_block(state)?;
         Ok(())
     }
@@ -264,6 +274,7 @@ impl<'config> TypeScriptParser<'config> {
         use crate::lexer::token_type::TypeScriptTokenType::*;
         state.bump(); // type
         self.expect(state, IdentifierName).ok();
+        self.parse_type_parameters(state)?;
         self.expect(state, Equal).ok();
         self.parse_type_annotation(state)?;
         while state.not_at_end() && !self.at(state, Semicolon) {
