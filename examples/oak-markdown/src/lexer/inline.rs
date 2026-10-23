@@ -45,36 +45,42 @@ impl<'config> MarkdownLexer<'config> {
     pub fn lex_inline_code<S: Source + ?Sized>(&self, state: &mut State<S>) -> bool {
         let start_pos = state.get_position();
 
-        if let Some('`') = state.peek() {
-            state.advance(1);
-            let mut found_end = false;
+        let mut opener_len = 0;
+        while let Some('`') = state.source().get_char_at(start_pos + opener_len) {
+            opener_len += 1;
+        }
 
-            while let Some(ch) = state.peek() {
-                if ch == '`' {
-                    state.advance(1);
-                    found_end = true;
-                    break;
+        if opener_len == 0 {
+            return false;
+        }
+
+        state.advance(opener_len);
+
+        while let Some(ch) = state.peek() {
+            if ch == '`' {
+                // CommonMark: only a closing run of exactly the same length ends the span.
+                // Runs of any other length are code span content, so the whole run is
+                // consumed instead of being cut into single-backtick delimiters.
+                let mut closer_len = 0;
+                while let Some('`') = state.source().get_char_at(state.get_position() + closer_len) {
+                    closer_len += 1;
                 }
-                else if ch == '\n' || ch == '\r' {
-                    break;
-                }
-                else {
-                    state.advance(ch.len_utf8());
+                state.advance(closer_len);
+                if closer_len == opener_len {
+                    state.add_token(MarkdownTokenType::InlineCode, start_pos, state.get_position());
+                    return true;
                 }
             }
-
-            if found_end {
-                state.add_token(MarkdownTokenType::InlineCode, start_pos, state.get_position());
-                true
+            else if ch == '\n' || ch == '\r' {
+                break;
             }
             else {
-                state.set_position(start_pos);
-                false
+                state.advance(ch.len_utf8());
             }
         }
-        else {
-            false
-        }
+
+        state.set_position(start_pos);
+        false
     }
 
     /// Handles strikethrough.
