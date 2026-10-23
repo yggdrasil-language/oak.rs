@@ -168,7 +168,12 @@ impl<'config> MarkdownLexer<'config> {
                         if self.config.allow_mdx && self.lex_mdx_expression(state) {
                             continue;
                         }
-                        self.lex_special_char(state);
+                        // A literal `{` outside MDX is ordinary text. Falling through
+                        // without emitting a token would silently drop the byte and
+                        // shift every later token span by one.
+                        if !self.lex_special_char(state) {
+                            self.lex_text(state);
+                        }
                     }
                     ']' | '(' | ')' | '|' | '.' | '\\' => {
                         self.lex_special_char(state);
