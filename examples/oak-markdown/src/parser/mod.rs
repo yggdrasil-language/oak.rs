@@ -130,6 +130,12 @@ impl<'config> Parser<MarkdownLanguage> for MarkdownParser<'config> {
                                                 indent_level += 1;
                                             }
                                             else if let Some(MarkdownTokenType::ListMarker) = state.peek_kind() {
+                                                // A sibling marker at column zero starts the next
+                                                // item of the current list, not a nested list.
+                                                if indent_level == 0 {
+                                                    state.restore(nl_checkpoint);
+                                                    break;
+                                                }
                                                 // 递归解析嵌套列表
                                                 let nested_list_checkpoint = state.checkpoint();
                                                 let nested_is_ordered = if let Some(text) = state.peek_text() { text.chars().next().map(|c| c.is_ascii_digit()).unwrap_or(false) } else { false };
