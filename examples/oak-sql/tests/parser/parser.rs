@@ -744,6 +744,79 @@ fn test_sql_builder_group_by_and_having_trailing_tokens_are_reported() {
 }
 
 #[test]
+fn test_sql_builder_order_by_nulls_first_last() {
+    let sql = "SELECT a FROM t ORDER BY a DESC NULLS LAST, b ASC NULLS FIRST, c;";
+    let (statement, source) = build_statement(sql);
+    let SqlStatement::Select(select) = &statement
+    else {
+        panic!("Expected Select statement, got {statement:?}");
+    };
+    let order_by = select.order_by.as_ref().unwrap_or_else(|| panic!("Missing ORDER BY"));
+    assert_eq!(order_by.items.len(), 3);
+
+    assert_eq!(order_by.items[0].direction, OrderDirection::Desc);
+    assert_eq!(order_by.items[0].nulls, Some(NullsOrder::Last));
+    assert_eq!(sql.get(order_by.items[0].span.start..order_by.items[0].span.end), Some("a DESC NULLS LAST"));
+
+    assert_eq!(order_by.items[1].direction, OrderDirection::Asc);
+    assert_eq!(order_by.items[1].nulls, Some(NullsOrder::First));
+    assert_eq!(sql.get(order_by.items[1].span.start..order_by.items[1].span.end), Some("b ASC NULLS FIRST"));
+
+    assert_eq!(order_by.items[2].direction, OrderDirection::Asc);
+    assert_eq!(order_by.items[2].nulls, None);
+
+    assert_eq!(source, "SELECT a FROM t ORDER BY a DESC NULLS LAST,b ASC NULLS FIRST,c ASC;");
+
+    // `NULLS` does not require an explicit direction.
+    let (statement, source) = build_statement("SELECT a FROM t ORDER BY a NULLS FIRST;");
+    let SqlStatement::Select(select) = &statement
+    else {
+        panic!("Expected Select statement, got {statement:?}");
+    };
+    let order_by = select.order_by.as_ref().unwrap_or_else(|| panic!("Missing ORDER BY"));
+    assert_eq!(order_by.items[0].direction, OrderDirection::Asc);
+    assert_eq!(order_by.items[0].nulls, Some(NullsOrder::First));
+    assert_eq!(source, "SELECT a FROM t ORDER BY a ASC NULLS FIRST;");
+}
+
+#[test]
+fn test_sql_builder_incomplete_nulls_order_is_reported() {
+    for (sql, expected) in [
+        ("SELECT a FROM t ORDER BY a NULLS MIDDLE;", "`NULLS` must be followed by `FIRST` or `LAST`"),
+        ("SELECT a FROM t ORDER BY a NULLS;", "`NULLS` must be followed by `FIRST` or `LAST`"),
+        ("SELECT a FROM t ORDER BY a FIRST;", "unsupported token in ORDER BY clause"),
+        ("SELECT a FROM t ORDER BY a NULLS FIRST LAST;", "unsupported token in ORDER BY clause"),
+        ("SELECT a FROM t ORDER BY;", "`ORDER BY` requires at least one item"),
+        ("SELECT a FROM t ORDER BY a,;", "trailing comma in `ORDER BY`"),
+    ] {
+        let reason = rejection_reason(sql);
+        assert!(reason.contains(expected), "{sql}: {reason}");
+    }
+}
+
+/// No statement may leave a token unconsumed without a diagnostic. The cases
+/// below differ in where the tail appears, not only in `NULLS` placement.
+#[test]
+fn test_sql_builder_unconsumed_trailing_tokens_are_reported() {
+    for (sql, expected) in [
+        ("SELECT a FROM t LIMIT 1 FOO;", "unexpected token after statement"),
+        ("INSERT INTO t (a) VALUES (1) FOO;", "unexpected token after statement"),
+        ("UPDATE t SET a = 1 FOO;", "unexpected token after statement"),
+        ("SELECT a FROM t ORDER BY a FOO;", "unsupported token in ORDER BY clause"),
+        ("SELECT a FROM t GROUP BY a FOO;", "unsupported token in GROUP BY clause"),
+        ("SELECT a FROM t HAVING a FOO;", "unsupported token in HAVING predicate"),
+    ] {
+        let reason = rejection_reason(sql);
+        assert!(reason.contains(expected), "{sql}: {reason}");
+    }
+
+    // Valid tails stay quiet.
+    for sql in ["SELECT a FROM t LIMIT 1; SELECT b FROM u;", "SELECT a FROM t", "SELECT a FROM t ORDER BY a DESC NULLS LAST;"] {
+        assert_eq!(rejection_reason(sql), "", "{sql} should not be rejected");
+    }
+}
+
+#[test]
 fn test_sql_builder_insert() {
     let config = SqlLanguage::default();
     let builder = SqlBuilder::new(&config);
