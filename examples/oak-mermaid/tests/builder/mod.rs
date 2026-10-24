@@ -1,10 +1,35 @@
 use oak_core::{Builder, SourceText};
 use oak_mermaid::{
     MermaidBuilder, MermaidLanguage,
-    ast::{EdgeStyle, FlowElement, Flowchart, MermaidDiagram, NodeShape},
+    ast::{ClassDiagram, EdgeStyle, FlowElement, Flowchart, MermaidDiagram, MermaidRoot, MessageArrow, NodeShape, ParticipantKind, SequenceDiagram},
 };
 use oak_testing::{building::BuilderTester, source_from_path};
 use std::{path::Path, time::Duration};
+
+fn build_root(source_text: &str) -> MermaidRoot {
+    let language = MermaidLanguage::default();
+    let builder = MermaidBuilder::new(&language);
+    let source = SourceText::new(source_text);
+    let mut cache = oak_core::parser::ParseSession::<MermaidLanguage>::default();
+
+    let output = builder.build(&source, &[], &mut cache);
+    assert!(output.diagnostics.is_empty(), "unexpected diagnostics: {:?}", output.diagnostics);
+    output.result.expect("source should build")
+}
+
+fn sequence(root: &MermaidRoot, index: usize) -> &SequenceDiagram {
+    match &root.diagrams[index] {
+        MermaidDiagram::Sequence(sequence) => sequence,
+        other => panic!("expected a sequence diagram, got {other:?}"),
+    }
+}
+
+fn class_diagram(root: &MermaidRoot, index: usize) -> &ClassDiagram {
+    match &root.diagrams[index] {
+        MermaidDiagram::Class(class) => class,
+        other => panic!("expected a class diagram, got {other:?}"),
+    }
+}
 
 fn fixture_flowchart() -> Flowchart {
     let here = Path::new(env!("CARGO_MANIFEST_DIR"));
@@ -194,4 +219,55 @@ fn test_empty_source_builds_no_diagrams() {
     assert!(root.diagrams.is_empty());
     assert_eq!(root.span.start, 0);
     assert_eq!(root.span.end, 0);
+}
+
+#[test]
+fn test_sequence_diagram_ast() {
+    let root = build_root("sequenceDiagram\n    participant A as Alice\n    actor B\n    A->>B: ping\n    B-->A: pong\n    A->B: notify\n    B->>A: done\n");
+    assert_eq!(root.diagrams.len(), 1);
+
+    let sequence = sequence(&root, 0);
+    assert_eq!(sequence.participants.len(), 2);
+    assert_eq!(sequence.participants[0].id, "A");
+    assert_eq!(sequence.participants[0].display.as_deref(), Some("Alice"));
+    assert_eq!(sequence.participants[0].kind, ParticipantKind::Participant);
+    assert_eq!(sequence.participants[1].id, "B");
+    assert_eq!(sequence.participants[1].display, None);
+    assert_eq!(sequence.participants[1].kind, ParticipantKind::Actor);
+
+    assert_eq!(sequence.messages.len(), 4);
+    let message = &sequence.messages[0];
+    assert_eq!((message.from.as_str(), message.to.as_str(), message.text.as_str()), ("A", "B", "ping"));
+    assert_eq!(message.arrow, MessageArrow::SolidArrow);
+    assert_eq!(sequence.messages[1].arrow, MessageArrow::Dotted);
+    assert_eq!(sequence.messages[2].arrow, MessageArrow::Solid);
+    assert_eq!(sequence.messages[3].arrow, MessageArrow::SolidArrow);
+    assert_eq!(sequence.messages[3].text, "done");
+}
+
+#[test]
+fn test_class_diagram_ast() {
+    let root = build_root("classDiagram\n    class Animal {\n        +int age\n        +isMammal()\n    }\n    class Duck {\n        +String beakColor\n        +swim()\n    }\n    Animal <|-- Duck : is a\n    Duck *-- Wing : has\n    Duck ..> Water\n");
+    assert_eq!(root.diagrams.len(), 1);
+
+    let class = class_diagram(&root, 0);
+    assert_eq!(class.classes.len(), 2);
+    assert_eq!(class.classes[0].name, "Animal");
+    assert_eq!(class.classes[0].members.len(), 2);
+    assert_eq!(class.classes[0].members[0].name, "+int age");
+    assert_eq!(class.classes[0].members[0].kind, oak_uml::model::MemberKind::Field);
+    assert_eq!(class.classes[0].members[1].name, "+isMammal()");
+    assert_eq!(class.classes[0].members[1].kind, oak_uml::model::MemberKind::Method);
+    assert_eq!(class.classes[1].name, "Duck");
+    assert_eq!(class.classes[1].members.len(), 2);
+
+    assert_eq!(class.relations.len(), 3);
+    assert_eq!(class.relations[0].source, "Animal");
+    assert_eq!(class.relations[0].target, "Duck");
+    assert_eq!(class.relations[0].kind, oak_uml::model::RelationKind::Inheritance);
+    assert_eq!(class.relations[0].label.as_deref(), Some("is a"));
+    assert_eq!(class.relations[1].kind, oak_uml::model::RelationKind::Composition);
+    assert_eq!(class.relations[1].label.as_deref(), Some("has"));
+    assert_eq!(class.relations[2].kind, oak_uml::model::RelationKind::Dependency);
+    assert_eq!(class.relations[2].label, None);
 }
