@@ -1,0 +1,119 @@
+{
+    "success": true,
+    "typed_root": {
+        "type_name": "oak_typst::ast::TypstRoot",
+        "content": {
+            "items": [
+                {
+                    "Heading": {
+                        "content": {
+                            "items": [
+                                {
+                                    "Text": "标题"
+                                }
+                            ],
+                            "span": {
+                                "end": 8,
+                                "start": 0
+                            }
+                        },
+                        "level": 1
+                    }
+                },
+                "Space",
+                {
+                    "Text": "标题之后的正文。"
+                },
+                "Space",
+                "Space",
+                {
+                    "ListItem": {
+                        "items": [
+                            {
+                                "Text": "-"
+                            },
+                            "Space",
+                            {
+                                "Text": "列表项一"
+                            }
+                        ],
+                        "span": {
+                            "end": 49,
+                            "start": 35
+                        }
+                    }
+                },
+                "Space",
+                {
+                    "ListItem": {
+                        "items": [
+                            {
+                                "Text": "-"
+                            },
+                            "Space",
+                            {
+                                "Text": "列表项二"
+                            }
+                        ],
+                        "span": {
+                            "end": 64,
+                            "start": 50
+                        }
+                    }
+                },
+                "Space",
+                "Space",
+                {
+                    "ListItem": {
+                        "items": [
+                            {
+                                "Text": "+"
+                            },
+                            "Space",
+                            {
+                                "Text": "加号列表项"
+                            }
+                        ],
+                        "span": {
+                            "end": 83,
+                            "start": 66
+                        }
+                    }
+                },
+                "Space",
+                "Space",
+                {
+                    "EnumItem": {
+                        "items": [
+                            {
+                                "Text": "1."
+                            },
+                            "Space",
+                            {
+                                "Text": "枚举项一"
+                            }
+                        ],
+                        "span": {
+                            "end": 100,
+                            "start": 85
+                        }
+                    }
+                },
+                "Space",
+                "Space",
+                {
+                    "Text": "末尾段落文本。"
+                },
+                "Space",
+                {
+                    "Text": ""
+                }
+            ],
+            "span": {
+                "end": 124,
+                "start": 0
+            }
+        }
+    },
+    "errors": []
+}
