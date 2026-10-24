@@ -400,10 +400,11 @@ pub(crate) fn parse_primary_expression<S: oak_core::Source + ?Sized>(state: &mut
             ValkyrieTokenType::Keyword(ValkyrieKeywords::While) => parse_while_expression(state),
             ValkyrieTokenType::Keyword(ValkyrieKeywords::For) => parse_for_expression(state),
             ValkyrieTokenType::Keyword(ValkyrieKeywords::Return) => parse_return_expression(state),
+            ValkyrieTokenType::Label => parse_labeled_loop_expression(state),
             ValkyrieTokenType::Keyword(ValkyrieKeywords::Break) => {
                 let cp = state.sink.checkpoint();
                 state.bump();
-                if state.at(ValkyrieTokenType::Identifier) {
+                if state.at(ValkyrieTokenType::Label) || state.at(ValkyrieTokenType::Identifier) {
                     state.bump();
                 }
                 state.sink.finish_node(cp, ValkyrieElementType::BreakExpression);
@@ -412,7 +413,7 @@ pub(crate) fn parse_primary_expression<S: oak_core::Source + ?Sized>(state: &mut
             ValkyrieTokenType::Keyword(ValkyrieKeywords::Continue) => {
                 let cp = state.sink.checkpoint();
                 state.bump();
-                if state.at(ValkyrieTokenType::Identifier) {
+                if state.at(ValkyrieTokenType::Label) || state.at(ValkyrieTokenType::Identifier) {
                     state.bump();
                 }
                 state.sink.finish_node(cp, ValkyrieElementType::ContinueExpression);
@@ -474,6 +475,10 @@ pub(crate) fn parse_if_expression<S: oak_core::Source + ?Sized>(state: &mut Stat
 
 pub(crate) fn parse_match_expression<S: oak_core::Source + ?Sized>(state: &mut State<'_, S>) -> Result<(), oak_core::OakError> {
     crate::parser::parse_control::parse_match_expression(state)
+}
+
+pub(crate) fn parse_labeled_loop_expression<S: oak_core::Source + ?Sized>(state: &mut State<'_, S>) -> Result<(), oak_core::OakError> {
+    crate::parser::parse_control::parse_labeled_loop_expression(state)
 }
 
 pub(crate) fn parse_loop_expression<S: oak_core::Source + ?Sized>(state: &mut State<'_, S>) -> Result<(), oak_core::OakError> {
