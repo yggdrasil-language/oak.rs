@@ -4653,7 +4653,7 @@
             "end": 4391
         },
         {
-            "kind": "Max",
+            "kind": "Identifier_",
             "text": "MAX",
             "start": 4400,
             "end": 4403
@@ -6027,7 +6027,7 @@
             "end": 5675
         },
         {
-            "kind": "Max",
+            "kind": "Identifier_",
             "text": "MAX",
             "start": 5684,
             "end": 5687
