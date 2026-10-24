@@ -25,8 +25,11 @@ fn fixture_flowchart() -> Flowchart {
 }
 
 fn find_node<'a>(flowchart: &'a Flowchart, id: &str) -> (Option<&'a str>, NodeShape) {
-    flowchart
-        .elements
+    find_node_in(&flowchart.elements, id)
+}
+
+fn find_node_in<'a>(elements: &'a [FlowElement], id: &str) -> (Option<&'a str>, NodeShape) {
+    elements
         .iter()
         .find_map(|element| match element {
             FlowElement::Node { id: node_id, text, shape } if node_id == id => Some((text.as_deref(), *shape)),
@@ -36,8 +39,11 @@ fn find_node<'a>(flowchart: &'a Flowchart, id: &str) -> (Option<&'a str>, NodeSh
 }
 
 fn find_edge<'a>(flowchart: &'a Flowchart, from: &str, to: &str) -> (Option<&'a str>, EdgeStyle) {
-    flowchart
-        .elements
+    find_edge_in(&flowchart.elements, from, to)
+}
+
+fn find_edge_in<'a>(elements: &'a [FlowElement], from: &str, to: &str) -> (Option<&'a str>, EdgeStyle) {
+    elements
         .iter()
         .find_map(|element| match element {
             FlowElement::Edge { from: source, to: target, text, style } if source == from && target == to => Some((text.as_deref(), *style)),
@@ -103,8 +109,77 @@ fn test_unsupported_statements_are_skipped() {
         panic!("expected a flowchart");
     };
     assert_eq!(flowchart.orientation, "LR");
-    assert_eq!(find_node(flowchart, "A"), (None, NodeShape::Box));
-    assert_eq!(find_edge(flowchart, "A", "B"), (None, EdgeStyle::Arrow));
+    assert_eq!(flowchart.elements.len(), 1, "subgraph should be the only top-level element");
+
+    let FlowElement::Subgraph(subgraph) = &flowchart.elements[0]
+    else {
+        panic!("expected a subgraph");
+    };
+    assert_eq!(subgraph.id, None);
+    assert_eq!(subgraph.title, "One");
+    assert_eq!(find_node_in(&subgraph.elements, "A"), (None, NodeShape::Box));
+    assert_eq!(find_edge_in(&subgraph.elements, "A", "B"), (None, EdgeStyle::Arrow));
+}
+
+#[test]
+fn test_nested_subgraphs_keep_titles_and_ids() {
+    let language = MermaidLanguage::default();
+    let builder = MermaidBuilder::new(&language);
+    let source = SourceText::new("graph TD\n    subgraph One\n        A --> B\n        subgraph two[Inner]\n            C\n        end\n    end\n    B --> D\n");
+    let mut cache = oak_core::parser::ParseSession::<MermaidLanguage>::default();
+
+    let output = builder.build(&source, &[], &mut cache);
+    assert!(output.diagnostics.is_empty(), "unexpected diagnostics: {:?}", output.diagnostics);
+    let root = output.result.expect("flowchart should build");
+
+    let MermaidDiagram::Flowchart(flowchart) = &root.diagrams[0]
+    else {
+        panic!("expected a flowchart");
+    };
+
+    let FlowElement::Subgraph(outer) = &flowchart.elements[0]
+    else {
+        panic!("expected the outer subgraph");
+    };
+    assert_eq!(outer.id, None);
+    assert_eq!(outer.title, "One");
+    assert_eq!(find_edge_in(&outer.elements, "A", "B"), (None, EdgeStyle::Arrow));
+
+    let nested = outer
+        .elements
+        .iter()
+        .find_map(|element| match element {
+            FlowElement::Subgraph(subgraph) => Some(subgraph),
+            _ => None,
+        })
+        .expect("nested subgraph is missing");
+    assert_eq!(nested.id.as_deref(), Some("two"));
+    assert_eq!(nested.title, "Inner");
+    assert_eq!(find_node_in(&nested.elements, "C"), (None, NodeShape::Box));
+
+    assert_eq!(find_edge(flowchart, "B", "D"), (None, EdgeStyle::Arrow));
+}
+
+#[test]
+fn test_unterminated_subgraph_still_builds() {
+    let language = MermaidLanguage::default();
+    let builder = MermaidBuilder::new(&language);
+    let source = SourceText::new("graph TD\n    subgraph Open\n        A --> B\n");
+    let mut cache = oak_core::parser::ParseSession::<MermaidLanguage>::default();
+
+    let output = builder.build(&source, &[], &mut cache);
+    let root = output.result.expect("flowchart should build");
+    let MermaidDiagram::Flowchart(flowchart) = &root.diagrams[0]
+    else {
+        panic!("expected a flowchart");
+    };
+
+    let FlowElement::Subgraph(subgraph) = &flowchart.elements[0]
+    else {
+        panic!("expected a subgraph");
+    };
+    assert_eq!(subgraph.title, "Open");
+    assert_eq!(find_edge_in(&subgraph.elements, "A", "B"), (None, EdgeStyle::Arrow));
 }
 
 #[test]
