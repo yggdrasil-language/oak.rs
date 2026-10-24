@@ -53,6 +53,90 @@ fn test_sql_builder_session_statements() {
 }
 
 #[test]
+fn test_sql_builder_qualified_columns_and_function_calls() {
+    let config = SqlLanguage::default();
+    let builder = SqlBuilder::new(&config);
+
+    let mut session = ParseSession::<SqlLanguage>::default();
+    let result = builder.build(&SourceText::new("SELECT t.id, t.name FROM t;"), &[], &mut session);
+    let root = result.result.unwrap_or_else(|error| panic!("qualified columns: {error:?} {:?}", result.diagnostics));
+    let SqlStatement::Select(select) = &root.statements[0]
+    else {
+        panic!("Expected Select statement");
+    };
+    let names = select
+        .items
+        .iter()
+        .map(|item| match item {
+            SelectItem::Expression { expr: Expression::Identifier(identifier), .. } => identifier.name.to_string(),
+            other => panic!("Expected identifier select item, got {other:?}"),
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(names, ["t.id", "t.name"]);
+
+    let mut session = ParseSession::<SqlLanguage>::default();
+    let result = builder.build(&SourceText::new("SELECT COUNT(*) FROM users;"), &[], &mut session);
+    let root = result.result.unwrap_or_else(|error| panic!("COUNT(*): {error:?} {:?}", result.diagnostics));
+    let SqlStatement::Select(select) = &root.statements[0]
+    else {
+        panic!("Expected Select statement");
+    };
+    let SelectItem::Expression { expr: Expression::FunctionCall { name, args, .. }, .. } = &select.items[0]
+    else {
+        panic!("Expected function call select item, got {:?}", select.items[0]);
+    };
+    assert_eq!(name.name.as_ref(), "COUNT");
+    assert!(args.is_empty(), "COUNT(*) must not invent an argument: {args:?}");
+
+    let mut session = ParseSession::<SqlLanguage>::default();
+    let result = builder.build(&SourceText::new("SELECT LOWER(name) FROM users;"), &[], &mut session);
+    let root = result.result.unwrap_or_else(|error| panic!("LOWER(name): {error:?} {:?}", result.diagnostics));
+    let SqlStatement::Select(select) = &root.statements[0]
+    else {
+        panic!("Expected Select statement");
+    };
+    let SelectItem::Expression { expr: Expression::FunctionCall { name, args, .. }, .. } = &select.items[0]
+    else {
+        panic!("Expected function call select item, got {:?}", select.items[0]);
+    };
+    assert_eq!(name.name.as_ref(), "LOWER");
+    assert!(matches!(args.as_slice(), [Expression::Identifier(identifier)] if identifier.name.as_ref() == "name"));
+}
+
+#[test]
+fn test_sql_builder_prefix_unary_signs() {
+    let config = SqlLanguage::default();
+    let builder = SqlBuilder::new(&config);
+
+    let mut session = ParseSession::<SqlLanguage>::default();
+    let result = builder.build(&SourceText::new("SELECT -3;"), &[], &mut session);
+    let root = result.result.unwrap_or_else(|error| panic!("SELECT -3: {error:?} {:?}", result.diagnostics));
+    let SqlStatement::Select(select) = &root.statements[0]
+    else {
+        panic!("Expected Select statement");
+    };
+    let SelectItem::Expression { expr: Expression::Unary { op, expr, .. }, .. } = &select.items[0]
+    else {
+        panic!("Expected unary select item, got {:?}", select.items[0]);
+    };
+    assert_eq!(*op, UnaryOperator::Minus);
+    assert!(matches!(expr.as_ref(), Expression::Literal(Literal::Number(value, _)) if value.as_ref() == "3"));
+
+    let mut session = ParseSession::<SqlLanguage>::default();
+    let result = builder.build(&SourceText::new("SELECT * FROM t WHERE age > -1;"), &[], &mut session);
+    let root = result.result.unwrap_or_else(|error| panic!("age > -1: {error:?} {:?}", result.diagnostics));
+    let SqlStatement::Select(select) = &root.statements[0]
+    else {
+        panic!("Expected Select statement");
+    };
+    let Some(Expression::Binary { op: BinaryOperator::Greater, right, .. }) = &select.expr
+    else {
+        panic!("Expected greater-than expression, got {:?}", select.expr);
+    };
+    assert!(matches!(right.as_ref(), Expression::Unary { op: UnaryOperator::Minus, .. }));
+}
+
+#[test]
 fn test_sql_builder_insert() {
     let config = SqlLanguage::default();
     let builder = SqlBuilder::new(&config);
