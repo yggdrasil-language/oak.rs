@@ -7,8 +7,8 @@ use oak_core::{Range, tree::RedNode};
 #[cfg(feature = "lsp")]
 use {
     oak_hover::{Hover as ProviderHover, HoverProvider},
-    oak_lsp::{service::LanguageService, types::Hover as LspHover},
     oak_lsp::Vfs,
+    oak_lsp::{service::LanguageService, types::Hover as LspHover},
     std::future::Future,
 };
 /// Hover provider implementation for Protobuf.

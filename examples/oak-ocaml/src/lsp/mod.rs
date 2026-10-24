@@ -8,11 +8,11 @@ use oak_core::{Range, tree::RedNode};
 use {
     futures::Future,
     oak_hover::HoverProvider,
+    oak_lsp::Vfs,
     oak_lsp::{
         service::LanguageService,
         types::{Hover, Hover as LspHover},
     },
-    oak_lsp::Vfs,
 };
 /// Hover provider implementation for OCaml.
 #[cfg(feature = "lsp")]

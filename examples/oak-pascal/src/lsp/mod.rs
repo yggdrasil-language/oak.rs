@@ -8,9 +8,9 @@ use oak_core::tree::RedNode;
 #[cfg(feature = "lsp")]
 use oak_hover::HoverProvider;
 #[cfg(feature = "lsp")]
-use oak_lsp::{service::LanguageService, types::Hover};
-#[cfg(feature = "lsp")]
 use oak_lsp::Vfs;
+#[cfg(feature = "lsp")]
+use oak_lsp::{service::LanguageService, types::Hover};
 /// Hover provider implementation for Pascal.
 #[cfg(feature = "lsp")]
 pub struct PascalHoverProvider;

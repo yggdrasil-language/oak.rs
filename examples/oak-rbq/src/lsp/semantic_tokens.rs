@@ -5,8 +5,8 @@ use oak_core::{
     source::Source,
     tree::{RedNode, RedTree},
 };
-use oak_semantic_tokens::{SemanticToken, SemanticTokensProvider};
 use oak_lsp::LineMap;
+use oak_semantic_tokens::{SemanticToken, SemanticTokensProvider};
 
 /// RBQ semantic tokens provider.
 pub struct RbqSemanticTokensProvider;
