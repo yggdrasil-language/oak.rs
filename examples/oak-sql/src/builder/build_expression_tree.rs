@@ -338,6 +338,11 @@ impl<'config> SqlBuilder<'config> {
                         args.push(self.build_expression(n, source)?);
                     }
                 }
+                // `COUNT(*)` keeps the wildcard as a bare Star leaf. Dropping it
+                // would turn the call into `COUNT()` on the way back to source.
+                RedTree::Leaf(t) if t.kind == SqlTokenType::Star => {
+                    args.push(Expression::Wildcard { span: t.span.clone() });
+                }
                 _ => {}
             }
         }
