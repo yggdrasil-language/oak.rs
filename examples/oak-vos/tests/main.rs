@@ -137,7 +137,8 @@ fn builder_exposes_lossless_cst_tokens_and_spans() {
             _ => None,
         })
         .expect("using CST node");
-    assert_eq!(&source[using.span.clone()], "using shared::UserId;\n");
+    // A node spans its own tokens only, so the following newline stays outside it.
+    assert_eq!(&source[using.span.clone()], "using shared::UserId;");
     assert!(using.children.iter().any(|element| matches!(
         element,
         VosSyntaxElement::Token(token) if token.kind == VosTokenType::Identifier && token.text == "shared"
