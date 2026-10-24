@@ -1,0 +1,232 @@
+{
+    "success": true,
+    "typed_root": {
+        "type_name": "oak_mermaid::ast::MermaidRoot",
+        "content": {
+            "diagrams": [
+                {
+                    "Flowchart": {
+                        "elements": [
+                            {
+                                "Node": {
+                                    "id": "A",
+                                    "shape": "Box",
+                                    "text": "Start"
+                                }
+                            },
+                            {
+                                "Node": {
+                                    "id": "B",
+                                    "shape": "Rhombus",
+                                    "text": "Decision"
+                                }
+                            },
+                            {
+                                "Edge": {
+                                    "from": "A",
+                                    "style": "Arrow",
+                                    "text": null,
+                                    "to": "B"
+                                }
+                            },
+                            {
+                                "Node": {
+                                    "id": "C",
+                                    "shape": "Box",
+                                    "text": "End"
+                                }
+                            },
+                            {
+                                "Edge": {
+                                    "from": "B",
+                                    "style": "Arrow",
+                                    "text": "yes",
+                                    "to": "C"
+                                }
+                            },
+                            {
+                                "Edge": {
+                                    "from": "C",
+                                    "style": "DottedArrow",
+                                    "text": null,
+                                    "to": "A"
+                                }
+                            },
+                            {
+                                "Node": {
+                                    "id": "D",
+                                    "shape": "Box",
+                                    "text": null
+                                }
+                            },
+                            {
+                                "Edge": {
+                                    "from": "A",
+                                    "style": "Arrow",
+                                    "text": null,
+                                    "to": "D"
+                                }
+                            },
+                            {
+                                "Node": {
+                                    "id": "E",
+                                    "shape": "Round",
+                                    "text": "Round"
+                                }
+                            },
+                            {
+                                "Edge": {
+                                    "from": "D",
+                                    "style": "Arrow",
+                                    "text": null,
+                                    "to": "E"
+                                }
+                            },
+                            {
+                                "Node": {
+                                    "id": "F",
+                                    "shape": "Stadium",
+                                    "text": "Stadium"
+                                }
+                            },
+                            {
+                                "Edge": {
+                                    "from": "E",
+                                    "style": "Arrow",
+                                    "text": null,
+                                    "to": "F"
+                                }
+                            },
+                            {
+                                "Node": {
+                                    "id": "G",
+                                    "shape": "Subroutine",
+                                    "text": "Subroutine"
+                                }
+                            },
+                            {
+                                "Edge": {
+                                    "from": "F",
+                                    "style": "Arrow",
+                                    "text": null,
+                                    "to": "G"
+                                }
+                            },
+                            {
+                                "Node": {
+                                    "id": "H",
+                                    "shape": "Cylinder",
+                                    "text": "Cylinder"
+                                }
+                            },
+                            {
+                                "Edge": {
+                                    "from": "G",
+                                    "style": "Arrow",
+                                    "text": null,
+                                    "to": "H"
+                                }
+                            },
+                            {
+                                "Node": {
+                                    "id": "I",
+                                    "shape": "Circle",
+                                    "text": "Circle"
+                                }
+                            },
+                            {
+                                "Edge": {
+                                    "from": "H",
+                                    "style": "Arrow",
+                                    "text": null,
+                                    "to": "I"
+                                }
+                            },
+                            {
+                                "Node": {
+                                    "id": "J",
+                                    "shape": "Rhombus",
+                                    "text": "Rhombus"
+                                }
+                            },
+                            {
+                                "Edge": {
+                                    "from": "I",
+                                    "style": "Arrow",
+                                    "text": null,
+                                    "to": "J"
+                                }
+                            },
+                            {
+                                "Node": {
+                                    "id": "K",
+                                    "shape": "Box",
+                                    "text": null
+                                }
+                            },
+                            {
+                                "Edge": {
+                                    "from": "J",
+                                    "style": "Line",
+                                    "text": null,
+                                    "to": "K"
+                                }
+                            },
+                            {
+                                "Node": {
+                                    "id": "L",
+                                    "shape": "Box",
+                                    "text": null
+                                }
+                            },
+                            {
+                                "Edge": {
+                                    "from": "K",
+                                    "style": "ThickArrow",
+                                    "text": null,
+                                    "to": "L"
+                                }
+                            },
+                            {
+                                "Node": {
+                                    "id": "M",
+                                    "shape": "Box",
+                                    "text": null
+                                }
+                            },
+                            {
+                                "Edge": {
+                                    "from": "L",
+                                    "style": "Arrow",
+                                    "text": "Yes",
+                                    "to": "M"
+                                }
+                            },
+                            {
+                                "Node": {
+                                    "id": "N",
+                                    "shape": "Box",
+                                    "text": null
+                                }
+                            },
+                            {
+                                "Edge": {
+                                    "from": "M",
+                                    "style": "Arrow",
+                                    "text": null,
+                                    "to": "N"
+                                }
+                            }
+                        ],
+                        "orientation": "TD"
+                    }
+                }
+            ],
+            "span": {
+                "end": 270,
+                "start": 0
+            }
+        }
+    },
+    "errors": []
+}
