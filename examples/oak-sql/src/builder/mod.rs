@@ -161,6 +161,10 @@ impl<'config> SqlBuilder<'config> {
             }
         }
 
+        if where_found && expr.is_none() {
+            return Err(OakError::custom_error("WHERE predicate could not be built"));
+        }
+
         Ok(SelectStatement { items, from, joins, expr, group_by, having, order_by, limit, span: node.span() })
     }
 
@@ -257,11 +261,13 @@ impl<'config> SqlBuilder<'config> {
         let mut table_name: Option<TableName> = None;
         let mut assignments = Vec::new();
         let mut selection = None;
+        let mut where_found = false;
 
         for child in node.children() {
             match child {
                 RedTree::Leaf(t) => match t.kind {
                     SqlTokenType::Set => {}
+                    SqlTokenType::Where => where_found = true,
                     SqlTokenType::Identifier_ => {
                         if table_name.is_none() {
                             let ident = Identifier { name: self.get_text(t.span.clone(), source), span: t.span.clone() };
@@ -277,6 +283,10 @@ impl<'config> SqlBuilder<'config> {
                     _ => {}
                 },
             }
+        }
+
+        if where_found && selection.is_none() {
+            return Err(OakError::custom_error("WHERE predicate could not be built"));
         }
 
         Ok(UpdateStatement { table_name: table_name.ok_or_else(|| OakError::custom_error("Missing table name in UPDATE"))?, assignments, selection, span: node.span() })
@@ -304,20 +314,25 @@ impl<'config> SqlBuilder<'config> {
     fn build_delete_statement<'a>(&self, node: RedNode<'a, SqlLanguage>, source: &SourceText) -> Result<DeleteStatement, OakError> {
         let mut table_name = None;
         let mut selection = None;
+        let mut where_found = false;
 
         for child in node.children() {
             match child {
-                RedTree::Leaf(t) => {
-                    if t.kind == SqlTokenType::From {
-                        // skip
-                    }
-                }
+                RedTree::Leaf(t) => match t.kind {
+                    SqlTokenType::From => {}
+                    SqlTokenType::Where => where_found = true,
+                    _ => {}
+                },
                 RedTree::Node(n) => match n.green.kind {
                     SqlElementType::TableName => table_name = Some(self.build_table_name(n, source)?),
                     SqlElementType::Expression => selection = Some(self.build_expression(n, source)?),
                     _ => {}
                 },
             }
+        }
+
+        if where_found && selection.is_none() {
+            return Err(OakError::custom_error("WHERE predicate could not be built"));
         }
 
         Ok(DeleteStatement { table_name: table_name.ok_or_else(|| OakError::custom_error("Missing table name in DELETE"))?, selection, span: node.span() })
