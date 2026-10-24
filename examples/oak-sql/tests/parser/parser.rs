@@ -52,6 +52,63 @@ fn test_sql_builder_session_statements() {
     assert_eq!(statement.collation.as_deref(), Some("utf8mb4_bin"));
 }
 
+/// Builds `sql` and returns the `WHERE` expression of its single SELECT statement.
+fn build_where(sql: &str) -> Expression {
+    let config = SqlLanguage::default();
+    let builder = SqlBuilder::new(&config);
+    let mut session = ParseSession::<SqlLanguage>::default();
+    let result = builder.build(&SourceText::new(sql), &[], &mut session);
+    let root = result.result.unwrap_or_else(|error| panic!("{sql}: {error:?} {:?}", result.diagnostics));
+    let SqlStatement::Select(select) = &root.statements[0]
+    else {
+        panic!("Expected Select statement for {sql}, got {:?}", root.statements);
+    };
+    select.expr.clone().unwrap_or_else(|| panic!("Missing WHERE expression for {sql}"))
+}
+
+#[test]
+fn test_sql_builder_predicates() {
+    let Expression::InList { list, negated, .. } = build_where("SELECT * FROM t WHERE id IN (1, 2, 3);")
+    else {
+        panic!("Expected IN list");
+    };
+    assert!(!negated);
+    assert_eq!(list.len(), 3);
+    assert!(matches!(&list[2], Expression::Literal(Literal::Number(value, _)) if value.as_ref() == "3"));
+
+    let Expression::Between { low, high, negated, .. } = build_where("SELECT * FROM t WHERE age BETWEEN 18 AND 30;")
+    else {
+        panic!("Expected BETWEEN");
+    };
+    assert!(!negated);
+    assert!(matches!(low.as_ref(), Expression::Literal(Literal::Number(value, _)) if value.as_ref() == "18"));
+    assert!(matches!(high.as_ref(), Expression::Literal(Literal::Number(value, _)) if value.as_ref() == "30"));
+
+    let Expression::Binary { op: BinaryOperator::Equal, right, .. } = build_where("SELECT * FROM t WHERE name IS NULL;")
+    else {
+        panic!("Expected IS NULL");
+    };
+    assert!(matches!(right.as_ref(), Expression::Literal(Literal::Null(_))));
+
+    let Expression::Binary { op: BinaryOperator::NotEqual, right, .. } = build_where("SELECT * FROM t WHERE name IS NOT NULL;")
+    else {
+        panic!("Expected IS NOT NULL");
+    };
+    assert!(matches!(right.as_ref(), Expression::Literal(Literal::Null(_))));
+
+    let Expression::Binary { op: BinaryOperator::Like, right, .. } = build_where("SELECT * FROM t WHERE name LIKE 'a%';")
+    else {
+        panic!("Expected LIKE");
+    };
+    assert!(matches!(right.as_ref(), Expression::Literal(Literal::String(value, _)) if value.as_ref() == "a%"));
+
+    let Expression::Binary { op: BinaryOperator::Equal, left, .. } = build_where("SELECT * FROM t WHERE id % 2 = 0;")
+    else {
+        panic!("Expected equality around a modulo");
+    };
+    assert!(matches!(left.as_ref(), Expression::Binary { op: BinaryOperator::Percent, .. }));
+}
+
 #[test]
 fn test_sql_builder_qualified_columns_and_function_calls() {
     let config = SqlLanguage::default();
