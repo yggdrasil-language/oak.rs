@@ -123,7 +123,7 @@ impl<'config> SqlBuilder<'config> {
                             }
                         }
                     }
-                    // === IS [NOT] NULL ===
+                    // === IS [NOT] NULL / IS [NOT] TRUE / IS [NOT] FALSE ===
                     SqlTokenType::Is => {
                         let precedence = 5;
                         if precedence >= min_precedence {
@@ -139,13 +139,22 @@ impl<'config> SqlBuilder<'config> {
                                     _ => break,
                                 }
                             }
-                            if let Some(RedTree::Node(n)) = children.get(i) {
-                                let right = self.build_expression_with_precedence(n.clone(), source, 0)?;
-                                let span = Range { start: left.span().start, end: right.span().end };
-                                let op = if negated { BinaryOperator::NotEqual } else { BinaryOperator::Equal };
-                                left = Expression::Binary { left: Box::new(left), op, right: Box::new(right), span };
-                                continue;
-                            }
+                            let Some(RedTree::Node(n)) = children.get(i)
+                            else {
+                                return Err(OakError::custom_error("`IS` requires `NULL`, `TRUE`, or `FALSE`"));
+                            };
+                            let right = self.build_expression_with_precedence(n.clone(), source, 0)?;
+                            let span = Range { start: left.span().start, end: right.span().end };
+                            let expr = Box::new(left);
+                            // The predicate keeps its own node: folding it into a
+                            // comparison would turn `NULL IS NULL` (TRUE) into
+                            // `NULL = NULL` (NULL) and lose three-valued logic.
+                            left = match &right {
+                                Expression::Literal(Literal::Null(_)) => Expression::IsNull { expr, negated, span },
+                                Expression::Literal(Literal::Boolean(value, _)) => Expression::IsTruth { expr, value: *value, negated, span },
+                                _ => return Err(OakError::custom_error("`IS` requires `NULL`, `TRUE`, or `FALSE`")),
+                            };
+                            continue;
                         }
                     }
                     // === IN (list) / IN (subquery) ===

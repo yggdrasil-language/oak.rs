@@ -160,17 +160,18 @@ fn test_sql_builder_predicates() {
     assert!(matches!(low.as_ref(), Expression::Literal(Literal::Number(value, _)) if value.as_ref() == "18"));
     assert!(matches!(high.as_ref(), Expression::Literal(Literal::Number(value, _)) if value.as_ref() == "30"));
 
-    let Expression::Binary { op: BinaryOperator::Equal, right, .. } = build_where("SELECT * FROM t WHERE name IS NULL;")
+    let Expression::IsNull { expr, negated: false, span } = build_where("SELECT * FROM t WHERE name IS NULL;")
     else {
         panic!("Expected IS NULL");
     };
-    assert!(matches!(right.as_ref(), Expression::Literal(Literal::Null(_))));
+    assert!(matches!(expr.as_ref(), Expression::Identifier(identifier) if identifier.name.as_ref() == "name"));
+    assert_eq!(span.start, expr.span().start);
 
-    let Expression::Binary { op: BinaryOperator::NotEqual, right, .. } = build_where("SELECT * FROM t WHERE name IS NOT NULL;")
+    let Expression::IsNull { expr, negated: true, .. } = build_where("SELECT * FROM t WHERE name IS NOT NULL;")
     else {
         panic!("Expected IS NOT NULL");
     };
-    assert!(matches!(right.as_ref(), Expression::Literal(Literal::Null(_))));
+    assert!(matches!(expr.as_ref(), Expression::Identifier(identifier) if identifier.name.as_ref() == "name"));
 
     let Expression::Binary { op: BinaryOperator::Like, right, .. } = build_where("SELECT * FROM t WHERE name LIKE 'a%';")
     else {
@@ -183,6 +184,82 @@ fn test_sql_builder_predicates() {
         panic!("Expected equality around a modulo");
     };
     assert!(matches!(left.as_ref(), Expression::Binary { op: BinaryOperator::Percent, .. }));
+}
+
+#[test]
+fn test_sql_builder_is_null_and_truth_predicates() {
+    // `IS NULL` and `IS TRUE` are three-valued predicates, not comparisons.
+    let Expression::IsNull { expr, negated: false, span } = build_where("SELECT * FROM t WHERE name IS NULL;")
+    else {
+        panic!("Expected IS NULL");
+    };
+    assert!(matches!(expr.as_ref(), Expression::Identifier(identifier) if identifier.name.as_ref() == "name"));
+    assert_eq!(span.start, expr.span().start);
+
+    let Expression::IsNull { negated: true, .. } = build_where("SELECT * FROM t WHERE name IS NOT NULL;")
+    else {
+        panic!("Expected IS NOT NULL");
+    };
+
+    let Expression::IsTruth { expr, value: true, negated: false, span } = build_where("SELECT * FROM t WHERE flag IS TRUE;")
+    else {
+        panic!("Expected IS TRUE");
+    };
+    assert!(matches!(expr.as_ref(), Expression::Identifier(identifier) if identifier.name.as_ref() == "flag"));
+    assert_eq!(span.start, expr.span().start);
+
+    let Expression::IsTruth { value: false, negated: true, .. } = build_where("SELECT * FROM t WHERE flag IS NOT FALSE;")
+    else {
+        panic!("Expected IS NOT FALSE");
+    };
+
+    // `IS` keeps the same precedence as `IN` and `BETWEEN`: a surrounding `AND`
+    // stays outside the predicate.
+    let Expression::Binary { op: BinaryOperator::And, left, .. } = build_where("SELECT * FROM t WHERE flag IS TRUE AND id > 0;")
+    else {
+        panic!("Expected AND around IS TRUE");
+    };
+    assert!(matches!(left.as_ref(), Expression::IsTruth { value: true, negated: false, .. }));
+}
+
+#[test]
+fn test_sql_builder_is_predicate_source_round_trip() {
+    for (sql, expected) in [
+        ("SELECT * FROM t WHERE name IS NULL;", "SELECT*FROM t WHERE name IS NULL;"),
+        ("SELECT * FROM t WHERE name IS NOT NULL;", "SELECT*FROM t WHERE name IS NOT NULL;"),
+        ("SELECT * FROM t WHERE flag IS TRUE;", "SELECT*FROM t WHERE flag IS TRUE;"),
+        ("SELECT * FROM t WHERE flag IS NOT FALSE;", "SELECT*FROM t WHERE flag IS NOT FALSE;"),
+        ("SELECT * FROM t WHERE NOT flag IS NULL;", "SELECT*FROM t WHERE NOT flag IS NULL;"),
+        // A negated operand has to keep its parentheses: `IS` binds tighter
+        // than `NOT`, so dropping them would reparse as `NOT (flag IS NULL)`.
+        ("SELECT * FROM t WHERE (NOT flag) IS NULL;", "SELECT*FROM t WHERE(NOT flag) IS NULL;"),
+        ("SELECT * FROM t WHERE (a = 1) IS FALSE;", "SELECT*FROM t WHERE(a=1) IS FALSE;"),
+    ] {
+        let (_, source) = build_statement(sql);
+        assert_eq!(source, expected, "{sql}");
+        // The printed source must build the same predicate again.
+        let rebuilt = build_where(&source);
+        assert!(matches!(rebuilt, Expression::Unary { .. } | Expression::IsNull { .. } | Expression::IsTruth { .. }), "unexpected rebuilt predicate for {sql}: {rebuilt:?}");
+    }
+}
+
+#[test]
+fn test_sql_builder_null_comparison_stays_binary() {
+    // A plain `=` / `<>` against `NULL` is a comparison, not an `IS` predicate.
+    let Expression::Binary { op: BinaryOperator::Equal, right, .. } = build_where("SELECT * FROM t WHERE name = NULL;")
+    else {
+        panic!("Expected comparison against NULL");
+    };
+    assert!(matches!(right.as_ref(), Expression::Literal(Literal::Null(_))));
+
+    let Expression::Binary { op: BinaryOperator::NotEqual, right, .. } = build_where("SELECT * FROM t WHERE name <> NULL;")
+    else {
+        panic!("Expected negated comparison against NULL");
+    };
+    assert!(matches!(right.as_ref(), Expression::Literal(Literal::Null(_))));
+
+    let (_, source) = build_statement("SELECT * FROM t WHERE name = NULL;");
+    assert_eq!(source, "SELECT*FROM t WHERE name=NULL;");
 }
 
 #[test]
@@ -332,7 +409,7 @@ fn test_sql_builder_prefix_not() {
     else {
         panic!("Expected NOT around IS NULL");
     };
-    assert!(matches!(expr.as_ref(), Expression::Binary { op: BinaryOperator::Equal, right, .. } if matches!(right.as_ref(), Expression::Literal(Literal::Null(_)))));
+    assert!(matches!(expr.as_ref(), Expression::IsNull { negated: false, .. }));
 
     let (_, source) = build_statement("SELECT * FROM t WHERE NOT (a = 1);");
     assert_eq!(source, "SELECT*FROM t WHERE NOT a=1;");
@@ -389,11 +466,11 @@ fn test_sql_builder_negated_predicates() {
     };
     assert!(matches!(expr.as_ref(), Expression::Binary { op: BinaryOperator::Like, .. }));
 
-    let Expression::Binary { op: BinaryOperator::NotEqual, right, .. } = build_where("SELECT * FROM t WHERE a IS NOT TRUE;")
+    let Expression::IsTruth { expr, value: true, negated: true, .. } = build_where("SELECT * FROM t WHERE a IS NOT TRUE;")
     else {
         panic!("Expected IS NOT TRUE");
     };
-    assert!(matches!(right.as_ref(), Expression::Literal(Literal::Boolean(true, _))));
+    assert!(matches!(expr.as_ref(), Expression::Identifier(identifier) if identifier.name.as_ref() == "a"));
 
     let (_, source) = build_statement("SELECT * FROM t WHERE a NOT IN (1, 2);");
     assert_eq!(source, "SELECT*FROM t WHERE a NOT IN(1,2);");
