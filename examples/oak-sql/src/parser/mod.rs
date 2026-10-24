@@ -419,6 +419,18 @@ impl<'config> SqlParser<'config> {
         state.finish_at(cp, SqlElementType::SelectQuantifier);
     }
 
+    /// Tokens that may legitimately follow the last `GROUP BY` item.
+    fn is_group_by_terminator(kind: Option<crate::lexer::SqlTokenType>) -> bool {
+        use crate::lexer::SqlTokenType::*;
+        matches!(kind, None | Some(Having | Order | Limit | Offset | Semicolon | Eof | RightParen | Returning))
+    }
+
+    /// Tokens that may legitimately follow the `HAVING` predicate.
+    fn is_having_terminator(kind: Option<crate::lexer::SqlTokenType>) -> bool {
+        use crate::lexer::SqlTokenType::*;
+        matches!(kind, None | Some(Order | Limit | Offset | Semicolon | Eof | RightParen | Returning))
+    }
+
     fn parse_select<'a, S: Source + ?Sized>(&self, state: &mut State<'a, S>) -> Result<(), OakError> {
         use crate::lexer::SqlTokenType::*;
         let cp = state.checkpoint();
@@ -487,18 +499,35 @@ impl<'config> SqlParser<'config> {
         if state.eat(Group) {
             let group_cp = state.checkpoint();
             state.expect(By).ok();
+            let mut first = true;
             while state.not_at_end() {
+                if Self::is_group_by_terminator(state.peek_kind()) {
+                    state.errors.push(OakError::custom_error(if first { "`GROUP BY` requires at least one item" } else { "trailing comma in `GROUP BY`" }));
+                    break;
+                }
+                first = false;
                 PrattParser::parse(state, 0, self);
                 if !state.eat(Comma) {
                     break;
                 }
+            }
+            if !Self::is_group_by_terminator(state.peek_kind()) {
+                return Err(OakError::custom_error("unsupported token in GROUP BY clause"));
             }
             state.finish_at(group_cp, SqlElementType::GroupByClause);
         }
 
         if state.eat(Having) {
             let having_cp = state.checkpoint();
-            PrattParser::parse(state, 0, self);
+            if Self::is_having_terminator(state.peek_kind()) {
+                state.errors.push(OakError::custom_error("`HAVING` requires a predicate"));
+            }
+            else {
+                PrattParser::parse(state, 0, self);
+                if !Self::is_having_terminator(state.peek_kind()) {
+                    return Err(OakError::custom_error("unsupported token in HAVING predicate"));
+                }
+            }
             state.finish_at(having_cp, SqlElementType::HavingClause);
         }
 

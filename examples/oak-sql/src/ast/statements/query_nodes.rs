@@ -207,8 +207,8 @@ impl ToSource for JoinType {
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct GroupByClause {
-    /// The columns to group by.
-    pub columns: Vec<Expression>,
+    /// The grouping items, in source order.
+    pub items: Vec<GroupByItem>,
     /// The span of the GROUP BY clause.
     #[serde(with = "oak_core::serde_range")]
     pub span: Range<usize>,
@@ -218,11 +218,39 @@ impl ToSource for GroupByClause {
     fn to_source(&self, buffer: &mut SourceBuffer) {
         buffer.push("GROUP");
         buffer.push("BY");
-        for (i, col) in self.columns.iter().enumerate() {
+        for (i, item) in self.items.iter().enumerate() {
             if i > 0 {
                 buffer.push(",");
             }
-            col.to_source(buffer);
+            item.to_source(buffer);
+        }
+    }
+}
+
+/// A single `GROUP BY` item.
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub enum GroupByItem {
+    /// A bare column reference such as `GROUP BY users.id`.
+    Column(Identifier),
+    /// A positional reference counted from 1 such as `GROUP BY 1`.
+    Position {
+        /// The one-based position in the select list.
+        index: usize,
+        /// The span of the position literal.
+        #[serde(with = "oak_core::serde_range")]
+        span: Range<usize>,
+    },
+    /// Any other grouping expression.
+    Expression(Expression),
+}
+
+impl ToSource for GroupByItem {
+    fn to_source(&self, buffer: &mut SourceBuffer) {
+        match self {
+            GroupByItem::Column(identifier) => identifier.to_source(buffer),
+            GroupByItem::Position { index, .. } => buffer.push(&index.to_string()),
+            GroupByItem::Expression(expr) => expr.to_source(buffer),
         }
     }
 }

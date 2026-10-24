@@ -1,5 +1,5 @@
 use crate::{SqlElementType, SqlLanguage, SqlParser, ast, ast::*, lexer::token_type::SqlTokenType};
-use oak_core::{Builder, BuilderCache, GreenNode, OakDiagnostics, OakError, Parser, Range, RedNode, RedTree, SourceText, TextEdit, builder::BuildOutput, source::Source};
+use oak_core::{Builder, BuilderCache, GreenNode, OakDiagnostics, OakError, Parser, Range, RedNode, RedTree, SourceText, TextEdit, TokenType, builder::BuildOutput, source::Source};
 use std::sync::Arc;
 
 mod build_expression_tree;
@@ -792,22 +792,60 @@ impl<'config> SqlBuilder<'config> {
     }
 
     fn build_group_by_clause<'a>(&self, node: RedNode<'a, SqlLanguage>, source: &SourceText) -> Result<GroupByClause, OakError> {
-        let mut columns = Vec::new();
+        let mut items = Vec::new();
         for child in node.children() {
             if let RedTree::Node(n) = child {
-                if n.green.kind == SqlElementType::Expression {
-                    columns.push(self.build_expression(n, source)?);
+                match n.green.kind {
+                    SqlElementType::Identifier => items.push(GroupByItem::Column(self.build_identifier(n, source)?)),
+                    SqlElementType::Expression | SqlElementType::FunctionCall => items.push(self.build_group_by_item(n, source)?),
+                    _ => {}
                 }
             }
         }
-        Ok(GroupByClause { columns, span: node.span() })
+        if items.is_empty() {
+            return Err(OakError::custom_error("Missing item in GROUP BY clause"));
+        }
+        Ok(GroupByClause { items, span: node.span() })
+    }
+
+    /// Classifies one `GROUP BY` expression node. A lone integer literal is a
+    /// positional reference and becomes an explicit [`GroupByItem::Position`].
+    fn build_group_by_item<'a>(&self, node: RedNode<'a, SqlLanguage>, source: &SourceText) -> Result<GroupByItem, OakError> {
+        if let Some(span) = Self::lone_number_span(&node) {
+            if let Ok(index) = self.get_text(span.clone(), source).parse::<usize>() {
+                return Ok(GroupByItem::Position { index, span });
+            }
+        }
+        Ok(GroupByItem::Expression(self.build_expression(node, source)?))
+    }
+
+    /// Returns the span of the only non-trivia leaf when the node contains just a
+    /// number literal, which is how a positional reference appears in the CST.
+    fn lone_number_span(node: &RedNode<'_, SqlLanguage>) -> Option<Range<usize>> {
+        let mut span = None;
+        for child in node.children() {
+            let RedTree::Leaf(t) = child
+            else {
+                return None;
+            };
+            if t.kind.is_ignored() {
+                continue;
+            }
+            if t.kind != SqlTokenType::NumberLiteral || span.is_some() {
+                return None;
+            }
+            span = Some(t.span);
+        }
+        span
     }
 
     fn build_having_clause<'a>(&self, node: RedNode<'a, SqlLanguage>, source: &SourceText) -> Result<HavingClause, OakError> {
         let mut condition = None;
         for child in node.children() {
             if let RedTree::Node(n) = child {
-                if n.green.kind == SqlElementType::Expression {
+                // A bare column or function call is a valid predicate too, so it
+                // must bind exactly like an infix expression.
+                if matches!(n.green.kind, SqlElementType::Expression | SqlElementType::Identifier | SqlElementType::FunctionCall) {
                     condition = Some(self.build_expression(n, source)?);
                 }
             }
