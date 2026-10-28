@@ -4,7 +4,7 @@ use oak_core::source::{SourceBuffer, ToSource};
 use std::sync::Arc;
 
 /// Transaction boundary operation.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum TransactionAction {
     /// Start a transaction.
@@ -13,6 +13,12 @@ pub enum TransactionAction {
     Commit,
     /// Roll back the active transaction.
     Rollback,
+    /// Create a named savepoint.
+    Savepoint(Arc<str>),
+    /// Roll back to a named savepoint (`ROLLBACK TO SAVEPOINT name` / `ROLLBACK TO name`).
+    RollbackToSavepoint(Arc<str>),
+    /// Release (commit) a named savepoint (`RELEASE SAVEPOINT name` / `RELEASE name`).
+    ReleaseSavepoint(Arc<str>),
 }
 
 /// A transaction boundary statement.
@@ -28,11 +34,23 @@ pub struct TransactionStatement {
 
 impl ToSource for TransactionStatement {
     fn to_source(&self, buffer: &mut SourceBuffer) {
-        buffer.push(match self.action {
-            TransactionAction::Begin => "BEGIN",
-            TransactionAction::Commit => "COMMIT",
-            TransactionAction::Rollback => "ROLLBACK",
-        });
+        match &self.action {
+            TransactionAction::Begin => buffer.push("BEGIN"),
+            TransactionAction::Commit => buffer.push("COMMIT"),
+            TransactionAction::Rollback => buffer.push("ROLLBACK"),
+            TransactionAction::Savepoint(name) => {
+                buffer.push("SAVEPOINT ");
+                buffer.push(name);
+            }
+            TransactionAction::RollbackToSavepoint(name) => {
+                buffer.push("ROLLBACK TO SAVEPOINT ");
+                buffer.push(name);
+            }
+            TransactionAction::ReleaseSavepoint(name) => {
+                buffer.push("RELEASE SAVEPOINT ");
+                buffer.push(name);
+            }
+        }
     }
 }
 

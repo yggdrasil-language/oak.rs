@@ -111,6 +111,8 @@ impl oak_core::TokenType for SqlTokenType {
             | Self::Begin
             | Self::Commit
             | Self::Rollback
+            | Self::Savepoint
+            | Self::Release
             | Self::Transaction
             | Self::Conflict
             | Self::Do
@@ -392,6 +394,10 @@ pub enum SqlTokenType {
     Commit,
     /// `ROLLBACK` keyword.
     Rollback,
+    /// `SAVEPOINT` keyword.
+    Savepoint,
+    /// `RELEASE` keyword.
+    Release,
     /// `TRANSACTION` keyword.
     Transaction,
     /// `CONFLICT` keyword.

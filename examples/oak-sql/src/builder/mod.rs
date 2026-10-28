@@ -104,7 +104,7 @@ impl<'config> SqlBuilder<'config> {
                     SqlElementType::CreateStatement => self.build_create_statement(n, source).map(SqlStatement::Create),
                     SqlElementType::DropStatement => self.build_drop_statement(n, source).map(SqlStatement::Drop),
                     SqlElementType::AlterStatement => self.build_alter_statement(n, source).map(SqlStatement::Alter),
-                    SqlElementType::TransactionStatement => self.build_transaction_statement(n).map(SqlStatement::Transaction),
+                    SqlElementType::TransactionStatement => self.build_transaction_statement(n, source).map(SqlStatement::Transaction),
                     SqlElementType::SetNamesStatement => self.build_set_names_statement(n, source).map(SqlStatement::SetNames),
                     SqlElementType::SetVariableStatement => self.build_set_variable_statement(n, source).map(SqlStatement::SetVariable),
                     SqlElementType::ShowStatement => self.build_show_statement(n, source).map(SqlStatement::Show),
@@ -911,20 +911,39 @@ impl<'config> SqlBuilder<'config> {
         Ok(TableName { name: name.ok_or_else(|| OakError::custom_error("Missing table name"))?, alias, span: node.span() })
     }
 
-    fn build_transaction_statement<'a>(&self, node: RedNode<'a, SqlLanguage>) -> Result<TransactionStatement, OakError> {
-        let action = node
-            .children()
-            .find_map(|child| match child {
-                RedTree::Leaf(token) => match token.kind {
-                    SqlTokenType::Begin => Some(TransactionAction::Begin),
-                    SqlTokenType::Commit => Some(TransactionAction::Commit),
-                    SqlTokenType::Rollback => Some(TransactionAction::Rollback),
-                    _ => None,
-                },
-                _ => None,
-            })
-            .ok_or_else(|| OakError::custom_error("Missing transaction action"))?;
-        Ok(TransactionStatement { action, span: node.span() })
+    fn build_transaction_statement<'a>(&self, node: RedNode<'a, SqlLanguage>, source: &SourceText) -> Result<ast::TransactionStatement, OakError> {
+        use SqlTokenType::*;
+        let mut head: Option<SqlTokenType> = None;
+        let mut saw_to = false;
+        let mut identifier: Option<Arc<str>> = None;
+        for child in node.children() {
+            if let RedTree::Leaf(token) = child {
+                match token.kind {
+                    Begin | Commit | Rollback | Savepoint | Release if head.is_none() => {
+                        head = Some(token.kind);
+                    }
+                    To => saw_to = true,
+                    Identifier_ => {
+                        identifier = Some(self.get_text(token.span.clone(), source));
+                    }
+                    _ => {}
+                }
+            }
+        }
+
+        let action = match (head, saw_to, identifier) {
+            (Some(Begin), _, _) => TransactionAction::Begin,
+            (Some(Commit), _, _) => TransactionAction::Commit,
+            (Some(Rollback), false, _) => TransactionAction::Rollback,
+            (Some(Rollback), true, Some(name)) => TransactionAction::RollbackToSavepoint(name),
+            (Some(Savepoint), _, Some(name)) => TransactionAction::Savepoint(name),
+            (Some(Release), _, Some(name)) => TransactionAction::ReleaseSavepoint(name),
+            (Some(Rollback), true, None) => return Err(OakError::custom_error("`ROLLBACK TO` requires a savepoint name")),
+            (Some(Savepoint), _, None) => return Err(OakError::custom_error("`SAVEPOINT` requires a name")),
+            (Some(Release), _, None) => return Err(OakError::custom_error("`RELEASE` requires a savepoint name")),
+            _ => return Err(OakError::custom_error("Missing transaction action")),
+        };
+        Ok(ast::TransactionStatement { action, span: node.span() })
     }
 
     fn build_set_names_statement<'a>(&self, node: RedNode<'a, SqlLanguage>, source: &SourceText) -> Result<SetNamesStatement, OakError> {
@@ -1224,7 +1243,7 @@ impl<'config> SqlBuilder<'config> {
             SqlElementType::CreateStatement => Ok(SqlStatement::Create(self.build_create_statement(node, source)?)),
             SqlElementType::DropStatement => Ok(SqlStatement::Drop(self.build_drop_statement(node, source)?)),
             SqlElementType::AlterStatement => Ok(SqlStatement::Alter(self.build_alter_statement(node, source)?)),
-            SqlElementType::TransactionStatement => Ok(SqlStatement::Transaction(self.build_transaction_statement(node)?)),
+            SqlElementType::TransactionStatement => Ok(SqlStatement::Transaction(self.build_transaction_statement(node, source)?)),
             SqlElementType::SetNamesStatement => Ok(SqlStatement::SetNames(self.build_set_names_statement(node, source)?)),
             SqlElementType::SetVariableStatement => Ok(SqlStatement::SetVariable(self.build_set_variable_statement(node, source)?)),
             SqlElementType::ShowStatement => Ok(SqlStatement::Show(self.build_show_statement(node, source)?)),

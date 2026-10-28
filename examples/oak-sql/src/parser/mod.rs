@@ -548,7 +548,7 @@ impl<'config> SqlParser<'config> {
             Some(Drop) => self.parse_drop(state)?,
             Some(Alter) => self.parse_alter(state)?,
             Some(Explain) => self.parse_explain(state)?,
-            Some(Begin) | Some(Commit) | Some(Rollback) | Some(Transaction) => self.parse_transaction(state)?,
+            Some(Begin) | Some(Commit) | Some(Rollback) | Some(Savepoint) | Some(Release) | Some(Transaction) => self.parse_transaction(state)?,
             Some(Pragma) => self.parse_pragma(state)?,
             Some(Show) => self.parse_show(state)?,
             Some(Set) => self.parse_set(state)?,
@@ -623,12 +623,31 @@ impl<'config> SqlParser<'config> {
             }
             Some(Rollback) => {
                 state.bump();
-                state.eat(Transaction);
+                if state.eat(To) {
+                    // `ROLLBACK TO [SAVEPOINT] name`
+                    state.eat(Savepoint);
+                    state.expect(Identifier_).ok();
+                }
+                else {
+                    // plain `ROLLBACK` / `ROLLBACK TRANSACTION`
+                    state.eat(Transaction);
+                }
+            }
+            Some(Savepoint) => {
+                // `SAVEPOINT name`
+                state.bump();
+                state.expect(Identifier_).ok();
+            }
+            Some(Release) => {
+                // `RELEASE [SAVEPOINT] name`
+                state.bump();
+                state.eat(Savepoint);
+                state.expect(Identifier_).ok();
             }
             Some(Transaction) => {
                 state.bump();
             }
-            _ => return Err(OakError::custom_error("Expected BEGIN, COMMIT, or ROLLBACK")),
+            _ => return Err(OakError::custom_error("Expected BEGIN, COMMIT, ROLLBACK, SAVEPOINT, or RELEASE")),
         }
         state.eat(Semicolon);
         state.finish_at(cp, SqlElementType::TransactionStatement);
