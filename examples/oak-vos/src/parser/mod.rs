@@ -81,6 +81,25 @@ impl VosParser {
         Ok(())
     }
 
+    /// Reports whether leading attributes are followed by any recognised
+    /// declaration keyword.
+    ///
+    /// The check is speculative, so the parser state is restored afterwards.
+    fn attributes_lead_to_declaration<'a, S: Source + ?Sized>(&self, state: &mut State<'a, S>) -> bool {
+        let checkpoint = state.checkpoint();
+        let result = loop {
+            self.skip_trivia(state);
+            if !self.starts_attribute(state) {
+                break state.current().map(|t| Self::declaration_kind(t.kind) != VosElementType::Error).unwrap_or(false);
+            }
+            if self.parse_attribute(state).is_err() {
+                break false;
+            }
+        };
+        state.restore(checkpoint);
+        result
+    }
+
     /// Reports whether leading attributes are followed by a `service` keyword.
     ///
     /// The check is speculative, so the parser state is restored afterwards.
@@ -180,6 +199,13 @@ impl VosParser {
     }
 
     fn parse_declaration<'a, S: Source + ?Sized>(&self, state: &mut State<'a, S>) -> Result<(), OakError> {
+        // Consume any leading attributes — `parse_service_declaration` does the
+        // same, but regular declarations (e.g. `operation`, `const`) were missing
+        // this loop and silently dropped attributes.
+        while self.starts_attribute(state) {
+            self.parse_attribute(state)?;
+            self.skip_trivia(state);
+        }
         let Some(token) = state.current()
         else {
             return Ok(());
@@ -476,6 +502,9 @@ impl Parser<VosLanguage> for VosParser {
                 }
                 else if self.starts_attribute(state) && self.attributes_lead_to_service(state) {
                     self.parse_service_declaration(state)?;
+                }
+                else if self.starts_attribute(state) && self.attributes_lead_to_declaration(state) {
+                    self.parse_declaration(state)?;
                 }
                 else if matches!(state.current().map(|token| token.kind), Some(VosTokenType::LeftBrace | VosTokenType::LeftParen | VosTokenType::LeftBracket)) {
                     self.parse_group(state)?;
