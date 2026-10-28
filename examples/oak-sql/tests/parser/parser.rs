@@ -926,9 +926,11 @@ fn test_sql_builder_set_operations() {
         else {
             panic!("Expected set operation for {sql}, got {statement:?}");
         };
-        assert_eq!(set.operator, expected_operator, "{sql}");
-        assert_eq!(sql.get(set.left.span.start..set.left.span.end).map(str::trim), Some("SELECT a FROM t"), "{sql}");
-        assert_eq!(sql.get(set.right.span.start..set.right.span.end).map(str::trim), Some("SELECT b FROM u"), "{sql}");
+        assert_eq!(set.operators.len(), 1, "{sql}");
+        assert_eq!(set.operands.len(), 2, "{sql}");
+        assert_eq!(set.operators[0], expected_operator, "{sql}");
+        assert_eq!(sql.get(set.operands[0].span.start..set.operands[0].span.end).map(str::trim), Some("SELECT a FROM t"), "{sql}");
+        assert_eq!(sql.get(set.operands[1].span.start..set.operands[1].span.end).map(str::trim), Some("SELECT b FROM u"), "{sql}");
         assert!(set.order_by.is_none(), "{sql}");
         assert!(set.limit.is_none(), "{sql}");
         assert_eq!(source, expected_source, "{sql}");
@@ -939,13 +941,13 @@ fn test_sql_builder_set_operations() {
         else {
             panic!("Expected set operation after round trip for {sql}, got {rebuilt:?}");
         };
-        assert_eq!(rebuilt.operator, expected_operator, "{sql}");
+        assert_eq!(rebuilt.operators[0], expected_operator, "{sql}");
         assert_eq!(rebuilt_source, source, "{sql}");
     }
 }
 
 /// `ORDER BY` and `LIMIT` after a set operation apply to the combined result, so
-/// they must not end up on the right branch.
+/// they must not end up on the last branch.
 #[test]
 fn test_sql_builder_set_operation_tail_binds_to_whole_result() {
     let sql = "SELECT a FROM t UNION SELECT b FROM u ORDER BY a LIMIT 5;";
@@ -954,13 +956,13 @@ fn test_sql_builder_set_operation_tail_binds_to_whole_result() {
     else {
         panic!("Expected set operation, got {statement:?}");
     };
-    assert_eq!(set.operator, SetOperator::Union);
+    assert_eq!(set.operators[0], SetOperator::Union);
     let order_by = set.order_by.as_ref().unwrap_or_else(|| panic!("Missing ORDER BY on the set operation"));
     assert_eq!(order_by.items.len(), 1);
     let limit = set.limit.as_ref().unwrap_or_else(|| panic!("Missing LIMIT on the set operation"));
     assert!(matches!(&limit.limit, Expression::Literal(Literal::Number(value, _)) if value.as_ref() == "5"));
-    assert!(set.right.order_by.is_none(), "ORDER BY must not bind to the right branch");
-    assert!(set.right.limit.is_none(), "LIMIT must not bind to the right branch");
+    assert!(set.operands[1].order_by.is_none(), "ORDER BY must not bind to the last operand");
+    assert!(set.operands[1].limit.is_none(), "LIMIT must not bind to the last operand");
     assert_eq!(source, "SELECT a FROM t UNION SELECT b FROM u ORDER BY a ASC LIMIT 5;");
 
     let (rebuilt, rebuilt_source) = build_statement(&source);
@@ -970,18 +972,39 @@ fn test_sql_builder_set_operation_tail_binds_to_whole_result() {
     };
     assert!(rebuilt.order_by.is_some());
     assert!(rebuilt.limit.is_some());
-    assert!(rebuilt.right.order_by.is_none());
+    assert!(rebuilt.operands[1].order_by.is_none());
     assert_eq!(rebuilt_source, source);
 }
 
+/// Chains of three or more SELECTs linked by set operators must parse into a
+/// flat operands/operators layout and round-trip without losing any branch.
 #[test]
-fn test_sql_builder_set_operations_reject_unsupported_shapes() {
-    let config = SqlLanguage::default();
-    let builder = SqlBuilder::new(&config);
-    let mut session = ParseSession::<SqlLanguage>::default();
-    let result = builder.build(&SourceText::new("SELECT a FROM t UNION SELECT b FROM u UNION SELECT c FROM v;"), &[], &mut session);
-    assert!(result.result.is_err(), "chained set operations must be rejected: {:?}", result.result);
+fn test_sql_builder_chained_set_operations() {
+    let sql = "SELECT a FROM t UNION SELECT b FROM u UNION ALL SELECT c FROM v INTERSECT SELECT d FROM w;";
+    let (statement, source) = build_statement(sql);
+    let SqlStatement::SetOperation(set) = &statement
+    else {
+        panic!("Expected set operation, got {statement:?}");
+    };
+    assert_eq!(set.operands.len(), 4);
+    assert_eq!(set.operators.len(), 3);
+    assert_eq!(set.operators, vec![SetOperator::Union, SetOperator::UnionAll, SetOperator::Intersect]);
 
+    // Round trip must preserve every operand and every operator.
+    let (rebuilt, rebuilt_source) = build_statement(&source);
+    let SqlStatement::SetOperation(rebuilt) = &rebuilt
+    else {
+        panic!("Expected set operation after round trip, got {rebuilt:?}");
+    };
+    assert_eq!(rebuilt.operands.len(), 4);
+    assert_eq!(rebuilt.operators, set.operators);
+    assert_eq!(rebuilt_source, source);
+}
+
+/// A stray operator with no right-hand operand (e.g. `SELECT a UNION;`) must
+/// still be reported as a build error.
+#[test]
+fn test_sql_builder_set_operation_missing_right_is_rejected() {
     let reason = rejection_reason("SELECT a FROM t UNION;");
     assert!(!reason.is_empty(), "a set operation without its right SELECT must be reported");
 }

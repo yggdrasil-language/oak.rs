@@ -153,16 +153,19 @@ impl AsDocument for CteDefinition {
 impl AsDocument for SetOperationStatement {
     fn as_document(&self, _config: &Self::Config) -> Document<'_> {
         let mut parts = Vec::new();
-        parts.push(self.left.as_document(&()));
-        parts.push(line);
-        parts.push(Document::text(match self.operator {
-            SetOperator::Union => "UNION",
-            SetOperator::UnionAll => "UNION ALL",
-            SetOperator::Intersect => "INTERSECT",
-            SetOperator::Except => "EXCEPT",
-        }));
-        parts.push(line);
-        parts.push(self.right.as_document(&()));
+        for (i, operand) in self.operands.iter().enumerate() {
+            if i > 0 {
+                parts.push(line);
+                parts.push(Document::text(match self.operators[i - 1] {
+                    SetOperator::Union => "UNION",
+                    SetOperator::UnionAll => "UNION ALL",
+                    SetOperator::Intersect => "INTERSECT",
+                    SetOperator::Except => "EXCEPT",
+                }));
+                parts.push(line);
+            }
+            parts.push(operand.as_document(&()));
+        }
 
         if let Some(order_by) = &self.order_by {
             parts.push(line);
