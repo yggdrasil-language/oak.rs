@@ -81,6 +81,11 @@ impl<'config> ValkyrieBuilder<'config> {
                 RedTree::Leaf(t) => match t.kind {
                     ValkyrieTokenType::Whitespace | ValkyrieTokenType::Newline | ValkyrieTokenType::LineComment | ValkyrieTokenType::BlockComment => continue,
                     ValkyrieTokenType::Keyword(ValkyrieKeywords::Micro) => continue,
+                    ValkyrieTokenType::Semicolon => {
+                        // Semicolon-only declarations (`micro foo(): T;`) have no BlockExpression →
+                        // mark abstract so the body check at end of the function accepts it.
+                        is_abstract = true;
+                    }
                     ValkyrieTokenType::Identifier | ValkyrieTokenType::Keyword(_) => {
                         if name.name.is_empty() {
                             name.name = crate::builder::identifier_text(source, t.span);
