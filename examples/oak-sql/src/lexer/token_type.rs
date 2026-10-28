@@ -63,9 +63,14 @@ impl oak_core::TokenType for SqlTokenType {
             | Self::Left
             | Self::Right
             | Self::Full
+            | Self::Cross
             | Self::Outer
             | Self::On
             | Self::Group
+            | Self::Grouping
+            | Self::Sets
+            | Self::Rollup
+            | Self::Cube
             | Self::By
             | Self::Having
             | Self::Order
@@ -296,12 +301,22 @@ pub enum SqlTokenType {
     Right,
     /// `FULL` keyword.
     Full,
+    /// `CROSS` keyword.
+    Cross,
     /// `OUTER` keyword.
     Outer,
     /// `ON` keyword.
     On,
     /// `GROUP` keyword.
     Group,
+    /// `GROUPING` keyword.
+    Grouping,
+    /// `SETS` keyword.
+    Sets,
+    /// `ROLLUP` keyword.
+    Rollup,
+    /// `CUBE` keyword.
+    Cube,
     /// `BY` keyword.
     By,
     /// `HAVING` keyword.

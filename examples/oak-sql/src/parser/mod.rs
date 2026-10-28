@@ -892,17 +892,20 @@ impl<'config> SqlParser<'config> {
 
             // Parse JOIN clauses
             while let Some(kind) = state.peek_kind() {
-                if matches!(kind, Join | Inner | Left | Right | Full) {
+                if matches!(kind, Join | Inner | Left | Right | Full | Cross) {
                     let join_cp = state.checkpoint();
                     if kind != Join {
-                        state.bump(); // Inner, Left, etc.
-                        state.eat(Outer);
+                        state.bump(); // Inner, Left, Right, Full, Cross
+                        if kind != Cross {
+                            state.eat(Outer);
+                        }
                     }
                     state.expect(Join).ok();
 
                     self.parse_table_source(state);
 
-                    if state.eat(On) {
+                    // CROSS JOIN has no ON clause; other join types may have one.
+                    if kind != Cross && state.eat(On) {
                         PrattParser::parse(state, 0, self); // Join condition
                     }
                     state.finish_at(join_cp, SqlElementType::JoinClause);
@@ -930,7 +933,80 @@ impl<'config> SqlParser<'config> {
                     break;
                 }
                 first = false;
-                PrattParser::parse(state, 0, self);
+                // GROUPING SETS ((a), (b), (a, b)) — two-keyword entry
+                if state.peek_kind() == Some(Grouping) {
+                    state.bump(); // GROUPING (Leaf stays as child of GroupByClause)
+                    if state.eat(Sets) {
+                        state.expect(LeftParen).ok();
+                        // Inner groups: ((a), (b), ...)
+                        if state.peek_kind() == Some(LeftParen) {
+                            while state.not_at_end() {
+                                if state.peek_kind() != Some(LeftParen) {
+                                    break;
+                                }
+                                state.bump(); // inner (
+                                // items inside ( ... ) — may be empty
+                                if state.peek_kind() != Some(RightParen) {
+                                    let mut item_first = true;
+                                    while state.not_at_end() && state.peek_kind() != Some(RightParen) {
+                                        if !item_first {
+                                            if !state.eat(Comma) {
+                                                break;
+                                            }
+                                        }
+                                        PrattParser::parse(state, 0, self);
+                                        item_first = false;
+                                    }
+                                }
+                                state.expect(RightParen).ok(); // inner )
+                                if !state.eat(Comma) {
+                                    break;
+                                }
+                            }
+                        }
+                        state.expect(RightParen).ok(); // outer )
+                    }
+                }
+                // ROLLUP(a, b, c)
+                else if state.peek_kind() == Some(Rollup) {
+                    state.bump(); // ROLLUP
+                    state.expect(LeftParen).ok();
+                    if state.peek_kind() != Some(RightParen) {
+                        let mut item_first = true;
+                        while state.not_at_end() && state.peek_kind() != Some(RightParen) {
+                            if !item_first {
+                                if !state.eat(Comma) {
+                                    break;
+                                }
+                            }
+                            PrattParser::parse(state, 0, self);
+                            item_first = false;
+                        }
+                    }
+                    state.expect(RightParen).ok();
+                }
+                // CUBE(a, b, c)
+                else if state.peek_kind() == Some(Cube) {
+                    state.bump(); // CUBE
+                    state.expect(LeftParen).ok();
+                    if state.peek_kind() != Some(RightParen) {
+                        let mut item_first = true;
+                        while state.not_at_end() && state.peek_kind() != Some(RightParen) {
+                            if !item_first {
+                                if !state.eat(Comma) {
+                                    break;
+                                }
+                            }
+                            PrattParser::parse(state, 0, self);
+                            item_first = false;
+                        }
+                    }
+                    state.expect(RightParen).ok();
+                }
+                // Plain expression or identifier or position literal
+                else {
+                    PrattParser::parse(state, 0, self);
+                }
                 if !state.eat(Comma) {
                     break;
                 }

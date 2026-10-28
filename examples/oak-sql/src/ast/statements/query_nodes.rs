@@ -357,6 +357,8 @@ pub enum JoinType {
     Right,
     /// FULL JOIN.
     Full,
+    /// CROSS JOIN (no ON clause).
+    Cross,
 }
 
 impl ToSource for JoinType {
@@ -366,6 +368,7 @@ impl ToSource for JoinType {
             JoinType::Left => buffer.push("LEFT"),
             JoinType::Right => buffer.push("RIGHT"),
             JoinType::Full => buffer.push("FULL"),
+            JoinType::Cross => buffer.push("CROSS"),
         }
     }
 }
@@ -410,6 +413,13 @@ pub enum GroupByItem {
     },
     /// Any other grouping expression.
     Expression(Expression),
+    /// `GROUPING SETS ((a), (b), (a, b))` — each inner list is one grouping set
+    /// and may be empty `()` to produce the all-NULLs row.
+    GroupingSets(Vec<Vec<GroupByItem>>),
+    /// `ROLLUP(a, b, c)` — generates `(a, b, c)`, `(a, b)`, `(a)` and the grand total.
+    Rollup(Vec<GroupByItem>),
+    /// `CUBE(a, b, c)` — generates all 2ⁿ combinations of the listed grouping items.
+    Cube(Vec<GroupByItem>),
 }
 
 impl ToSource for GroupByItem {
@@ -418,6 +428,47 @@ impl ToSource for GroupByItem {
             GroupByItem::Column(identifier) => identifier.to_source(buffer),
             GroupByItem::Position { index, .. } => buffer.push(&index.to_string()),
             GroupByItem::Expression(expr) => expr.to_source(buffer),
+            GroupByItem::GroupingSets(groups) => {
+                buffer.push("GROUPING");
+                buffer.push("SETS");
+                buffer.push("(");
+                for (i, group) in groups.iter().enumerate() {
+                    if i > 0 {
+                        buffer.push(",");
+                    }
+                    buffer.push("(");
+                    for (j, item) in group.iter().enumerate() {
+                        if j > 0 {
+                            buffer.push(",");
+                        }
+                        item.to_source(buffer);
+                    }
+                    buffer.push(")");
+                }
+                buffer.push(")");
+            }
+            GroupByItem::Rollup(items) => {
+                buffer.push("ROLLUP");
+                buffer.push("(");
+                for (i, item) in items.iter().enumerate() {
+                    if i > 0 {
+                        buffer.push(",");
+                    }
+                    item.to_source(buffer);
+                }
+                buffer.push(")");
+            }
+            GroupByItem::Cube(items) => {
+                buffer.push("CUBE");
+                buffer.push("(");
+                for (i, item) in items.iter().enumerate() {
+                    if i > 0 {
+                        buffer.push(",");
+                    }
+                    item.to_source(buffer);
+                }
+                buffer.push(")");
+            }
         }
     }
 }
