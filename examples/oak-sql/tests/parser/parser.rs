@@ -1631,3 +1631,79 @@ fn test_sql_builder_subquery_parentheses_are_required() {
     // keeping a truncated query.
     assert!(!rejection_reason("SELECT * FROM t WHERE a = (SELECT b FROM u;").is_empty(), "Unclosed `(SELECT` must be rejected");
 }
+
+#[test]
+fn test_sql_builder_limit_offset_round_trip() {
+    // Plain number literals keep working as before.
+    let (statement, source) = build_statement("SELECT * FROM t LIMIT 10 OFFSET 5;");
+    let SqlStatement::Select(select) = &statement
+    else {
+        panic!("Expected Select statement");
+    };
+    let limit_clause = select.limit.as_ref().unwrap_or_else(|| panic!("Missing LIMIT clause"));
+    assert!(matches!(&limit_clause.limit, Expression::Literal(Literal::Number(v, _)) if v.as_ref() == "10"));
+    assert!(matches!(&limit_clause.offset, Some(Expression::Literal(Literal::Number(v, _))) if v.as_ref() == "5"));
+    assert_eq!(source, "SELECT*FROM t LIMIT 10 OFFSET 5;");
+
+    // LIMIT alone.
+    let (statement, source) = build_statement("SELECT * FROM t LIMIT 10;");
+    let SqlStatement::Select(select) = &statement
+    else {
+        panic!("Expected Select statement");
+    };
+    let limit_clause = select.limit.as_ref().unwrap_or_else(|| panic!("Missing LIMIT clause"));
+    assert!(matches!(&limit_clause.limit, Expression::Literal(Literal::Number(v, _)) if v.as_ref() == "10"));
+    assert!(limit_clause.offset.is_none());
+    assert_eq!(source, "SELECT*FROM t LIMIT 10;");
+
+    // OFFSET alone (MySQL-style without LIMIT).
+    let (statement, source) = build_statement("SELECT * FROM t OFFSET 5;");
+    let SqlStatement::Select(select) = &statement
+    else {
+        panic!("Expected Select statement");
+    };
+    let limit_clause = select.limit.as_ref().unwrap_or_else(|| panic!("Missing LIMIT clause"));
+    assert!(matches!(&limit_clause.limit, Expression::Literal(Literal::Number(v, _)) if v.as_ref() == "5"));
+    assert!(limit_clause.offset.is_none());
+    assert_eq!(source, "SELECT*FROM t LIMIT 5;");
+}
+
+#[test]
+fn test_sql_builder_limit_offset_expressions() {
+    // Scalar subquery as LIMIT value.
+    let (statement, _source) = build_statement("SELECT * FROM t LIMIT (SELECT 1);");
+    let SqlStatement::Select(select) = &statement
+    else {
+        panic!("Expected Select statement");
+    };
+    let limit_clause = select.limit.as_ref().unwrap_or_else(|| panic!("Missing LIMIT clause"));
+    assert!(matches!(&limit_clause.limit, Expression::Subquery { .. }), "LIMIT should accept a scalar subquery, got {:?}", limit_clause.limit);
+
+    // Expression (column reference + arithmetic) as OFFSET value.
+    let (statement, _source) = build_statement("SELECT * FROM t LIMIT 10 OFFSET a + b;");
+    let SqlStatement::Select(select) = &statement
+    else {
+        panic!("Expected Select statement");
+    };
+    let limit_clause = select.limit.as_ref().unwrap_or_else(|| panic!("Missing LIMIT clause"));
+    assert!(matches!(&limit_clause.limit, Expression::Literal(Literal::Number(v, _)) if v.as_ref() == "10"));
+    assert!(matches!(&limit_clause.offset, Some(Expression::Binary { .. })), "OFFSET should accept a binary expression, got {:?}", limit_clause.offset);
+
+    // Bare identifier as LIMIT value (resolved by semantic layer, parser accepts it).
+    let (statement, _source) = build_statement("SELECT * FROM t LIMIT n;");
+    let SqlStatement::Select(select) = &statement
+    else {
+        panic!("Expected Select statement");
+    };
+    let limit_clause = select.limit.as_ref().unwrap_or_else(|| panic!("Missing LIMIT clause"));
+    assert!(matches!(&limit_clause.limit, Expression::Identifier(id) if id.name.as_ref() == "n"), "LIMIT should accept a bare identifier");
+
+    // Negative literal as LIMIT value (unary minus).
+    let (statement, _source) = build_statement("SELECT * FROM t LIMIT -1;");
+    let SqlStatement::Select(select) = &statement
+    else {
+        panic!("Expected Select statement");
+    };
+    let limit_clause = select.limit.as_ref().unwrap_or_else(|| panic!("Missing LIMIT clause"));
+    assert!(matches!(&limit_clause.limit, Expression::Unary { op: UnaryOperator::Minus, .. }), "LIMIT should accept unary minus expression");
+}

@@ -1173,26 +1173,25 @@ impl<'config> SqlBuilder<'config> {
         let mut offset = None;
 
         for child in node.children() {
-            if let RedTree::Leaf(t) = child {
-                if t.kind == SqlTokenType::NumberLiteral {
-                    let expr = Expression::Literal(Literal::Number(self.get_text(t.span.clone(), source), t.span.clone()));
-                    if limit.is_none() {
-                        limit = Some(expr);
-                    }
-                    else {
-                        offset = Some(expr);
-                    }
+            let expr = match child {
+                RedTree::Leaf(t) if t.kind == SqlTokenType::NumberLiteral => {
+                    Some(Expression::Literal(Literal::Number(self.get_text(t.span.clone(), source), t.span.clone())))
                 }
-            }
-            else if let RedTree::Node(n) = child {
-                if n.green.kind == SqlElementType::Expression {
-                    let expr = self.build_expression(n, source)?;
-                    if limit.is_none() {
-                        limit = Some(expr);
-                    }
-                    else {
-                        offset = Some(expr);
-                    }
+                RedTree::Node(n) => match n.green.kind {
+                    SqlElementType::Expression => Some(self.build_expression(n, source)?),
+                    SqlElementType::Identifier => Some(Expression::Identifier(self.build_identifier(n, source)?)),
+                    SqlElementType::FunctionCall => Some(self.build_expression(n, source)?),
+                    SqlElementType::Subquery => Some(self.build_expression(n, source)?),
+                    _ => None,
+                },
+                _ => None,
+            };
+            if let Some(expr) = expr {
+                if limit.is_none() {
+                    limit = Some(expr);
+                }
+                else {
+                    offset = Some(expr);
                 }
             }
         }
