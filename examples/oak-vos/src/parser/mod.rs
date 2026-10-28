@@ -199,19 +199,34 @@ impl VosParser {
     }
 
     fn parse_declaration<'a, S: Source + ?Sized>(&self, state: &mut State<'a, S>) -> Result<(), OakError> {
-        // Consume any leading attributes — `parse_service_declaration` does the
-        // same, but regular declarations (e.g. `operation`, `const`) were missing
-        // this loop and silently dropped attributes.
-        while self.starts_attribute(state) {
-            self.parse_attribute(state)?;
+        // Speculatively peek past any leading attributes to identify the
+        // declaration kind without consuming anything — the attributes must be
+        // parsed *inside* the incremental_node closure so the builder finds them
+        // as children of the declaration node, not stranded at root level.
+        let peek = state.checkpoint();
+        let element = loop {
             self.skip_trivia(state);
-        }
-        let Some(token) = state.current()
-        else {
-            return Ok(());
+            if !self.starts_attribute(state) {
+                break state
+                    .current()
+                    .map(|t| Self::declaration_kind(t.kind))
+                    .unwrap_or(VosElementType::Error);
+            }
+            if self.parse_attribute(state).is_err() {
+                break VosElementType::Error;
+            }
         };
-        let element = Self::declaration_kind(token.kind);
+        state.restore(peek);
+        if matches!(element, VosElementType::Error) {
+            return Ok(());
+        }
         state.incremental_node(element, |state| {
+            // Consume leading attributes *inside* the node so they become its
+            // children; `parse_service_declaration` follows the same pattern.
+            while self.starts_attribute(state) {
+                self.parse_attribute(state)?;
+                self.skip_trivia(state);
+            }
             state.bump();
             self.skip_trivia(state);
             if element == VosElementType::Obsolete && state.at(VosTokenType::Table) {
