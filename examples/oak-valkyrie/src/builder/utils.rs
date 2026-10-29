@@ -86,11 +86,11 @@ pub(crate) fn build_name_path<S: Source + ?Sized>(node: &RedNode<ValkyrieLanguag
                 continue;
             }
             match t.kind {
-                ValkyrieTokenType::Identifier => {
-                    parts.push(Identifier { name: crate::builder::identifier_text(source, t.span), span: t.span });
-                }
                 ValkyrieTokenType::Keyword(crate::lexer::ValkyrieKeywords::SelfType) => {
                     parts.push(Identifier { name: "Self".to_string(), span: t.span });
+                }
+                _ if t.kind.is_soft_identifier() => {
+                    parts.push(Identifier { name: crate::builder::identifier_text(source, t.span), span: t.span });
                 }
                 _ => {}
             }

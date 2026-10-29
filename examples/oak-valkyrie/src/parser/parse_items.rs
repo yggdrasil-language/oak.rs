@@ -913,11 +913,6 @@ fn is_attribute_argument_name<S: oak_core::Source + ?Sized>(state: &State<'_, S>
 /// Parse an attribute argument: `name: "answer"` or a positional argument.
 pub(crate) fn parse_attribute_argument<S: oak_core::Source + ?Sized>(state: &mut State<'_, S>) -> Result<(), oak_core::OakError> {
     let cp = state.sink.checkpoint();
-    if state.at(ValkyrieTokenType::Identifier) && matches!(state.peek_non_trivia_kind_at(1), Some(ValkyrieTokenType::ColonColon | ValkyrieTokenType::Dot)) {
-        parse_name_path(state)?;
-        state.sink.finish_node(cp, ValkyrieElementType::AttributeArgument);
-        return Ok(());
-    }
     if is_attribute_argument_name(state) {
         let next = state.peek_non_trivia_kind_at(1);
         if next == Some(ValkyrieTokenType::Colon) || next == Some(ValkyrieTokenType::Eq) {

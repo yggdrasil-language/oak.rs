@@ -146,7 +146,7 @@ impl ValkyrieTokenType {
     /// 软关键字：词法上是关键字，但在名字位置等价于标识符。
     ///
     /// 这些关键字只在声明的锚点位置（访问器、`yield from`、`union X {`、`flags X {`、
-    /// `shader X by Y`）决定语法，在参数名、绑定名、表达式名和成员名位置仍按标识符处理。
+    /// `shader X by Y`、文件锚点 `[when(...)]`）决定语法，在参数名、绑定名、表达式名和成员名位置仍按标识符处理。
     pub fn is_soft_identifier(&self) -> bool {
         matches!(
             self,
@@ -157,6 +157,7 @@ impl ValkyrieTokenType {
                 | Self::Keyword(ValkyrieKeywords::Union)
                 | Self::Keyword(ValkyrieKeywords::Flags)
                 | Self::Keyword(ValkyrieKeywords::By)
+                | Self::Keyword(ValkyrieKeywords::When)
         )
     }
 }
