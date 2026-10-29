@@ -5,7 +5,7 @@ impl<'config> TypeScriptBuilder<'config> {
     pub(crate) fn build_parameter(&self, node: &RedNode<TypeScriptLanguage>, source: &SourceText) -> Result<Option<FunctionParam>, OakError> {
         let mut name = String::new();
         let mut ty = None;
-        let mut optional = false;
+        let mut optional_marker = None;
         let mut decorators = Vec::new();
 
         for child in node.children() {
@@ -26,7 +26,7 @@ impl<'config> TypeScriptBuilder<'config> {
                 },
                 RedTree::Leaf(leaf) => {
                     if leaf.kind == TypeScriptTokenType::Question {
-                        optional = true
+                        optional_marker = Some(OptionalMarker::new(leaf.span))
                     }
                     else if leaf.kind == TypeScriptTokenType::IdentifierName {
                         name = source.get_text_in(leaf.span.into()).to_string();
@@ -35,7 +35,7 @@ impl<'config> TypeScriptBuilder<'config> {
             }
         }
         let span = node.span();
-        Ok(Some(FunctionParam { name, ty, optional, decorators, span: span.into() }))
+        Ok(Some(FunctionParam { name, ty, optional_marker, decorators, span: span.into() }))
     }
 
     pub(crate) fn build_enum_member(&self, node: &RedNode<TypeScriptLanguage>, source: &SourceText) -> Result<Option<EnumMember>, OakError> {

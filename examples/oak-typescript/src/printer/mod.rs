@@ -41,7 +41,7 @@ pub fn format_source(source: &str, options: &FormatOptions) -> Result<String, St
     let root = built.result.ok().ok_or_else(|| "oak build returned no root".to_string())?;
     let mut out = String::new();
     for (index, stmt) in root.statements.iter().enumerate() {
-        if options.type_erasure && matches!(stmt, crate::ast::Statement::ImportDeclaration(import) if import.is_type_only) {
+        if options.type_erasure && matches!(stmt, crate::ast::Statement::ImportDeclaration(import) if import.is_type_only()) {
             continue;
         }
         if !out.is_empty() {

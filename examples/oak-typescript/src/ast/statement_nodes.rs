@@ -1,4 +1,4 @@
-use crate::ast::{ClassMember, Decorator, EnumMember, Expression, TypeAnnotation, TypeParameter};
+use crate::ast::{ClassMember, Decorator, EnumMember, Expression, Modifier, ModifierKind, OptionalMarker, TypeAnnotation, TypeParameter, has_modifier};
 use core::range::Range;
 
 /// Represents a TypeScript statement.
@@ -90,8 +90,6 @@ impl Statement {
 pub struct ExpressionStatement {
     /// Decorators associated with the statement.
     pub decorators: Vec<Decorator>,
-    /// Whether the statement is declared with `declare`.
-    pub is_declare: bool,
     /// The expression being evaluated.
     pub expression: Expression,
     /// Source span of the statement.
@@ -105,8 +103,6 @@ pub struct ExpressionStatement {
 pub struct ReturnStatement {
     /// Decorators associated with the statement.
     pub decorators: Vec<Decorator>,
-    /// Whether the statement is declared with `declare`.
-    pub is_declare: bool,
     /// The expression being returned, if any.
     pub argument: Option<Expression>,
     /// Source span of the statement.
@@ -120,8 +116,6 @@ pub struct ReturnStatement {
 pub struct ThrowStatement {
     /// Decorators associated with the statement.
     pub decorators: Vec<Decorator>,
-    /// Whether the statement is declared with `declare`.
-    pub is_declare: bool,
     /// The expression being thrown.
     pub argument: Expression,
     /// Source span of the statement.
@@ -135,8 +129,6 @@ pub struct ThrowStatement {
 pub struct BreakStatement {
     /// Decorators associated with the statement.
     pub decorators: Vec<Decorator>,
-    /// Whether the statement is declared with `declare`.
-    pub is_declare: bool,
     /// The label being broken to, if any.
     pub label: Option<String>,
     /// Source span of the statement.
@@ -150,8 +142,6 @@ pub struct BreakStatement {
 pub struct ContinueStatement {
     /// Decorators associated with the statement.
     pub decorators: Vec<Decorator>,
-    /// Whether the statement is declared with `declare`.
-    pub is_declare: bool,
     /// The label being continued to, if any.
     pub label: Option<String>,
     /// Source span of the statement.
@@ -165,8 +155,8 @@ pub struct ContinueStatement {
 pub struct NamespaceDeclaration {
     /// Decorators associated with the declaration.
     pub decorators: Vec<Decorator>,
-    /// Whether the declaration is declared with `declare`.
-    pub is_declare: bool,
+    /// Keyword modifiers written before the declaration (`declare`).
+    pub modifiers: Vec<Modifier>,
     /// The name of the namespace.
     pub name: String,
     /// The statements within the namespace.
@@ -182,8 +172,8 @@ pub struct NamespaceDeclaration {
 pub struct InterfaceDeclaration {
     /// Decorators associated with the declaration.
     pub decorators: Vec<Decorator>,
-    /// Whether the declaration is declared with `declare`.
-    pub is_declare: bool,
+    /// Keyword modifiers written before the declaration (`declare`).
+    pub modifiers: Vec<Modifier>,
     /// The name of the interface.
     pub name: String,
     /// Type parameters of the interface.
@@ -203,8 +193,8 @@ pub struct InterfaceDeclaration {
 pub struct TypeAliasDeclaration {
     /// Decorators associated with the declaration.
     pub decorators: Vec<Decorator>,
-    /// Whether the declaration is declared with `declare`.
-    pub is_declare: bool,
+    /// Keyword modifiers written before the declaration (`declare`).
+    pub modifiers: Vec<Modifier>,
     /// The name of the type alias.
     pub name: String,
     /// Type parameters of the type alias.
@@ -222,8 +212,8 @@ pub struct TypeAliasDeclaration {
 pub struct EnumDeclaration {
     /// Decorators associated with the declaration.
     pub decorators: Vec<Decorator>,
-    /// Whether the declaration is declared with `declare`.
-    pub is_declare: bool,
+    /// Keyword modifiers written before the declaration (`declare`).
+    pub modifiers: Vec<Modifier>,
     /// The name of the enum.
     pub name: String,
     /// Members of the enum.
@@ -239,8 +229,6 @@ pub struct EnumDeclaration {
 pub struct IfStatement {
     /// Decorators associated with the statement.
     pub decorators: Vec<Decorator>,
-    /// Whether the statement is declared with `declare`.
-    pub is_declare: bool,
     /// The condition being tested.
     pub test: Expression,
     /// The statement to execute if the condition is true.
@@ -258,8 +246,6 @@ pub struct IfStatement {
 pub struct WhileStatement {
     /// Decorators associated with the statement.
     pub decorators: Vec<Decorator>,
-    /// Whether the statement is declared with `declare`.
-    pub is_declare: bool,
     /// The condition being tested.
     pub test: Expression,
     /// The statement to execute as long as the condition is true.
@@ -275,8 +261,6 @@ pub struct WhileStatement {
 pub struct DoWhileStatement {
     /// Decorators associated with the statement.
     pub decorators: Vec<Decorator>,
-    /// Whether the statement is declared with `declare`.
-    pub is_declare: bool,
     /// The statement to execute at least once.
     pub body: Box<Statement>,
     /// The condition being tested after each iteration.
@@ -292,8 +276,6 @@ pub struct DoWhileStatement {
 pub struct ForStatement {
     /// Decorators associated with the statement.
     pub decorators: Vec<Decorator>,
-    /// Whether the statement is declared with `declare`.
-    pub is_declare: bool,
     /// The initialization statement.
     pub initializer: Option<Box<Statement>>,
     /// The condition being tested before each iteration.
@@ -313,8 +295,6 @@ pub struct ForStatement {
 pub struct ForInStatement {
     /// Decorators associated with the statement.
     pub decorators: Vec<Decorator>,
-    /// Whether the statement is declared with `declare`.
-    pub is_declare: bool,
     /// The left-hand side of the for-in loop.
     pub left: Box<Statement>,
     /// The expression being iterated over.
@@ -332,8 +312,6 @@ pub struct ForInStatement {
 pub struct ForOfStatement {
     /// Decorators associated with the statement.
     pub decorators: Vec<Decorator>,
-    /// Whether the statement is declared with `declare`.
-    pub is_declare: bool,
     /// The left-hand side of the for-of loop.
     pub left: Box<Statement>,
     /// The expression being iterated over.
@@ -351,8 +329,6 @@ pub struct ForOfStatement {
 pub struct SwitchStatement {
     /// Decorators associated with the statement.
     pub decorators: Vec<Decorator>,
-    /// Whether the statement is declared with `declare`.
-    pub is_declare: bool,
     /// The expression being switched on.
     pub discriminant: Expression,
     /// Cases within the switch statement.
@@ -381,8 +357,6 @@ pub struct SwitchCase {
 pub struct TryStatement {
     /// Decorators associated with the statement.
     pub decorators: Vec<Decorator>,
-    /// Whether the statement is declared with `declare`.
-    pub is_declare: bool,
     /// The try block.
     pub block: Vec<Statement>,
     /// The catch clause.
@@ -413,8 +387,6 @@ pub struct CatchClause {
 pub struct BlockStatement {
     /// Decorators associated with the statement.
     pub decorators: Vec<Decorator>,
-    /// Whether the statement is declared with `declare`.
-    pub is_declare: bool,
     /// The statements within the block.
     pub statements: Vec<Statement>,
     /// Source span of the block statement.
@@ -436,7 +408,19 @@ pub enum ImportSpecifier {
         local: String,
         /// Imported name.
         imported: String,
+        /// `type` keyword written before this specifier, e.g. `{ type Foo }`.
+        type_modifier: Option<Modifier>,
     },
+}
+
+impl ImportSpecifier {
+    /// Returns `true` when this specifier carries an inline `type` keyword.
+    ///
+    /// Declaration-level `import type …` is recorded on
+    /// [`ImportDeclaration::is_type_only`], not here.
+    pub fn is_inline_type_only(&self) -> bool {
+        matches!(self, ImportSpecifier::Named { type_modifier: Some(_), .. })
+    }
 }
 
 /// Represents an export specifier.
@@ -447,8 +431,18 @@ pub struct ExportSpecifier {
     pub local: String,
     /// Exported name.
     pub exported: String,
-    /// Whether this specifier is type-only.
-    pub is_type_only: bool,
+    /// `type` keyword written before this specifier, e.g. `{ type Foo }`.
+    pub type_modifier: Option<Modifier>,
+}
+
+impl ExportSpecifier {
+    /// Returns `true` when this specifier carries an inline `type` keyword.
+    ///
+    /// Declaration-level `export type …` is recorded on
+    /// [`ExportDeclaration::is_type_only`], not here.
+    pub fn is_inline_type_only(&self) -> bool {
+        self.type_modifier.is_some()
+    }
 }
 
 /// Represents an import declaration.
@@ -459,11 +453,18 @@ pub struct ImportDeclaration {
     pub module_specifier: String,
     /// The specifiers within the import.
     pub specifiers: Vec<ImportSpecifier>,
-    /// Whether the import is type-only.
-    pub is_type_only: bool,
+    /// Keyword modifiers written before the bindings (`type`).
+    pub modifiers: Vec<Modifier>,
     /// Source span of the declaration.
     #[cfg_attr(feature = "serde", serde(with = "oak_core::serde_range"))]
     pub span: Range<usize>,
+}
+
+impl ImportDeclaration {
+    /// Returns `true` for `import type …` declarations.
+    pub fn is_type_only(&self) -> bool {
+        has_modifier(&self.modifiers, ModifierKind::Type)
+    }
 }
 
 /// Represents an export declaration.
@@ -476,13 +477,23 @@ pub struct ExportDeclaration {
     pub specifiers: Vec<ExportSpecifier>,
     /// The module specifier being exported from.
     pub source: Option<String>,
-    /// Whether this is a default export.
-    pub is_default: bool,
-    /// Whether the export is type-only.
-    pub is_type_only: bool,
+    /// Keyword modifiers written directly after `export` (`default`, `type`).
+    pub modifiers: Vec<Modifier>,
     /// Source span of the declaration.
     #[cfg_attr(feature = "serde", serde(with = "oak_core::serde_range"))]
     pub span: Range<usize>,
+}
+
+impl ExportDeclaration {
+    /// Returns `true` for `export default …`.
+    pub fn is_default(&self) -> bool {
+        has_modifier(&self.modifiers, ModifierKind::Default)
+    }
+
+    /// Returns `true` for `export type …`.
+    pub fn is_type_only(&self) -> bool {
+        has_modifier(&self.modifiers, ModifierKind::Type)
+    }
 }
 
 /// Represents a variable declaration.
@@ -491,8 +502,8 @@ pub struct ExportDeclaration {
 pub struct VariableDeclaration {
     /// Decorators associated with the declaration.
     pub decorators: Vec<Decorator>,
-    /// Whether the declaration is declared with `declare`.
-    pub is_declare: bool,
+    /// Keyword modifiers written before the declaration (`declare`).
+    pub modifiers: Vec<Modifier>,
     /// The name of the variable.
     pub name: String,
     /// The JavaScript declaration keyword.
@@ -524,8 +535,8 @@ pub enum VariableKind {
 pub struct FunctionDeclaration {
     /// Decorators associated with the declaration.
     pub decorators: Vec<Decorator>,
-    /// Whether the declaration is declared with `declare`.
-    pub is_declare: bool,
+    /// Keyword modifiers written before the declaration (`declare`).
+    pub modifiers: Vec<Modifier>,
     /// The name of the function.
     pub name: String,
     /// Type parameters of the function.
@@ -547,8 +558,8 @@ pub struct FunctionDeclaration {
 pub struct ClassDeclaration {
     /// Decorators associated with the declaration.
     pub decorators: Vec<Decorator>,
-    /// Whether the declaration is declared with `declare`.
-    pub is_declare: bool,
+    /// Keyword modifiers written before the declaration (`declare`, `abstract`).
+    pub modifiers: Vec<Modifier>,
     /// The name of the class.
     pub name: String,
     /// Type parameters of the class.
@@ -557,8 +568,6 @@ pub struct ClassDeclaration {
     pub extends: Option<TypeAnnotation>,
     /// The interfaces that this class implements.
     pub implements: Vec<TypeAnnotation>,
-    /// Whether the class is abstract.
-    pub is_abstract: bool,
     /// Members of the class.
     pub body: Vec<ClassMember>,
     /// Source span of the declaration.
@@ -576,9 +585,70 @@ pub struct FunctionParam {
     pub name: String,
     /// The type annotation of the parameter.
     pub ty: Option<TypeAnnotation>,
-    /// Whether the parameter is optional.
-    pub optional: bool,
+    /// `?` marker written after the parameter name.
+    pub optional_marker: Option<OptionalMarker>,
     /// Source span of the parameter.
     #[cfg_attr(feature = "serde", serde(with = "oak_core::serde_range"))]
     pub span: Range<usize>,
+}
+
+impl FunctionParam {
+    /// Returns `true` when the parameter is marked optional with `?`.
+    pub fn is_optional(&self) -> bool {
+        self.optional_marker.is_some()
+    }
+}
+
+impl VariableDeclaration {
+    /// Returns `true` when the declaration carries a `declare` modifier.
+    pub fn is_declare(&self) -> bool {
+        has_modifier(&self.modifiers, ModifierKind::Declare)
+    }
+}
+
+impl FunctionDeclaration {
+    /// Returns `true` when the declaration carries a `declare` modifier.
+    pub fn is_declare(&self) -> bool {
+        has_modifier(&self.modifiers, ModifierKind::Declare)
+    }
+}
+
+impl ClassDeclaration {
+    /// Returns `true` when the declaration carries a `declare` modifier.
+    pub fn is_declare(&self) -> bool {
+        has_modifier(&self.modifiers, ModifierKind::Declare)
+    }
+
+    /// Returns `true` when the class carries an `abstract` modifier.
+    pub fn is_abstract(&self) -> bool {
+        has_modifier(&self.modifiers, ModifierKind::Abstract)
+    }
+}
+
+impl InterfaceDeclaration {
+    /// Returns `true` when the declaration carries a `declare` modifier.
+    pub fn is_declare(&self) -> bool {
+        has_modifier(&self.modifiers, ModifierKind::Declare)
+    }
+}
+
+impl TypeAliasDeclaration {
+    /// Returns `true` when the declaration carries a `declare` modifier.
+    pub fn is_declare(&self) -> bool {
+        has_modifier(&self.modifiers, ModifierKind::Declare)
+    }
+}
+
+impl EnumDeclaration {
+    /// Returns `true` when the declaration carries a `declare` modifier.
+    pub fn is_declare(&self) -> bool {
+        has_modifier(&self.modifiers, ModifierKind::Declare)
+    }
+}
+
+impl NamespaceDeclaration {
+    /// Returns `true` when the declaration carries a `declare` modifier.
+    pub fn is_declare(&self) -> bool {
+        has_modifier(&self.modifiers, ModifierKind::Declare)
+    }
 }

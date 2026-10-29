@@ -1,6 +1,6 @@
 //! Oak TypeScript statement → canonical text.
 
-use crate::ast::{BlockStatement, ClassDeclaration, ClassMember, DoWhileStatement, ExportDeclaration, FunctionDeclaration, ImportDeclaration, ImportSpecifier, Statement, TryStatement, TypeAliasDeclaration, VariableDeclaration};
+use crate::ast::{BlockStatement, ClassDeclaration, ClassMember, DoWhileStatement, ExportDeclaration, FunctionDeclaration, ImportDeclaration, ImportSpecifier, ModifierKind, Statement, TryStatement, TypeAliasDeclaration, VariableDeclaration};
 
 use super::expr::{print_expression, print_string};
 
@@ -78,7 +78,7 @@ fn print_try(s: &TryStatement) -> Option<String> {
 }
 
 fn print_variable(v: &VariableDeclaration) -> Option<String> {
-    if !v.decorators.is_empty() || v.is_declare {
+    if !v.decorators.is_empty() || v.is_declare() {
         return None;
     }
     let init = match &v.value {
@@ -93,7 +93,7 @@ fn print_variable(v: &VariableDeclaration) -> Option<String> {
 }
 
 fn print_import(d: &ImportDeclaration) -> Option<String> {
-    let type_kw = if d.is_type_only { "type " } else { "" };
+    let type_kw = if d.is_type_only() { "type " } else { "" };
     let module = print_string(&d.module_specifier);
     if d.specifiers.is_empty() {
         return Some(format!("import {type_kw}{module};"));
@@ -103,8 +103,10 @@ fn print_import(d: &ImportDeclaration) -> Option<String> {
         parts.push(match spec {
             ImportSpecifier::Default(name) => name.clone(),
             ImportSpecifier::Namespace(name) => format!("* as {name}"),
-            ImportSpecifier::Named { local, imported } if local == imported => local.clone(),
-            ImportSpecifier::Named { local, imported } => format!("{imported} as {local}"),
+            ImportSpecifier::Named { local, imported, type_modifier } => {
+                let type_kw = if type_modifier.is_some() { "type " } else { "" };
+                if local == imported { format!("{type_kw}{local}") } else { format!("{type_kw}{imported} as {local}") }
+            }
         });
     }
     Some(format!("import {type_kw}{{ {} }} from {};", parts.join(", "), module))
@@ -114,24 +116,25 @@ fn print_export(d: &ExportDeclaration) -> Option<String> {
     if !d.specifiers.is_empty() {
         let mut parts = Vec::with_capacity(d.specifiers.len());
         for specifier in &d.specifiers {
-            let type_kw = if specifier.is_type_only { "type " } else { "" };
+            let type_kw = if specifier.is_inline_type_only() { "type " } else { "" };
             let name = if specifier.local == specifier.exported { specifier.local.clone() } else { format!("{} as {}", specifier.local, specifier.exported) };
             parts.push(format!("{type_kw}{name}"));
         }
         let source = d.source.as_ref().map(|value| format!(" from {}", print_string(value))).unwrap_or_default();
-        return Some(format!("export {{ {} }}{source};", parts.join(", ")));
+        let type_kw = if d.is_type_only() { "type " } else { "" };
+        return Some(format!("export {type_kw}{{ {} }}{source};", parts.join(", ")));
     }
-    if d.source.is_some() || d.is_type_only {
+    if d.source.is_some() || d.is_type_only() {
         return None;
     }
-    let default_kw = if d.is_default { "default " } else { "" };
+    let default_kw = if d.is_default() { "default " } else { "" };
     let decl = d.declaration.as_ref()?;
     let body = print_statement(decl)?;
     Some(format!("export {default_kw}{body}"))
 }
 
 fn print_function(d: &FunctionDeclaration) -> Option<String> {
-    if !d.decorators.is_empty() || d.is_declare || !d.type_params.is_empty() {
+    if !d.decorators.is_empty() || d.is_declare() || !d.type_params.is_empty() {
         return None;
     }
     let params = print_function_params(&d.params)?;
@@ -156,14 +159,14 @@ fn print_function_params(params: &[crate::ast::FunctionParam]) -> Option<String>
             Some(t) => format!(": {}", super::expr::print_type_annotation(t)?),
             None => String::new(),
         };
-        let opt = if p.optional { "?" } else { "" };
+        let opt = if p.is_optional() { "?" } else { "" };
         parts.push(format!("{}{}{}", p.name, opt, ty));
     }
     Some(format!("({})", parts.join(", ")))
 }
 
 fn print_class(d: &ClassDeclaration) -> Option<String> {
-    if !d.decorators.is_empty() || d.is_declare || d.is_abstract || !d.type_params.is_empty() || !d.implements.is_empty() {
+    if !d.decorators.is_empty() || d.is_declare() || d.is_abstract() || !d.type_params.is_empty() || !d.implements.is_empty() {
         return None;
     }
     let extends = match d.extends.as_ref() {
@@ -180,27 +183,27 @@ fn print_class(d: &ClassDeclaration) -> Option<String> {
 
 fn print_class_member(member: &ClassMember) -> Option<String> {
     match member {
-        ClassMember::Property { decorators, name, initializer, is_static, is_readonly, is_abstract, is_optional, .. } => {
-            if !decorators.is_empty() || *is_readonly || *is_abstract || *is_optional {
+        ClassMember::Property { decorators, name, initializer, optional_marker, .. } => {
+            if !decorators.is_empty() || member.has_modifier(ModifierKind::Readonly) || member.has_modifier(ModifierKind::Abstract) || optional_marker.is_some() {
                 return None;
             }
-            let static_kw = if *is_static { "static " } else { "" };
+            let static_kw = if member.has_modifier(ModifierKind::Static) { "static " } else { "" };
             let initializer = match initializer.as_ref() {
                 Some(expr) => format!(" = {}", print_expression(expr)?),
                 None => String::new(),
             };
             Some(format!("{static_kw}{name}{initializer};"))
         }
-        ClassMember::Method { decorators, name, params, body, is_static, is_abstract, is_async, is_getter, is_setter, is_optional, type_params, .. } => {
-            if !decorators.is_empty() || *is_abstract || *is_optional || !type_params.is_empty() {
+        ClassMember::Method { decorators, name, params, body, optional_marker, type_params, .. } => {
+            if !decorators.is_empty() || member.has_modifier(ModifierKind::Abstract) || optional_marker.is_some() || !type_params.is_empty() {
                 return None;
             }
-            let static_kw = if *is_static { "static " } else { "" };
-            let async_kw = if *is_async { "async " } else { "" };
-            let accessor = if *is_getter {
+            let static_kw = if member.has_modifier(ModifierKind::Static) { "static " } else { "" };
+            let async_kw = if member.has_modifier(ModifierKind::Async) { "async " } else { "" };
+            let accessor = if member.has_modifier(ModifierKind::Get) {
                 "get "
             }
-            else if *is_setter {
+            else if member.has_modifier(ModifierKind::Set) {
                 "set "
             }
             else {

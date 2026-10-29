@@ -12,9 +12,8 @@ impl<'config> TypeScriptBuilder<'config> {
                 let mut ty = None;
                 let mut value = None;
                 let mut visibility = None;
-                let mut is_static = false;
-                let mut is_readonly = false;
-                let mut is_optional = false;
+                let mut modifiers: Vec<Modifier> = Vec::new();
+                let mut optional_marker = None;
                 let mut decorators = Vec::new();
 
                 for child in node.children() {
@@ -49,14 +48,14 @@ impl<'config> TypeScriptBuilder<'config> {
                             TypeScriptTokenType::Public => visibility = Some(Visibility::Public),
                             TypeScriptTokenType::Private => visibility = Some(Visibility::Private),
                             TypeScriptTokenType::Protected => visibility = Some(Visibility::Protected),
-                            TypeScriptTokenType::Static => is_static = true,
-                            TypeScriptTokenType::Readonly => is_readonly = true,
-                            TypeScriptTokenType::Question => is_optional = true,
+                            TypeScriptTokenType::Static => modifiers.push(Modifier::new(ModifierKind::Static, leaf.span)),
+                            TypeScriptTokenType::Readonly => modifiers.push(Modifier::new(ModifierKind::Readonly, leaf.span)),
+                            TypeScriptTokenType::Question => optional_marker = Some(OptionalMarker::new(leaf.span)),
                             _ => {}
                         },
                     }
                 }
-                Ok(Some(ClassMember::Property { decorators, name, ty, initializer: value, visibility, is_static, is_readonly, is_optional, span: span.into(), is_abstract: false }))
+                Ok(Some(ClassMember::Property { decorators, name, ty, initializer: value, visibility, modifiers, optional_marker, span: span.into() }))
             }
             TypeScriptElementType::MethodDeclaration | TypeScriptElementType::MethodSignature | TypeScriptElementType::Constructor | TypeScriptElementType::ConstructorDeclaration => {
                 let mut name = if matches!(kind, TypeScriptElementType::Constructor | TypeScriptElementType::ConstructorDeclaration) { "constructor".to_string() } else { String::new() };
@@ -65,12 +64,8 @@ impl<'config> TypeScriptBuilder<'config> {
                 let mut return_type = None;
                 let mut body = Vec::new();
                 let mut visibility = None;
-                let mut is_static = false;
-                let mut is_abstract = false;
-                let mut is_async = false;
-                let mut is_getter = false;
-                let mut is_setter = false;
-                let mut is_optional = false;
+                let mut modifiers: Vec<Modifier> = Vec::new();
+                let mut optional_marker = None;
                 let mut decorators = Vec::new();
 
                 for child in node.children() {
@@ -120,18 +115,18 @@ impl<'config> TypeScriptBuilder<'config> {
                             TypeScriptTokenType::Public => visibility = Some(Visibility::Public),
                             TypeScriptTokenType::Private => visibility = Some(Visibility::Private),
                             TypeScriptTokenType::Protected => visibility = Some(Visibility::Protected),
-                            TypeScriptTokenType::Static => is_static = true,
-                            TypeScriptTokenType::Abstract => is_abstract = true,
-                            TypeScriptTokenType::Async => is_async = true,
-                            TypeScriptTokenType::Get => is_getter = true,
-                            TypeScriptTokenType::Set => is_setter = true,
-                            TypeScriptTokenType::Question => is_optional = true,
+                            TypeScriptTokenType::Static => modifiers.push(Modifier::new(ModifierKind::Static, leaf.span)),
+                            TypeScriptTokenType::Abstract => modifiers.push(Modifier::new(ModifierKind::Abstract, leaf.span)),
+                            TypeScriptTokenType::Async => modifiers.push(Modifier::new(ModifierKind::Async, leaf.span)),
+                            TypeScriptTokenType::Get => modifiers.push(Modifier::new(ModifierKind::Get, leaf.span)),
+                            TypeScriptTokenType::Set => modifiers.push(Modifier::new(ModifierKind::Set, leaf.span)),
+                            TypeScriptTokenType::Question => optional_marker = Some(OptionalMarker::new(leaf.span)),
                             _ => {}
                         },
                     }
                 }
 
-                Ok(Some(ClassMember::Method { decorators, name, type_params, params, return_type, body, visibility, is_static, is_abstract, is_async, is_getter, is_setter, is_optional, span: span.into() }))
+                Ok(Some(ClassMember::Method { decorators, name, type_params, params, return_type, body, visibility, modifiers, optional_marker, span: span.into() }))
             }
             _ => Ok(None),
         }
