@@ -424,7 +424,12 @@ impl AsDocument for OrderDirection {
 #[cfg(feature = "oak-pretty-print")]
 impl AsDocument for LimitClause {
     fn as_document(&self, _config: &Self::Config) -> Document<'_> {
-        doc!("LIMIT", soft_space, self.limit.as_document(&()), if let Some(offset) = &self.offset { doc!(soft_space, "OFFSET", soft_space, offset.as_document(&())) } else { nil })
+        match (&self.limit, &self.offset) {
+            (Some(limit), Some(offset)) => doc!("LIMIT", soft_space, limit.as_document(&()), soft_space, "OFFSET", soft_space, offset.as_document(&())),
+            (Some(limit), None) => doc!("LIMIT", soft_space, limit.as_document(&())),
+            (None, Some(offset)) => doc!("OFFSET", soft_space, offset.as_document(&())),
+            (None, None) => nil,
+        }
     }
 }
 

@@ -584,23 +584,28 @@ impl ToSource for OrderDirection {
     }
 }
 
-/// LIMIT clause.
+/// LIMIT / OFFSET clause.
+///
+/// At least one of `limit` or `offset` is present: `OFFSET n` without a `LIMIT`
+/// is a valid standalone clause that skips rows instead of capping them.
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct LimitClause {
-    /// The limit value.
-    pub limit: Expression,
-    /// The optional offset value.
+    /// The limit value, absent when the clause was written as a standalone `OFFSET`.
+    pub limit: Option<Expression>,
+    /// The offset value, absent when the clause was written as a plain `LIMIT`.
     pub offset: Option<Expression>,
-    /// The span of the LIMIT clause.
+    /// The span of the LIMIT / OFFSET clause.
     #[serde(with = "oak_core::serde_range")]
     pub span: Range<usize>,
 }
 
 impl ToSource for LimitClause {
     fn to_source(&self, buffer: &mut SourceBuffer) {
-        buffer.push("LIMIT");
-        self.limit.to_source(buffer);
+        if let Some(limit) = &self.limit {
+            buffer.push("LIMIT");
+            limit.to_source(buffer);
+        }
         if let Some(offset) = &self.offset {
             buffer.push("OFFSET");
             offset.to_source(buffer);

@@ -1063,18 +1063,20 @@ impl<'config> SqlParser<'config> {
             state.finish_at(order_cp, SqlElementType::OrderByClause);
         }
 
+        // The checkpoint is taken before the leading keyword so the `LIMIT` /
+        // `OFFSET` token stays inside the node: a standalone `OFFSET` is a valid
+        // clause and the builder must dispatch on the keyword, not on position.
+        let clause_cp = state.checkpoint();
         if state.eat(Limit) {
-            let limit_cp = state.checkpoint();
             PrattParser::parse(state, 0, self);
             if state.eat(Offset) {
                 PrattParser::parse(state, 0, self);
             }
-            state.finish_at(limit_cp, SqlElementType::LimitClause);
+            state.finish_at(clause_cp, SqlElementType::LimitClause);
         }
         else if state.eat(Offset) {
-            let offset_cp = state.checkpoint();
             PrattParser::parse(state, 0, self);
-            state.finish_at(offset_cp, SqlElementType::LimitClause);
+            state.finish_at(clause_cp, SqlElementType::LimitClause);
         }
 
         Ok(())
