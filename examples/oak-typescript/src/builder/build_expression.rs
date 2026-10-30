@@ -558,6 +558,17 @@ impl<'config> TypeScriptBuilder<'config> {
 
                 if let (Some(t), Some(tpl)) = (tag, template) { Ok(Some(Expression::new(ExpressionKind::TaggedTemplateExpression { tag: Box::new(t), template: Box::new(tpl) }, span.into()))) } else { Ok(None) }
             }
+            TypeScriptElementType::SequenceExpression => {
+                let mut expressions = Vec::new();
+                for child in node.children() {
+                    if let RedTree::Node(child_node) = child {
+                        if let Some(expr) = self.build_expression(&child_node, source)? {
+                            expressions.push(expr);
+                        }
+                    }
+                }
+                Ok(Some(Expression::new(ExpressionKind::SequenceExpression(expressions), span.into())))
+            }
             TypeScriptElementType::ConditionalExpression => {
                 let mut test = None;
                 let mut consequent = None;

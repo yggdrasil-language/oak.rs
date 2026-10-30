@@ -149,6 +149,8 @@ pub enum ExpressionKind {
         /// Elements within the array literal.
         elements: Vec<Expression>,
     },
+    /// A comma sequence expression (`a, b`), produced by `for` header slots.
+    SequenceExpression(Vec<Expression>),
     /// A spread element.
     SpreadElement(Box<Expression>),
     /// An await expression.
