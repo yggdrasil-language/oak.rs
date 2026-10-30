@@ -738,12 +738,14 @@ impl<'config> TypeScriptBuilder<'config> {
                 let mut specifiers = Vec::new();
                 let mut module_specifier = None;
                 let mut modifiers: Vec<Modifier> = Vec::new();
+                let mut attributes = None;
 
                 for child in node.children() {
                     match child {
                         RedTree::Node(child_node) => {
                             let child_kind = child_node.green.kind;
                             match child_kind {
+                                TypeScriptElementType::ImportAttributes => attributes = Some(source.get_text_in(child_node.span().into()).trim().to_string()),
                                 TypeScriptElementType::ImportClause => {
                                     for clause_child in child_node.children() {
                                         if let RedTree::Node(clause_node) = clause_child {
@@ -810,13 +812,14 @@ impl<'config> TypeScriptBuilder<'config> {
                     }
                 }
                 let module_specifier = module_specifier.unwrap_or_else(|| ModuleSpecifier { value: String::new(), span: Range { start: span.start, end: span.start } });
-                Ok(Some(Statement::ImportDeclaration(ImportDeclaration { specifiers, module_specifier, modifiers, span: span.into() })))
+                Ok(Some(Statement::ImportDeclaration(ImportDeclaration { specifiers, module_specifier, modifiers, attributes, span: span.into() })))
             }
             TypeScriptElementType::ExportDeclaration => {
                 let mut declaration = None;
                 let mut specifiers = Vec::new();
                 let mut module_specifier = None;
                 let mut modifiers: Vec<Modifier> = Vec::new();
+                let mut attributes = None;
 
                 for child in node.children() {
                     match child {
@@ -876,6 +879,7 @@ impl<'config> TypeScriptBuilder<'config> {
                                     }
                                 }
                                 TypeScriptElementType::StringLiteral => module_specifier = Some(module_specifier_at(child_node.span(), source)),
+                                TypeScriptElementType::ImportAttributes => attributes = Some(source.get_text_in(child_node.span().into()).trim().to_string()),
                                 _ => declaration = self.build_statement(&child_node, source)?,
                             }
                         }
@@ -889,7 +893,7 @@ impl<'config> TypeScriptBuilder<'config> {
                         },
                     }
                 }
-                Ok(Some(Statement::ExportDeclaration(ExportDeclaration { declaration: declaration.map(Box::new), specifiers, source: module_specifier, modifiers, span: span.into() })))
+                Ok(Some(Statement::ExportDeclaration(ExportDeclaration { declaration: declaration.map(Box::new), specifiers, source: module_specifier, modifiers, attributes, span: span.into() })))
             }
             TypeScriptElementType::ForOfStatement => {
                 let mut left: Option<Statement> = None;

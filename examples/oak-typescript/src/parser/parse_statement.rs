@@ -44,7 +44,7 @@ impl<'config> TypeScriptParser<'config> {
                     self.parse_enum_declaration_content(state)?;
                     state.finish_at(cp, crate::parser::element_type::TypeScriptElementType::EnumDeclaration);
                 }
-                Some(Type) => {
+                Some(Type) if self.is_type_alias_head(state) => {
                     self.parse_type_alias_declaration_content(state)?;
                     state.finish_at(cp, crate::parser::element_type::TypeScriptElementType::TypeAliasDeclaration);
                 }
@@ -77,7 +77,7 @@ impl<'config> TypeScriptParser<'config> {
                 Some(Enum) => {
                     self.parse_enum_declaration(state)?;
                 }
-                Some(Type) => {
+                Some(Type) if self.is_type_alias_head(state) => {
                     self.parse_type_alias_declaration(state)?;
                 }
                 Some(Namespace) | Some(Module) => {
@@ -378,6 +378,48 @@ impl<'config> TypeScriptParser<'config> {
         let str_cp = state.checkpoint();
         self.expect(state, StringLiteral).ok();
         state.finish_at(str_cp, TypeScriptElementType::StringLiteral);
+        self.parse_import_attributes(state);
+    }
+
+    /// Consumes an import attribute clause (`with { … }` / legacy `assert { … }`)
+    /// that follows the module string, keeping it inside the declaration node.
+    fn parse_import_attributes<'a, S: Source + ?Sized>(&self, state: &mut State<'a, S>) {
+        use crate::{lexer::token_type::TypeScriptTokenType::*, parser::element_type::TypeScriptElementType};
+        self.skip_trivia(state);
+        let head = state.peek_kind();
+        let is_assert = head == Some(IdentifierName) && state.peek_text().is_some_and(|text| text == "assert");
+        if !matches!(head, Some(With)) && !is_assert {
+            return;
+        }
+        if state.peek_non_trivia_kind_at(1) != Some(LeftBrace) {
+            return;
+        }
+        let cp = state.checkpoint();
+        state.bump(); // `with` / `assert`
+        self.skip_trivia(state);
+        state.bump(); // `{`
+        let mut depth = 1usize;
+        while state.not_at_end() && depth > 0 {
+            if state.at(LeftBrace.into()) {
+                depth += 1;
+            }
+            else if state.at(RightBrace.into()) {
+                depth -= 1;
+            }
+            state.bump();
+        }
+        state.finish_at(cp, TypeScriptElementType::ImportAttributes);
+    }
+
+    /// `type` at the statement head introduces a type alias only when a name
+    /// follows it; `type = x` and `type == x` are assignment expressions.
+    pub(crate) fn is_type_alias_head<'a, S: Source + ?Sized>(&self, state: &mut State<'a, S>) -> bool {
+        use crate::lexer::token_type::TypeScriptTokenType::*;
+        match state.peek_non_trivia_kind_at(1) {
+            Some(IdentifierName) => true,
+            Some(kind) => kind.is_contextual_keyword(),
+            None => false,
+        }
     }
 
     fn parse_named_imports<'a, S: Source + ?Sized>(&self, state: &mut State<'a, S>) {

@@ -524,6 +524,8 @@ pub struct ImportDeclaration {
     pub specifiers: Vec<ImportSpecifier>,
     /// Keyword modifiers written before the bindings (`type`).
     pub modifiers: Vec<Modifier>,
+    /// Raw text of a trailing import attribute clause (`with { type: "json" }`).
+    pub attributes: Option<String>,
     /// Source span of the declaration.
     #[cfg_attr(feature = "serde", serde(with = "oak_core::serde_range"))]
     pub span: Range<usize>,
@@ -548,6 +550,8 @@ pub struct ExportDeclaration {
     pub source: Option<ModuleSpecifier>,
     /// Keyword modifiers written directly after `export` (`default`, `type`).
     pub modifiers: Vec<Modifier>,
+    /// Raw text of a trailing import attribute clause (`with { type: "json" }`).
+    pub attributes: Option<String>,
     /// Source span of the declaration.
     #[cfg_attr(feature = "serde", serde(with = "oak_core::serde_range"))]
     pub span: Range<usize>,
