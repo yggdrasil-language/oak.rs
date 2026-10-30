@@ -497,6 +497,8 @@ pub enum TypeScriptElementType {
     EnumMember,
     /// A meta property such as `import.meta`.
     MetaProperty,
+    /// An await expression `await x`.
+    AwaitExpression,
 }
 
 impl TypeScriptElementType {

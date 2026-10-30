@@ -1,7 +1,7 @@
 use oak_core::{Builder, SourceText, parser::ParseSession};
 use oak_typescript::{
     TypeScriptBuilder, TypeScriptLanguage,
-    ast::{ExpressionKind, Statement, TypeScriptRoot},
+    ast::{ExpressionKind, ModifierKind, Statement, TypeScriptRoot},
 };
 
 fn build(source: &str) -> TypeScriptRoot {
@@ -94,4 +94,87 @@ fn dynamic_import_still_parses() {
     // The statement-head dynamic import keeps its existing fingerprint shape;
     // this test only pins that the meta-property change did not break it.
     assert!(!stmts.is_empty());
+}
+
+fn await_spans_text(root: &TypeScriptRoot, source: &str) -> Vec<String> {
+    root.top_level_await_spans.iter().map(|span| source[span.start..span.end].to_string()).collect()
+}
+
+#[test]
+fn top_level_await_is_recorded() {
+    let positives: &[&str] = &["const x = await f();", "await f();", "if (await f()) { g(); }", "try { await f(); } catch (e) { }", "for await (const x of xs) { }", "for await (x of xs) { }", "let a = 1;\nawait f();\nawait g();"];
+    for source in positives {
+        let root = build(source);
+        assert!(root.has_top_level_await(), "{source}: expected top-level await");
+        assert!(!root.top_level_await_spans.is_empty(), "{source}: spans must be recorded");
+        for text in await_spans_text(&root, source) {
+            assert!(text.trim_start().starts_with("await"), "{source}: span text {text:?} must start at the await keyword");
+        }
+    }
+
+    let root = build("const x = await f();");
+    assert_eq!(await_spans_text(&root, "const x = await f();"), vec!["await f()".to_string()]);
+
+    let root = build("for await (const x of xs) { }");
+    assert_eq!(await_spans_text(&root, "for await (const x of xs) { }"), vec!["await".to_string()]);
+}
+
+#[test]
+fn await_inside_functions_is_not_top_level() {
+    let negatives: &[&str] = &[
+        "async function main() { await f(); }",
+        "const g = async () => { await f(); };",
+        "function h() { return await f(); }",
+        "class C { async m() { await f(); } }",
+        "const p = xs.map(async (x) => await f(x));",
+        "async function outer() { for await (const x of xs) { } }",
+    ];
+    for source in negatives {
+        let root = build(source);
+        assert!(!root.has_top_level_await(), "{source}: must not report top-level await");
+        assert!(root.top_level_await_spans.is_empty(), "{source}: spans must be empty");
+    }
+}
+
+#[test]
+fn for_of_without_await_is_not_tla() {
+    let root = build("for (const x of xs) { }");
+    assert!(!root.has_top_level_await());
+    let Statement::ForOfStatement(stmt) = &root_statements(&root)[0]
+    else {
+        panic!("expected for-of statement: {:?}", root_statements(&root))
+    };
+    assert!(stmt.await_marker.is_none());
+    assert!(!stmt.is_await());
+}
+
+#[test]
+fn for_await_records_marker_on_ast_statement() {
+    let root = build("for await (const x of xs) { }");
+    let Statement::ForOfStatement(stmt) = &root_statements(&root)[0]
+    else {
+        panic!("expected for-of statement: {:?}", root_statements(&root))
+    };
+    let marker = stmt.await_marker.as_ref().expect("await marker");
+    assert_eq!(marker.kind, ModifierKind::Await);
+    assert!(stmt.is_await());
+}
+
+#[test]
+fn await_expression_is_a_real_node() {
+    let root = build("const x = await f();");
+    let Statement::VariableDeclaration(decl) = &root_statements(&root)[0]
+    else {
+        panic!("decl")
+    };
+    let value = decl.value.as_ref().expect("value");
+    let ExpressionKind::AwaitExpression(argument) = &*value.kind
+    else {
+        panic!("expected await expression: {:?}", value.kind)
+    };
+    let ExpressionKind::CallExpression { func, .. } = &*argument.kind
+    else {
+        panic!("argument")
+    };
+    assert!(matches!(&*func.kind, ExpressionKind::Identifier(name) if name == "f"));
 }
