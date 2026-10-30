@@ -570,12 +570,30 @@ impl<'config> TypeScriptParser<'config> {
         state.finish_at(named_cp, TypeScriptElementType::NamedExports);
     }
 
+    /// Parses one expression in a parenthesized statement head and folds a
+    /// top-level comma sequence into a `SequenceExpression` node. The
+    /// ECMAScript `Expression` production used by `if`, `while`, `do…while`,
+    /// `switch` and the `for` init/test/update slots allows sequences, so a
+    /// bare comma must not terminate the slot or leak into the following
+    /// punctuation.
+    fn parse_expression_or_sequence<'a, S: Source + ?Sized>(&self, state: &mut State<'a, S>) {
+        use crate::lexer::token_type::TypeScriptTokenType::*;
+        let seq_cp = state.checkpoint();
+        PrattParser::parse(state, 0, self);
+        if self.at(state, Comma) {
+            while self.eat(state, Comma) {
+                PrattParser::parse(state, 0, self);
+            }
+            state.finish_at(seq_cp, crate::parser::element_type::TypeScriptElementType::SequenceExpression);
+        }
+    }
+
     pub(crate) fn parse_if_statement<'a, S: Source + ?Sized>(&self, state: &mut State<'a, S>) -> Result<(), OakError> {
         use crate::lexer::token_type::TypeScriptTokenType::*;
         let cp = state.checkpoint();
         state.bump(); // if
         self.expect(state, LeftParen).ok();
-        PrattParser::parse(state, 0, self);
+        self.parse_expression_or_sequence(state);
         self.expect(state, RightParen).ok();
         self.parse_statement(state)?;
         if self.eat(state, Else) {
@@ -628,14 +646,7 @@ impl<'config> TypeScriptParser<'config> {
                     state.finish_at(cp, crate::parser::element_type::TypeScriptElementType::ForInStatement);
                     return Ok(());
                 }
-                let seq_cp = state.checkpoint();
-                PrattParser::parse(state, 0, self);
-                if self.at(state, Comma) {
-                    while self.eat(state, Comma) {
-                        PrattParser::parse(state, 0, self);
-                    }
-                    state.finish_at(seq_cp, crate::parser::element_type::TypeScriptElementType::SequenceExpression);
-                }
+                self.parse_expression_or_sequence(state);
             }
             self.skip_trivia(state);
             if self.at(state, Of) {
@@ -652,21 +663,14 @@ impl<'config> TypeScriptParser<'config> {
         // Test
         self.skip_trivia(state);
         if !self.at(state, Semicolon) {
-            PrattParser::parse(state, 0, self);
+            self.parse_expression_or_sequence(state);
         }
         self.expect(state, Semicolon).ok();
 
         // Update
         self.skip_trivia(state);
         if !self.at(state, RightParen) {
-            let seq_cp = state.checkpoint();
-            PrattParser::parse(state, 0, self);
-            if self.at(state, Comma) {
-                while self.eat(state, Comma) {
-                    PrattParser::parse(state, 0, self);
-                }
-                state.finish_at(seq_cp, crate::parser::element_type::TypeScriptElementType::SequenceExpression);
-            }
+            self.parse_expression_or_sequence(state);
         }
         self.expect(state, RightParen).ok();
 
@@ -707,7 +711,7 @@ impl<'config> TypeScriptParser<'config> {
         let cp = state.checkpoint();
         state.bump(); // while
         self.expect(state, LeftParen).ok();
-        PrattParser::parse(state, 0, self);
+        self.parse_expression_or_sequence(state);
         self.expect(state, RightParen).ok();
         self.parse_statement(state)?;
         state.finish_at(cp, crate::parser::element_type::TypeScriptElementType::WhileStatement);
@@ -721,7 +725,7 @@ impl<'config> TypeScriptParser<'config> {
         self.parse_statement(state)?;
         self.expect(state, While).ok();
         self.expect(state, LeftParen).ok();
-        PrattParser::parse(state, 0, self);
+        self.parse_expression_or_sequence(state);
         self.expect(state, RightParen).ok();
         self.eat(state, Semicolon);
         state.finish_at(cp, crate::parser::element_type::TypeScriptElementType::DoWhileStatement);
@@ -733,7 +737,7 @@ impl<'config> TypeScriptParser<'config> {
         let cp = state.checkpoint();
         state.bump(); // switch
         self.expect(state, LeftParen).ok();
-        PrattParser::parse(state, 0, self);
+        self.parse_expression_or_sequence(state);
         self.expect(state, RightParen).ok();
         self.expect(state, LeftBrace).ok();
         while state.not_at_end() && !self.at(state, RightBrace) {
