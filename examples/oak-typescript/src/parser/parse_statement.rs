@@ -492,7 +492,19 @@ impl<'config> TypeScriptParser<'config> {
 
         if self.eat(state, Default) {
             self.skip_trivia(state);
-            self.parse_statement(state)?;
+            if self.at(state, LeftBrace) {
+                // `export default { … }` exports an object literal expression;
+                // parsing it as a statement would read `{` as a block and turn
+                // every property `:` into a diagnostic.
+                let ecp = state.checkpoint();
+                PrattParser::parse(state, 0, self);
+                self.skip_trivia(state);
+                self.eat(state, Semicolon);
+                state.finish_at(ecp, TypeScriptElementType::ExpressionStatement);
+            }
+            else {
+                self.parse_statement(state)?;
+            }
         }
         else if self.at(state, LeftBrace) {
             self.parse_named_exports(state);
