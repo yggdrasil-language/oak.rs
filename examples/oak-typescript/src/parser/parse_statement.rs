@@ -84,7 +84,16 @@ impl<'config> TypeScriptParser<'config> {
                     self.parse_namespace_declaration(state)?;
                 }
                 Some(Import) => {
-                    self.parse_import_declaration(state)?;
+                    if state.peek_non_trivia_kind_at(1) == Some(Dot) {
+                        // `import.meta` at the statement head is an expression, not a declaration.
+                        PrattParser::parse(state, 0, self);
+                        self.skip_trivia(state);
+                        state.eat(Semicolon);
+                        state.finish_at(cp, crate::parser::element_type::TypeScriptElementType::ExpressionStatement);
+                    }
+                    else {
+                        self.parse_import_declaration(state)?;
+                    }
                 }
                 Some(Export) => {
                     self.parse_export_declaration(state)?;

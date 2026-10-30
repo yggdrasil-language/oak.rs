@@ -76,6 +76,7 @@ fn print_expr(expr: &Expression, min_prec: Prec) -> Option<String> {
             };
             wrap_prec(format!("{obj}{opt}{prop}"), Prec::Call, min_prec)
         }
+        ExpressionKind::MetaProperty { meta, property } => wrap_prec(format!("{meta}.{property}"), Prec::Primary, min_prec),
         ExpressionKind::CallExpression { func, args } => {
             if matches!(func.kind.as_ref(), ExpressionKind::Identifier(n) if n == "import") {
                 let arg = args.first()?;
