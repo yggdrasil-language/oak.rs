@@ -180,6 +180,9 @@ fn print_object_prop(prop: &ObjectProperty) -> Option<String> {
             }
             Some(format!("{}: {}", name, print_expr(value, Prec::Assign)?))
         }
+        // Methods are function boundaries; this expression printer does not
+        // emit function bodies (mirrors `ExpressionKind::FunctionExpression`).
+        ObjectProperty::Method { .. } => None,
         ObjectProperty::Spread(expr) => Some(format!("...{}", print_expr(expr, Prec::Unary)?)),
     }
 }

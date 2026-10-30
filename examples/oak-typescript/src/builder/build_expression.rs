@@ -366,6 +366,65 @@ impl<'config> TypeScriptBuilder<'config> {
                             let value = Expression::new(ExpressionKind::Identifier(name.clone()), key_span.into());
                             properties.push(ObjectProperty::Property { name, value, shorthand: true, span: key_span.into() });
                         }
+                        else if child_kind == TypeScriptElementType::ObjectMethod {
+                            let m_span = child_node.span();
+                            let mut name = String::new();
+                            let mut params = Vec::new();
+                            let mut return_type = None;
+                            let mut body = Vec::new();
+                            let mut modifiers = Vec::new();
+                            let mut generator = false;
+                            let mut past_paren = false;
+
+                            for m_child in child_node.children() {
+                                match m_child {
+                                    RedTree::Leaf(leaf) => match leaf.kind {
+                                        TypeScriptTokenType::Async => modifiers.push(Modifier::new(ModifierKind::Async, leaf.span)),
+                                        TypeScriptTokenType::Get => modifiers.push(Modifier::new(ModifierKind::Get, leaf.span)),
+                                        TypeScriptTokenType::Set => modifiers.push(Modifier::new(ModifierKind::Set, leaf.span)),
+                                        TypeScriptTokenType::Star => generator = true,
+                                        TypeScriptTokenType::LeftParen => past_paren = true,
+                                        TypeScriptTokenType::IdentifierName | TypeScriptTokenType::StringLiteral | TypeScriptTokenType::NumericLiteral
+                                            if !past_paren && name.is_empty() => {
+                                            let raw = source.get_text_in(leaf.span.into());
+                                            name = match leaf.kind {
+                                                TypeScriptTokenType::StringLiteral => decode_string_literal_text(&raw).unwrap_or_else(|_| raw.trim_matches(['"', '\'']).to_string()),
+                                                _ => raw.trim().to_string(),
+                                            };
+                                        }
+                                        _ => {}
+                                    },
+                                    RedTree::Node(m_node) => match m_node.green.kind {
+                                        TypeScriptElementType::IdentifierName if !past_paren && name.is_empty() => {
+                                            // Keyword method name wrapped by the parser (`{ get() {} }`).
+                                            name = source.get_text_in(m_node.span().into()).trim().to_string();
+                                        }
+                                        TypeScriptElementType::Parameter => {
+                                            if let Some(p) = self.build_parameter(&m_node, source)? {
+                                                params.push(p);
+                                            }
+                                        }
+                                        TypeScriptElementType::TypeAnnotation => {
+                                            if !self.erase_types {
+                                                return_type = self.build_type_annotation(&m_node, source)?;
+                                            }
+                                        }
+                                        TypeScriptElementType::BlockStatement => {
+                                            if let Some(Statement::BlockStatement(block)) = self.build_statement(&m_node, source)? {
+                                                body = block.statements;
+                                            }
+                                        }
+                                        _ => {
+                                            // Computed key `[expr]` before the parameter list.
+                                            if !past_paren && name.is_empty() {
+                                                name = source.get_text_in(m_node.span().into()).trim().to_string();
+                                            }
+                                        }
+                                    },
+                                }
+                            }
+                            properties.push(ObjectProperty::Method { name, params, return_type, body, modifiers, generator, span: m_span.into() });
+                        }
                         else if child_kind == TypeScriptElementType::SpreadElement {
                             for spread_child in child_node.children() {
                                 if let RedTree::Node(spread_node) = spread_child {

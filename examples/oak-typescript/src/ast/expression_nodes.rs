@@ -1,4 +1,4 @@
-use crate::ast::{FunctionParam, JsxElement, JsxFragment, JsxSelfClosingElement, Statement, TypeAnnotation, TypeParameter};
+use crate::ast::{FunctionParam, JsxElement, JsxFragment, JsxSelfClosingElement, Modifier, Statement, TypeAnnotation, TypeParameter};
 use core::range::Range;
 
 /// Represents a TypeScript expression.
@@ -214,6 +214,24 @@ pub enum ObjectProperty {
         /// Whether the property is shorthand.
         shorthand: bool,
         /// Source span of the property.
+        #[cfg_attr(feature = "serde", serde(with = "oak_core::serde_range"))]
+        span: Range<usize>,
+    },
+    /// A method or accessor member (`{ m() {} }`, `{ get x() {} }`).
+    Method {
+        /// Name of the member; a computed key keeps its raw inner text.
+        name: String,
+        /// Parameters of the method.
+        params: Vec<FunctionParam>,
+        /// Return type annotation of the method.
+        return_type: Option<TypeAnnotation>,
+        /// Body statements of the method.
+        body: Vec<Statement>,
+        /// Keyword modifiers written before the name (`async`, `get`, `set`).
+        modifiers: Vec<Modifier>,
+        /// Whether the member is a generator (`*`).
+        generator: bool,
+        /// Source span of the member.
         #[cfg_attr(feature = "serde", serde(with = "oak_core::serde_range"))]
         span: Range<usize>,
     },
