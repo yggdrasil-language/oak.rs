@@ -542,9 +542,21 @@ impl<'config> TypeScriptBuilder<'config> {
                     Ok(None)
                 }
             }
-            TypeScriptElementType::TemplateExpression => {
+            TypeScriptElementType::TemplateExpression | TypeScriptElementType::TemplateString => {
                 let text = source.get_text_in(span.into()).to_string();
                 Ok(Some(Expression::new(ExpressionKind::TemplateString(text), span.into())))
+            }
+            TypeScriptElementType::TaggedTemplateExpression => {
+                let mut tag = None;
+                let mut template = None;
+
+                for child in node.children() {
+                    if let RedTree::Node(child_node) = child {
+                        if tag.is_none() { tag = self.build_expression(&child_node, source)? } else if template.is_none() { template = self.build_expression(&child_node, source)? }
+                    }
+                }
+
+                if let (Some(t), Some(tpl)) = (tag, template) { Ok(Some(Expression::new(ExpressionKind::TaggedTemplateExpression { tag: Box::new(t), template: Box::new(tpl) }, span.into()))) } else { Ok(None) }
             }
             TypeScriptElementType::ConditionalExpression => {
                 let mut test = None;

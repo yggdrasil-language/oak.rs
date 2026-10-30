@@ -334,7 +334,7 @@ impl<'config> TypeScriptParser<'config> {
             StarStar => (13, Associativity::Right),
             As => (14, Associativity::Left),
             Arrow => (15, Associativity::Right),
-            LeftParen | Dot | LeftBracket | QuestionDot => (16, Associativity::Left),
+            LeftParen | Dot | LeftBracket | QuestionDot | TemplateString => (16, Associativity::Left),
             // Postfix ++ / -- bind tighter than call/member so `this.count++` is UpdateExpression.
             PlusPlus | MinusMinus => (17, Associativity::Left),
             _ => return None,
@@ -432,6 +432,15 @@ impl<'config> TypeScriptParser<'config> {
                 self.expect(state, Colon).ok();
                 PrattParser::parse(state, 0, self);
                 Some(state.finish_at(cp, crate::parser::element_type::TypeScriptElementType::ConditionalExpression.into()))
+            }
+            // Tagged template: `tag`raw`` or `tag`a${x}b``. The template token is
+            // wrapped like a primary so the builder sees tag and template nodes.
+            TemplateString => {
+                let cp = state.checkpoint_before(left);
+                let tcp = state.checkpoint();
+                state.bump();
+                state.finish_at(tcp, crate::parser::element_type::TypeScriptElementType::TemplateString);
+                Some(state.finish_at(cp, crate::parser::element_type::TypeScriptElementType::TaggedTemplateExpression.into()))
             }
             _ => Some(binary(state, left, kind, prec, assoc, crate::parser::element_type::TypeScriptElementType::BinaryExpression, |s, p| PrattParser::parse(s, p, self))),
         }
