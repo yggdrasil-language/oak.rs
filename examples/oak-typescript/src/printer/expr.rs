@@ -184,19 +184,35 @@ fn print_object_prop(prop: &ObjectProperty) -> Option<String> {
     }
 }
 
-fn print_params(params: &[FunctionParam]) -> Option<String> {
+pub(super) fn print_params(params: &[FunctionParam]) -> Option<String> {
     if params.is_empty() {
         return Some("()".into());
     }
-    if params.len() == 1 && params[0].name.is_empty() {
-        return None;
-    }
     let mut parts = Vec::with_capacity(params.len());
     for p in params {
-        if p.name.is_empty() {
+        if !p.decorators.is_empty() {
             return None;
         }
-        parts.push(p.name.clone());
+        let binding = match &p.pattern_text {
+            Some(text) => text.clone(),
+            None => {
+                if p.name.is_empty() {
+                    return None;
+                }
+                p.name.clone()
+            }
+        };
+        let rest = if p.is_rest { "..." } else { "" };
+        let opt = if p.is_optional() { "?" } else { "" };
+        let ty = match &p.ty {
+            Some(t) => format!(": {}", print_type_annotation(t)?),
+            None => String::new(),
+        };
+        let default = match &p.default {
+            Some(d) => format!(" = {}", print_expr(d, Prec::Assign)?),
+            None => String::new(),
+        };
+        parts.push(format!("{rest}{binding}{opt}{ty}{default}"));
     }
     Some(format!("({})", parts.join(", ")))
 }

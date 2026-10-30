@@ -62,18 +62,34 @@ impl<'config> TypeScriptParser<'config> {
                 self.parse_decorator(state)?;
             }
 
-            if self.at(state, IdentifierName) {
-                self.expect(state, IdentifierName).ok();
-                // `?` is part of the parameter node so the builder records a real marker token.
-                self.eat(state, Question);
-                // Skip type annotation
-                if self.eat(state, Colon) {
-                    self.parse_type_annotation(state)?;
-                }
+            // Rest parameter: `...args`.
+            self.eat(state, DotDotDot);
+
+            // Binding: identifier or destructuring pattern.
+            if self.at(state, LeftBrace) || self.at(state, LeftBracket) {
+                self.parse_binding_pattern(state);
+            }
+            else if self.is_binding_identifier(state) {
+                self.parse_binding_identifier(state);
             }
             else {
                 state.bump();
             }
+
+            // `?` is part of the parameter node so the builder records a real marker token.
+            self.eat(state, Question);
+
+            // Type annotation
+            if self.eat(state, Colon) {
+                self.parse_type_annotation(state)?;
+            }
+
+            // Default value: the Pratt run stops at `,` or `)` because neither
+            // is an infix operator in this grammar.
+            if self.eat(state, Equal) {
+                oak_core::parser::pratt::PrattParser::parse(state, 0, self);
+            }
+
             state.finish_at(cp, crate::parser::element_type::TypeScriptElementType::Parameter);
             self.eat(state, Comma);
         }
