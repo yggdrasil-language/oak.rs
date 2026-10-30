@@ -505,6 +505,8 @@ pub enum TypeScriptElementType {
     MetaProperty,
     /// An await expression `await x`.
     AwaitExpression,
+    /// A class expression `class {}` or `class Named extends Base {}`.
+    ClassExpression,
 }
 
 impl TypeScriptElementType {

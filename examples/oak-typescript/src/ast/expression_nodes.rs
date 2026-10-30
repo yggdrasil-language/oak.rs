@@ -1,4 +1,4 @@
-use crate::ast::{FunctionParam, JsxElement, JsxFragment, JsxSelfClosingElement, Modifier, Statement, TypeAnnotation, TypeParameter};
+use crate::ast::{ClassMember, FunctionParam, JsxElement, JsxFragment, JsxSelfClosingElement, Modifier, Statement, TypeAnnotation, TypeParameter};
 use core::range::Range;
 
 /// Represents a TypeScript expression.
@@ -178,6 +178,19 @@ pub enum ExpressionKind {
         async_: bool,
         /// Whether the function is a generator.
         generator: bool,
+    },
+    /// A class expression (`class {}`, `class Named extends Base { … }`).
+    ClassExpression {
+        /// Optional name of the class.
+        name: Option<String>,
+        /// Type parameters of the class.
+        type_params: Vec<TypeParameter>,
+        /// The class that this class extends.
+        extends: Option<TypeAnnotation>,
+        /// The interfaces that this class implements.
+        implements: Vec<TypeAnnotation>,
+        /// Members of the class.
+        body: Vec<ClassMember>,
     },
     /// A tagged template expression.
     TaggedTemplateExpression {
