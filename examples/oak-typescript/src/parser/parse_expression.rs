@@ -68,39 +68,53 @@ impl<'config> TypeScriptParser<'config> {
                 state.finish_at(cp, elem)
             }
             Some(LeftParen) => {
-                state.bump();
-                if !self.at(state, RightParen) {
-                    PrattParser::parse(state, 0, self);
+                // A paren group whose matching `)` is followed by `=>` is an arrow
+                // parameter list; parse it through `parse_parameters` so rest and
+                // default parameters build real `Parameter` nodes.
+                if self.paren_group_ends_at_arrow(state) {
+                    self.parse_parameters(state).ok();
                     if self.eat(state, Colon) {
-                        self.parse_type_annotation(state).ok();
+                        self.parse_return_type_annotation(state).ok();
                     }
-                    while self.eat(state, Comma) {
+                    self.expect(state, Arrow).ok();
+                    self.parse_statement(state).ok();
+                    state.finish_at(cp, crate::parser::element_type::TypeScriptElementType::ArrowFunction)
+                }
+                else {
+                    state.bump();
+                    if !self.at(state, RightParen) {
                         PrattParser::parse(state, 0, self);
                         if self.eat(state, Colon) {
                             self.parse_type_annotation(state).ok();
                         }
+                        while self.eat(state, Comma) {
+                            PrattParser::parse(state, 0, self);
+                            if self.eat(state, Colon) {
+                                self.parse_type_annotation(state).ok();
+                            }
+                        }
                     }
-                }
-                self.expect(state, RightParen).ok();
-                if self.eat(state, Arrow) {
-                    self.parse_statement(state).ok();
-                    state.finish_at(cp, crate::parser::element_type::TypeScriptElementType::ArrowFunction)
-                }
-                else if self.at(state, Colon) {
-                    let colon_cp = state.checkpoint();
-                    state.bump();
-                    self.parse_return_type_annotation(state).ok();
+                    self.expect(state, RightParen).ok();
                     if self.eat(state, Arrow) {
                         self.parse_statement(state).ok();
                         state.finish_at(cp, crate::parser::element_type::TypeScriptElementType::ArrowFunction)
                     }
+                    else if self.at(state, Colon) {
+                        let colon_cp = state.checkpoint();
+                        state.bump();
+                        self.parse_return_type_annotation(state).ok();
+                        if self.eat(state, Arrow) {
+                            self.parse_statement(state).ok();
+                            state.finish_at(cp, crate::parser::element_type::TypeScriptElementType::ArrowFunction)
+                        }
+                        else {
+                            state.restore(colon_cp);
+                            state.finish_at(cp, crate::parser::element_type::TypeScriptElementType::OpenParen)
+                        }
+                    }
                     else {
-                        state.restore(colon_cp);
                         state.finish_at(cp, crate::parser::element_type::TypeScriptElementType::OpenParen)
                     }
-                }
-                else {
-                    state.finish_at(cp, crate::parser::element_type::TypeScriptElementType::OpenParen)
                 }
             }
             Some(Less) if self.config.jsx => self.parse_jsx_element(state),
@@ -230,6 +244,42 @@ impl<'config> TypeScriptParser<'config> {
                 state.finish_at(cp, crate::parser::element_type::TypeScriptElementType::Error)
             }
         }
+    }
+
+    /// Returns `true` when the current token is a `(` whose matching `)` is
+    /// immediately followed by `=>`, marking a parenthesized arrow parameter
+    /// list rather than a grouped expression.
+    fn paren_group_ends_at_arrow<'a, S: Source + ?Sized>(&self, state: &mut State<'a, S>) -> bool {
+        use crate::lexer::token_type::TypeScriptTokenType::*;
+        use oak_core::TokenType;
+        let mut depth = 0usize;
+        let mut offset = 0usize;
+        while let Some(token) = state.peek_at(offset) {
+            if token.kind.is_ignored() {
+                offset += 1;
+                continue;
+            }
+            match token.kind {
+                LeftParen => depth += 1,
+                RightParen => {
+                    depth -= 1;
+                    if depth == 0 {
+                        let mut next = offset + 1;
+                        while let Some(candidate) = state.peek_at(next) {
+                            if candidate.kind.is_ignored() {
+                                next += 1;
+                                continue;
+                            }
+                            return candidate.kind == Arrow;
+                        }
+                        return false;
+                    }
+                }
+                _ => {}
+            }
+            offset += 1;
+        }
+        false
     }
 
     /// Returns `true` when the Nth non-trivia token can start an object member
