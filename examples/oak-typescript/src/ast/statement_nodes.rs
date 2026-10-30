@@ -394,15 +394,38 @@ pub struct BlockStatement {
     pub span: Range<usize>,
 }
 
+/// A module specifier string literal written in an import or export declaration.
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct ModuleSpecifier {
+    /// The specifier text without its surrounding quotes.
+    pub value: String,
+    /// Source span of the string literal token, quotes included.
+    #[cfg_attr(feature = "serde", serde(with = "oak_core::serde_range"))]
+    pub span: Range<usize>,
+}
+
 /// Represents an import specifier.
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum ImportSpecifier {
     /// Default import: `import local from "source"`.
-    Default(String),
+    Default {
+        /// Local name.
+        local: String,
+        /// Source span of the binding token.
+        #[cfg_attr(feature = "serde", serde(with = "oak_core::serde_range"))]
+        span: Range<usize>,
+    },
     /// Namespace import: `import * as local from "source"`.
-    Namespace(String),
-    /// Named import: `import { local as imported } from "source"`.
+    Namespace {
+        /// Local name bound to the module namespace.
+        local: String,
+        /// Source span of the `* as local` clause.
+        #[cfg_attr(feature = "serde", serde(with = "oak_core::serde_range"))]
+        span: Range<usize>,
+    },
+    /// Named import: `import { imported as local } from "source"`.
     Named {
         /// Local name.
         local: String,
@@ -410,6 +433,9 @@ pub enum ImportSpecifier {
         imported: String,
         /// `type` keyword written before this specifier, e.g. `{ type Foo }`.
         type_modifier: Option<Modifier>,
+        /// Source span of the whole specifier.
+        #[cfg_attr(feature = "serde", serde(with = "oak_core::serde_range"))]
+        span: Range<usize>,
     },
 }
 
@@ -421,18 +447,45 @@ impl ImportSpecifier {
     pub fn is_inline_type_only(&self) -> bool {
         matches!(self, ImportSpecifier::Named { type_modifier: Some(_), .. })
     }
+
+    /// Returns the source span of the whole specifier.
+    pub fn span(&self) -> &Range<usize> {
+        match self {
+            ImportSpecifier::Default { span, .. } | ImportSpecifier::Namespace { span, .. } | ImportSpecifier::Named { span, .. } => span,
+        }
+    }
 }
 
 /// Represents an export specifier.
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct ExportSpecifier {
-    /// Local name.
-    pub local: String,
-    /// Exported name.
-    pub exported: String,
-    /// `type` keyword written before this specifier, e.g. `{ type Foo }`.
-    pub type_modifier: Option<Modifier>,
+pub enum ExportSpecifier {
+    /// `*` in `export * from "source"`.
+    All {
+        /// Source span of the `*` token.
+        #[cfg_attr(feature = "serde", serde(with = "oak_core::serde_range"))]
+        span: Range<usize>,
+    },
+    /// `* as exported` in `export * as exported from "source"`.
+    Namespace {
+        /// Exported namespace name.
+        exported: String,
+        /// Source span of the `* as exported` clause.
+        #[cfg_attr(feature = "serde", serde(with = "oak_core::serde_range"))]
+        span: Range<usize>,
+    },
+    /// `local as exported` in `export { local as exported }`.
+    Named {
+        /// Local name.
+        local: String,
+        /// Exported name.
+        exported: String,
+        /// `type` keyword written before this specifier, e.g. `{ type Foo }`.
+        type_modifier: Option<Modifier>,
+        /// Source span of the whole specifier.
+        #[cfg_attr(feature = "serde", serde(with = "oak_core::serde_range"))]
+        span: Range<usize>,
+    },
 }
 
 impl ExportSpecifier {
@@ -441,7 +494,14 @@ impl ExportSpecifier {
     /// Declaration-level `export type …` is recorded on
     /// [`ExportDeclaration::is_type_only`], not here.
     pub fn is_inline_type_only(&self) -> bool {
-        self.type_modifier.is_some()
+        matches!(self, ExportSpecifier::Named { type_modifier: Some(_), .. })
+    }
+
+    /// Returns the source span of the whole specifier.
+    pub fn span(&self) -> &Range<usize> {
+        match self {
+            ExportSpecifier::All { span, .. } | ExportSpecifier::Namespace { span, .. } | ExportSpecifier::Named { span, .. } => span,
+        }
     }
 }
 
@@ -450,7 +510,7 @@ impl ExportSpecifier {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ImportDeclaration {
     /// The module specifier being imported from.
-    pub module_specifier: String,
+    pub module_specifier: ModuleSpecifier,
     /// The specifiers within the import.
     pub specifiers: Vec<ImportSpecifier>,
     /// Keyword modifiers written before the bindings (`type`).
@@ -476,7 +536,7 @@ pub struct ExportDeclaration {
     /// The specifiers within the export.
     pub specifiers: Vec<ExportSpecifier>,
     /// The module specifier being exported from.
-    pub source: Option<String>,
+    pub source: Option<ModuleSpecifier>,
     /// Keyword modifiers written directly after `export` (`default`, `type`).
     pub modifiers: Vec<Modifier>,
     /// Source span of the declaration.

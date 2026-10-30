@@ -1,5 +1,17 @@
 use crate::{ast::*, builder::TypeScriptBuilder, language::TypeScriptLanguage, lexer::token_type::TypeScriptTokenType, parser::element_type::TypeScriptElementType};
+use core::range::Range;
 use oak_core::{OakError, RedNode, RedTree, Source, SourceText};
+
+/// Builds a [`ModuleSpecifier`] from the span of a string literal token.
+///
+/// The span is kept as written (quotes included); `value` drops the quotes.
+/// A missing or malformed literal yields an empty `value` at the token's
+/// (possibly zero-width) span, mirroring the parser's error recovery node.
+fn module_specifier_at(span: Range<usize>, source: &SourceText) -> ModuleSpecifier {
+    let text = source.get_text_in(span.clone());
+    let value = if text.len() >= 2 { text[1..text.len() - 1].to_string() } else { String::new() };
+    ModuleSpecifier { value, span }
+}
 
 impl<'config> TypeScriptBuilder<'config> {
     pub(crate) fn build_statement(&self, node: &RedNode<TypeScriptLanguage>, source: &SourceText) -> Result<Option<Statement>, OakError> {
@@ -703,7 +715,7 @@ impl<'config> TypeScriptBuilder<'config> {
             }
             TypeScriptElementType::ImportDeclaration => {
                 let mut specifiers = Vec::new();
-                let mut source_str = String::new();
+                let mut module_specifier = None;
                 let mut modifiers: Vec<Modifier> = Vec::new();
 
                 for child in node.children() {
@@ -714,21 +726,25 @@ impl<'config> TypeScriptBuilder<'config> {
                                 TypeScriptElementType::ImportClause => {
                                     for clause_child in child_node.children() {
                                         if let RedTree::Node(clause_node) = clause_child {
+                                            let clause_span = clause_node.span();
                                             match clause_node.green.kind {
-                                                TypeScriptElementType::IdentifierName => specifiers.push(ImportSpecifier::Default(source.get_text_in(clause_node.span().into()).trim().to_string())),
+                                                TypeScriptElementType::IdentifierName => specifiers.push(ImportSpecifier::Default { local: source.get_text_in(clause_span.clone()).trim().to_string(), span: clause_span }),
                                                 TypeScriptElementType::NamespaceImport => {
+                                                    let mut local = String::new();
                                                     for ns_child in clause_node.children() {
                                                         if let RedTree::Node(ns_node) = ns_child {
                                                             if ns_node.green.kind == TypeScriptElementType::IdentifierName {
-                                                                specifiers.push(ImportSpecifier::Namespace(source.get_text_in(ns_node.span().into()).trim().to_string()))
+                                                                local = source.get_text_in(ns_node.span().into()).trim().to_string()
                                                             }
                                                         }
                                                     }
+                                                    specifiers.push(ImportSpecifier::Namespace { local, span: clause_span })
                                                 }
                                                 TypeScriptElementType::NamedImports => {
                                                     for named_child in clause_node.children() {
                                                         if let RedTree::Node(named_node) = named_child {
                                                             if named_node.green.kind == TypeScriptElementType::ImportSpecifier {
+                                                                let spec_span = named_node.span();
                                                                 let mut local = String::new();
                                                                 let mut imported = String::new();
                                                                 let mut type_modifier = None;
@@ -748,7 +764,7 @@ impl<'config> TypeScriptBuilder<'config> {
                                                                 if local.is_empty() {
                                                                     local = imported.clone()
                                                                 }
-                                                                specifiers.push(ImportSpecifier::Named { local, imported, type_modifier })
+                                                                specifiers.push(ImportSpecifier::Named { local, imported, type_modifier, span: spec_span })
                                                             }
                                                         }
                                                     }
@@ -758,10 +774,7 @@ impl<'config> TypeScriptBuilder<'config> {
                                         }
                                     }
                                 }
-                                TypeScriptElementType::StringLiteral => {
-                                    let text = source.get_text_in(child_node.span().into());
-                                    source_str = text[1..text.len() - 1].to_string()
-                                }
+                                TypeScriptElementType::StringLiteral => module_specifier = Some(module_specifier_at(child_node.span(), source)),
                                 _ => {}
                             }
                         }
@@ -769,21 +782,19 @@ impl<'config> TypeScriptBuilder<'config> {
                             if leaf.kind == TypeScriptTokenType::Type {
                                 modifiers.push(Modifier::new(ModifierKind::Type, leaf.span))
                             }
-                            else if leaf.kind == TypeScriptTokenType::StringLiteral && source_str.is_empty() {
-                                let text = source.get_text_in(leaf.span.into());
-                                if text.len() >= 2 {
-                                    source_str = text[1..text.len() - 1].to_string();
-                                }
+                            else if leaf.kind == TypeScriptTokenType::StringLiteral && module_specifier.is_none() {
+                                module_specifier = Some(module_specifier_at(leaf.span, source));
                             }
                         }
                     }
                 }
-                Ok(Some(Statement::ImportDeclaration(ImportDeclaration { specifiers, module_specifier: source_str, modifiers, span: span.into() })))
+                let module_specifier = module_specifier.unwrap_or_else(|| ModuleSpecifier { value: String::new(), span: Range { start: span.start, end: span.start } });
+                Ok(Some(Statement::ImportDeclaration(ImportDeclaration { specifiers, module_specifier, modifiers, span: span.into() })))
             }
             TypeScriptElementType::ExportDeclaration => {
                 let mut declaration = None;
                 let mut specifiers = Vec::new();
-                let mut source_str = None;
+                let mut module_specifier = None;
                 let mut modifiers: Vec<Modifier> = Vec::new();
 
                 for child in node.children() {
@@ -795,6 +806,7 @@ impl<'config> TypeScriptBuilder<'config> {
                                     for named_child in child_node.children() {
                                         if let RedTree::Node(named_node) = named_child {
                                             if named_node.green.kind == TypeScriptElementType::ExportSpecifier {
+                                                let spec_span = named_node.span();
                                                 let mut local = String::new();
                                                 let mut exported = String::new();
                                                 let mut type_modifier = None;
@@ -814,32 +826,49 @@ impl<'config> TypeScriptBuilder<'config> {
                                                 if exported.is_empty() {
                                                     exported = local.clone()
                                                 }
-                                                specifiers.push(ExportSpecifier { local, exported, type_modifier })
+                                                specifiers.push(ExportSpecifier::Named { local, exported, type_modifier, span: spec_span })
                                             }
                                         }
                                     }
                                 }
-                                TypeScriptElementType::StringLiteral => {
-                                    let text = source.get_text_in(child_node.span().into());
-                                    source_str = Some(text[1..text.len() - 1].to_string())
+                                TypeScriptElementType::NamespaceImport => {
+                                    let clause_span = child_node.span();
+                                    let mut exported = None;
+                                    let mut star_span = None;
+                                    for ns_child in child_node.children() {
+                                        match ns_child {
+                                            RedTree::Node(ns_node) => {
+                                                if ns_node.green.kind == TypeScriptElementType::IdentifierName {
+                                                    exported = Some(source.get_text_in(ns_node.span().into()).trim().to_string())
+                                                }
+                                            }
+                                            RedTree::Leaf(leaf) => {
+                                                if leaf.kind == TypeScriptTokenType::Star {
+                                                    star_span = Some(leaf.span)
+                                                }
+                                            }
+                                        }
+                                    }
+                                    match exported {
+                                        Some(exported) => specifiers.push(ExportSpecifier::Namespace { exported, span: clause_span }),
+                                        None => specifiers.push(ExportSpecifier::All { span: star_span.unwrap_or(clause_span) }),
+                                    }
                                 }
+                                TypeScriptElementType::StringLiteral => module_specifier = Some(module_specifier_at(child_node.span(), source)),
                                 _ => declaration = self.build_statement(&child_node, source)?,
                             }
                         }
                         RedTree::Leaf(leaf) => match leaf.kind {
                             TypeScriptTokenType::Default => modifiers.push(Modifier::new(ModifierKind::Default, leaf.span)),
                             TypeScriptTokenType::Type => modifiers.push(Modifier::new(ModifierKind::Type, leaf.span)),
-                            TypeScriptTokenType::StringLiteral if source_str.is_none() => {
-                                let text = source.get_text_in(leaf.span.into());
-                                if text.len() >= 2 {
-                                    source_str = Some(text[1..text.len() - 1].to_string());
-                                }
+                            TypeScriptTokenType::StringLiteral if module_specifier.is_none() => {
+                                module_specifier = Some(module_specifier_at(leaf.span, source));
                             }
                             _ => {}
                         },
                     }
                 }
-                Ok(Some(Statement::ExportDeclaration(ExportDeclaration { declaration: declaration.map(Box::new), specifiers, source: source_str, modifiers, span: span.into() })))
+                Ok(Some(Statement::ExportDeclaration(ExportDeclaration { declaration: declaration.map(Box::new), specifiers, source: module_specifier, modifiers, span: span.into() })))
             }
             _ => {
                 // Try building as expression statement if not a recognized statement kind

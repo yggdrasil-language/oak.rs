@@ -4,7 +4,7 @@
 use oak_core::{Builder, OakDiagnostics, SourceText, parser::ParseSession};
 use oak_typescript::{
     TypeScriptBuilder, TypeScriptLanguage,
-    ast::{ClassMember, ImportSpecifier, ModifierKind, Statement, TypeScriptRoot},
+    ast::{ClassMember, ExportSpecifier, ImportSpecifier, ModifierKind, Statement, TypeScriptRoot},
 };
 
 fn parse(source: &str) -> OakDiagnostics<TypeScriptRoot> {
@@ -77,9 +77,13 @@ fn export_specifiers_keep_inline_type_modifiers() {
     assert_eq!(declaration.specifiers.len(), 2);
     assert!(!declaration.specifiers[0].is_inline_type_only());
     assert!(declaration.specifiers[1].is_inline_type_only());
-    let marker = declaration.specifiers[1].type_modifier.as_ref().expect("inline `type` must be recorded");
+    let ExportSpecifier::Named { type_modifier, .. } = &declaration.specifiers[1]
+    else {
+        panic!("expected a named export specifier");
+    };
+    let marker = type_modifier.as_ref().expect("inline `type` must be recorded");
     assert_eq!(module_text(source, marker.span.start, marker.span.end), "type");
-    assert_eq!(declaration.source.as_deref(), Some("./b"));
+    assert_eq!(declaration.source.as_ref().map(|specifier| specifier.value.as_str()), Some("./b"));
 }
 
 #[test]
