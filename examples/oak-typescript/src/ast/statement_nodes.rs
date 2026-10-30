@@ -573,15 +573,35 @@ pub struct VariableDeclaration {
     pub decorators: Vec<Decorator>,
     /// Keyword modifiers written before the declaration (`declare`).
     pub modifiers: Vec<Modifier>,
-    /// The name of the variable.
-    pub name: String,
     /// The JavaScript declaration keyword.
     pub kind: VariableKind,
-    /// The type annotation of the variable.
-    pub ty: Option<TypeAnnotation>,
-    /// The initial value of the variable.
-    pub value: Option<Expression>,
+    /// One entry per declarator, in source order (`const a = 1, b = 2` has two).
+    pub declarators: Vec<VariableDeclarator>,
     /// Source span of the declaration.
+    #[cfg_attr(feature = "serde", serde(with = "oak_core::serde_range"))]
+    pub span: Range<usize>,
+}
+
+/// A single declarator inside a [`VariableDeclaration`].
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct VariableDeclarator {
+    /// Binding identifiers introduced by this declarator, in source order.
+    ///
+    /// A plain binding gives `["a"]`, an object pattern `{ a, b: c, ...rest }`
+    /// gives `["a", "c", "rest"]` and an array pattern `[x, , ...ys]` gives
+    /// `["x", "ys"]`. Nested patterns and default values expand the same way.
+    pub binding_names: Vec<String>,
+    /// The binding pattern exactly as written (`{ a, b: c }`), or `None` for a
+    /// plain binding identifier. The identities themselves live in
+    /// [`Self::binding_names`] and are never read back from this text.
+    pub pattern_text: Option<String>,
+    /// The type annotation of the declarator.
+    pub ty: Option<TypeAnnotation>,
+    /// The initial value of the declarator.
+    pub value: Option<Expression>,
+    /// Source span of the declarator, from its binding to the last of its
+    /// type annotation and initializer.
     #[cfg_attr(feature = "serde", serde(with = "oak_core::serde_range"))]
     pub span: Range<usize>,
 }
@@ -672,6 +692,24 @@ impl VariableDeclaration {
     /// Returns `true` when the declaration carries a `declare` modifier.
     pub fn is_declare(&self) -> bool {
         has_modifier(&self.modifiers, ModifierKind::Declare)
+    }
+
+    /// The first binding identifier of the first declarator, or an empty string.
+    ///
+    /// Multi-declarator and destructuring declarations are read through
+    /// [`Self::declarators`].
+    pub fn name(&self) -> &str {
+        self.declarators.first().and_then(|declarator| declarator.binding_names.first()).map(String::as_str).unwrap_or("")
+    }
+
+    /// The type annotation of the first declarator.
+    pub fn ty(&self) -> Option<&TypeAnnotation> {
+        self.declarators.first().and_then(|declarator| declarator.ty.as_ref())
+    }
+
+    /// The initializer of the first declarator.
+    pub fn value(&self) -> Option<&Expression> {
+        self.declarators.first().and_then(|declarator| declarator.value.as_ref())
     }
 }
 

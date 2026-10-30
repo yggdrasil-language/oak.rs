@@ -21,7 +21,7 @@ fn variable_value(source: &str) -> Expression {
     else {
         panic!("expected a variable declaration, got {statement:?}");
     };
-    declaration.value.clone().expect("expected an initialized variable declaration")
+    declaration.value().cloned().expect("expected an initialized variable declaration")
 }
 
 fn properties(source: &str) -> Vec<ObjectProperty> {

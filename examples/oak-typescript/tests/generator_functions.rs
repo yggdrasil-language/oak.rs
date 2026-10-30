@@ -56,6 +56,6 @@ fn generator_function_expression_parses() {
     else {
         panic!("expected variable declaration: {:?}", root.statements)
     };
-    assert_eq!(decl.name, "f");
+    assert_eq!(decl.name(), "f");
     assert_eq!(root.statements.len(), 1);
 }

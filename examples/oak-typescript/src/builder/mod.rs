@@ -1,6 +1,7 @@
 use crate::{ast::*, language::TypeScriptLanguage, lexer::TypeScriptLexer, parser::TypeScriptParser};
 use oak_core::{Builder, BuilderCache, Lexer, OakDiagnostics, Parser, SourceText, TextEdit, source::Source};
 
+mod build_binding;
 mod build_class;
 mod build_expression;
 pub use build_expression::decode_string_literal_text;
