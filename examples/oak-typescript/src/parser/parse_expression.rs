@@ -37,6 +37,12 @@ impl<'config> TypeScriptParser<'config> {
                 }
                 state.finish_at(cp, crate::parser::element_type::TypeScriptElementType::IdentifierName)
             }
+            // Contextual keywords are valid identifiers in expression position:
+            // `require('./m')`, `const type = ...`, `obj.get`.
+            Some(kind) if kind.is_contextual_keyword() => {
+                state.bump();
+                state.finish_at(cp, crate::parser::element_type::TypeScriptElementType::IdentifierName)
+            }
             // Keywords that are valid primary expressions (not Error leaves).
             Some(This) => {
                 self.expect(state, This).ok();

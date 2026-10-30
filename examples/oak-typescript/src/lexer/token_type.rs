@@ -499,6 +499,15 @@ pub enum TypeScriptTokenType {
 }
 
 impl TypeScriptTokenType {
+    /// Returns true for contextual keywords that are valid identifier names in
+    /// expression position (`require('./m')`, `map.get(k)`, `obj.type`).
+    pub fn is_contextual_keyword(&self) -> bool {
+        use TypeScriptTokenType::*;
+        matches!(self,
+            Abstract | Any | Asserts | Async | Boolean | Constructor | Declare | From | Get | Implements | Keyof | Namespace | Never | Number | Object | Package | Private | Protected | Public | Readonly | Require | Set | String | Symbol | Type | Unique | Unknown
+        )
+    }
+
     /// Returns the keyword token type for the given text, if any.
     pub fn from_keyword(text: &str) -> Option<Self> {
         match text {

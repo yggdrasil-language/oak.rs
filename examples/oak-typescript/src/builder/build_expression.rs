@@ -196,10 +196,10 @@ impl<'config> TypeScriptBuilder<'config> {
 
                 for child in node.children() {
                     if let RedTree::Node(child_node) = child {
-                        if func.is_none() {
-                            func = self.build_expression(&child_node, source)?
-                        }
-                        else if child_node.green.kind == TypeScriptElementType::CallArgument {
+                        // `CallArgument` wrappers are always arguments. Checking the
+                        // kind first keeps a callee that fails to build from
+                        // swallowing the first argument as its `func`.
+                        if child_node.green.kind == TypeScriptElementType::CallArgument {
                             for arg_child in child_node.children() {
                                 if let RedTree::Node(arg_node) = arg_child {
                                     if let Some(arg) = self.build_expression(&arg_node, source)? {
@@ -207,6 +207,9 @@ impl<'config> TypeScriptBuilder<'config> {
                                     }
                                 }
                             }
+                        }
+                        else if func.is_none() {
+                            func = self.build_expression(&child_node, source)?
                         }
                         else {
                             // Try to build as expression directly if it's not a CallArgument node
@@ -244,7 +247,14 @@ impl<'config> TypeScriptBuilder<'config> {
                                     property = Some(Expression::new(ExpressionKind::Identifier(name), leaf.span.into()));
                                 }
                             }
-                            _ => {}
+                            _ => {
+                                // Property names may be keywords: `map.get(k)`, `reader.read()`,
+                                // `obj.type`. Any non-trivia leaf after the object becomes the property.
+                                if !leaf.kind.is_ignored() && object.is_some() && property.is_none() && !matches!(leaf.kind, TypeScriptTokenType::Dot) {
+                                    let name = source.get_text_in(leaf.span.into()).trim().to_string();
+                                    property = Some(Expression::new(ExpressionKind::Identifier(name), leaf.span.into()));
+                                }
+                            }
                         },
                     }
                 }
