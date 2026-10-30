@@ -800,12 +800,35 @@ impl<'config> TypeScriptParser<'config> {
         Ok(())
     }
 
+    /// Returns `true` when the token after the current one (the `break` or
+    /// `continue` keyword, still un-bumped) is an `IdentifierName` reachable
+    /// without crossing a line terminator. ECMAScript forbids a newline
+    /// between the keyword and its label, so a newline means the statement
+    /// ends here and the identifier starts the next one.
+    fn label_follows_same_line<'a, S: Source + ?Sized>(&self, state: &mut State<'a, S>) -> bool {
+        use crate::lexer::token_type::TypeScriptTokenType::*;
+        use oak_core::TokenType;
+        let mut offset = 1usize;
+        while let Some(token) = state.peek_at(offset) {
+            if token.kind.is_ignored() {
+                if token.kind == Newline {
+                    return false;
+                }
+                offset += 1;
+                continue;
+            }
+            return token.kind == IdentifierName;
+        }
+        false
+    }
+
     pub(crate) fn parse_break_statement<'a, S: Source + ?Sized>(&self, state: &mut State<'a, S>) -> Result<(), OakError> {
         use crate::lexer::token_type::TypeScriptTokenType::*;
         let cp = state.checkpoint();
+        let has_label = self.label_follows_same_line(state);
         state.bump(); // break
-        if self.at(state, IdentifierName) {
-            state.bump();
+        if has_label {
+            state.bump(); // label
         }
         self.eat(state, Semicolon);
         state.finish_at(cp, crate::parser::element_type::TypeScriptElementType::BreakStatement);
@@ -815,9 +838,10 @@ impl<'config> TypeScriptParser<'config> {
     pub(crate) fn parse_continue_statement<'a, S: Source + ?Sized>(&self, state: &mut State<'a, S>) -> Result<(), OakError> {
         use crate::lexer::token_type::TypeScriptTokenType::*;
         let cp = state.checkpoint();
+        let has_label = self.label_follows_same_line(state);
         state.bump(); // continue
-        if self.at(state, IdentifierName) {
-            state.bump();
+        if has_label {
+            state.bump(); // label
         }
         self.eat(state, Semicolon);
         state.finish_at(cp, crate::parser::element_type::TypeScriptElementType::ContinueStatement);
