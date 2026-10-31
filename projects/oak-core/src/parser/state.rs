@@ -321,6 +321,15 @@ impl<'a, L: Language, S: Source + ?Sized> ParserState<'a, L, S> {
         self.current().map(|t| self.source.get_text_in(t.span))
     }
 
+    /// Returns the text of the `n`-th following token, skipping trivia.
+    ///
+    /// Parsers use this to read a name that decides how the following tokens
+    /// are grouped, such as an environment name that owns an argument slot.
+    pub fn non_trivia_text_at(&self, n: usize) -> Option<std::borrow::Cow<'_, str>> {
+        let token = self.peek_non_trivia_at(n)?;
+        Some(self.source.get_text_in(token.span))
+    }
+
     /// Manually promotes a node from a previous generation to the current one.
     /// This is useful for improving memory locality.
     pub fn promote(&mut self, node: &'a GreenNode<'a, L>) -> &'a GreenNode<'a, L> {

@@ -1,7 +1,7 @@
 use oak_core::errors::OakError;
 use oak_testing::parsing::ParserTester;
 use oak_tex::{
-    ast::{MathDelimiter, TexCell, TexEnvironment, TexItem, TexRow},
+    ast::{MathDelimiter, TexArgument, TexCell, TexEnvironment, TexItem, TexRow},
     builder::TexBuilder,
     language::TexLanguage,
     parser::TexParser,
@@ -249,6 +249,24 @@ fn empty_cells_and_trailing_row_breaks_keep_the_grid() {
     assert_eq!(cell_text(&rows[0].cells[0]), "a");
     assert_eq!(cell_text(&rows[0].cells[1]), "");
     assert_eq!(cell_text(&rows[0].cells[2]), "b");
+}
+
+#[test]
+fn alignedat_declares_its_column_pairs_as_environment_arguments() {
+    let ast = parse_to_ast(r"\begin{alignedat}{2} a &= b \end{alignedat}");
+    let TexItem::Environment(environment) = &ast.items[0]
+    else {
+        panic!("expected an environment")
+    };
+    assert_eq!(environment.name, "alignedat");
+    let TexArgument::Required(root) = &environment.arguments[0]
+    else {
+        panic!("the column-pair count is a required argument")
+    };
+    assert_eq!(root.items.iter().filter_map(|item| match item { TexItem::Text { content, .. } => Some(content.as_str()), _ => None }).collect::<String>(), "2");
+    let rows = environment_rows(environment);
+    assert_eq!(rows.len(), 1);
+    assert_eq!(cell_text(&rows[0].cells[0]), "a", "the declared pair count is not part of the first cell");
 }
 
 #[test]
