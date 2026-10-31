@@ -275,6 +275,29 @@ fn interface_bodies_are_opaque_and_mark_incomplete() {
 }
 
 #[test]
+fn destructuring_and_shorthand_tokens_mark_rename_unsafe() {
+    let source = "const { value } = obj;\nlet [a, b] = arr;\nconst { x: renamed } = obj2;\nconst plain = 1;\nconst o = { plain };\nfunction safe(){ }\nsafe();";
+    let f = facts(source);
+    assert!(!f.incomplete, "{f:?}");
+    assert!(binding(&f, "value").rename_unsafe, "shorthand pattern token doubles as the property key");
+    assert!(binding(&f, "a").rename_unsafe, "array pattern token");
+    assert!(binding(&f, "b").rename_unsafe, "array pattern token");
+    assert!(binding(&f, "renamed").rename_unsafe, "conservative: `{{ x: renamed }}` renames safely but the whole pattern is flagged");
+    assert!(binding(&f, "plain").rename_unsafe, "shorthand reference `{{ plain }}` doubles as the property key");
+    assert!(!binding(&f, "safe").rename_unsafe, "plain declaration and plain call are rename-safe");
+}
+
+#[test]
+fn block_var_destructuring_marks_rename_unsafe() {
+    let source = "if (x) { var { value } = obj; }";
+    let f = facts(source);
+    assert!(!f.incomplete, "{f:?}");
+    let value = binding(&f, "value");
+    assert!(matches!(value.kind, ModuleBindingKind::Var), "block var must hoist: {value:?}");
+    assert!(value.rename_unsafe, "hoisted var destructuring keeps the pattern token");
+}
+
+#[test]
 fn export_star_re_exports_create_no_local_binding() {
     let f = facts("export * as ns from \"m\";");
     assert!(f.bindings.is_empty(), "`export * as ns from` is a re-export, not a local binding: {f:?}");

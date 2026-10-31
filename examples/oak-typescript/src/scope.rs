@@ -21,6 +21,13 @@
 //! The single exception is [`crate::ast::TypeAnnotation::Query`] (`typeof X`),
 //! which stores no span: there a whole-word textual match may only set the
 //! conservative `has_type_references` flag, never a reference span.
+//!
+//! `rename_unsafe` marks a binding whose renaming would change semantics even
+//! with every recorded span rewritten: the declaration token sits in a
+//! destructuring pattern (a shorthand token doubles as the property key), or a
+//! value reference is a shorthand object-property token. The flag is
+//! per-binding and conservative: a shadowed shorthand mention of the same
+//! spelling still sets it. Consumers must refuse renames of such bindings.
 
 use std::collections::HashMap;
 
@@ -58,6 +65,10 @@ pub struct ModuleBindingFacts {
     pub references: Vec<Range<usize>>,
     /// `true` when the name is used in a type position (span not recorded).
     pub has_type_references: bool,
+    /// `true` when renaming would change semantics: the declaration token is
+    /// inside a destructuring pattern, or a value reference is a shorthand
+    /// object-property token (both double as the property key).
+    pub rename_unsafe: bool,
 }
 
 /// The declaration form that introduced a module-level binding.
@@ -184,6 +195,15 @@ impl ScopeWalker {
         }
     }
 
+    /// Marks the module binding `name` rename-unsafe, if there is one. A
+    /// shadowed mention of the same spelling marks it too: over-rejecting is
+    /// safe, a missed shorthand key-token is not.
+    fn mark_unsafe(&mut self, name: &str) {
+        if let Some(&index) = self.binding_index.get(name) {
+            self.bindings[index].rename_unsafe = true;
+        }
+    }
+
     // ---------------------------------------------------------------- phase 1
 
     fn add_module_binding(&mut self, name: &str, kind: ModuleBindingKind, declaration: &Range<usize>) {
@@ -205,6 +225,7 @@ impl ScopeWalker {
             declaration: declaration.clone(),
             references: Vec::new(),
             has_type_references: false,
+            rename_unsafe: false,
         });
         self.binding_index.insert(name.to_string(), index);
         let frame = &mut self.frames[0];
@@ -236,6 +257,11 @@ impl ScopeWalker {
                 match declarator.binding_spans.get(position) {
                     Some(span) => self.add_module_binding(name, kind.clone(), span),
                     None => self.add_module_binding(name, kind.clone(), &Range { start: declarator.span.start, end: declarator.span.start }),
+                }
+            }
+            if declarator.pattern_text.is_some() {
+                for name in &declarator.binding_names {
+                    self.mark_unsafe(name);
                 }
             }
         }
@@ -284,8 +310,11 @@ impl ScopeWalker {
             other => {
                 let mut hoisted = Vec::new();
                 collect_var_declarators_one(other, &mut hoisted);
-                for (name, span) in hoisted {
+                for (name, span, pattern) in hoisted {
                     self.add_module_binding(&name, ModuleBindingKind::Var, &span);
+                    if pattern {
+                        self.mark_unsafe(&name);
+                    }
                 }
             }
         }
@@ -563,7 +592,7 @@ impl ScopeWalker {
         }
         let mut hoisted = Vec::new();
         collect_var_declarators(body, &mut hoisted);
-        for (name, _) in hoisted {
+        for (name, _, _) in hoisted {
             self.hoist_register(&name);
         }
         self.prescan_declarations(body);
@@ -734,7 +763,10 @@ impl ScopeWalker {
                 for property in properties {
                     match property {
                         ObjectProperty::Property { name, value, shorthand, .. } => {
-                            if !*shorthand {
+                            if *shorthand {
+                                self.mark_unsafe(name);
+                            }
+                            else {
                                 self.check_key_name(name);
                             }
                             self.walk_expression(value);
@@ -893,22 +925,23 @@ fn import_local(specifier: &ImportSpecifier) -> &str {
 
 /// Collects every `var` binding declared in `statements`, descending through
 /// block-shaped statements but never into function, class or namespace bodies.
-fn collect_var_declarators(statements: &[Statement], out: &mut Vec<(String, Range<usize>)>) {
+fn collect_var_declarators(statements: &[Statement], out: &mut Vec<(String, Range<usize>, bool)>) {
     for statement in statements {
         collect_var_declarators_one(statement, out);
     }
 }
 
-fn collect_var_declarators_one(statement: &Statement, out: &mut Vec<(String, Range<usize>)>) {
+fn collect_var_declarators_one(statement: &Statement, out: &mut Vec<(String, Range<usize>, bool)>) {
     match statement {
         Statement::VariableDeclaration(declaration) if declaration.kind == VariableKind::Var => {
             for declarator in &declaration.declarators {
+                let pattern = declarator.pattern_text.is_some();
                 for (position, name) in declarator.binding_names.iter().enumerate() {
                     let span = match declarator.binding_spans.get(position) {
                         Some(span) => span.clone(),
                         None => Range { start: declarator.span.start, end: declarator.span.start },
                     };
-                    out.push((name.clone(), span));
+                    out.push((name.clone(), span, pattern));
                 }
             }
         }
