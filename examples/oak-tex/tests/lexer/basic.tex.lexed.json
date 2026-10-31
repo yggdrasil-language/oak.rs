@@ -3195,7 +3195,7 @@
             "end": 2683
         },
         {
-            "kind": "Command",
+            "kind": "RowBreak",
             "text": "\\\\",
             "start": 2683,
             "end": 2685
@@ -3225,7 +3225,7 @@
             "end": 2724
         },
         {
-            "kind": "Command",
+            "kind": "RowBreak",
             "text": "\\\\",
             "start": 2724,
             "end": 2726
@@ -3249,7 +3249,7 @@
             "end": 2756
         },
         {
-            "kind": "Command",
+            "kind": "RowBreak",
             "text": "\\\\",
             "start": 2756,
             "end": 2758
@@ -6117,7 +6117,7 @@
             "end": 5037
         },
         {
-            "kind": "Command",
+            "kind": "RowBreak",
             "text": "\\\\",
             "start": 5038,
             "end": 5040
@@ -6177,7 +6177,7 @@
             "end": 5069
         },
         {
-            "kind": "Command",
+            "kind": "RowBreak",
             "text": "\\\\",
             "start": 5070,
             "end": 5072
@@ -6309,7 +6309,7 @@
             "end": 5140
         },
         {
-            "kind": "Command",
+            "kind": "RowBreak",
             "text": "\\\\",
             "start": 5141,
             "end": 5143
@@ -6765,7 +6765,7 @@
             "end": 5359
         },
         {
-            "kind": "Command",
+            "kind": "RowBreak",
             "text": "\\\\",
             "start": 5360,
             "end": 5362
@@ -6891,7 +6891,7 @@
             "end": 5396
         },
         {
-            "kind": "Command",
+            "kind": "RowBreak",
             "text": "\\\\",
             "start": 5397,
             "end": 5399
@@ -6939,7 +6939,7 @@
             "end": 5433
         },
         {
-            "kind": "Command",
+            "kind": "RowBreak",
             "text": "\\\\",
             "start": 5434,
             "end": 5436
@@ -7233,7 +7233,7 @@
             "end": 5558
         },
         {
-            "kind": "Command",
+            "kind": "RowBreak",
             "text": "\\\\",
             "start": 5559,
             "end": 5561
@@ -10407,7 +10407,7 @@
             "end": 7766
         },
         {
-            "kind": "Command",
+            "kind": "RowBreak",
             "text": "\\\\",
             "start": 7767,
             "end": 7769
@@ -10449,7 +10449,7 @@
             "end": 7792
         },
         {
-            "kind": "Command",
+            "kind": "RowBreak",
             "text": "\\\\",
             "start": 7793,
             "end": 7795
@@ -10485,7 +10485,7 @@
             "end": 7809
         },
         {
-            "kind": "Command",
+            "kind": "RowBreak",
             "text": "\\\\",
             "start": 7810,
             "end": 7812
@@ -10521,7 +10521,7 @@
             "end": 7830
         },
         {
-            "kind": "Command",
+            "kind": "RowBreak",
             "text": "\\\\",
             "start": 7831,
             "end": 7833
@@ -10959,7 +10959,7 @@
             "end": 8108
         },
         {
-            "kind": "Command",
+            "kind": "RowBreak",
             "text": "\\\\",
             "start": 8109,
             "end": 8111
@@ -11013,7 +11013,7 @@
             "end": 8146
         },
         {
-            "kind": "Command",
+            "kind": "RowBreak",
             "text": "\\\\",
             "start": 8147,
             "end": 8149
@@ -11061,7 +11061,7 @@
             "end": 8175
         },
         {
-            "kind": "Command",
+            "kind": "RowBreak",
             "text": "\\\\",
             "start": 8176,
             "end": 8178
@@ -11109,7 +11109,7 @@
             "end": 8204
         },
         {
-            "kind": "Command",
+            "kind": "RowBreak",
             "text": "\\\\",
             "start": 8205,
             "end": 8207
@@ -11235,7 +11235,7 @@
             "end": 8275
         },
         {
-            "kind": "Command",
+            "kind": "RowBreak",
             "text": "\\\\",
             "start": 8276,
             "end": 8278
@@ -19575,7 +19575,7 @@
             "end": 14951
         },
         {
-            "kind": "Command",
+            "kind": "RowBreak",
             "text": "\\\\",
             "start": 14952,
             "end": 14954
@@ -19683,7 +19683,7 @@
             "end": 14979
         },
         {
-            "kind": "Command",
+            "kind": "RowBreak",
             "text": "\\\\",
             "start": 14980,
             "end": 14982
@@ -19809,7 +19809,7 @@
             "end": 15017
         },
         {
-            "kind": "Command",
+            "kind": "RowBreak",
             "text": "\\\\",
             "start": 15018,
             "end": 15020
@@ -19905,7 +19905,7 @@
             "end": 15051
         },
         {
-            "kind": "Command",
+            "kind": "RowBreak",
             "text": "\\\\",
             "start": 15052,
             "end": 15054

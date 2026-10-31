@@ -201,6 +201,11 @@ impl<'config> TexBuilder<'config> {
                 }
             }
             TexTokenType::Environment => Ok(Some(TexItem::Environment(self.build_environment(tree.as_node().unwrap(), source)?))),
+            TexTokenType::Row => Ok(Some(TexItem::Row(self.build_row(tree.as_node().unwrap(), source)?))),
+            // A row break outside an environment body has no row to close;
+            // keep it as text so text-mode lowering still sees the authored
+            // line break instead of dropping it.
+            TexTokenType::RowBreak => Ok(Some(TexItem::Text { span: tree.span().into(), content: tree.text(source).to_string() })),
             TexTokenType::Group => Ok(Some(TexItem::Group(self.build_group(tree.as_node().unwrap(), source)?))),
             TexTokenType::InlineMath | TexTokenType::DisplayMath | TexTokenType::ParenInlineMathDelim | TexTokenType::BracketDisplayMathDelim => Ok(Some(TexItem::Math(self.build_math(tree.as_node().unwrap(), source)?))),
             TexTokenType::LeftRightPair => Ok(Some(TexItem::LeftRightPair(self.build_left_right(tree.as_node().unwrap(), source)?))),
@@ -474,6 +479,22 @@ impl<'config> TexBuilder<'config> {
         let is_math = TEX_MATH_ENVIRONMENTS.contains(&name.as_str());
 
         Ok(TexEnvironment { span: node.span().into(), name, starred, is_math, arguments, content })
+    }
+
+    fn build_row<S: Source + ?Sized>(&self, node: RedNode<TexLanguage>, source: &S) -> Result<TexRow, OakError> {
+        let mut cells = Vec::new();
+        for child in node.children() {
+            if child.kind::<TexTokenType>() == TexTokenType::Cell {
+                if let Some(cell) = child.as_node() {
+                    cells.push(self.build_cell(cell, source)?);
+                }
+            }
+        }
+        Ok(TexRow { span: node.span().into(), cells })
+    }
+
+    fn build_cell<S: Source + ?Sized>(&self, node: RedNode<TexLanguage>, source: &S) -> Result<TexCell, OakError> {
+        Ok(TexCell { span: node.span().into(), content: self.build_content(node, source)? })
     }
 }
 

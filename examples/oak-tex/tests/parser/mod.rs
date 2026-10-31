@@ -1,7 +1,7 @@
 use oak_core::errors::OakError;
 use oak_testing::parsing::ParserTester;
 use oak_tex::{
-    ast::{MathDelimiter, TexItem},
+    ast::{MathDelimiter, TexCell, TexEnvironment, TexItem, TexRow},
     builder::TexBuilder,
     language::TexLanguage,
     parser::TexParser,
@@ -176,6 +176,85 @@ fn ams_pmatrix_environment() {
         }
         other => panic!("expected Environment, got {:?}", other),
     }
+}
+
+// --- environment row / cell structure ------------------------------------
+
+/// The rows of an environment body, in source order.
+fn environment_rows(environment: &TexEnvironment) -> Vec<&TexRow> {
+    environment
+        .content
+        .items
+        .iter()
+        .filter_map(|item| match item {
+            TexItem::Row(row) => Some(row),
+            _ => None,
+        })
+        .collect()
+}
+
+/// The visible text of one cell, ignoring separators and trivia.
+fn cell_text(cell: &TexCell) -> String {
+    cell.content
+        .items
+        .iter()
+        .filter_map(|item| match item {
+            TexItem::Text { content, .. } => Some(content.as_str()),
+            TexItem::Command(command) => Some(command.name.as_str()),
+            _ => None,
+        })
+        .collect()
+}
+
+#[test]
+fn math_environment_body_is_rows_of_cells() {
+    let ast = parse_to_ast(
+        r#"\begin{cases}
+1 & x > 0 \\
+0 & x \le 0
+\end{cases}"#,
+    );
+    let TexItem::Environment(environment) = &ast.items[0]
+    else {
+        panic!("expected an environment, got {:?}", ast.items[0])
+    };
+
+    assert!(environment.content.items.iter().all(|item| matches!(item, TexItem::Row(_))), "an environment body only contains rows: {:?}", environment.content.items);
+    let rows = environment_rows(environment);
+    assert_eq!(rows.len(), 2, "two authored rows, got {rows:?}");
+    assert_eq!(rows[0].cells.len(), 2, "`1 & x > 0` has two cells");
+    assert_eq!(rows[1].cells.len(), 2, "`0 & x \\le 0` has two cells");
+    assert_eq!(cell_text(&rows[0].cells[0]), "1");
+    assert_eq!(cell_text(&rows[1].cells[0]), "0");
+
+    for row in &rows {
+        for cell in &row.cells {
+            assert!(cell.span.start <= cell.span.end);
+            assert!(row.span.start <= cell.span.start && cell.span.end <= row.span.end.max(cell.span.end));
+        }
+    }
+}
+
+#[test]
+fn empty_cells_and_trailing_row_breaks_keep_the_grid() {
+    let ast = parse_to_ast(r#"\begin{matrix} a & & b \\ \end{matrix}"#);
+    let TexItem::Environment(environment) = &ast.items[0]
+    else {
+        panic!("expected an environment")
+    };
+    let rows = environment_rows(environment);
+
+    assert_eq!(rows.len(), 1, "a trailing `\\\\` does not add a row: {rows:?}");
+    assert_eq!(rows[0].cells.len(), 3, "the middle cell is empty but present");
+    assert_eq!(cell_text(&rows[0].cells[0]), "a");
+    assert_eq!(cell_text(&rows[0].cells[1]), "");
+    assert_eq!(cell_text(&rows[0].cells[2]), "b");
+}
+
+#[test]
+fn row_break_outside_an_environment_stays_text() {
+    let ast = parse_to_ast(r#"first \\ second"#);
+    assert!(ast.items.iter().any(|item| matches!(item, TexItem::Text { content, .. } if content == r#"\\"#)), "a row break outside an environment must not disappear: {:?}", ast.items);
 }
 
 // --- left right pair -------------------------------------------------------

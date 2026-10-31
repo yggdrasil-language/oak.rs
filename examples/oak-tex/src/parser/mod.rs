@@ -104,9 +104,11 @@ impl<'config> TexParser<'config> {
         }
         state.finish_at(begin_checkpoint, TexElementType::BeginEnvironment);
 
-        // Parse content until \end{...}
+        // Parse the body as rows of cells: `&` separates cells and `\\`
+        // separates rows, so the syntax tree carries the alignment structure
+        // instead of leaving the separators as plain text.
         while state.not_at_end() && !state.at(TexTokenType::EndKeyword) {
-            self.parse_item(state)?;
+            self.parse_environment_row(state)?;
         }
 
         // Parse \end{name}
@@ -120,6 +122,39 @@ impl<'config> TexParser<'config> {
         }
 
         state.finish_at(checkpoint, TexElementType::Environment);
+        Ok(())
+    }
+
+    /// Parses one row of an environment body.
+    ///
+    /// A row is one or more cells separated by `&`, optionally closed by the
+    /// `\\` row break. An empty cell before `&`, `\\` or `\end` is a real cell
+    /// (for example `a & & b`), so the parser always finishes a cell node.
+    fn parse_environment_row<'a, S: Source + ?Sized>(&self, state: &mut State<'a, S>) -> Result<(), OakError> {
+        let checkpoint = state.checkpoint();
+        loop {
+            self.parse_environment_cell(state)?;
+            if state.at(TexTokenType::Ampersand) {
+                state.bump();
+                continue;
+            }
+            break;
+        }
+        if state.at(TexTokenType::RowBreak) {
+            state.bump();
+        }
+        state.finish_at(checkpoint, TexElementType::Row);
+        Ok(())
+    }
+
+    /// Parses one cell of an environment row, stopping at the next cell
+    /// separator, row break or the closing `\end`.
+    fn parse_environment_cell<'a, S: Source + ?Sized>(&self, state: &mut State<'a, S>) -> Result<(), OakError> {
+        let checkpoint = state.checkpoint();
+        while state.not_at_end() && !state.at(TexTokenType::Ampersand) && !state.at(TexTokenType::RowBreak) && !state.at(TexTokenType::EndKeyword) {
+            self.parse_item(state)?;
+        }
+        state.finish_at(checkpoint, TexElementType::Cell);
         Ok(())
     }
 

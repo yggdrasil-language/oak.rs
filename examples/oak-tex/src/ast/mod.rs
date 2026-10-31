@@ -20,6 +20,8 @@ pub enum TexItem {
     Command(TexCommand),
     /// A TeX environment.
     Environment(TexEnvironment),
+    /// A row of an environment body.
+    Row(TexRow),
     /// A TeX group.
     Group(TexGroup),
     /// A TeX math environment.
@@ -50,6 +52,33 @@ pub enum TexItem {
     },
 }
 
+/// A row of a TeX environment body.
+///
+/// `&` separates cells and `\\` separates rows, so the parser wraps an
+/// environment body into rows of cells instead of leaving the separators as
+/// plain text. Downstream semantic lowering reads this structure; it never
+/// rescans the environment source for alignment tabs or row breaks.
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct TexRow {
+    /// The span of the row, from its first cell to the row break when present.
+    #[cfg_attr(feature = "serde", serde(with = "oak_core::serde_range"))]
+    pub span: Range<usize>,
+    /// The cells in this row, in source order.
+    pub cells: Vec<TexCell>,
+}
+
+/// One cell of an environment row.
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct TexCell {
+    /// The span of the cell.
+    #[cfg_attr(feature = "serde", serde(with = "oak_core::serde_range"))]
+    pub span: Range<usize>,
+    /// The cell content.
+    pub content: TexRoot,
+}
+
 /// A TeX environment (e.g., \begin{matrix} ... \end{matrix}).
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
@@ -65,7 +94,7 @@ pub struct TexEnvironment {
     pub is_math: bool,
     /// The arguments to the environment.
     pub arguments: Vec<TexArgument>,
-    /// The content of the environment.
+    /// The content of the environment, one [`TexItem::Row`] per row.
     pub content: TexRoot,
 }
 
