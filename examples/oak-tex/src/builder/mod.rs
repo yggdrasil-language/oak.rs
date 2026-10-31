@@ -202,10 +202,10 @@ impl<'config> TexBuilder<'config> {
             }
             TexTokenType::Environment => Ok(Some(TexItem::Environment(self.build_environment(tree.as_node().unwrap(), source)?))),
             TexTokenType::Row => Ok(Some(TexItem::Row(self.build_row(tree.as_node().unwrap(), source)?))),
-            // A row break outside an environment body has no row to close;
-            // keep it as text so text-mode lowering still sees the authored
-            // line break instead of dropping it.
-            TexTokenType::RowBreak => Ok(Some(TexItem::Text { span: tree.span().into(), content: tree.text(source).to_string() })),
+            // A row break outside an environment body has no row to close.
+            // Keep it as the `\\` command so text-mode lowering still sees the
+            // authored line break instead of dropping it.
+            TexTokenType::RowBreak => Ok(Some(TexItem::Command(TexCommand { span: tree.span().into(), name: "\\".to_string(), starred: false, arguments: Vec::new() }))),
             TexTokenType::Group => Ok(Some(TexItem::Group(self.build_group(tree.as_node().unwrap(), source)?))),
             TexTokenType::InlineMath | TexTokenType::DisplayMath | TexTokenType::ParenInlineMathDelim | TexTokenType::BracketDisplayMathDelim => Ok(Some(TexItem::Math(self.build_math(tree.as_node().unwrap(), source)?))),
             TexTokenType::LeftRightPair => Ok(Some(TexItem::LeftRightPair(self.build_left_right(tree.as_node().unwrap(), source)?))),

@@ -252,9 +252,9 @@ fn empty_cells_and_trailing_row_breaks_keep_the_grid() {
 }
 
 #[test]
-fn row_break_outside_an_environment_stays_text() {
+fn row_break_outside_an_environment_stays_a_command() {
     let ast = parse_to_ast(r#"first \\ second"#);
-    assert!(ast.items.iter().any(|item| matches!(item, TexItem::Text { content, .. } if content == r#"\\"#)), "a row break outside an environment must not disappear: {:?}", ast.items);
+    assert!(ast.items.iter().any(|item| matches!(item, TexItem::Command(command) if command.name == "\\")), "a text-mode row break must stay the `\\\\` command: {:?}", ast.items);
 }
 
 // --- left right pair -------------------------------------------------------
