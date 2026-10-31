@@ -54,8 +54,11 @@ impl<'config> TypeScriptBuilder<'config> {
                             }
                             match child_kind {
                                 TypeScriptElementType::BindingPattern => {
-                                    let mut declarator = current.take().unwrap_or(VariableDeclarator { binding_names: Vec::new(), pattern_text: None, ty: None, value: None, span: child_span });
-                                    declarator.binding_names.extend(crate::builder::build_binding::binding_pattern_names(&child_node, source));
+                                    let mut declarator = current.take().unwrap_or(VariableDeclarator { binding_names: Vec::new(), binding_spans: Vec::new(), pattern_text: None, ty: None, value: None, span: child_span });
+                                    for (name, name_span) in crate::builder::build_binding::binding_pattern_names(&child_node, source) {
+                                        declarator.binding_names.push(name);
+                                        declarator.binding_spans.push(name_span);
+                                    }
                                     declarator.pattern_text = Some(source.get_text_in(child_span.clone()).trim().to_string());
                                     declarator.span.end = child_span.end;
                                     current = Some(declarator);
@@ -69,9 +72,10 @@ impl<'config> TypeScriptBuilder<'config> {
                                     }
                                 }
                                 TypeScriptElementType::IdentifierName => {
-                                    let name = crate::builder::build_binding::binding_identifier_text(&child_node, source);
-                                    let mut declarator = current.take().unwrap_or(VariableDeclarator { binding_names: Vec::new(), pattern_text: None, ty: None, value: None, span: child_span.clone() });
+                                    let (name, name_span) = crate::builder::build_binding::binding_identifier_text(&child_node, source);
+                                    let mut declarator = current.take().unwrap_or(VariableDeclarator { binding_names: Vec::new(), binding_spans: Vec::new(), pattern_text: None, ty: None, value: None, span: child_span.clone() });
                                     declarator.binding_names.push(name);
+                                    declarator.binding_spans.push(name_span);
                                     declarator.span.end = child_span.end;
                                     current = Some(declarator);
                                 }
@@ -93,8 +97,9 @@ impl<'config> TypeScriptBuilder<'config> {
                             TypeScriptTokenType::IdentifierName => {
                                 let span: Range<usize> = leaf.span.into();
                                 let name = source.get_text_in(span.clone()).trim().to_string();
-                                let mut declarator = current.take().unwrap_or(VariableDeclarator { binding_names: Vec::new(), pattern_text: None, ty: None, value: None, span: span.clone() });
+                                let mut declarator = current.take().unwrap_or(VariableDeclarator { binding_names: Vec::new(), binding_spans: Vec::new(), pattern_text: None, ty: None, value: None, span: span.clone() });
                                 declarator.binding_names.push(name);
+                                declarator.binding_spans.push(span.clone());
                                 declarator.span.end = span.end;
                                 current = Some(declarator);
                             }
@@ -109,6 +114,7 @@ impl<'config> TypeScriptBuilder<'config> {
             }
             TypeScriptElementType::FunctionDeclaration => {
                 let mut name = String::new();
+                let mut name_span: Option<Range<usize>> = None;
                 let mut type_params = Vec::new();
                 let mut params = Vec::new();
                 let mut return_type = None;
@@ -127,12 +133,14 @@ impl<'config> TypeScriptBuilder<'config> {
                                             if let RedTree::Leaf(l) = c {
                                                 if l.kind == TypeScriptTokenType::IdentifierName {
                                                     name = source.get_text_in(l.span.into()).trim().to_string();
+                                                    name_span = Some(l.span.into());
                                                     break;
                                                 }
                                             }
                                         }
                                         if name.is_empty() {
                                             name = source.get_text_in(child_node.span().into()).trim().to_string();
+                                            name_span = Some(child_node.span().into());
                                         }
                                     }
                                 }
@@ -169,7 +177,8 @@ impl<'config> TypeScriptBuilder<'config> {
                         RedTree::Leaf(leaf) => match leaf.kind {
                             TypeScriptTokenType::IdentifierName => {
                                 if name.is_empty() {
-                                    name = source.get_text_in(leaf.span.into()).to_string()
+                                    name = source.get_text_in(leaf.span.into()).to_string();
+                                    name_span = Some(leaf.span.into());
                                 }
                             }
                             TypeScriptTokenType::Declare => modifiers.push(Modifier::new(ModifierKind::Declare, leaf.span)),
@@ -177,10 +186,12 @@ impl<'config> TypeScriptBuilder<'config> {
                         },
                     }
                 }
-                Ok(Some(Statement::FunctionDeclaration(FunctionDeclaration { decorators, modifiers, name, type_params, params, return_type, body, span: span.into() })))
+                let name_span = name_span.unwrap_or_else(|| Range { start: span.start, end: span.start });
+                Ok(Some(Statement::FunctionDeclaration(FunctionDeclaration { decorators, modifiers, name, name_span, type_params, params, return_type, body, span: span.into() })))
             }
             TypeScriptElementType::ClassDeclaration => {
                 let mut name = String::new();
+                let mut name_span: Option<Range<usize>> = None;
                 let mut type_params = Vec::new();
                 let mut extends = None;
                 let mut implements = Vec::new();
@@ -196,7 +207,8 @@ impl<'config> TypeScriptBuilder<'config> {
                             match child_kind {
                                 TypeScriptElementType::IdentifierName => {
                                     if name.is_empty() {
-                                        name = source.get_text_in(child_node.span().into()).to_string()
+                                        name = source.get_text_in(child_node.span().into()).to_string();
+                                        name_span = Some(child_node.span().into());
                                     }
                                 }
                                 TypeScriptElementType::TypeParameter => {
@@ -267,7 +279,8 @@ impl<'config> TypeScriptBuilder<'config> {
                         RedTree::Leaf(leaf) => match leaf.kind {
                             TypeScriptTokenType::IdentifierName => {
                                 if name.is_empty() {
-                                    name = source.get_text_in(leaf.span.into()).to_string()
+                                    name = source.get_text_in(leaf.span.into()).to_string();
+                                    name_span = Some(leaf.span.into());
                                 }
                             }
                             TypeScriptTokenType::Abstract => modifiers.push(Modifier::new(ModifierKind::Abstract, leaf.span)),
@@ -277,7 +290,8 @@ impl<'config> TypeScriptBuilder<'config> {
                         },
                     }
                 }
-                Ok(Some(Statement::ClassDeclaration(ClassDeclaration { decorators, modifiers, name, type_params, extends, implements, body, span: span.into() })))
+                let name_span = name_span.unwrap_or_else(|| Range { start: span.start, end: span.start });
+                Ok(Some(Statement::ClassDeclaration(ClassDeclaration { decorators, modifiers, name, name_span, type_params, extends, implements, body, span: span.into() })))
             }
             TypeScriptElementType::InterfaceDeclaration => {
                 if self.erase_types {
@@ -397,6 +411,7 @@ impl<'config> TypeScriptBuilder<'config> {
             }
             TypeScriptElementType::EnumDeclaration => {
                 let mut name = String::new();
+                let mut name_span: Option<Range<usize>> = None;
                 let mut members = Vec::new();
                 let mut modifiers: Vec<Modifier> = Vec::new();
                 let mut decorators = Vec::new();
@@ -408,7 +423,8 @@ impl<'config> TypeScriptBuilder<'config> {
                             match child_kind {
                                 TypeScriptElementType::IdentifierName => {
                                     if name.is_empty() {
-                                        name = source.get_text_in(child_node.span().into()).to_string()
+                                        name = source.get_text_in(child_node.span().into()).to_string();
+                                        name_span = Some(child_node.span().into());
                                     }
                                 }
                                 TypeScriptElementType::EnumMember => {
@@ -431,7 +447,8 @@ impl<'config> TypeScriptBuilder<'config> {
                         }
                     }
                 }
-                Ok(Some(Statement::Enum(EnumDeclaration { decorators, modifiers, name, members, span: span.into() })))
+                let name_span = name_span.unwrap_or_else(|| Range { start: span.start, end: span.start });
+                Ok(Some(Statement::Enum(EnumDeclaration { decorators, modifiers, name, name_span, members, span: span.into() })))
             }
             TypeScriptElementType::BlockStatement => {
                 let mut statements = Vec::new();
@@ -771,14 +788,17 @@ impl<'config> TypeScriptBuilder<'config> {
                                                 TypeScriptElementType::IdentifierName => specifiers.push(ImportSpecifier::Default { local: source.get_text_in(clause_span.clone()).trim().to_string(), span: clause_span }),
                                                 TypeScriptElementType::NamespaceImport => {
                                                     let mut local = String::new();
+                                                    let mut local_span: Option<Range<usize>> = None;
                                                     for ns_child in clause_node.children() {
                                                         if let RedTree::Node(ns_node) = ns_child {
                                                             if ns_node.green.kind == TypeScriptElementType::IdentifierName {
-                                                                local = source.get_text_in(ns_node.span().into()).trim().to_string()
+                                                                local = source.get_text_in(ns_node.span().into()).trim().to_string();
+                                                                local_span = Some(ns_node.span().into());
                                                             }
                                                         }
                                                     }
-                                                    specifiers.push(ImportSpecifier::Namespace { local, span: clause_span })
+                                                    let local_span = local_span.unwrap_or_else(|| Range { start: clause_span.start, end: clause_span.start });
+                                                    specifiers.push(ImportSpecifier::Namespace { local, local_span, span: clause_span })
                                                 }
                                                 TypeScriptElementType::NamedImports => {
                                                     for named_child in clause_node.children() {
@@ -787,12 +807,21 @@ impl<'config> TypeScriptBuilder<'config> {
                                                                 let spec_span = named_node.span();
                                                                 let mut local = String::new();
                                                                 let mut imported = String::new();
+                                                                let mut local_span: Option<Range<usize>> = None;
+                                                                let mut imported_span: Option<Range<usize>> = None;
                                                                 let mut type_modifier = None;
                                                                 for spec_child in named_node.children() {
                                                                     if let RedTree::Node(spec_node) = spec_child {
                                                                         if spec_node.green.kind == TypeScriptElementType::IdentifierName {
+                                                                            let name_span = spec_node.span().into();
                                                                             let name = source.get_text_in(spec_node.span().into()).trim().to_string();
-                                                                            if imported.is_empty() { imported = name } else { local = name }
+                                                                            if imported.is_empty() {
+                                                                                imported = name;
+                                                                                imported_span = Some(name_span);
+                                                                            } else {
+                                                                                local = name;
+                                                                                local_span = Some(name_span);
+                                                                            }
                                                                         }
                                                                     }
                                                                     else if let RedTree::Leaf(leaf) = spec_child {
@@ -804,7 +833,8 @@ impl<'config> TypeScriptBuilder<'config> {
                                                                 if local.is_empty() {
                                                                     local = imported.clone()
                                                                 }
-                                                                specifiers.push(ImportSpecifier::Named { local, imported, type_modifier, span: spec_span })
+                                                                let local_span = local_span.unwrap_or_else(|| imported_span.unwrap_or_else(|| Range { start: spec_span.start, end: spec_span.start }));
+                                                                specifiers.push(ImportSpecifier::Named { local, local_span, imported, type_modifier, span: spec_span })
                                                             }
                                                         }
                                                     }
@@ -850,12 +880,17 @@ impl<'config> TypeScriptBuilder<'config> {
                                                 let spec_span = named_node.span();
                                                 let mut local = String::new();
                                                 let mut exported = String::new();
+                                                let mut local_span: Option<Range<usize>> = None;
                                                 let mut type_modifier = None;
                                                 for spec_child in named_node.children() {
                                                     if let RedTree::Node(spec_node) = spec_child {
                                                         if spec_node.green.kind == TypeScriptElementType::IdentifierName {
+                                                            let name_span = spec_node.span().into();
                                                             let name = source.get_text_in(spec_node.span().into()).trim().to_string();
-                                                            if local.is_empty() { local = name } else { exported = name }
+                                                            if local.is_empty() {
+                                                                local = name;
+                                                                local_span = Some(name_span);
+                                                            } else { exported = name }
                                                         }
                                                     }
                                                     else if let RedTree::Leaf(leaf) = spec_child {
@@ -867,7 +902,8 @@ impl<'config> TypeScriptBuilder<'config> {
                                                 if exported.is_empty() {
                                                     exported = local.clone()
                                                 }
-                                                specifiers.push(ExportSpecifier::Named { local, exported, type_modifier, span: spec_span })
+                                                let local_span = local_span.unwrap_or_else(|| Range { start: spec_span.start, end: spec_span.start });
+                                                specifiers.push(ExportSpecifier::Named { local, local_span, exported, type_modifier, span: spec_span })
                                             }
                                         }
                                     }

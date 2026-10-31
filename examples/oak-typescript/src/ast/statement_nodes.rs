@@ -216,6 +216,10 @@ pub struct EnumDeclaration {
     pub modifiers: Vec<Modifier>,
     /// The name of the enum.
     pub name: String,
+    /// Source span of the name token, zero-width at the declaration start when
+    /// the builder could not recover the token.
+    #[cfg_attr(feature = "serde", serde(with = "oak_core::serde_range"))]
+    pub name_span: Range<usize>,
     /// Members of the enum.
     pub members: Vec<EnumMember>,
     /// Source span of the declaration.
@@ -430,6 +434,10 @@ pub enum ImportSpecifier {
     Namespace {
         /// Local name bound to the module namespace.
         local: String,
+        /// Source span of the local binding token, zero-width at the clause
+        /// start when the builder could not recover the token.
+        #[cfg_attr(feature = "serde", serde(with = "oak_core::serde_range"))]
+        local_span: Range<usize>,
         /// Source span of the `* as local` clause.
         #[cfg_attr(feature = "serde", serde(with = "oak_core::serde_range"))]
         span: Range<usize>,
@@ -438,6 +446,11 @@ pub enum ImportSpecifier {
     Named {
         /// Local name.
         local: String,
+        /// Source span of the local binding token (the imported token when no
+        /// `as` alias is written), zero-width at the specifier start when the
+        /// builder could not recover the token.
+        #[cfg_attr(feature = "serde", serde(with = "oak_core::serde_range"))]
+        local_span: Range<usize>,
         /// Imported name.
         imported: String,
         /// `type` keyword written before this specifier, e.g. `{ type Foo }`.
@@ -487,6 +500,10 @@ pub enum ExportSpecifier {
     Named {
         /// Local name.
         local: String,
+        /// Source span of the local binding token, zero-width at the specifier
+        /// start when the builder could not recover the token.
+        #[cfg_attr(feature = "serde", serde(with = "oak_core::serde_range"))]
+        local_span: Range<usize>,
         /// Exported name.
         exported: String,
         /// `type` keyword written before this specifier, e.g. `{ type Foo }`.
@@ -596,6 +613,9 @@ pub struct VariableDeclarator {
     /// gives `["a", "c", "rest"]` and an array pattern `[x, , ...ys]` gives
     /// `["x", "ys"]`. Nested patterns and default values expand the same way.
     pub binding_names: Vec<String>,
+    /// Source spans of [`Self::binding_names`], same length and same order.
+    #[cfg_attr(feature = "serde", serde(with = "oak_core::serde_range::vec"))]
+    pub binding_spans: Vec<Range<usize>>,
     /// The binding pattern exactly as written (`{ a, b: c }`), or `None` for a
     /// plain binding identifier. The identities themselves live in
     /// [`Self::binding_names`] and are never read back from this text.
@@ -632,6 +652,10 @@ pub struct FunctionDeclaration {
     pub modifiers: Vec<Modifier>,
     /// The name of the function.
     pub name: String,
+    /// Source span of the name token, zero-width at the declaration start when
+    /// the builder could not recover the token.
+    #[cfg_attr(feature = "serde", serde(with = "oak_core::serde_range"))]
+    pub name_span: Range<usize>,
     /// Type parameters of the function.
     pub type_params: Vec<TypeParameter>,
     /// Parameters of the function.
@@ -655,6 +679,10 @@ pub struct ClassDeclaration {
     pub modifiers: Vec<Modifier>,
     /// The name of the class.
     pub name: String,
+    /// Source span of the name token, zero-width at the declaration start when
+    /// the builder could not recover the token.
+    #[cfg_attr(feature = "serde", serde(with = "oak_core::serde_range"))]
+    pub name_span: Range<usize>,
     /// Type parameters of the class.
     pub type_params: Vec<TypeParameter>,
     /// The class that this class extends.
