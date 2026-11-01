@@ -24,12 +24,18 @@
 //! which stores no span: there a whole-word textual match may only set the
 //! conservative `has_type_references` flag, never a reference span.
 //!
-//! `rename_unsafe` marks a binding whose renaming would change semantics even
-//! with every recorded span rewritten: the declaration token sits in a
-//! destructuring pattern (a shorthand token doubles as the property key), or a
-//! value reference is a shorthand object-property token. The flag is
-//! per-binding and conservative: a shadowed shorthand mention of the same
-//! spelling still sets it. Consumers must refuse renames of such bindings.
+//! `rename_unsafe` marks a binding whose declaration token sits inside a
+//! destructuring pattern: the pattern token doubles as the property key, so
+//! rewriting every recorded span still changes semantics. Consumers must
+//! refuse renames of such bindings.
+//!
+//! A value reference that is a shorthand object-property token (`{ x }`) is
+//! renamable, but not by replacing the span with the bare new name — the
+//! token doubles as the property key. Such spans are recorded in
+//! `shorthand_reference_spans` (always a subset of `references`): a consumer
+//! rewriting the binding replaces those spans with `x: <new>` and the other
+//! reference spans with `<new>`. A shorthand mention shadowed by a local
+//! binding resolves to the local and is recorded nowhere.
 
 use std::collections::HashMap;
 
@@ -103,10 +109,15 @@ pub struct ModuleBindingFacts {
     pub references: Vec<Range<usize>>,
     /// `true` when the name is used in a type position (span not recorded).
     pub has_type_references: bool,
-    /// `true` when renaming would change semantics: the declaration token is
-    /// inside a destructuring pattern, or a value reference is a shorthand
-    /// object-property token (both double as the property key).
+    /// `true` when the declaration token sits inside a destructuring pattern
+    /// (the pattern token doubles as the property key), so renaming would
+    /// change semantics even with every recorded span rewritten.
     pub rename_unsafe: bool,
+    /// Spans within [`Self::references`] that are shorthand object-property
+    /// tokens (`{ x }`): the token doubles as the property key, so a rename
+    /// must replace such a span with `x: <new>` instead of the bare new name.
+    #[cfg_attr(feature = "serde", serde(with = "oak_core::serde_range::vec"))]
+    pub shorthand_reference_spans: Vec<Range<usize>>,
 }
 
 /// The declaration form that introduced a module-level binding.
@@ -235,12 +246,28 @@ impl ScopeWalker {
         }
     }
 
-    /// Marks the module binding `name` rename-unsafe, if there is one. A
-    /// shadowed mention of the same spelling marks it too: over-rejecting is
-    /// safe, a missed shorthand key-token is not.
+    /// Marks the module binding `name` rename-unsafe: its declaration token
+    /// sits inside a destructuring pattern.
     fn mark_unsafe(&mut self, name: &str) {
         if let Some(&index) = self.binding_index.get(name) {
             self.bindings[index].rename_unsafe = true;
+        }
+    }
+
+    /// Resolves a shorthand object-property token: like [`Self::resolve_value`]
+    /// but the span is additionally recorded in `shorthand_reference_spans`,
+    /// because the token doubles as the property key. A mention shadowed by a
+    /// local binding resolves to the local and is recorded nowhere.
+    fn resolve_value_shorthand(&mut self, name: &str, span: Range<usize>) {
+        for frame in self.frames.iter().rev() {
+            let slot = frame.entries.iter().find(|(entry_name, _)| entry_name == name).map(|(_, slot)| *slot);
+            if let Some(slot) = slot {
+                if let Some(index) = slot {
+                    self.bindings[index].references.push(span.clone());
+                    self.bindings[index].shorthand_reference_spans.push(span);
+                }
+                return;
+            }
         }
     }
 
@@ -259,7 +286,7 @@ impl ScopeWalker {
             return;
         }
         let index = self.bindings.len();
-        self.bindings.push(ModuleBindingFacts { name: name.to_string(), kind, declaration: declaration.clone(), references: Vec::new(), has_type_references: false, rename_unsafe: false });
+        self.bindings.push(ModuleBindingFacts { name: name.to_string(), kind, declaration: declaration.clone(), references: Vec::new(), has_type_references: false, rename_unsafe: false, shorthand_reference_spans: Vec::new() });
         self.binding_index.insert(name.to_string(), index);
         let frame = &mut self.frames[0];
         match frame.entries.iter_mut().find(|(entry_name, _)| entry_name == name) {
@@ -785,12 +812,12 @@ impl ScopeWalker {
                     match property {
                         ObjectProperty::Property { name, value, shorthand, .. } => {
                             if *shorthand {
-                                self.mark_unsafe(name);
+                                self.resolve_value_shorthand(name, value.span.clone());
                             }
                             else {
                                 self.check_key_name(name);
+                                self.walk_expression(value);
                             }
-                            self.walk_expression(value);
                         }
                         ObjectProperty::Method { name, params, return_type, body, .. } => {
                             self.check_key_name(name);
