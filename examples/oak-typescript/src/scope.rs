@@ -9,12 +9,14 @@
 //! default): with types erased, type references are invisible to this module
 //! and `has_type_references` will be wrong.
 //!
-//! When `incomplete` is `true`, the facts may be missing references (dynamic
-//! `eval`, JSX, template interpolations, ambiguous computed keys, unrecoverable
-//! declaration spans, duplicate bindings, namespaces, interface bodies — the
-//! parser does not yet record interface members or heritage in the AST). A
-//! consumer **must refuse to rename** any binding while the flag is set:
-//! over-rejecting is safe, under-reporting a reference is not.
+//! When [`ModuleScopeFacts::incomplete_reasons`] is non-empty, the facts may be
+//! missing references. Each entry names the precise cause (direct `eval`, JSX,
+//! template interpolations, ambiguous computed keys, unrecoverable declaration
+//! spans, duplicate bindings, namespaces, interface bodies, top-level `return`)
+//! instead of a bare flag, so a consumer can decide between refusing a rename
+//! and isolating the whole module. While any reason is present, a consumer
+//! **must refuse to rename** any binding: over-rejecting is safe,
+//! under-reporting a reference is not.
 //!
 //! `references` are value-position uses in source order. Only spans the AST
 //! actually carries are recorded; no span is ever invented by name matching.
@@ -34,8 +36,7 @@ use std::collections::HashMap;
 use core::range::Range;
 
 use crate::ast::{
-    ClassMember, Decorator, Expression, ExpressionKind, ExportDeclaration, ExportSpecifier, FunctionParam, ImportDeclaration,
-    ImportSpecifier, ObjectProperty, Statement, TemplateElement, TypeScriptRoot, TypeAnnotation, TypeParameter, VariableDeclaration,
+    ClassMember, Decorator, ExportDeclaration, ExportSpecifier, Expression, ExpressionKind, FunctionParam, ImportDeclaration, ImportSpecifier, ObjectProperty, Statement, TemplateElement, TypeAnnotation, TypeParameter, TypeScriptRoot, VariableDeclaration,
     VariableKind,
 };
 
@@ -45,8 +46,45 @@ use crate::ast::{
 pub struct ModuleScopeFacts {
     /// Module-level bindings in source order.
     pub bindings: Vec<ModuleBindingFacts>,
-    /// `true` when references may be missing; consumers must refuse renames.
-    pub incomplete: bool,
+    /// The precise causes that may hide references, in first-seen order; empty
+    /// when the facts are complete. Consumers must refuse renames while this
+    /// list is non-empty.
+    pub incomplete_reasons: Vec<ScopeIncompleteReason>,
+}
+
+impl ModuleScopeFacts {
+    /// `true` when [`Self::incomplete_reasons`] is non-empty.
+    pub fn is_incomplete(&self) -> bool {
+        !self.incomplete_reasons.is_empty()
+    }
+}
+
+/// A precise reason why [`ModuleScopeFacts`] may be missing references.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub enum ScopeIncompleteReason {
+    /// A direct `eval(...)` call: it can read and write bindings by name at runtime.
+    DirectEval,
+    /// A template string with `${...}`: the AST carries no expressions inside the interpolation.
+    TemplateInterpolation,
+    /// A JSX tree: the AST does not expose the identifier references inside it.
+    Jsx,
+    /// A member key spelled like a module binding: the AST cannot tell `foo:` from `[foo]:`.
+    AmbiguousMemberKey,
+    /// An `interface` declaration: the parser records no members, so references inside the body are invisible.
+    InterfaceBody,
+    /// A `namespace` declaration: its members are not walked.
+    Namespace,
+    /// A binding token with an empty name.
+    EmptyBindingName,
+    /// A binding token with a zero-width declaration span.
+    ZeroWidthDeclarationSpan,
+    /// A duplicate module-level binding name: only the first entry is kept.
+    DuplicateBinding,
+    /// A declarator whose binding names and binding spans do not line up.
+    BindingSpanMismatch,
+    /// A `return` outside any function: the module cannot be emitted as a standalone ESM file.
+    TopLevelReturn,
 }
 
 /// One module-level binding with its declaration and reference spans.
@@ -104,7 +142,7 @@ pub fn module_scope_facts(root: &TypeScriptRoot) -> ModuleScopeFacts {
     for statement in &root.statements {
         walker.walk_statement(statement);
     }
-    ModuleScopeFacts { bindings: walker.bindings, incomplete: walker.incomplete }
+    ModuleScopeFacts { bindings: walker.bindings, incomplete_reasons: walker.incomplete_reasons }
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -125,16 +163,18 @@ struct ScopeWalker {
     bindings: Vec<ModuleBindingFacts>,
     binding_index: HashMap<String, usize>,
     frames: Vec<Frame>,
-    incomplete: bool,
+    incomplete_reasons: Vec<ScopeIncompleteReason>,
 }
 
 impl ScopeWalker {
     fn new() -> Self {
-        Self {
-            bindings: Vec::new(),
-            binding_index: HashMap::new(),
-            frames: vec![Frame { kind: FrameKind::Module, entries: Vec::new() }],
-            incomplete: false,
+        Self { bindings: Vec::new(), binding_index: HashMap::new(), frames: vec![Frame { kind: FrameKind::Module, entries: Vec::new() }], incomplete_reasons: Vec::new() }
+    }
+
+    /// Records `reason` once, in first-seen order.
+    fn mark(&mut self, reason: ScopeIncompleteReason) {
+        if !self.incomplete_reasons.contains(&reason) {
+            self.incomplete_reasons.push(reason);
         }
     }
 
@@ -191,7 +231,7 @@ impl ScopeWalker {
     /// key that reads like a module binding marks the facts incomplete.
     fn check_key_name(&mut self, name: &str) {
         if self.binding_index.contains_key(name) {
-            self.incomplete = true;
+            self.mark(ScopeIncompleteReason::AmbiguousMemberKey);
         }
     }
 
@@ -208,25 +248,18 @@ impl ScopeWalker {
 
     fn add_module_binding(&mut self, name: &str, kind: ModuleBindingKind, declaration: &Range<usize>) {
         if name.is_empty() {
-            self.incomplete = true;
+            self.mark(ScopeIncompleteReason::EmptyBindingName);
             return;
         }
         if declaration.start == declaration.end {
-            self.incomplete = true;
+            self.mark(ScopeIncompleteReason::ZeroWidthDeclarationSpan);
         }
         if self.binding_index.contains_key(name) {
-            self.incomplete = true;
+            self.mark(ScopeIncompleteReason::DuplicateBinding);
             return;
         }
         let index = self.bindings.len();
-        self.bindings.push(ModuleBindingFacts {
-            name: name.to_string(),
-            kind,
-            declaration: declaration.clone(),
-            references: Vec::new(),
-            has_type_references: false,
-            rename_unsafe: false,
-        });
+        self.bindings.push(ModuleBindingFacts { name: name.to_string(), kind, declaration: declaration.clone(), references: Vec::new(), has_type_references: false, rename_unsafe: false });
         self.binding_index.insert(name.to_string(), index);
         let frame = &mut self.frames[0];
         match frame.entries.iter_mut().find(|(entry_name, _)| entry_name == name) {
@@ -237,7 +270,7 @@ impl ScopeWalker {
 
     fn declared_binding(&mut self, name: &str, kind: ModuleBindingKind, name_span: &Range<usize>) {
         if name.is_empty() {
-            self.incomplete = true;
+            self.mark(ScopeIncompleteReason::EmptyBindingName);
             return;
         }
         self.add_module_binding(name, kind, name_span);
@@ -251,7 +284,7 @@ impl ScopeWalker {
         };
         for declarator in &declaration.declarators {
             if declarator.binding_spans.len() != declarator.binding_names.len() {
-                self.incomplete = true;
+                self.mark(ScopeIncompleteReason::BindingSpanMismatch);
             }
             for (position, name) in declarator.binding_names.iter().enumerate() {
                 match declarator.binding_spans.get(position) {
@@ -277,9 +310,7 @@ impl ScopeWalker {
         for specifier in &declaration.specifiers {
             match specifier {
                 ImportSpecifier::Default { local, span } => self.add_module_binding(local, ModuleBindingKind::ImportDefault, span),
-                ImportSpecifier::Namespace { local, local_span, .. } => {
-                    self.add_module_binding(local, ModuleBindingKind::ImportNamespace, local_span)
-                }
+                ImportSpecifier::Namespace { local, local_span, .. } => self.add_module_binding(local, ModuleBindingKind::ImportNamespace, local_span),
                 ImportSpecifier::Named { local, local_span, type_modifier, .. } => {
                     if type_modifier.is_some() {
                         self.register(local.as_str(), None);
@@ -374,7 +405,7 @@ impl ScopeWalker {
                 // written inside it. Any reference from an interface to a
                 // module binding is therefore invisible: refuse all renames in
                 // such a module until the parser grows interface members.
-                self.incomplete = true;
+                self.mark(ScopeIncompleteReason::InterfaceBody);
                 self.walk_decorators(&declaration.decorators);
                 self.push(FrameKind::Block);
                 self.register_type_params(&declaration.type_params);
@@ -408,6 +439,12 @@ impl ScopeWalker {
                 }
             }
             Statement::ReturnStatement(statement) => {
+                // A `return` with no enclosing function frame is a module-level
+                // return: legal only inside a wrapper, so a consumer cannot
+                // emit the module as a standalone ESM file.
+                if !self.frames.iter().any(|frame| frame.kind == FrameKind::Function) {
+                    self.mark(ScopeIncompleteReason::TopLevelReturn);
+                }
                 self.walk_decorators(&statement.decorators);
                 if let Some(argument) = &statement.argument {
                     self.walk_expression(argument);
@@ -513,7 +550,7 @@ impl ScopeWalker {
                 self.walk_statements(&statement.statements);
                 self.pop();
             }
-            Statement::Namespace(_) => self.incomplete = true,
+            Statement::Namespace(_) => self.mark(ScopeIncompleteReason::Namespace),
         }
     }
 
@@ -538,7 +575,7 @@ impl ScopeWalker {
                         self.resolve_type(local);
                     }
                     else if local_span.start == local_span.end {
-                        self.incomplete = true;
+                        self.mark(ScopeIncompleteReason::ZeroWidthDeclarationSpan);
                     }
                     else {
                         self.resolve_value(local, local_span.clone());
@@ -548,14 +585,7 @@ impl ScopeWalker {
         }
     }
 
-    fn enter_function(
-        &mut self,
-        name_shadow: Option<&str>,
-        type_params: &[TypeParameter],
-        params: &[FunctionParam],
-        return_type: Option<&TypeAnnotation>,
-        body: &[Statement],
-    ) {
+    fn enter_function(&mut self, name_shadow: Option<&str>, type_params: &[TypeParameter], params: &[FunctionParam], return_type: Option<&TypeAnnotation>, body: &[Statement]) {
         self.push(FrameKind::Function);
         if let Some(name) = name_shadow {
             if !name.is_empty() {
@@ -600,14 +630,7 @@ impl ScopeWalker {
         self.pop();
     }
 
-    fn enter_class(
-        &mut self,
-        name_shadow: Option<&str>,
-        type_params: &[TypeParameter],
-        extends: Option<&TypeAnnotation>,
-        implements: &[TypeAnnotation],
-        members: &[ClassMember],
-    ) {
+    fn enter_class(&mut self, name_shadow: Option<&str>, type_params: &[TypeParameter], extends: Option<&TypeAnnotation>, implements: &[TypeAnnotation], members: &[ClassMember]) {
         self.push(FrameKind::Block);
         if let Some(name) = name_shadow {
             if !name.is_empty() {
@@ -706,12 +729,10 @@ impl ScopeWalker {
             ExpressionKind::Identifier(name) => self.resolve_value(name, expression.span.clone()),
             ExpressionKind::TemplateString(text) => {
                 if text.contains("${") {
-                    self.incomplete = true;
+                    self.mark(ScopeIncompleteReason::TemplateInterpolation);
                 }
             }
-            ExpressionKind::UnaryExpression { argument, .. } | ExpressionKind::UpdateExpression { argument, .. } => {
-                self.walk_expression(argument)
-            }
+            ExpressionKind::UnaryExpression { argument, .. } | ExpressionKind::UpdateExpression { argument, .. } => self.walk_expression(argument),
             ExpressionKind::BinaryExpression { left, right, .. } => {
                 self.walk_expression(left);
                 self.walk_expression(right);
@@ -730,7 +751,7 @@ impl ScopeWalker {
             ExpressionKind::CallExpression { func, args } => {
                 if let ExpressionKind::Identifier(name) = &*func.kind {
                     if name == "eval" {
-                        self.incomplete = true;
+                        self.mark(ScopeIncompleteReason::DirectEval);
                     }
                 }
                 self.walk_expression(func);
@@ -784,9 +805,7 @@ impl ScopeWalker {
                     self.walk_expression(element);
                 }
             }
-            ExpressionKind::SpreadElement(inner) | ExpressionKind::AwaitExpression(inner) | ExpressionKind::NonNullExpression(inner) => {
-                self.walk_expression(inner)
-            }
+            ExpressionKind::SpreadElement(inner) | ExpressionKind::AwaitExpression(inner) | ExpressionKind::NonNullExpression(inner) => self.walk_expression(inner),
             ExpressionKind::YieldExpression(inner) => {
                 if let Some(inner) = inner {
                     self.walk_expression(inner);
@@ -804,7 +823,7 @@ impl ScopeWalker {
                 self.walk_expression(template);
             }
             ExpressionKind::JsxElement(_) | ExpressionKind::JsxFragment(_) | ExpressionKind::JsxSelfClosingElement(_) => {
-                self.incomplete = true;
+                self.mark(ScopeIncompleteReason::Jsx);
             }
             ExpressionKind::NumericLiteral(_)
             | ExpressionKind::StringLiteral(_)
