@@ -3,7 +3,10 @@
 //! terminate the literal, while plain division keeps its binary meaning.
 
 use oak_core::{Builder, SourceText, parser::ParseSession};
-use oak_typescript::{TypeScriptBuilder, TypeScriptLanguage};
+use oak_typescript::{
+    TypeScriptBuilder, TypeScriptLanguage,
+    ast::{ExpressionKind, Statement},
+};
 
 fn parse(source: &str) -> oak_core::OakDiagnostics<oak_typescript::ast::TypeScriptRoot> {
     let language = TypeScriptLanguage::standard();
@@ -37,4 +40,35 @@ fn division_between_operands_stays_operator() {
     assert_clean("const x = a / b;");
     assert_clean("const x = (a + b) / c;");
     assert_clean("const x = arr.length / 2;");
+}
+
+/// The builder must keep regex literals as real expressions: a missing
+/// `RegexLiteral` arm silently dropped the whole `export default /…/`
+/// payload and initializer values (`value: None`).
+#[test]
+fn regex_literal_expressions_survive_into_ast() {
+    let output = parse("export default /abc/;\nconst x = /re/g;\n");
+    assert!(output.diagnostics.is_empty(), "{:#?}", output.diagnostics);
+    let root = output.result.expect("source should parse");
+    let Statement::ExportDeclaration(export) = &root.statements[0] else {
+        panic!("expected export declaration");
+    };
+    let inner = export.declaration.as_ref().expect("default payload");
+    let Statement::ExpressionStatement(expr) = &**inner else {
+        panic!("expected expression statement, got {inner:?}");
+    };
+    assert!(
+        matches!(*expr.expression.kind, ExpressionKind::RegexLiteral(ref text) if text == "/abc/"),
+        "{:?}",
+        expr.expression.kind
+    );
+    let Statement::VariableDeclaration(var) = &root.statements[1] else {
+        panic!("expected variable declaration");
+    };
+    let value = var.declarators[0].value.as_ref().expect("initializer kept");
+    assert!(
+        matches!(*value.kind, ExpressionKind::RegexLiteral(ref text) if text == "/re/g"),
+        "{:?}",
+        value.kind
+    );
 }

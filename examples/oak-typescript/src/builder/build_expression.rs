@@ -58,6 +58,10 @@ impl<'config> TypeScriptBuilder<'config> {
                 Ok(Some(Expression::new(ExpressionKind::BooleanLiteral(val), span.into())))
             }
             TypeScriptElementType::Null => Ok(Some(Expression::new(ExpressionKind::NullLiteral, span.into()))),
+            TypeScriptElementType::RegexLiteral => {
+                let raw = source.get_text_in(span.into());
+                Ok(Some(Expression::new(ExpressionKind::RegexLiteral(raw.trim().to_string()), span.into())))
+            }
             TypeScriptElementType::JsxExpressionContainer => {
                 let mut left = None;
                 let mut operator = String::new();
