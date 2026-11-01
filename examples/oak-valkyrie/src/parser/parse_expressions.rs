@@ -207,6 +207,12 @@ pub(crate) fn parse_scrutinee_expression<S: oak_core::Source + ?Sized>(state: &m
     parse_condition_expression(state)
 }
 
+/// `::<`（turbofish）与 `::[`（基数下标 ASCII 别名）是 postfix 后缀而非路径段。
+fn at_postfix_colon_colon<S: oak_core::Source + ?Sized>(state: &State<'_, S>) -> bool {
+    state.at(ValkyrieTokenType::ColonColon)
+        && (state.peek_non_trivia_kind_at(1) == Some(ValkyrieTokenType::LessThan) || state.peek_non_trivia_kind_at(1) == Some(ValkyrieTokenType::BracketL))
+}
+
 fn parse_postfix_expression_with_options<S: oak_core::Source + ?Sized>(state: &mut State<'_, S>, allow_object_literal: bool) -> Result<(), oak_core::OakError> {
     parse_primary_expression(state)?;
     loop {
@@ -304,11 +310,20 @@ pub(crate) fn parse_primary_expression<S: oak_core::Source + ?Sized>(state: &mut
             _ if token.kind.is_soft_identifier() => {
                 let cp = state.sink.checkpoint();
                 state.bump();
-                if state.at(ValkyrieTokenType::ColonColon) && state.peek_non_trivia_kind_at(1) != Some(ValkyrieTokenType::LessThan) && state.peek_non_trivia_kind_at(1) != Some(ValkyrieTokenType::BracketL) {
+                if state.at(ValkyrieTokenType::ColonColon) && !at_postfix_colon_colon(state) {
                     while state.at(ValkyrieTokenType::ColonColon) {
+                        // 路径段在 `::<`（turbofish）与 `::[`（基数下标别名）前必须停下：
+                        // 这两种形态是 postfix 后缀，不是路径段；提前消费 `::` 会把
+                        // `a::b::f::<T>(x)` 拆成 `a::b` 与 `<T>(x)` 的比较链。
+                        if at_postfix_colon_colon(state) {
+                            break;
+                        }
                         state.bump();
                         if at_identifier_like(state) {
                             state.bump();
+                        }
+                        else {
+                            break;
                         }
                     }
                     state.sink.finish_node(cp, ValkyrieElementType::PathExpression);
