@@ -116,10 +116,11 @@ impl<'config> TypeScriptParser<'config> {
                     self.parse_parameters(state)?;
                     self.skip_trivia(state);
                     if self.eat(state, Colon) {
-                        // Skip return type
-                        while state.not_at_end() && !self.at(state, LeftBrace) && !self.at(state, Semicolon) && !self.at(state, RightBrace) {
-                            state.bump();
-                        }
+                        // The return annotation is a real type: an inline object type
+                        // (`m(): { ok: boolean } { … }`) opens with `{`, so a blind scan
+                        // for the body brace would mistake the annotation for the body
+                        // and push the remaining members out of the class.
+                        self.parse_declaration_return_type_annotation(state)?;
                     }
                     if self.at(state, LeftBrace) {
                         self.parse_block(state)?;
