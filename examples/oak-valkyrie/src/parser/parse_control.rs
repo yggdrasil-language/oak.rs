@@ -162,7 +162,14 @@ fn parse_match_pattern<S: oak_core::Source + ?Sized>(state: &mut State<'_, S>) -
                 if state.at(ValkyrieTokenType::ParenthesisR) {
                     break;
                 }
+                // 与数组/字段模式同构的进展保护：字面量等未覆盖原子在此层不展开
+                // （由 rusty-valkyrie 的源码恢复修补），但必须消费一个 token，
+                // 否则 `case Some(60)` / `case Some('<')` 会原地死循环。
+                let before = state.checkpoint().0;
                 parse_match_pattern(state)?;
+                if state.checkpoint().0 == before {
+                    state.bump();
+                }
                 state.skip_trivia();
                 if state.at(ValkyrieTokenType::Comma) {
                     state.bump();
