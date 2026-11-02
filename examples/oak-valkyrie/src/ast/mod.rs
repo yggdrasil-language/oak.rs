@@ -43,7 +43,7 @@ pub use self::{
     ecs_nodes::{ComponentDeclaration, EventDeclaration, SystemDeclaration},
     items_nodes::{Effect, Enums, Flags, MicroDeclaration, Parent, Property, PropertyKind, StatementNode, TypeAliasDeclaration, TypeFunction, Variant},
     namespace_nodes::{NamespaceDeclaration, UsingDeclaration},
-    pattern_nodes::{ClassPattern, LiteralPattern, MatchArm, Pattern, TypePattern, VariablePattern, WildcardPattern},
+    pattern_nodes::{ArrayPattern, ClassPattern, LiteralPattern, MatchArm, Pattern, TypePattern, VariablePattern, WildcardPattern},
     root_nodes::{EnumsKind, Identifier, LoopKind, NamePath, Span, ValkyrieRoot},
     shader_nodes::ShaderDeclaration,
     singleton_nodes::SingletonDeclaration,

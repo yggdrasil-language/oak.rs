@@ -55,6 +55,8 @@ pub enum Pattern {
     Class(Box<ClassPattern>),
     /// An else pattern (catch-all).
     Else(Box<ElsePattern>),
+    /// An array pattern with optional rest binding.
+    Array(Box<ArrayPattern>),
 }
 
 /// A wildcard pattern that matches anything.
@@ -162,6 +164,29 @@ pub struct ClassPattern {
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ElsePattern {
+    /// The source code span.
+    #[cfg_attr(feature = "serde", serde(with = "oak_core::serde_range"))]
+    pub span: Span,
+}
+
+/// An array pattern with an optional rest binding.
+///
+/// # V Language Example
+/// ```v
+/// match bytes {
+///     [head, ...tail] => head
+///     [first, ..., last] => first
+/// }
+/// ```
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct ArrayPattern {
+    /// Patterns before the rest binding.
+    pub prefix: Vec<Pattern>,
+    /// The optional rest binding (`...rest`).
+    pub rest: Option<Box<Pattern>>,
+    /// Patterns after the rest binding.
+    pub suffix: Vec<Pattern>,
     /// The source code span.
     #[cfg_attr(feature = "serde", serde(with = "oak_core::serde_range"))]
     pub span: Span,

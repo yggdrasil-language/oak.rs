@@ -204,6 +204,128 @@ mod recovery_tests {
     }
 }
 
+#[cfg(test)]
+mod array_pattern_tests {
+    use super::*;
+    use crate::{
+        ValkyrieBuilder, ValkyrieRoot,
+        ast::{Pattern, Statement, StatementNode, TermExpression},
+    };
+    use oak_core::{Builder, OakDiagnostics, SourceText, parser::ParseSession};
+
+    fn build(source: &str) -> OakDiagnostics<ValkyrieRoot> {
+        let language = ValkyrieLanguage::default();
+        let builder = ValkyrieBuilder::new(&language);
+        let text = SourceText::new(source);
+        let mut session = ParseSession::<ValkyrieLanguage>::default();
+        builder.build(&text, &[], &mut session)
+    }
+
+    fn micro_names(root: &ValkyrieRoot) -> Vec<&str> {
+        root.items
+            .iter()
+            .filter_map(|item| match item {
+                StatementNode::Micro(micro) => Some(micro.name.name.as_str()),
+                _ => None,
+            })
+            .collect()
+    }
+
+    fn single_arm_pattern(root: &ValkyrieRoot) -> &Pattern {
+        let micro = root
+            .items
+            .iter()
+            .find_map(|item| match item {
+                StatementNode::Micro(micro) => Some(micro),
+                _ => None,
+            })
+            .expect("expected a micro item");
+        let statement = micro.body.statements.first().expect("expected one body statement");
+        let expression = match statement {
+            Statement::Expression(expr) => &expr.expr,
+            other => panic!("expected expression statement, got {other:?}"),
+        };
+        match expression {
+            TermExpression::Match { arms, .. } => &arms.first().expect("expected one match arm").pattern,
+            other => panic!("expected match expression, got {other:?}"),
+        }
+    }
+
+    /// 正例：`case [head, ...tail]` 解析为 prefix + rest 的数组模式。
+    #[test]
+    fn array_pattern_with_rest_builds_array_node() {
+        let output = build("micro f() { match data { case [head, ...tail]: head } }\n");
+        assert!(output.diagnostics.is_empty(), "diagnostics: {:?}", output.diagnostics);
+        let root = output.result.unwrap_or_else(|error| panic!("array pattern must build, got {error:?}"));
+        match single_arm_pattern(&root) {
+            Pattern::Array(array) => {
+                assert_eq!(array.prefix.len(), 1, "prefix: {:?}", array.prefix);
+                assert!(matches!(&array.prefix[0], Pattern::Variable(variable) if variable.name.name == "head"));
+                let rest = array.rest.as_ref().expect("expected a rest binding");
+                assert!(matches!(rest.as_ref(), Pattern::Variable(variable) if variable.name.name == "tail"));
+                assert!(array.suffix.is_empty(), "suffix: {:?}", array.suffix);
+            }
+            other => panic!("expected array pattern, got {other:?}"),
+        }
+    }
+
+    /// 正例：`[a, b, ...rest, c]` 完整 prefix/rest/suffix 形态。
+    #[test]
+    fn array_pattern_prefix_rest_suffix_builds() {
+        let output = build("micro f() { match data { [a, b, ...rest, c]: 0 } }\n");
+        assert!(output.diagnostics.is_empty(), "diagnostics: {:?}", output.diagnostics);
+        let root = output.result.unwrap_or_else(|error| panic!("array pattern must build, got {error:?}"));
+        match single_arm_pattern(&root) {
+            Pattern::Array(array) => {
+                let names: Vec<&str> = array
+                    .prefix
+                    .iter()
+                    .map(|pattern| match pattern {
+                        Pattern::Variable(variable) => variable.name.name.as_str(),
+                        other => panic!("expected variable prefix pattern, got {other:?}"),
+                    })
+                    .collect();
+                assert_eq!(names, ["a", "b"]);
+                let rest = array.rest.as_ref().expect("expected a rest binding");
+                assert!(matches!(rest.as_ref(), Pattern::Variable(variable) if variable.name.name == "rest"));
+                assert_eq!(array.suffix.len(), 1, "suffix: {:?}", array.suffix);
+                assert!(matches!(&array.suffix[0], Pattern::Variable(variable) if variable.name.name == "c"));
+            }
+            other => panic!("expected array pattern, got {other:?}"),
+        }
+    }
+
+    /// 反例：双 `...` 记一条诊断并由根循环恢复，兄弟 item 不受影响。
+    #[test]
+    fn double_rest_marker_reports_and_recovers() {
+        let output = build("micro f() { match data { [...a, ...b]: 0 } }\nmicro g() {}\n");
+        let root = output.result.unwrap_or_else(|error| panic!("recovery must keep the build alive, got {error:?}"));
+        assert_eq!(micro_names(&root), ["g"]);
+        assert_eq!(output.diagnostics.len(), 1, "diagnostics: {:?}", output.diagnostics);
+        assert!(output.diagnostics[0].to_string().contains("只允许一个"), "diagnostics: {:?}", output.diagnostics);
+    }
+
+    /// 反例：未闭合 `[` 记一条诊断并由根循环恢复，兄弟 item 不受影响。
+    #[test]
+    fn unclosed_array_pattern_reports_and_recovers() {
+        let output = build("micro f() { match data { [head, ...tail: head } }\nmicro g() {}\n");
+        let root = output.result.unwrap_or_else(|error| panic!("recovery must keep the build alive, got {error:?}"));
+        assert_eq!(micro_names(&root), ["g"]);
+        assert_eq!(output.diagnostics.len(), 1, "diagnostics: {:?}", output.diagnostics);
+        assert!(output.diagnostics[0].to_string().contains("缺少闭合方括号"), "diagnostics: {:?}", output.diagnostics);
+    }
+
+    /// 反例：`...` 后缺绑定记一条诊断并由根循环恢复。
+    #[test]
+    fn rest_marker_without_binding_reports_and_recovers() {
+        let output = build("micro f() { match data { [a, ...]: 0 } }\nmicro g() {}\n");
+        let root = output.result.unwrap_or_else(|error| panic!("recovery must keep the build alive, got {error:?}"));
+        assert_eq!(micro_names(&root), ["g"]);
+        assert_eq!(output.diagnostics.len(), 1, "diagnostics: {:?}", output.diagnostics);
+        assert!(output.diagnostics[0].to_string().contains("必须跟绑定模式"), "diagnostics: {:?}", output.diagnostics);
+    }
+}
+
 /// 元素类型定义
 pub mod element_type;
 

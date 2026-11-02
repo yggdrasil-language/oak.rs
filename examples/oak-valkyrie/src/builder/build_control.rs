@@ -1,7 +1,7 @@
 use crate::{
     ValkyrieLanguage,
     ast::{
-        pattern_nodes::{ClassPattern, LiteralPattern, TypePattern, VariablePattern, WildcardPattern},
+        pattern_nodes::{ArrayPattern, ClassPattern, LiteralPattern, TypePattern, VariablePattern, WildcardPattern},
         term_nodes::{Break, Continue, Raise, Resume, Return},
         *,
     },
@@ -50,15 +50,7 @@ impl<'config> ValkyrieBuilder<'config> {
                     crate::parser::element_type::ValkyrieElementType::IfExpression => {
                         let nested_span = n.span();
                         let nested = self.build_if(n, source)?;
-                        else_branch = Some(Block {
-                            statements: vec![Statement::Expression(Box::new(ExprStmt {
-                                expr: nested,
-                                semi: false,
-                                annotations: Vec::new(),
-                                span: nested_span,
-                            }))],
-                            span: nested_span,
-                        });
+                        else_branch = Some(Block { statements: vec![Statement::Expression(Box::new(ExprStmt { expr: nested, semi: false, annotations: Vec::new(), span: nested_span }))], span: nested_span });
                     }
                     _ => {
                         if condition.is_none() {
@@ -397,24 +389,39 @@ impl<'config> ValkyrieBuilder<'config> {
         let mut fields: Option<Vec<(Identifier, Option<Pattern>)>> = None;
         let mut nested_patterns: Vec<Pattern> = Vec::new();
         let mut lone_identifier: Option<(Identifier, Span)> = None;
+        // 数组形态：`[prefix, ..., ...rest, suffix]`，子模式落在嵌套 Pattern 节点里，
+        // `...` 词法形态是 DotDot + Dot 两个 leaf，以 DotDot 为剩余绑定标记。
+        let mut saw_bracket = false;
+        let mut rest_pending = false;
+        let mut array_prefix: Vec<Pattern> = Vec::new();
+        let mut array_rest: Option<Box<Pattern>> = None;
+        let mut array_suffix: Vec<Pattern> = Vec::new();
 
         for child in node.children() {
             match child {
                 RedTree::Leaf(t) => match t.kind {
                     ValkyrieTokenType::Whitespace | ValkyrieTokenType::Newline | ValkyrieTokenType::LineComment | ValkyrieTokenType::BlockComment => continue,
+                    ValkyrieTokenType::BracketL => {
+                        saw_bracket = true;
+                    }
+                    ValkyrieTokenType::DotDot => {
+                        if saw_bracket && array_rest.is_none() {
+                            rest_pending = true;
+                        }
+                    }
                     ValkyrieTokenType::Underscore => {
-                        if name_path.is_none() && fields.is_none() && nested_patterns.is_empty() && lone_identifier.is_none() {
+                        if name_path.is_none() && fields.is_none() && nested_patterns.is_empty() && lone_identifier.is_none() && !saw_bracket {
                             return Ok(Pattern::Wildcard(Box::new(WildcardPattern { span: t.span })));
                         }
                     }
                     ValkyrieTokenType::Identifier => {
-                        if name_path.is_none() && fields.is_none() && nested_patterns.is_empty() && lone_identifier.is_none() {
+                        if name_path.is_none() && fields.is_none() && nested_patterns.is_empty() && lone_identifier.is_none() && !saw_bracket {
                             let name = crate::builder::text(source, t.span);
                             lone_identifier = Some((Identifier { name, span: t.span }, t.span));
                         }
                     }
                     ValkyrieTokenType::IntegerLiteral | ValkyrieTokenType::FloatLiteral | ValkyrieTokenType::StringLiteral => {
-                        if name_path.is_none() && fields.is_none() && nested_patterns.is_empty() && lone_identifier.is_none() {
+                        if name_path.is_none() && fields.is_none() && nested_patterns.is_empty() && lone_identifier.is_none() && !saw_bracket {
                             let value = crate::builder::text(source, t.span);
                             return Ok(Pattern::Literal(Box::new(LiteralPattern { value, span: t.span })));
                         }
@@ -437,11 +444,30 @@ impl<'config> ValkyrieBuilder<'config> {
                         }
                     }
                     crate::parser::element_type::ValkyrieElementType::Pattern => {
-                        nested_patterns.push(self.build_pattern(n, source)?);
+                        let pattern = self.build_pattern(n, source)?;
+                        if saw_bracket {
+                            if rest_pending {
+                                array_rest = Some(Box::new(pattern));
+                                rest_pending = false;
+                            }
+                            else if array_rest.is_some() {
+                                array_suffix.push(pattern);
+                            }
+                            else {
+                                array_prefix.push(pattern);
+                            }
+                        }
+                        else {
+                            nested_patterns.push(pattern);
+                        }
                     }
                     _ => {}
                 },
             }
+        }
+
+        if saw_bracket {
+            return Ok(Pattern::Array(Box::new(ArrayPattern { prefix: array_prefix, rest: array_rest, suffix: array_suffix, span })));
         }
 
         if let Some(name) = name_path {
