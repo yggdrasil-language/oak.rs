@@ -289,7 +289,7 @@ impl<'config> TypeScriptParser<'config> {
     /// Returns `true` when the Nth non-trivia token can start an object member
     /// name. `async`/`get`/`set` are method prefixes only when this holds;
     /// otherwise the keyword itself is the property name.
-    fn at_object_member_name<'a, S: Source + ?Sized>(&self, state: &State<'a, S>, n: usize) -> bool {
+    pub(crate) fn at_object_member_name<'a, S: Source + ?Sized>(&self, state: &State<'a, S>, n: usize) -> bool {
         use crate::lexer::token_type::TypeScriptTokenType::*;
         match state.peek_non_trivia_kind_at(n) {
             Some(IdentifierName) | Some(StringLiteral) | Some(NumericLiteral) | Some(LeftBracket) | Some(Star) => true,
