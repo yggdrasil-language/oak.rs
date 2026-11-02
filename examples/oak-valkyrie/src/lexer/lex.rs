@@ -177,6 +177,25 @@ impl crate::lexer::ValkyrieLexer<'_> {
             state.set_position(start);
             return false;
         }
+        // `'hello\n'` 这类"标识符段后还有内容、且在空白/EOF 之前遇到闭合引号"的形态
+        // 也是引号捕获而不是标签：从名字段末端向前扫描，先见引号则退让给捕获。
+        if state.current().is_some_and(|c| !c.is_whitespace()) {
+            let tail = state.get_text_in((end..state.get_length()).into());
+            let mut closed_before_trivia = false;
+            for c in tail.chars() {
+                if c == '\'' {
+                    closed_before_trivia = true;
+                    break;
+                }
+                if c.is_whitespace() {
+                    break;
+                }
+            }
+            if closed_before_trivia {
+                state.set_position(start);
+                return false;
+            }
+        }
         state.add_token(ValkyrieTokenType::Label, start, end);
         true
     }
