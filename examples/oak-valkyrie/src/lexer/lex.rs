@@ -236,11 +236,7 @@ impl crate::lexer::ValkyrieLexer<'_> {
         }
 
         state.add_token(ValkyrieTokenType::Error, start, state.get_position());
-        state.add_error(oak_core::OakError::syntax_error(
-            format!("unterminated quoted literal: opening run of {quote_count} `{quote}` requires a closing run of {quote_count}"),
-            start,
-            None,
-        ));
+        state.add_error(oak_core::OakError::syntax_error(format!("unterminated quoted literal: opening run of {quote_count} `{quote}` requires a closing run of {quote_count}"), start, None));
         true
     }
 

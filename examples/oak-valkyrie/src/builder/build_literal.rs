@@ -21,6 +21,20 @@ fn count_leading_quotes(text: &str) -> u8 {
     count
 }
 
+/// Counts the number of leading single quotes in a capture.
+fn count_leading_single_quotes(text: &str) -> u8 {
+    let mut count = 0u8;
+    for ch in text.chars() {
+        if ch == '\'' {
+            count += 1;
+        }
+        else {
+            break;
+        }
+    }
+    count
+}
+
 /// Extracts the content of a string literal by removing leading and trailing quotes.
 fn extract_content(text: &str, quote_count: u8) -> &str {
     let start = quote_count as usize;
@@ -37,18 +51,23 @@ impl<'config> ValkyrieBuilder<'config> {
         let mut prefix: Option<Identifier> = None;
         let mut string_value: Option<String> = None;
         let mut string_span: Option<oak_core::Range<usize>> = None;
+        let mut single_quote_value: Option<String> = None;
 
         for child in node.children() {
             if let RedTree::Leaf(t) = child {
                 match t.kind {
                     ValkyrieTokenType::Whitespace | ValkyrieTokenType::Newline | ValkyrieTokenType::LineComment | ValkyrieTokenType::BlockComment => continue,
-                    ValkyrieTokenType::StringPrefix => {
+                    // 紧邻的标识符前缀（`r`、`b` 等）只是捕获事实的携带者，语义由编译器解释。
+                    ValkyrieTokenType::Identifier => {
                         let prefix_text = text(source, t.span);
                         prefix = Some(Identifier { name: prefix_text, span: t.span });
                     }
                     ValkyrieTokenType::StringLiteral => {
                         string_value = Some(text(source, t.span));
                         string_span = Some(t.span);
+                    }
+                    ValkyrieTokenType::CharLiteral => {
+                        single_quote_value = Some(text(source, t.span));
                     }
                     ValkyrieTokenType::IntegerLiteral => {
                         return Ok(TermExpression::IntegerLiteral { value: text(source, t.span), span });
@@ -65,6 +84,12 @@ impl<'config> ValkyrieBuilder<'config> {
             }
         }
 
+        if let Some(raw_text) = single_quote_value {
+            let quote_count = count_leading_single_quotes(&raw_text);
+            let content = extract_content(&raw_text, quote_count);
+            return Ok(TermExpression::SingleQuoteLiteral { prefix, quote_count, content: content.to_string(), span });
+        }
+
         if let (Some(raw_text), Some(str_span)) = (string_value, string_span) {
             let quote_count = count_leading_quotes(&raw_text);
             let content = extract_content(&raw_text, quote_count);
@@ -75,7 +100,7 @@ impl<'config> ValkyrieBuilder<'config> {
             Ok(TermExpression::StringLiteral(StringLiteral { prefix, quote_count, segments, span }))
         }
         else {
-            Err(source.syntax_error("Missing string literal value".to_string(), span.start))
+            Err(source.syntax_error("Missing literal value".to_string(), span.start))
         }
     }
 
