@@ -103,7 +103,17 @@ pub(crate) fn parse_match_expression<S: oak_core::Source + ?Sized>(state: &mut S
 /// 解析 match 模式：`Some(value)` / `None` / `_` / `[head, ...tail]`。
 fn parse_match_pattern<S: oak_core::Source + ?Sized>(state: &mut State<'_, S>) -> Result<(), oak_core::OakError> {
     let pcp = state.sink.checkpoint();
-    if state.at(ValkyrieTokenType::Underscore) {
+    // 字面量原子：完整模式或构造/数组子模式的单个 token，直接消费进当前 Pattern 节点；
+    // builder 按叶节点映射 `Pattern::Literal`，不经零消费的递归调用产生空节点。
+    if state.at(ValkyrieTokenType::IntegerLiteral)
+        || state.at(ValkyrieTokenType::FloatLiteral)
+        || state.at(ValkyrieTokenType::BoolLiteral)
+        || state.at(ValkyrieTokenType::StringLiteral)
+        || state.at(ValkyrieTokenType::CharLiteral)
+    {
+        state.bump();
+    }
+    else if state.at(ValkyrieTokenType::Underscore) {
         state.bump();
     }
     else if state.at(ValkyrieTokenType::BracketL) {

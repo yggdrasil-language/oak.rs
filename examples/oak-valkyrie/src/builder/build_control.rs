@@ -1,7 +1,7 @@
 use crate::{
     ValkyrieLanguage,
     ast::{
-        pattern_nodes::{ArrayPattern, ClassPattern, LiteralPattern, TypePattern, VariablePattern, WildcardPattern},
+        pattern_nodes::{ArrayPattern, ClassPattern, ElsePattern, LiteralPattern, TypePattern, VariablePattern, WildcardPattern},
         term_nodes::{Break, Continue, Raise, Resume, Return},
         *,
     },
@@ -105,12 +105,16 @@ impl<'config> ValkyrieBuilder<'config> {
     pub(crate) fn build_match_arm<S: Source + ?Sized>(&self, node: RedNode<ValkyrieLanguage>, source: &S) -> Result<MatchArm, OakError> {
         let span = node.span();
         let mut pattern = None;
+        let mut else_span = None;
         let mut expressions = Vec::new();
 
         for child in node.children() {
             match child {
                 RedTree::Leaf(t) => match t.kind {
                     ValkyrieTokenType::Whitespace | ValkyrieTokenType::Newline | ValkyrieTokenType::LineComment | ValkyrieTokenType::BlockComment => continue,
+                    ValkyrieTokenType::Keyword(ValkyrieKeywords::Else) => else_span = Some(t.span.clone()),
+                    // `default` 臂与 `else` 同形：标识符叶节点文本判定。
+                    ValkyrieTokenType::Identifier if crate::builder::text(source, t.span.clone()) == "default" => else_span = Some(t.span.clone()),
                     _ => {}
                 },
                 RedTree::Node(n) => match n.green.kind {
@@ -126,7 +130,15 @@ impl<'config> ValkyrieBuilder<'config> {
             }
         }
 
-        let pattern = pattern.ok_or_else(|| source.syntax_error("Missing match arm pattern".to_string(), span.start))?;
+        // `else` / `default` 臂不产 Pattern 子节点（只有关键字叶），按 AST 既有
+        // `Pattern::Else` 合成；缺关键字又缺模式才报缺模式。
+        let pattern = match pattern {
+            Some(pattern) => pattern,
+            None => match else_span {
+                Some(span) => Pattern::Else(Box::new(ElsePattern { span })),
+                None => return Err(source.syntax_error("Missing match arm pattern".to_string(), span.start)),
+            },
+        };
         let (guard, body) = match expressions.len() {
             0 => {
                 return Err(source.syntax_error("Missing match arm body".to_string(), span.start));
@@ -420,10 +432,33 @@ impl<'config> ValkyrieBuilder<'config> {
                             lone_identifier = Some((Identifier { name, span: t.span }, t.span));
                         }
                     }
-                    ValkyrieTokenType::IntegerLiteral | ValkyrieTokenType::FloatLiteral | ValkyrieTokenType::StringLiteral => {
+                    ValkyrieTokenType::IntegerLiteral
+                    | ValkyrieTokenType::FloatLiteral
+                    | ValkyrieTokenType::BoolLiteral
+                    | ValkyrieTokenType::StringLiteral
+                    | ValkyrieTokenType::CharLiteral => {
+                        // 字面量可以是完整模式（`case 60`），也可以是构造/数组模式的
+                        // 位置子模式（`case Some(60)` / `case [head, 0]`）：前者整臂即
+                        // Literal，后者按位置落入嵌套/数组序列，不得丢弃成 Wildcard。
+                        let value = crate::builder::text(source, t.span);
+                        let literal = Pattern::Literal(Box::new(LiteralPattern { value, span: t.span }));
                         if name_path.is_none() && fields.is_none() && nested_patterns.is_empty() && lone_identifier.is_none() && !saw_bracket {
-                            let value = crate::builder::text(source, t.span);
-                            return Ok(Pattern::Literal(Box::new(LiteralPattern { value, span: t.span })));
+                            return Ok(literal);
+                        }
+                        if saw_bracket {
+                            if rest_pending {
+                                array_rest = Some(Box::new(literal));
+                                rest_pending = false;
+                            }
+                            else if array_rest.is_some() {
+                                array_suffix.push(literal);
+                            }
+                            else {
+                                array_prefix.push(literal);
+                            }
+                        }
+                        else {
+                            nested_patterns.push(literal);
                         }
                     }
                     _ => {}
