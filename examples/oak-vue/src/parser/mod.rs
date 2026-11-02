@@ -76,7 +76,7 @@ impl<'config> VueParser<'config> {
 
     /// Parses only an expression.
     pub fn parse_expression_only<'a, S: Source + ?Sized>(&self, source: &'a S, session: &'a mut oak_core::parser::ParseSession<VueLanguage>) -> oak_core::parser::ParseOutput<'a, VueLanguage> {
-        let lexer = VueLexer::new(self.config);
+        let lexer = VueLexer::new_expression(self.config);
         oak_core::parser::parse_with_lexer(&lexer, source, &[], session, |state| {
             let cp = state.checkpoint();
             self.parse_expression(state);
@@ -86,7 +86,7 @@ impl<'config> VueParser<'config> {
 
     /// Parses only a `v-for` expression.
     pub fn parse_v_for_only<'a, S: Source + ?Sized>(&self, source: &'a S, session: &'a mut oak_core::parser::ParseSession<VueLanguage>) -> oak_core::parser::ParseOutput<'a, VueLanguage> {
-        let lexer = VueLexer::new(self.config);
+        let lexer = VueLexer::new_expression(self.config);
         oak_core::parser::parse_with_lexer(&lexer, source, &[], session, |state| {
             let cp = state.checkpoint();
             self.parse_v_for_expression(state);
