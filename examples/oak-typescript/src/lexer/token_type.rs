@@ -506,7 +506,7 @@ impl TypeScriptTokenType {
     pub fn is_contextual_keyword(&self) -> bool {
         use TypeScriptTokenType::*;
         matches!(self,
-            Abstract | Any | Asserts | Async | Boolean | Constructor | Declare | From | Get | Implements | Keyof | Namespace | Never | Number | Object | Package | Private | Protected | Public | Readonly | Require | Set | String | Symbol | Type | Unique | Unknown
+            Abstract | Any | As | Asserts | Async | Boolean | Constructor | Declare | From | Get | Global | Implements | Infer | Is | Keyof | Namespace | Never | Number | Object | Of | Package | Private | Protected | Public | Readonly | Require | Set | String | Symbol | Type | Unique | Unknown
         )
     }
 
