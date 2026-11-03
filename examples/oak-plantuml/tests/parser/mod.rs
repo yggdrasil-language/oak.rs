@@ -1,58 +1,71 @@
-use oak_core::{ParseSession, parser::Parser};
-use oak_plantuml::{language::PlantUmlLanguage, parser::PlantUmlParser};
+use oak_core::{Parser, RedNode, RedTree, parser::session::ParseSession};
+use oak_plantuml::{PlantUmlElementType, PlantUmlLanguage, PlantUmlParser};
 
-#[test]
-fn test_basic_parsing() {
-    let language = PlantUmlLanguage::default();
-    let parser = PlantUmlParser::new(&language);
+fn collect_elements(node: RedNode<PlantUmlLanguage>, kinds: &mut Vec<PlantUmlElementType>) {
+    for child in node.children() {
+        if let RedTree::Node(child) = child {
+            kinds.push(child.green.kind);
+            collect_elements(child, kinds);
+        }
+    }
+}
 
-    let content = "@startuml\nclass Test\n@interface TestInterface\n@enduml";
-    let mut session = ParseSession::new(0);
-    let parse_result = parser.parse(content, &[], &mut session);
-
-    assert!(parse_result.result.is_ok());
-    let root = parse_result.result.unwrap();
-    assert!(root.children().len() > 0);
+fn count(kinds: &[PlantUmlElementType], kind: PlantUmlElementType) -> usize {
+    kinds.iter().filter(|candidate| **candidate == kind).count()
 }
 
 #[test]
-fn test_comment_parsing() {
-    let language = PlantUmlLanguage::default();
+fn groups_class_block_and_relation_elements() {
+    let source = "@startuml\nclass Foo {\n+ int x\n- void run()\n}\nFoo \"1\" --> \"many\" Bar : uses\n@enduml\n";
+    let language = PlantUmlLanguage::new();
     let parser = PlantUmlParser::new(&language);
+    let mut cache = ParseSession::<PlantUmlLanguage>::default();
+    let output = parser.parse(source, &[], &mut cache);
 
-    let content = "@startuml\n// This is a comment\nclass Test\n@enduml";
-    let mut session = ParseSession::new(0);
-    let parse_result = parser.parse(content, &[], &mut session);
+    assert!(output.diagnostics.is_empty(), "unexpected diagnostics: {:?}", output.diagnostics);
+    let root = output.result.expect("parsing should succeed");
+    let mut kinds = Vec::new();
+    collect_elements(RedNode::new(root, 0), &mut kinds);
 
-    assert!(parse_result.result.is_ok());
-    let root = parse_result.result.unwrap();
-    assert!(root.children().len() > 0);
+    assert_eq!(count(&kinds, PlantUmlElementType::ClassDeclaration), 1);
+    assert_eq!(count(&kinds, PlantUmlElementType::ClassMemberBlock), 1);
+    assert_eq!(count(&kinds, PlantUmlElementType::ClassMember), 2);
+    assert_eq!(count(&kinds, PlantUmlElementType::ClassRelation), 1);
+    assert_eq!(count(&kinds, PlantUmlElementType::StartMarker), 1);
+    assert_eq!(count(&kinds, PlantUmlElementType::EndMarker), 1);
 }
 
 #[test]
-fn test_complex_parsing() {
-    let language = PlantUmlLanguage::default();
+fn groups_sequence_elements() {
+    let source = "@startuml\nparticipant \"Web UI\" as UI\nactor DB\n' a note\nUI ->> DB : query\nactivate DB\nDB --> UI : rows\ndeactivate DB\nUI -> UI : render\n@enduml\n";
+    let language = PlantUmlLanguage::new();
     let parser = PlantUmlParser::new(&language);
+    let mut cache = ParseSession::<PlantUmlLanguage>::default();
+    let output = parser.parse(source, &[], &mut cache);
 
-    let content = "@startuml\nclass Test {\n  \"This is a label\"\n}\n@interface TestInterface\nTest --> TestInterface\n@enduml";
-    let mut session = ParseSession::new(0);
-    let parse_result = parser.parse(content, &[], &mut session);
+    assert!(output.diagnostics.is_empty(), "unexpected diagnostics: {:?}", output.diagnostics);
+    let root = output.result.expect("parsing should succeed");
+    let mut kinds = Vec::new();
+    collect_elements(RedNode::new(root, 0), &mut kinds);
 
-    assert!(parse_result.result.is_ok());
-    let root = parse_result.result.unwrap();
-    assert!(root.children().len() > 0);
+    assert_eq!(count(&kinds, PlantUmlElementType::ParticipantDeclaration), 2);
+    assert_eq!(count(&kinds, PlantUmlElementType::SequenceMessage), 3);
+    assert_eq!(count(&kinds, PlantUmlElementType::Activate), 1);
+    assert_eq!(count(&kinds, PlantUmlElementType::Deactivate), 1);
+    assert_eq!(count(&kinds, PlantUmlElementType::Comment), 1);
 }
 
 #[test]
-fn test_empty_document() {
-    let language = PlantUmlLanguage::default();
+fn reports_unsupported_statements_instead_of_dropping_them() {
+    let source = "@startuml\nskinparam monochrome true\n@enduml\n";
+    let language = PlantUmlLanguage::new();
     let parser = PlantUmlParser::new(&language);
+    let mut cache = ParseSession::<PlantUmlLanguage>::default();
+    let output = parser.parse(source, &[], &mut cache);
 
-    let content = "";
-    let mut session = ParseSession::new(0);
-    let parse_result = parser.parse(content, &[], &mut session);
-
-    assert!(parse_result.result.is_ok());
-    let root = parse_result.result.unwrap();
-    assert!(root.children().len() <= 1);
+    assert!(!output.diagnostics.is_empty(), "unsupported statements should produce diagnostics");
+    let root = output.result.expect("parsing should still produce a tree");
+    let mut kinds = Vec::new();
+    collect_elements(RedNode::new(root, 0), &mut kinds);
+    assert_eq!(count(&kinds, PlantUmlElementType::Error), 1);
 }

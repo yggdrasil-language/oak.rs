@@ -2,7 +2,7 @@
 name = "oak-plantuml"
 version.workspace = true
 authors.workspace = true
-description = "PlantUML diagramming language parser for Oak"
+description = "PlantUML class and sequence diagram parser for Oak"
 edition.workspace = true
 license.workspace = true
 homepage.workspace = true
@@ -10,24 +10,14 @@ repository = "https://github.com/yggdrasil-language/oak.rs/tree/master/examples/
 
 [dependencies]
 oak-core = { workspace = true }
-oak-uml = { workspace = true }
-oak-highlight = { workspace = true, optional = true }
-oak-pretty-print = { workspace = true, optional = true }
-oak-lsp = { workspace = true, optional = true }
-oak-hover = { workspace = true, optional = true }
-oak-mcp = { workspace = true, optional = true, features = ["io-std"] }
 serde = { workspace = true, optional = true }
-tokio = { workspace = true, optional = true }
-futures = { workspace = true, optional = true }
 
 [dev-dependencies]
 oak-testing = { workspace = true }
 
 [features]
 default = ["serde"]
-serde = ["dep:serde", "oak-core/serde", "oak-uml/serde"]
-lsp = ["dep:oak-lsp", "dep:oak-hover", "oak-highlight", "oak-pretty-print", "dep:futures"]
-mcp = ["lsp", "oak-mcp/io-std"]
+serde = ["dep:serde", "oak-core/serde"]
 
 [[test]]
 name = "main"

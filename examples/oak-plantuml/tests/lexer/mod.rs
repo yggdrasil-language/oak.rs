@@ -1,62 +1,67 @@
-use oak_plantuml::{
-    language::PlantUmlLanguage,
-    lexer::{PlantUmlLexer, token_type::PlantUmlTokenType},
-};
+use oak_core::{Lexer, parser::session::ParseSession};
+use oak_plantuml::{PlantUmlLanguage, PlantUmlLexer, PlantUmlTokenType};
 
-#[test]
-fn test_basic_lexing() {
-    let language = PlantUmlLanguage::default();
+fn lex(input: &str) -> Vec<(String, PlantUmlTokenType)> {
+    let language = PlantUmlLanguage::new();
     let lexer = PlantUmlLexer::new(&language);
+    let mut cache = ParseSession::<PlantUmlLanguage>::default();
+    let output = lexer.lex(input, &[], &mut cache);
+    assert!(output.diagnostics.is_empty(), "unexpected lexer diagnostics: {:?}", output.diagnostics);
 
-    let content = "@startuml\nclass Test\n@interface TestInterface\n@enduml";
-    let lex_output = lexer.lex_internal(content);
-
-    assert!(lex_output.result.is_ok());
-    let tokens = lex_output.result.unwrap();
-    assert!(!tokens.is_empty());
+    output
+        .result
+        .expect("lexing should succeed")
+        .iter()
+        .filter(|token| !matches!(token.kind, PlantUmlTokenType::Whitespace | PlantUmlTokenType::Newline | PlantUmlTokenType::Eof))
+        .map(|token| (input[token.span.start..token.span.end].to_string(), token.kind))
+        .collect()
 }
 
 #[test]
-fn test_comment_lexing() {
-    let language = PlantUmlLanguage::default();
-    let lexer = PlantUmlLexer::new(&language);
+fn lexes_declaration_keywords() {
+    let tokens = lex("class Foo\ninterface Bar\nabstract class Baz\nenum E\nparticipant P\nactor A\nactivate P\ndeactivate P\n");
 
-    let content = "@startuml\n// This is a comment\nclass Test\n@enduml";
-    let lex_output = lexer.lex_internal(content);
-
-    assert!(lex_output.result.is_ok());
-    let tokens = lex_output.result.unwrap();
-    assert!(!tokens.is_empty());
-    // 检查是否包含注释标记
-    let has_comment = tokens.iter().any(|t| t.kind == PlantUmlTokenType::Comment);
-    assert!(has_comment);
+    let kinds: Vec<_> = tokens.iter().map(|(_, kind)| *kind).collect();
+    assert_eq!(
+        kinds,
+        vec![
+            PlantUmlTokenType::Class,
+            PlantUmlTokenType::Identifier,
+            PlantUmlTokenType::Interface,
+            PlantUmlTokenType::Identifier,
+            PlantUmlTokenType::Abstract,
+            PlantUmlTokenType::Class,
+            PlantUmlTokenType::Identifier,
+            PlantUmlTokenType::Enum,
+            PlantUmlTokenType::Identifier,
+            PlantUmlTokenType::Participant,
+            PlantUmlTokenType::Identifier,
+            PlantUmlTokenType::Actor,
+            PlantUmlTokenType::Identifier,
+            PlantUmlTokenType::Activate,
+            PlantUmlTokenType::Identifier,
+            PlantUmlTokenType::Deactivate,
+            PlantUmlTokenType::Identifier,
+        ]
+    );
 }
 
 #[test]
-fn test_label_lexing() {
-    let language = PlantUmlLanguage::default();
-    let lexer = PlantUmlLexer::new(&language);
+fn lexes_all_arrows_as_single_tokens() {
+    let tokens = lex("A --> B\nA <-- B\nA <|-- B\nA --|> B\nA *-- B\nA --* B\nA o-- B\nA --o B\nA ..> B\nA <.. B\nA .. B\nA ->> B\nA -->> B\n");
 
-    let content = "@startuml\nclass Test {\n  \"This is a label\"\n}\n@enduml";
-    let lex_output = lexer.lex_internal(content);
+    let arrows: Vec<_> = tokens.iter().filter(|(_, kind)| *kind == PlantUmlTokenType::Arrow).map(|(text, _)| text.as_str()).collect();
 
-    assert!(lex_output.result.is_ok());
-    let tokens = lex_output.result.unwrap();
-    assert!(!tokens.is_empty());
-    // 检查是否包含标签标记
-    let has_label = tokens.iter().any(|t| t.kind == PlantUmlTokenType::Label);
-    assert!(has_label);
+    assert_eq!(arrows, vec!["-->", "<--", "<|--", "--|>", "*--", "--*", "o--", "--o", "..>", "<..", "..", "->>", "-->>",]);
 }
 
 #[test]
-fn test_error_handling() {
-    let language = PlantUmlLanguage::default();
-    let lexer = PlantUmlLexer::new(&language);
+fn lexes_line_comments_and_strings() {
+    let tokens = lex("' a note\nclass \"Display Name\" as Alias\n");
 
-    let content = "@startuml\nclass Test\n@enduml";
-    let lex_output = lexer.lex_internal(content);
-
-    assert!(lex_output.result.is_ok());
-    let tokens = lex_output.result.unwrap();
-    assert!(!tokens.is_empty());
+    assert_eq!(tokens[0], ("' a note".to_string(), PlantUmlTokenType::Comment));
+    assert_eq!(tokens[1], ("class".to_string(), PlantUmlTokenType::Class));
+    assert_eq!(tokens[2], ("\"Display Name\"".to_string(), PlantUmlTokenType::String));
+    assert_eq!(tokens[3], ("as".to_string(), PlantUmlTokenType::As));
+    assert_eq!(tokens[4], ("Alias".to_string(), PlantUmlTokenType::Identifier));
 }
