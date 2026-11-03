@@ -206,6 +206,7 @@ impl PlantUmlBuilder<'_> {
         let visibility = match leaves.first().map(|leaf| leaf.kind) {
             Some(PlantUmlTokenType::Minus) => MemberVisibility::Private,
             Some(PlantUmlTokenType::Hash) => MemberVisibility::Protected,
+            Some(PlantUmlTokenType::Tilde) => MemberVisibility::Package,
             _ => MemberVisibility::Public,
         };
         let text_start = leaves.first().map(|leaf| leaf.span.end).unwrap_or(span.start);

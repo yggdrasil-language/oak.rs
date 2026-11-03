@@ -15,7 +15,7 @@ fn build(source: &str) -> oak_plantuml::PlantUmlRoot {
 
 #[test]
 fn builds_class_diagram_with_members_and_relation() {
-    let source = "@startuml\nclass \"Display Name\" as Alias {\n+ int x\n- void run()\n# int hidden\n}\ninterface Service\nAlias \"1\" --> \"many\" Service : uses\n@enduml\n";
+    let source = "@startuml\nclass \"Display Name\" as Alias {\n+ int x\n- void run()\n# int hidden\n~ Map cache\n}\ninterface Service\nAlias \"1\" --> \"many\" Service : uses\n@enduml\n";
     let root = build(source);
 
     assert_eq!(root.diagrams.len(), 1);
@@ -33,7 +33,7 @@ fn builds_class_diagram_with_members_and_relation() {
     assert_eq!(alias.display.as_deref(), Some("Display Name"));
     assert_eq!(alias.keyword, ClassKeyword::Class);
     assert_eq!(alias.span.start, source.find("class \"Display Name\"").unwrap());
-    assert_eq!(alias.members.len(), 3);
+    assert_eq!(alias.members.len(), 4);
     assert_eq!(alias.members[0].visibility, MemberVisibility::Public);
     assert_eq!(alias.members[0].text, "int x");
     assert!(!alias.members[0].is_method);
@@ -43,6 +43,9 @@ fn builds_class_diagram_with_members_and_relation() {
     assert!(alias.members[1].is_method);
     assert_eq!(alias.members[2].visibility, MemberVisibility::Protected);
     assert_eq!(alias.members[2].text, "int hidden");
+    assert_eq!(alias.members[3].visibility, MemberVisibility::Package);
+    assert_eq!(alias.members[3].text, "Map cache");
+    assert_eq!(alias.members[3].span.start, source.find("~ Map cache").unwrap());
 
     let service = &diagram.classes[1];
     assert_eq!(service.name, "Service");

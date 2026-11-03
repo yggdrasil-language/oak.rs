@@ -69,3 +69,28 @@ fn reports_unsupported_statements_instead_of_dropping_them() {
     collect_elements(RedNode::new(root, 0), &mut kinds);
     assert_eq!(count(&kinds, PlantUmlElementType::Error), 1);
 }
+
+#[test]
+fn accepts_package_visibility_and_rejects_unknown_markers() {
+    let language = PlantUmlLanguage::new();
+    let parser = PlantUmlParser::new(&language);
+
+    let supported = "@startuml\nclass C {\n~ Map cache\n}\n@enduml\n";
+    let mut cache = ParseSession::<PlantUmlLanguage>::default();
+    let output = parser.parse(supported, &[], &mut cache);
+    assert!(output.diagnostics.is_empty(), "`~` is a supported visibility marker: {:?}", output.diagnostics);
+    let root = output.result.expect("parsing should succeed");
+    let mut kinds = Vec::new();
+    collect_elements(RedNode::new(root, 0), &mut kinds);
+    assert_eq!(count(&kinds, PlantUmlElementType::ClassMember), 1);
+    assert_eq!(count(&kinds, PlantUmlElementType::Error), 0);
+
+    let unsupported = "@startuml\nclass C {\n! int x\n}\n@enduml\n";
+    let mut cache = ParseSession::<PlantUmlLanguage>::default();
+    let output = parser.parse(unsupported, &[], &mut cache);
+    assert!(!output.diagnostics.is_empty(), "an unknown marker must not be dropped silently");
+    let root = output.result.expect("parsing should still produce a tree");
+    let mut kinds = Vec::new();
+    collect_elements(RedNode::new(root, 0), &mut kinds);
+    assert_eq!(count(&kinds, PlantUmlElementType::Error), 1);
+}

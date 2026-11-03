@@ -277,8 +277,11 @@ fn parse_member_block<S: Source + ?Sized>(state: &mut ParserState<'_, PlantUmlLa
 fn parse_class_member<S: Source + ?Sized>(state: &mut ParserState<'_, PlantUmlLanguage, S>) {
     let checkpoint = state.checkpoint();
 
-    if !matches!(state.peek_kind(), Some(PlantUmlTokenType::Plus | PlantUmlTokenType::Minus | PlantUmlTokenType::Hash)) {
-        state.syntax_error("class member must start with `+`, `-` or `#`");
+    if !matches!(
+        state.peek_kind(),
+        Some(PlantUmlTokenType::Plus | PlantUmlTokenType::Minus | PlantUmlTokenType::Hash | PlantUmlTokenType::Tilde)
+    ) {
+        state.syntax_error("class member must start with `+`, `-`, `#` or `~`");
         skip_to_line_end(state);
         state.finish_at(checkpoint, PlantUmlElementType::Error);
         return;

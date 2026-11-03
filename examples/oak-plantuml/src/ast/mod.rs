@@ -129,6 +129,8 @@ pub enum MemberVisibility {
     Private,
     /// Protected, written `#`.
     Protected,
+    /// Package, written `~`.
+    Package,
 }
 
 /// One member inside a class member block.
@@ -152,6 +154,7 @@ impl fmt::Display for ClassMember {
             MemberVisibility::Public => '+',
             MemberVisibility::Private => '-',
             MemberVisibility::Protected => '#',
+            MemberVisibility::Package => '~',
         };
         write!(f, "{marker} {}", self.text)
     }

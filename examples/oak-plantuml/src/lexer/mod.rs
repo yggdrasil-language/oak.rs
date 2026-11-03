@@ -58,6 +58,7 @@ impl<'config> PlantUmlLexer<'config> {
                 ')' => self.single(state, PlantUmlTokenType::RightParen),
                 '+' => self.single(state, PlantUmlTokenType::Plus),
                 '#' => self.single(state, PlantUmlTokenType::Hash),
+                '~' => self.single(state, PlantUmlTokenType::Tilde),
                 ':' => self.single(state, PlantUmlTokenType::Colon),
                 _ => {
                     if self.lex_arrow(state) {
@@ -251,7 +252,7 @@ impl<'config> PlantUmlLexer<'config> {
         let start = state.get_position();
 
         while let Some(ch) = state.peek() {
-            if ch.is_whitespace() || matches!(ch, '"' | '@' | '{' | '}' | '(' | ')' | '+' | '#' | ':') {
+            if ch.is_whitespace() || matches!(ch, '"' | '@' | '{' | '}' | '(' | ')' | '+' | '~' | '#' | ':') {
                 break;
             }
             state.advance(ch.len_utf8());
