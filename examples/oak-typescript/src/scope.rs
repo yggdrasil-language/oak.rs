@@ -24,10 +24,14 @@
 //! which stores no span: there a whole-word textual match may only set the
 //! conservative `has_type_references` flag, never a reference span.
 //!
-//! `rename_unsafe` marks a binding whose declaration token sits inside a
-//! destructuring pattern: the pattern token doubles as the property key, so
-//! rewriting every recorded span still changes semantics. Consumers must
-//! refuse renames of such bindings.
+//! `rename_unsafe` marks a binding whose declaration token doubles as an
+//! object-pattern property key (`const { value } = obj`): replacing that span
+//! with the bare new name would change the key. Such a binding is still
+//! renamable — a consumer rewriting it replaces the declaration span with
+//! `<name>: <new>` to preserve the key, exactly like the spans recorded in
+//! `shorthand_reference_spans`. Array-pattern elements and `{ x: renamed }`
+//! value targets are never marked: a bare replacement at their declaration
+//! span is already safe.
 //!
 //! A value reference that is a shorthand object-property token (`{ x }`) is
 //! renamable, but not by replacing the span with the bare new name — the
@@ -109,9 +113,10 @@ pub struct ModuleBindingFacts {
     pub references: Vec<Range<usize>>,
     /// `true` when the name is used in a type position (span not recorded).
     pub has_type_references: bool,
-    /// `true` when the declaration token sits inside a destructuring pattern
-    /// (the pattern token doubles as the property key), so renaming would
-    /// change semantics even with every recorded span rewritten.
+    /// `true` when the declaration token doubles as an object-pattern
+    /// property key (`const { value } = obj`). A rename keeps the key by
+    /// replacing the declaration span with `<name>: <new>` instead of the
+    /// bare new name.
     pub rename_unsafe: bool,
     /// Spans within [`Self::references`] that are shorthand object-property
     /// tokens (`{ x }`): the token doubles as the property key, so a rename
@@ -247,7 +252,8 @@ impl ScopeWalker {
     }
 
     /// Marks the module binding `name` rename-unsafe: its declaration token
-    /// sits inside a destructuring pattern.
+    /// doubles as an object-pattern property key, so a rename must rewrite
+    /// that span as `<name>: <new>` to preserve the key.
     fn mark_unsafe(&mut self, name: &str) {
         if let Some(&index) = self.binding_index.get(name) {
             self.bindings[index].rename_unsafe = true;
@@ -318,9 +324,7 @@ impl ScopeWalker {
                     Some(span) => self.add_module_binding(name, kind.clone(), span),
                     None => self.add_module_binding(name, kind.clone(), &Range { start: declarator.span.start, end: declarator.span.start }),
                 }
-            }
-            if declarator.pattern_text.is_some() {
-                for name in &declarator.binding_names {
+                if declarator.binding_pattern_keys.get(position).copied().unwrap_or(true) {
                     self.mark_unsafe(name);
                 }
             }
@@ -985,12 +989,12 @@ fn collect_var_declarators_one(statement: &Statement, out: &mut Vec<(String, Ran
     match statement {
         Statement::VariableDeclaration(declaration) if declaration.kind == VariableKind::Var => {
             for declarator in &declaration.declarators {
-                let pattern = declarator.pattern_text.is_some();
                 for (position, name) in declarator.binding_names.iter().enumerate() {
                     let span = match declarator.binding_spans.get(position) {
                         Some(span) => span.clone(),
                         None => Range { start: declarator.span.start, end: declarator.span.start },
                     };
+                    let pattern = declarator.binding_pattern_keys.get(position).copied().unwrap_or(declarator.pattern_text.is_some());
                     out.push((name.clone(), span, pattern));
                 }
             }

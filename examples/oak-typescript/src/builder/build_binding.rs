@@ -13,8 +13,10 @@ struct PatternToken {
 /// The parser records the pattern as a flat token run, so the pattern grammar
 /// (`{ a, b: c, ...rest }` / `[x, , ...ys]`, nested patterns and defaults) is
 /// walked here over the CST tokens instead of re-reading declarator source text.
-/// Each entry pairs the bound name with the source span of its token.
-pub(crate) fn binding_pattern_names(node: &RedNode<TypeScriptLanguage>, source: &SourceText) -> Vec<(String, Range<usize>)> {
+/// Each entry pairs the bound name with the source span of its token and a
+/// flag that is `true` exactly when the token doubles as a shorthand
+/// object-pattern property key (`const { value } = obj`).
+pub(crate) fn binding_pattern_names(node: &RedNode<TypeScriptLanguage>, source: &SourceText) -> Vec<(String, Range<usize>, bool)> {
     let mut tokens = Vec::new();
     collect_pattern_tokens(node, &mut tokens);
     let mut names = Vec::new();
@@ -65,14 +67,14 @@ fn kind_at(tokens: &[PatternToken], cursor: usize) -> Option<TypeScriptTokenType
 
 /// Parses one binding target: a plain identifier, an object pattern or an
 /// array pattern. The cursor advances past the whole target.
-fn parse_binding_target(tokens: &[PatternToken], cursor: &mut usize, source: &SourceText, names: &mut Vec<(String, Range<usize>)>) {
+fn parse_binding_target(tokens: &[PatternToken], cursor: &mut usize, source: &SourceText, names: &mut Vec<(String, Range<usize>, bool)>) {
     match kind_at(tokens, *cursor) {
         Some(TypeScriptTokenType::LeftBrace) => parse_object_pattern(tokens, cursor, source, names),
         Some(TypeScriptTokenType::LeftBracket) => parse_array_pattern(tokens, cursor, source, names),
         Some(_) => {
             if let Some(token) = tokens.get(*cursor) {
                 if is_binding_identifier(token, source) {
-                    names.push((token_text(token, source), token.span.clone()));
+                    names.push((token_text(token, source), token.span.clone(), false));
                 }
             }
             *cursor += 1;
@@ -81,7 +83,7 @@ fn parse_binding_target(tokens: &[PatternToken], cursor: &mut usize, source: &So
     }
 }
 
-fn parse_object_pattern(tokens: &[PatternToken], cursor: &mut usize, source: &SourceText, names: &mut Vec<(String, Range<usize>)>) {
+fn parse_object_pattern(tokens: &[PatternToken], cursor: &mut usize, source: &SourceText, names: &mut Vec<(String, Range<usize>, bool)>) {
     *cursor += 1; // `{`
     while let Some(kind) = kind_at(tokens, *cursor) {
         match kind {
@@ -114,7 +116,7 @@ fn parse_object_pattern(tokens: &[PatternToken], cursor: &mut usize, source: &So
                 }
                 else if is_identifier {
                     if let Some(span) = key_span {
-                        names.push((key, span));
+                        names.push((key, span, true));
                     }
                 }
                 skip_default_value(tokens, cursor);
@@ -123,7 +125,7 @@ fn parse_object_pattern(tokens: &[PatternToken], cursor: &mut usize, source: &So
     }
 }
 
-fn parse_array_pattern(tokens: &[PatternToken], cursor: &mut usize, source: &SourceText, names: &mut Vec<(String, Range<usize>)>) {
+fn parse_array_pattern(tokens: &[PatternToken], cursor: &mut usize, source: &SourceText, names: &mut Vec<(String, Range<usize>, bool)>) {
     *cursor += 1; // `[`
     while let Some(kind) = kind_at(tokens, *cursor) {
         match kind {

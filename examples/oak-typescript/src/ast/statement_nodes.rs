@@ -616,6 +616,12 @@ pub struct VariableDeclarator {
     /// Source spans of [`Self::binding_names`], same length and same order.
     #[cfg_attr(feature = "serde", serde(with = "oak_core::serde_range::vec"))]
     pub binding_spans: Vec<Range<usize>>,
+    /// Whether each binding token doubles as an object-pattern property key,
+    /// same length and same order as [`Self::binding_names`]. `true` exactly
+    /// for shorthand pattern entries (`const { value } = obj`): rewriting such
+    /// a token with the bare new name would change the property key, so a
+    /// rename must emit `<old>: <new>` at that span instead.
+    pub binding_pattern_keys: Vec<bool>,
     /// The binding pattern exactly as written (`{ a, b: c }`), or `None` for a
     /// plain binding identifier. The identities themselves live in
     /// [`Self::binding_names`] and are never read back from this text.

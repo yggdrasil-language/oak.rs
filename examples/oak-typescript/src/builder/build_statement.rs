@@ -54,10 +54,11 @@ impl<'config> TypeScriptBuilder<'config> {
                             }
                             match child_kind {
                                 TypeScriptElementType::BindingPattern => {
-                                    let mut declarator = current.take().unwrap_or(VariableDeclarator { binding_names: Vec::new(), binding_spans: Vec::new(), pattern_text: None, ty: None, value: None, span: child_span });
-                                    for (name, name_span) in crate::builder::build_binding::binding_pattern_names(&child_node, source) {
+                                    let mut declarator = current.take().unwrap_or(VariableDeclarator { binding_names: Vec::new(), binding_spans: Vec::new(), binding_pattern_keys: Vec::new(), pattern_text: None, ty: None, value: None, span: child_span });
+                                    for (name, name_span, is_pattern_key) in crate::builder::build_binding::binding_pattern_names(&child_node, source) {
                                         declarator.binding_names.push(name);
                                         declarator.binding_spans.push(name_span);
+                                        declarator.binding_pattern_keys.push(is_pattern_key);
                                     }
                                     declarator.pattern_text = Some(source.get_text_in(child_span.clone()).trim().to_string());
                                     declarator.span.end = child_span.end;
@@ -73,9 +74,10 @@ impl<'config> TypeScriptBuilder<'config> {
                                 }
                                 TypeScriptElementType::IdentifierName => {
                                     let (name, name_span) = crate::builder::build_binding::binding_identifier_text(&child_node, source);
-                                    let mut declarator = current.take().unwrap_or(VariableDeclarator { binding_names: Vec::new(), binding_spans: Vec::new(), pattern_text: None, ty: None, value: None, span: child_span.clone() });
+                                    let mut declarator = current.take().unwrap_or(VariableDeclarator { binding_names: Vec::new(), binding_spans: Vec::new(), binding_pattern_keys: Vec::new(), pattern_text: None, ty: None, value: None, span: child_span.clone() });
                                     declarator.binding_names.push(name);
                                     declarator.binding_spans.push(name_span);
+                                    declarator.binding_pattern_keys.push(false);
                                     declarator.span.end = child_span.end;
                                     current = Some(declarator);
                                 }
@@ -97,9 +99,10 @@ impl<'config> TypeScriptBuilder<'config> {
                             TypeScriptTokenType::IdentifierName => {
                                 let span: Range<usize> = leaf.span.into();
                                 let name = source.get_text_in(span.clone()).trim().to_string();
-                                let mut declarator = current.take().unwrap_or(VariableDeclarator { binding_names: Vec::new(), binding_spans: Vec::new(), pattern_text: None, ty: None, value: None, span: span.clone() });
+                                let mut declarator = current.take().unwrap_or(VariableDeclarator { binding_names: Vec::new(), binding_spans: Vec::new(), binding_pattern_keys: Vec::new(), pattern_text: None, ty: None, value: None, span: span.clone() });
                                 declarator.binding_names.push(name);
                                 declarator.binding_spans.push(span.clone());
+                                declarator.binding_pattern_keys.push(false);
                                 declarator.span.end = span.end;
                                 current = Some(declarator);
                             }
