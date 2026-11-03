@@ -83,6 +83,12 @@ impl Parser<PlantUmlLanguage> for PlantUmlParser<'_> {
                         match diagram {
                             DiagramKind::Class => parse_class_line(state),
                             DiagramKind::Sequence => parse_sequence_line(state, &mut active),
+                            DiagramKind::Mixed { conflict } => {
+                                return Err(state.source.syntax_error(
+                                    "PlantUML source mixes class and sequence declarations, one diagram family per source is required".to_string(),
+                                    conflict,
+                                ));
+                            }
                         }
                     }
                 }
@@ -107,46 +113,60 @@ enum DiagramKind {
     Class,
     /// Sequence diagrams.
     Sequence,
+    /// Both families are authored, so no single diagram can represent the source.
+    Mixed {
+        /// Byte offset of the marker that contradicts the earlier family.
+        conflict: usize,
+    },
 }
 
+/// Decide the diagram family from authored markers.
+///
+/// Family keywords outrank arrow spelling: a `class` / `interface` / `enum` /
+/// `abstract` declaration or a `participant` / `actor` / `activate` /
+/// `deactivate` statement names its family explicitly, while `A --> B` is
+/// ambiguous between a class association and a sequence message. Scanning the
+/// whole document means a class-looking relation before the first `participant`
+/// no longer locks the source into the class family.
 fn detect_diagram<S: Source + ?Sized>(state: &ParserState<'_, PlantUmlLanguage, S>) -> DiagramKind {
     let mut index = 0;
+    let mut class_marker: Option<usize> = None;
+    let mut sequence_marker: Option<usize> = None;
+    let mut sequence_arrow = false;
+    let mut class_arrow = false;
 
-    loop {
-        match state.peek_kind_at(index) {
-            None | Some(PlantUmlTokenType::Eof) => return DiagramKind::Class,
-            Some(PlantUmlTokenType::Whitespace) | Some(PlantUmlTokenType::Newline) | Some(PlantUmlTokenType::Comment) => index += 1,
-            Some(PlantUmlTokenType::StartMarker) => {
-                index += 1;
-                while let Some(kind) = state.peek_kind_at(index) {
-                    if is_line_end(kind) {
-                        break;
+    while let Some(kind) = state.peek_kind_at(index) {
+        let offset = state.peek_at(index).map(|token| token.span.start).unwrap_or(0);
+        match kind {
+            PlantUmlTokenType::Eof => break,
+            PlantUmlTokenType::Class | PlantUmlTokenType::Interface | PlantUmlTokenType::Enum | PlantUmlTokenType::Abstract => {
+                class_marker.get_or_insert(offset);
+            }
+            PlantUmlTokenType::Participant | PlantUmlTokenType::Actor | PlantUmlTokenType::Activate | PlantUmlTokenType::Deactivate => {
+                sequence_marker.get_or_insert(offset);
+            }
+            PlantUmlTokenType::Arrow => {
+                if let Some(token) = state.peek_at(index) {
+                    let arrow = state.source.get_text_in(token.span);
+                    if is_sequence_arrow(arrow.as_ref()) {
+                        sequence_arrow = true;
                     }
-                    index += 1;
+                    if is_class_arrow(arrow.as_ref()) {
+                        class_arrow = true;
+                    }
                 }
             }
-            Some(PlantUmlTokenType::EndMarker) => return DiagramKind::Class,
-            Some(PlantUmlTokenType::Participant) | Some(PlantUmlTokenType::Actor) | Some(PlantUmlTokenType::Activate) | Some(PlantUmlTokenType::Deactivate) => {
-                return DiagramKind::Sequence;
-            }
-            Some(_) => {
-                let mut cursor = index;
-                while let Some(kind) = state.peek_kind_at(cursor) {
-                    if is_line_end(kind) {
-                        break;
-                    }
-                    if kind == PlantUmlTokenType::Arrow {
-                        let Some(token) = state.peek_at(cursor)
-                        else {
-                            return DiagramKind::Class;
-                        };
-                        return if is_sequence_arrow(state.source.get_text_in(token.span).as_ref()) { DiagramKind::Sequence } else { DiagramKind::Class };
-                    }
-                    cursor += 1;
-                }
-                return DiagramKind::Class;
-            }
+            _ => {}
         }
+        index += 1;
+    }
+
+    match (class_marker, sequence_marker) {
+        (Some(class), Some(sequence)) => DiagramKind::Mixed { conflict: class.max(sequence) },
+        (None, Some(_)) => DiagramKind::Sequence,
+        (Some(_), None) => DiagramKind::Class,
+        (None, None) if sequence_arrow && !class_arrow => DiagramKind::Sequence,
+        (None, None) => DiagramKind::Class,
     }
 }
 

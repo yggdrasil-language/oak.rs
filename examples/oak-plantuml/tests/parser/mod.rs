@@ -94,3 +94,37 @@ fn accepts_package_visibility_and_rejects_unknown_markers() {
     collect_elements(RedNode::new(root, 0), &mut kinds);
     assert_eq!(count(&kinds, PlantUmlElementType::Error), 1);
 }
+
+#[test]
+fn sequence_markers_outrank_a_leading_class_style_arrow() {
+    let source = "@startuml\nA --> B\nparticipant X\nX ->> B : hi\n@enduml\n";
+    let language = PlantUmlLanguage::new();
+    let parser = PlantUmlParser::new(&language);
+    let mut cache = ParseSession::<PlantUmlLanguage>::default();
+    let output = parser.parse(source, &[], &mut cache);
+
+    assert!(output.diagnostics.is_empty(), "unexpected diagnostics: {:?}", output.diagnostics);
+    let root = output.result.expect("parsing should succeed");
+    let mut kinds = Vec::new();
+    collect_elements(RedNode::new(root, 0), &mut kinds);
+    assert_eq!(count(&kinds, PlantUmlElementType::SequenceMessage), 2, "the leading arrow belongs to the sequence family");
+    assert_eq!(count(&kinds, PlantUmlElementType::ParticipantDeclaration), 1);
+    assert_eq!(count(&kinds, PlantUmlElementType::ClassRelation), 0, "no line may be reinterpreted as a class relation");
+}
+
+#[test]
+fn refuses_a_source_that_mixes_both_diagram_families() {
+    let source = "@startuml\nclass Order\nparticipant X\n@enduml\n";
+    let language = PlantUmlLanguage::new();
+    let parser = PlantUmlParser::new(&language);
+    let mut cache = ParseSession::<PlantUmlLanguage>::default();
+    let output = parser.parse(source, &[], &mut cache);
+
+    let error = output.result.expect_err("a mixed source cannot pick one family silently");
+    let oak_core::errors::OakErrorKind::SyntaxError { message, offset, .. } = error.kind()
+    else {
+        panic!("expected a syntax error, got {:?}", error.kind());
+    };
+    assert!(message.contains("mixes class and sequence"), "{message}");
+    assert_eq!(&source[*offset..*offset + "participant".len()], "participant", "the offset points at the contradicting marker");
+}
