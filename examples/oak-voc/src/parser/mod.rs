@@ -35,7 +35,7 @@ impl<'a> AwslParser<'a> {
         let mut has_widget_shell = false;
         let mut template = Vec::new();
         let mut script = None;
-        let mut style = None;
+        let mut styles = Vec::new();
         let mut imports = Vec::new();
 
         if parser.lexer.peek_starts_with("<import:") {
@@ -65,10 +65,7 @@ impl<'a> AwslParser<'a> {
                 script = Some(parser.parse_block_section("script")?);
             }
             else if parser.lexer.peek_starts_with("<style") {
-                if style.is_some() {
-                    return Err(parser.error("duplicate <style> block"));
-                }
-                style = Some(parser.parse_block_section("style")?);
+                styles.push(parser.parse_style_block()?);
             }
             else if let Some(tag) = parser.lexer.peek_top_level_template_open() {
                 if has_widget_shell {
@@ -86,7 +83,7 @@ impl<'a> AwslParser<'a> {
         }
 
         let end = source.len();
-        Ok(AwslRoot { has_widget_shell, widget_name, template, script, style, imports, span: start..end })
+        Ok(AwslRoot { has_widget_shell, widget_name, template, script, styles, imports, span: start..end })
     }
 
     /// Parse a top-level `<widget>` or `<template>` container (equivalent semantics).
@@ -176,6 +173,39 @@ impl<'a> AwslParser<'a> {
         let body = self.lexer.source[body_start..body_start + close_pos].to_string();
         self.lexer.pos = body_start + close_pos + close.len();
         Ok(body)
+    }
+
+    /// Parse a `<style>` block, capturing an optional `target="dom webview"` attribute list.
+    fn parse_style_block(&mut self) -> Result<crate::AwslStyleBlock, AwslParseError> {
+        self.lexer.expect_literal("<style")?;
+        self.lexer.skip_trivia();
+        let target = if self.lexer.peek_starts_with("target") {
+            self.lexer.expect_literal("target")?;
+            self.lexer.skip_trivia();
+            self.lexer.expect_char('=')?;
+            self.lexer.skip_trivia();
+            self.lexer.expect_char('"')?;
+            let value_start = self.lexer.pos;
+            let value_end = self.lexer.source[value_start..].find('"').ok_or_else(|| self.error("unterminated target attribute"))?;
+            let raw = &self.lexer.source[value_start..value_start + value_end];
+            self.lexer.pos = value_start + value_end + 1;
+            let names: Vec<String> = raw.split_whitespace().map(|name| name.to_string()).collect();
+            if names.is_empty() {
+                return Err(self.error("<style target> must list at least one backend"));
+            }
+            Some(names)
+        }
+        else {
+            None
+        };
+        self.lexer.skip_trivia();
+        self.lexer.expect_char('>')?;
+        let body_start = self.lexer.pos;
+        let close = "</style>";
+        let close_pos = self.lexer.source[body_start..].find(close).ok_or_else(|| self.error("expected `</style>`"))?;
+        let content = self.lexer.source[body_start..body_start + close_pos].to_string();
+        self.lexer.pos = body_start + close_pos + close.len();
+        Ok(crate::AwslStyleBlock { target, content })
     }
 
     fn parse_nodes_until(&mut self, stop_tags: &[&str]) -> Result<Vec<AwslTemplateNode>, AwslParseError> {

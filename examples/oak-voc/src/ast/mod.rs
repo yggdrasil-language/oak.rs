@@ -13,12 +13,21 @@ pub struct AwslRoot {
     pub template: Vec<AwslTemplateNode>,
     /// `<script>` 块原始文本。
     pub script: Option<String>,
-    /// `<style>` 块原始文本。
-    pub style: Option<String>,
+    /// `<style>` 块列表；每块可携带 `target` 条件编译归属。
+    pub styles: Vec<AwslStyleBlock>,
     /// 导入声明。
     pub imports: Vec<AwslImport>,
     /// 根节点 span。
     pub span: Range<usize>,
+}
+
+/// 一个 `<style>` 块：可选 `target` 归属 + 原始内容文本。
+#[derive(Debug, Clone, PartialEq)]
+pub struct AwslStyleBlock {
+    /// `target="dom webview"` 的目标端列表；`None` 表示公共块（对全部后端生效）。
+    pub target: Option<Vec<String>>,
+    /// 块内容原始文本。
+    pub content: String,
 }
 
 /// 模板节点。

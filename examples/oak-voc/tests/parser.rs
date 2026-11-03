@@ -36,7 +36,7 @@ fn parse_widget_with_script_style_and_template() {
 </widget>"#;
     let root = AwslParser::parse_root(source).expect("parse widget shell");
     assert!(root.script.is_some());
-    assert!(root.style.is_some());
+    assert_eq!(root.styles.len(), 1);
     assert!(!root.template.is_empty());
 }
 
@@ -137,9 +137,32 @@ fn widget_with_script_style_as_sibling_sections() {
 
     assert_eq!(root.widget_name, Some("todo".into()));
     assert!(root.script.as_ref().is_some_and(|s| s.contains("let x = 1")));
-    assert!(root.style.as_ref().is_some_and(|s| s.contains(".x")));
+    assert!(root.styles.first().is_some_and(|block| block.target.is_none() && block.content.contains(".x")));
     assert_eq!(root.template.len(), 1);
     assert_eq!(expect_element(&root.template[0]).tag, "div");
+}
+
+#[test]
+fn style_blocks_carry_target_attribute_and_multiple_blocks_are_allowed() {
+    let source = "<widget todo>\n\
+        <div class=\"todo-app\" />\n\
+    </widget>\n\
+    <style>root { gap: 8 }</style>\n\
+    <style target=\"dom\">#hero { background: @brand }</style>\n\
+    <style target=\"dom webview\">slot nav { gap: 4 }</style>";
+    let root = AwslParser::parse_root(source).expect("targeted style blocks");
+
+    assert_eq!(root.styles.len(), 3, "多个 <style> 块必须全部捕获");
+    assert_eq!(root.styles[0].target, None, "无 target 的块是公共块");
+    assert_eq!(root.styles[1].target, Some(vec!["dom".to_string()]));
+    assert_eq!(root.styles[2].target, Some(vec!["dom".to_string(), "webview".to_string()]));
+    assert!(root.styles[1].content.contains("#hero"));
+}
+
+#[test]
+fn style_block_with_empty_target_is_rejected() {
+    let source = "<widget todo><div /></widget>\n<style target=\"\">root { gap: 8 }</style>";
+    assert!(AwslParser::parse_root(source).is_err(), "空 target 列表必须拒绝");
 }
 
 #[test]
