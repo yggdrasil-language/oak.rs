@@ -1,6 +1,3 @@
+mod builder;
 mod lexer;
-
-#[test]
-fn ready() {
-    // Simple readiness test
-}
+mod parser;

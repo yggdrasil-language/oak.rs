@@ -72,6 +72,11 @@ pub enum DotTokenType {
     Error,
     /// End of stream marker.
     Eof,
+    /// The `:` port separator.
+    ///
+    /// Appended after `Eof` so every earlier discriminant stays stable for the
+    /// `#[repr(u8)]` conversion into [`crate::parser::element_type::DotElementType`].
+    Colon,
 }
 
 impl TokenType for DotTokenType {
@@ -87,7 +92,7 @@ impl TokenType for DotTokenType {
             Self::Identifier => UniversalTokenRole::Name,
             Self::String | Self::Number => UniversalTokenRole::Literal,
             Self::Graph | Self::Digraph | Self::Subgraph | Self::Node | Self::Edge | Self::Strict => UniversalTokenRole::Keyword,
-            Self::Arrow | Self::Line | Self::Equal | Self::Semicolon | Self::Comma => UniversalTokenRole::Operator,
+            Self::Arrow | Self::Line | Self::Equal | Self::Semicolon | Self::Comma | Self::Colon => UniversalTokenRole::Operator,
             Self::LeftBrace | Self::RightBrace | Self::LeftBracket | Self::RightBracket | Self::LeftParen | Self::RightParen => UniversalTokenRole::Punctuation,
             Self::Comment => UniversalTokenRole::Comment,
             _ => UniversalTokenRole::None,

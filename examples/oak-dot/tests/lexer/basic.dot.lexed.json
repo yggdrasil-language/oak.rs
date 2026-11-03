@@ -3813,7 +3813,7 @@
             "end": 3246
         },
         {
-            "kind": "Error",
+            "kind": "Colon",
             "text": ":",
             "start": 3246,
             "end": 3247
@@ -3837,7 +3837,7 @@
             "end": 3260
         },
         {
-            "kind": "Error",
+            "kind": "Colon",
             "text": ":",
             "start": 3260,
             "end": 3261
@@ -3861,7 +3861,7 @@
             "end": 3276
         },
         {
-            "kind": "Error",
+            "kind": "Colon",
             "text": ":",
             "start": 3276,
             "end": 3277
@@ -3885,7 +3885,7 @@
             "end": 3290
         },
         {
-            "kind": "Error",
+            "kind": "Colon",
             "text": ":",
             "start": 3290,
             "end": 3291
@@ -3909,7 +3909,7 @@
             "end": 3306
         },
         {
-            "kind": "Error",
+            "kind": "Colon",
             "text": ":",
             "start": 3306,
             "end": 3307
@@ -3933,7 +3933,7 @@
             "end": 3320
         },
         {
-            "kind": "Error",
+            "kind": "Colon",
             "text": ":",
             "start": 3320,
             "end": 3321

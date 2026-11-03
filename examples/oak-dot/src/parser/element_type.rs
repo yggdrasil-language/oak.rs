@@ -11,7 +11,7 @@ pub enum DotElementType {
     Identifier,
     /// A string literal.
     String,
-    /// A number literal.
+    /// A number.
     Number,
     /// Whitespace.
     Whitespace,
@@ -69,6 +69,34 @@ pub enum DotElementType {
     Error,
     /// End of stream marker.
     Eof,
+    /// The `:` port separator.
+    Colon,
+
+    // Composite elements.
+    //
+    // These variants follow the token variants one-to-one up to `Colon`: [`DotElementType`]
+    // and [`crate::lexer::token_type::DotTokenType`] share a `#[repr(u8)]` layout, and the
+    // `From<DotTokenType>` conversion transmutes between them. Every token variant must keep
+    // the discriminant of its element counterpart, so new element-only variants may only be
+    // added after this prefix and `Colon` must stay at the same position in both enums.
+    /// A complete graph definition.
+    GraphDefinition,
+    /// A node statement.
+    GraphNode,
+    /// An edge statement.
+    GraphEdge,
+    /// A `graph`/`node`/`edge` attribute statement.
+    GraphAttribute,
+    /// A subgraph definition or an anonymous subgraph operand.
+    GraphSubgraph,
+    /// A bare `key = value` assignment.
+    GraphAssignment,
+    /// An attribute list enclosed in square brackets.
+    AttributeList,
+    /// A node identifier with an optional port.
+    NodeId,
+    /// A port suffix on a node identifier.
+    Port,
 }
 
 impl ElementType for DotElementType {
@@ -76,6 +104,12 @@ impl ElementType for DotElementType {
 
     fn role(&self) -> Self::Role {
         match self {
+            Self::Root => UniversalElementRole::Root,
+            Self::GraphDefinition | Self::GraphSubgraph => UniversalElementRole::Container,
+            Self::GraphNode | Self::GraphEdge | Self::GraphAttribute | Self::GraphAssignment => UniversalElementRole::Statement,
+            Self::AttributeList => UniversalElementRole::Attribute,
+            Self::NodeId => UniversalElementRole::Reference,
+            Self::Port => UniversalElementRole::Detail,
             _ => UniversalElementRole::None,
         }
     }
