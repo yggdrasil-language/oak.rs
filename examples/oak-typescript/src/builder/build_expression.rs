@@ -586,6 +586,37 @@ impl<'config> TypeScriptBuilder<'config> {
 
                 if let (Some(expr), Some(ty)) = (expression, type_annotation) { Ok(Some(Expression::new(ExpressionKind::AsExpression { expression: Box::new(expr), type_annotation: ty }, span.into()))) } else { Ok(None) }
             }
+            TypeScriptElementType::SatisfiesExpression => {
+                let mut expression = None;
+                let mut type_annotation = None;
+
+                for child in node.children() {
+                    if let RedTree::Node(child_node) = child {
+                        if expression.is_none() { expression = self.build_expression(&child_node, source)? } else { type_annotation = self.build_type_annotation(&child_node, source)? }
+                    }
+                }
+
+                if let (Some(expr), Some(ty)) = (expression, type_annotation) { Ok(Some(Expression::new(ExpressionKind::SatisfiesExpression { expression: Box::new(expr), type_annotation: ty }, span.into()))) } else { Ok(None) }
+            }
+            TypeScriptElementType::TypeAssertionExpression => {
+                // Prefix assertion `<T>expr`: the type child comes first, the
+                // operand after it — dispatch by node kind, not position.
+                let mut expression = None;
+                let mut type_annotation = None;
+
+                for child in node.children() {
+                    if let RedTree::Node(child_node) = child {
+                        if child_node.green.kind == TypeScriptElementType::TypeAnnotation {
+                            type_annotation = self.build_type_annotation(&child_node, source)?;
+                        }
+                        else if expression.is_none() {
+                            expression = self.build_expression(&child_node, source)?;
+                        }
+                    }
+                }
+
+                if let (Some(expr), Some(ty)) = (expression, type_annotation) { Ok(Some(Expression::new(ExpressionKind::TypeAssertionExpression { expression: Box::new(expr), type_annotation: ty }, span.into()))) } else { Ok(None) }
+            }
             TypeScriptElementType::JsxElement => {
                 if let Some(e) = self.build_jsx_element(node, source)? {
                     Ok(Some(Expression::new(ExpressionKind::JsxElement(Box::new(e)), span.into())))

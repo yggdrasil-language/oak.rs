@@ -126,6 +126,13 @@ pub enum ExpressionKind {
         /// Type annotation being asserted to.
         type_annotation: TypeAnnotation,
     },
+    /// A 'satisfies' expression (type constraint check).
+    SatisfiesExpression {
+        /// Expression being checked.
+        expression: Box<Expression>,
+        /// Type annotation being satisfied.
+        type_annotation: TypeAnnotation,
+    },
     /// An arrow function expression.
     ArrowFunction {
         /// Type parameters of the arrow function.

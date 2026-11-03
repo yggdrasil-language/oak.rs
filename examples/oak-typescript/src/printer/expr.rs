@@ -149,6 +149,11 @@ fn print_expr(expr: &Expression, min_prec: Prec) -> Option<String> {
             let ty = print_type_annotation(type_annotation)?;
             wrap_prec(format!("{expr_s} as {ty}"), Prec::Unary, min_prec)
         }
+        ExpressionKind::SatisfiesExpression { expression, type_annotation } => {
+            let expr_s = print_expr(expression, Prec::Unary)?;
+            let ty = print_type_annotation(type_annotation)?;
+            wrap_prec(format!("{expr_s} satisfies {ty}"), Prec::Unary, min_prec)
+        }
         ExpressionKind::NonNullExpression(inner) => wrap_prec(format!("{}!", print_expr(inner, Prec::Postfix)?), Prec::Postfix, min_prec),
         ExpressionKind::FunctionExpression { .. } | ExpressionKind::TaggedTemplateExpression { .. } => None,
         ExpressionKind::ClassExpression { name, type_params, extends, implements, body } => {

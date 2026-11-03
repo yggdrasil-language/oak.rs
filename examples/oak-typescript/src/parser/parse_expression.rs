@@ -124,20 +124,24 @@ impl<'config> TypeScriptParser<'config> {
             Some(Less) if self.config.jsx => self.parse_jsx_element(state),
             Some(Less) => {
                 // Generic arrow function: `<T>(x: T) => x` / `<T extends object>() => {}`.
+                // Any other `<T>…` shape at expression start is a prefix type
+                // assertion `<T>expr` (JSX only reaches the arm above).
                 let params_cp = state.checkpoint();
                 self.parse_type_parameters(state).ok();
-                if !self.at(state, LeftParen) {
-                    state.restore(params_cp);
-                    state.bump();
-                    return state.finish_at(cp, crate::parser::element_type::TypeScriptElementType::Error);
+                if self.at(state, LeftParen) {
+                    self.parse_parameters(state).ok();
+                    if self.eat(state, Colon) {
+                        self.parse_return_type_annotation(state).ok();
+                    }
+                    if self.eat(state, Arrow) {
+                        self.parse_statement(state).ok();
+                        return state.finish_at(cp, crate::parser::element_type::TypeScriptElementType::ArrowFunction);
+                    }
                 }
-                self.parse_parameters(state).ok();
-                if self.eat(state, Colon) {
-                    self.parse_return_type_annotation(state).ok();
-                }
-                if self.eat(state, Arrow) {
-                    self.parse_statement(state).ok();
-                    state.finish_at(cp, crate::parser::element_type::TypeScriptElementType::ArrowFunction)
+                state.restore(params_cp);
+                if self.parse_prefix_assertion_content(state) {
+                    PrattParser::parse(state, 15, self);
+                    state.finish_at(cp, crate::parser::element_type::TypeScriptElementType::TypeAssertionExpression)
                 }
                 else {
                     state.restore(params_cp);
@@ -387,6 +391,9 @@ impl<'config> TypeScriptParser<'config> {
             Star | Slash | Percent => (12, Associativity::Left),
             StarStar => (13, Associativity::Right),
             As => (14, Associativity::Left),
+            // `satisfies` lexes as a plain identifier and is only an operator
+            // when it follows a complete expression (the infix position here).
+            IdentifierName if state.peek_text().is_some_and(|text| text == "satisfies") => (14, Associativity::Left),
             Arrow => (15, Associativity::Right),
             LeftParen | Dot | LeftBracket | QuestionDot | TemplateString => (16, Associativity::Left),
             // Postfix ++ / -- bind tighter than call/member so `this.count++` is UpdateExpression.
@@ -472,6 +479,14 @@ impl<'config> TypeScriptParser<'config> {
                 self.expect(state, As).ok();
                 self.parse_assertion_type(state);
                 Some(state.finish_at(cp, crate::parser::element_type::TypeScriptElementType::AsExpression.into()))
+            }
+            IdentifierName => {
+                // Reachable only for the contextual `satisfies` operator (the
+                // precedence match above rejects every other identifier).
+                let cp = state.checkpoint_before(left);
+                state.bump();
+                self.parse_assertion_type(state);
+                Some(state.finish_at(cp, crate::parser::element_type::TypeScriptElementType::SatisfiesExpression.into()))
             }
             Arrow => {
                 let cp = state.checkpoint_before(left);

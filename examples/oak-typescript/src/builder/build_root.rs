@@ -181,7 +181,7 @@ fn collect_top_level_await_expression(expr: &Expression, spans: &mut Vec<Range<u
                 collect_top_level_await_expression(arg, spans);
             }
         }
-        ExpressionKind::AsExpression { expression, .. } | ExpressionKind::TypeAssertionExpression { expression, .. } => {
+        ExpressionKind::AsExpression { expression, .. } | ExpressionKind::SatisfiesExpression { expression, .. } | ExpressionKind::TypeAssertionExpression { expression, .. } => {
             collect_top_level_await_expression(expression, spans);
         }
         ExpressionKind::ObjectLiteral { properties } => {

@@ -405,6 +405,8 @@ pub enum TypeScriptElementType {
     TaggedTemplateExpression,
     /// As expression `a as T`.
     AsExpression,
+    /// Satisfies expression `a satisfies T`.
+    SatisfiesExpression,
     /// Type assertion expression `<T>a`.
     TypeAssertionExpression,
     /// Non-null expression `a!`.

@@ -800,6 +800,10 @@ impl ScopeWalker {
                 self.walk_expression(expression);
                 self.walk_type(type_annotation);
             }
+            ExpressionKind::SatisfiesExpression { expression, type_annotation } => {
+                self.walk_expression(expression);
+                self.walk_type(type_annotation);
+            }
             ExpressionKind::TypeAssertionExpression { expression, type_annotation } => {
                 self.walk_expression(expression);
                 self.walk_type(type_annotation);
