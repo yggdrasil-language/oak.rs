@@ -327,6 +327,7 @@ impl<'config> ValkyrieBuilder<'config> {
         let mut target_type = TypeExpression::Namepath(Box::new(crate::ast::NamePath { parts: Vec::new(), span: Default::default() }));
         let mut trait_type = None;
         let mut methods = Vec::new();
+        let mut associated_types = Vec::new();
         let mut pending_annotations = Vec::new();
         let mut saw_target = false;
 
@@ -367,6 +368,11 @@ impl<'config> ValkyrieBuilder<'config> {
                         func.annotations.splice(0..0, pending_annotations.drain(..));
                         methods.push(func);
                     }
+                    ValkyrieElementType::AssociatedType => {
+                        let mut item = self.build_trait_associated_type(n, source)?;
+                        item.annotations.splice(0..0, pending_annotations.drain(..));
+                        associated_types.push(item);
+                    }
                     ValkyrieElementType::BlockExpression => {
                         for inner_child in n.children() {
                             if let RedTree::Node(inner_n) = inner_child {
@@ -375,6 +381,9 @@ impl<'config> ValkyrieBuilder<'config> {
                                         if let Ok(func) = self.build_function(inner_n, source) {
                                             methods.push(func);
                                         }
+                                    }
+                                    ValkyrieElementType::AssociatedType => {
+                                        associated_types.push(self.build_trait_associated_type(inner_n, source)?);
                                     }
                                     _ => {}
                                 }
@@ -386,7 +395,7 @@ impl<'config> ValkyrieBuilder<'config> {
             }
         }
 
-        Ok(ImplyDeclaration { annotations, generics, target_type, trait_type, methods, span })
+        Ok(ImplyDeclaration { annotations, generics, target_type, trait_type, associated_types, methods, span })
     }
 
     pub(crate) fn build_trait<S: Source + ?Sized>(&self, node: RedNode<ValkyrieLanguage>, source: &S) -> Result<Trait, OakError> {
