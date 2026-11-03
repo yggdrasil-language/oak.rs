@@ -2,7 +2,7 @@ use crate::{
     lexer::token_type::TypeScriptTokenType,
     parser::{State, TypeScriptParser},
 };
-use oak_core::{OakError, parser::pratt::PrattParser, source::Source};
+use oak_core::{OakError, TokenType, parser::pratt::PrattParser, source::Source};
 
 impl<'config> TypeScriptParser<'config> {
     pub(crate) fn parse_statement<'a, S: Source + ?Sized>(&self, state: &mut State<'a, S>) -> Result<(), OakError> {
@@ -254,20 +254,207 @@ impl<'config> TypeScriptParser<'config> {
     }
 
     pub(crate) fn parse_interface_declaration_content<'a, S: Source + ?Sized>(&self, state: &mut State<'a, S>) -> Result<(), OakError> {
-        use crate::lexer::token_type::TypeScriptTokenType::*;
+        use crate::{lexer::token_type::TypeScriptTokenType::*, parser::element_type::TypeScriptElementType};
         state.bump(); // interface
         self.expect(state, IdentifierName).ok();
         self.parse_type_parameters(state)?;
         if self.eat(state, Extends) {
+            let heritage = state.checkpoint();
             loop {
                 self.parse_type_reference(state)?;
                 if !self.eat(state, Comma) {
                     break;
                 }
             }
+            state.finish_at(heritage, TypeScriptElementType::HeritageClause);
         }
-        self.parse_block(state)?;
+        self.parse_interface_body(state)?;
         Ok(())
+    }
+
+    /// Parse an interface body as a `TypeLiteral` whose children are
+    /// `PropertySignature` / `MethodSignature` nodes.
+    ///
+    /// Interface members are signatures only: no initializers and no method
+    /// bodies. Index, call and construct signatures are folded into
+    /// `MethodSignature` nodes so their parameter and value types stay visible
+    /// to the scope analyzer.
+    fn parse_interface_body<'a, S: Source + ?Sized>(&self, state: &mut State<'a, S>) -> Result<(), OakError> {
+        use crate::{lexer::token_type::TypeScriptTokenType::*, parser::element_type::TypeScriptElementType};
+        let body = state.checkpoint();
+        self.expect(state, LeftBrace).ok();
+        while state.not_at_end() && !self.at(state, RightBrace) {
+            self.skip_trivia(state);
+            let member = state.checkpoint();
+
+            while state.not_at_end() && self.at(state, Readonly) {
+                state.bump();
+            }
+            // `get` / `set` only prefix a real member name, matching the
+            // object-literal rule used for class bodies.
+            if (self.at(state, Get) || self.at(state, Set)) && self.at_object_member_name(state, 1) {
+                state.bump();
+            }
+
+            if self.at(state, LeftParen) {
+                // Call signature.
+                self.parse_parameters(state)?;
+                if self.eat(state, Colon) {
+                    self.parse_interface_member_type(state);
+                }
+                self.eat(state, Semicolon);
+                state.finish_at(member, TypeScriptElementType::MethodSignature);
+            }
+            else if self.at(state, LeftBracket) {
+                self.parse_index_signature_member(state)?;
+                state.finish_at(member, TypeScriptElementType::MethodSignature);
+            }
+            else if state.not_at_end() && !self.at(state, RightBrace) {
+                // Property or method signature. `new` reads as a construct
+                // signature because it is followed by a parameter list.
+                let name = state.checkpoint();
+                state.bump();
+                state.finish_at(name, TypeScriptElementType::IdentifierName);
+                self.eat(state, Question);
+                if self.at(state, Less) {
+                    self.parse_type_parameters(state)?;
+                }
+                if self.at(state, LeftParen) {
+                    self.parse_parameters(state)?;
+                    if self.eat(state, Colon) {
+                        self.parse_interface_member_type(state);
+                    }
+                    self.eat(state, Semicolon);
+                    state.finish_at(member, TypeScriptElementType::MethodSignature);
+                }
+                else {
+                    if self.eat(state, Colon) {
+                        self.parse_interface_member_type(state);
+                    }
+                    self.eat(state, Semicolon);
+                    state.finish_at(member, TypeScriptElementType::PropertySignature);
+                }
+            }
+
+            if member.0 == state.checkpoint().0 && state.not_at_end() {
+                state.bump();
+            }
+        }
+        self.expect(state, RightBrace).ok();
+        state.finish_at(body, TypeScriptElementType::TypeLiteral);
+        Ok(())
+    }
+
+    /// Parse `[key: KeyType]: ValueType` as a member node.
+    ///
+    /// TypeScript restricts an index key type to `string`, `number`, `symbol`
+    /// or a template literal, so the key cannot reference a module binding and
+    /// only the value type is recorded for the scope analyzer.
+    fn parse_index_signature_member<'a, S: Source + ?Sized>(&self, state: &mut State<'a, S>) -> Result<(), OakError> {
+        use crate::{lexer::token_type::TypeScriptTokenType::*, parser::element_type::TypeScriptElementType};
+        self.expect(state, LeftBracket).ok();
+        if state.not_at_end() && !self.at(state, RightBracket) && !self.at(state, Colon) {
+            let name = state.checkpoint();
+            state.bump();
+            state.finish_at(name, TypeScriptElementType::IdentifierName);
+        }
+        if self.eat(state, Colon) {
+            let key_type = state.checkpoint();
+            let mut depth = 0usize;
+            let mut consumed = false;
+            while state.not_at_end() {
+                let Some(kind) = self.peek_kind(state) else {
+                    break;
+                };
+                match kind {
+                    LeftBracket | LeftParen | LeftBrace => depth += 1,
+                    RightBracket if depth == 0 => break,
+                    RightBracket | RightParen | RightBrace => depth = depth.saturating_sub(1),
+                    _ => {}
+                }
+                state.bump();
+                consumed = true;
+            }
+            if consumed {
+                state.finish_at(key_type, TypeScriptElementType::TypeAnnotation);
+            }
+        }
+        self.expect(state, RightBracket).ok();
+        if self.eat(state, Colon) {
+            self.parse_interface_member_type(state);
+        }
+        self.eat(state, Semicolon);
+        Ok(())
+    }
+
+    /// Scan an interface member type annotation.
+    ///
+    /// Interface members end at `;`, `,`, `}` or `=` (ASI), and a newline that
+    /// is followed by a token able to start another member also ends the type.
+    /// Multi-line union types keep working because a line starting with `|` is
+    /// not a member start.
+    fn parse_interface_member_type<'a, S: Source + ?Sized>(&self, state: &mut State<'a, S>) {
+        use crate::{lexer::token_type::TypeScriptTokenType::*, parser::element_type::TypeScriptElementType};
+        self.skip_trivia(state);
+        let cp = state.checkpoint();
+        let mut depth = 0usize;
+        let mut angles = 0usize;
+        let mut consumed = false;
+        while state.not_at_end() {
+            let Some(kind) = self.peek_kind(state) else {
+                break;
+            };
+            if consumed && depth == 0 && angles == 0 {
+                if matches!(kind, Semicolon | Comma | RightBrace | Equal) {
+                    break;
+                }
+                if self.interface_member_starts(state) {
+                    break;
+                }
+            }
+            match kind {
+                LeftParen | LeftBracket | LeftBrace => depth += 1,
+                RightParen | RightBracket | RightBrace => {
+                    if depth == 0 {
+                        break;
+                    }
+                    depth -= 1;
+                }
+                Less => angles += 1,
+                Greater if angles > 0 => angles -= 1,
+                RightShift if angles >= 2 => angles -= 2,
+                UnsignedRightShift if angles >= 3 => angles -= 3,
+                _ => {}
+            }
+            state.bump();
+            consumed = true;
+        }
+        if consumed {
+            state.finish_at(cp, TypeScriptElementType::TypeAnnotation);
+        }
+    }
+
+    /// A type ends where the next interface member starts: a member name
+    /// followed by `:`, `?`, `(` or `<`, or a prefix such as `readonly`.
+    ///
+    /// Trivia is not part of the token stream, so a line break cannot be
+    /// observed directly. Requiring the member punctuation keeps multi-line
+    /// unions and arrow return types intact.
+    fn interface_member_starts<'a, S: Source + ?Sized>(&self, state: &State<'a, S>) -> bool {
+        use crate::lexer::token_type::TypeScriptTokenType::*;
+        let Some(first) = state.peek_non_trivia_kind_at(0) else {
+            return false;
+        };
+        if matches!(first, Readonly | Get | Set | New | LeftParen | Star) {
+            return true;
+        }
+        let starts = matches!(first, IdentifierName | StringLiteral | NumericLiteral)
+            || first.is_contextual_keyword();
+        starts
+            && matches!(
+                state.peek_non_trivia_kind_at(1),
+                Some(Colon | Question | LeftParen | Less)
+            )
     }
 
     pub(crate) fn parse_enum_declaration<'a, S: Source + ?Sized>(&self, state: &mut State<'a, S>) -> Result<(), OakError> {

@@ -279,13 +279,26 @@ fn export_type_clause_marks_type_reference_on_value_binding() {
 }
 
 #[test]
-fn interface_bodies_are_opaque_and_name_their_reason() {
-    let f = facts("let foo = 1;\ninterface I { foo: string }");
-    assert_eq!(f.incomplete_reasons, vec![ScopeIncompleteReason::InterfaceBody], "the AST carries no interface members: {f:?}");
+fn interface_bodies_record_member_and_heritage_type_references() {
+    let f = facts(
+        "class Bar {}\ninterface I extends Bar { b: Bar\n readonly c?: Bar }\ninterface Empty {}",
+    );
+    assert!(!f.is_incomplete(), "interface members are walked now: {f:?}");
+    assert!(binding(&f, "Bar").has_type_references, "heritage and member types name `Bar`: {:?}", binding(&f, "Bar"));
 
-    let empty = facts("let foo = 1;\ninterface I {}");
-    assert_eq!(empty.incomplete_reasons, vec![ScopeIncompleteReason::InterfaceBody], "even an empty interface names the reason until the parser records members");
-    assert_eq!(empty.bindings.len(), 1, "{empty:?}");
+    // A member key that matches a module binding stays rename-unsafe for that
+    // binding alone, because the AST cannot tell `foo:` from `[foo]:`.
+    let ambiguous = facts("let foo = 1;\ninterface I { foo: string }");
+    assert_eq!(ambiguous.incomplete_reasons, vec![ScopeIncompleteReason::AmbiguousMemberKey], "{ambiguous:?}");
+}
+
+#[test]
+fn interface_index_and_call_signatures_keep_their_value_types() {
+    let f = facts(
+        "class Bar {}\ninterface I { [key: string]: Bar\n (value: Bar): Bar\n new (value: Bar): Bar }",
+    );
+    assert!(!f.is_incomplete(), "{f:?}");
+    assert!(binding(&f, "Bar").has_type_references, "index, call and construct signatures name `Bar`: {:?}", binding(&f, "Bar"));
 }
 
 #[test]

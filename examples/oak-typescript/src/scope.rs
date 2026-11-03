@@ -81,8 +81,6 @@ pub enum ScopeIncompleteReason {
     Jsx,
     /// A member key spelled like a module binding: the AST cannot tell `foo:` from `[foo]:`.
     AmbiguousMemberKey,
-    /// An `interface` declaration: the parser records no members, so references inside the body are invisible.
-    InterfaceBody,
     /// A `namespace` declaration: its members are not walked.
     Namespace,
     /// A binding token with an empty name.
@@ -431,12 +429,6 @@ impl ScopeWalker {
             Statement::ImportDeclaration(_) => {}
             Statement::ExportDeclaration(declaration) => self.walk_export(declaration),
             Statement::Interface(declaration) => {
-                // The parser does not yet produce member or heritage nodes for
-                // an interface body, so the AST carries none of the type names
-                // written inside it. Any reference from an interface to a
-                // module binding is therefore invisible: refuse all renames in
-                // such a module until the parser grows interface members.
-                self.mark(ScopeIncompleteReason::InterfaceBody);
                 self.walk_decorators(&declaration.decorators);
                 self.push(FrameKind::Block);
                 self.register_type_params(&declaration.type_params);
