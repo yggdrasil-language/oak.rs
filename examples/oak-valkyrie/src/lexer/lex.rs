@@ -304,7 +304,44 @@ impl crate::lexer::ValkyrieLexer<'_> {
                     if ch.is_ascii_digit() || ch == '_' { state.advance(ch.len_utf8()) } else { break }
                 }
 
-                let kind = if has_fraction { ValkyrieTokenType::FloatLiteral } else { ValkyrieTokenType::IntegerLiteral };
+                // 指数部分：`e`/`E` 后接可选符号与至少一位数字，必须整体属于字面量。
+                // 旧实现只扫尾数，`1e300` 会被拆成 `1` + 标识符 `e300` 并静默取尾数。
+                let mut has_exponent = false;
+                if matches!(state.current(), Some('e' | 'E')) {
+                    state.advance(1);
+                    if matches!(state.current(), Some('+' | '-')) {
+                        state.advance(1);
+                    }
+
+                    let mut has_exponent_digit = false;
+                    while let Some(ch) = state.current() {
+                        if ch.is_ascii_digit() {
+                            has_exponent_digit = true;
+                            state.advance(ch.len_utf8());
+                        }
+                        else if ch == '_' {
+                            state.advance(ch.len_utf8());
+                        }
+                        else {
+                            break;
+                        }
+                    }
+
+                    if has_exponent_digit {
+                        has_exponent = true;
+                    }
+                    else {
+                        state.add_token(ValkyrieTokenType::Error, start, state.get_position());
+                        state.add_error(oak_core::OakError::syntax_error(
+                            "float literal exponent requires at least one digit",
+                            start,
+                            None,
+                        ));
+                        return true;
+                    }
+                }
+
+                let kind = if has_fraction || has_exponent { ValkyrieTokenType::FloatLiteral } else { ValkyrieTokenType::IntegerLiteral };
                 state.add_token(kind, start, state.get_position());
                 return true;
             }
