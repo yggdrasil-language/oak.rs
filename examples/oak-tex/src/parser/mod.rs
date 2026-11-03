@@ -105,9 +105,12 @@ impl<'config> TexParser<'config> {
         }
         // Some environment grammars declare arguments after the name, such as
         // `\begin{alignedat}{2}`. They belong to the environment, not to its
-        // first cell, so the parser consumes them here.
-        let takes_optional = matches!(name.as_str(), "matrix" | "pmatrix" | "bmatrix" | "Bmatrix" | "vmatrix" | "Vmatrix" | "smallmatrix" | "alignedat" | "alignat" | "array" | "tabular");
-        let takes_required = matches!(name.as_str(), "alignedat" | "alignat" | "array" | "tabular");
+        // first cell, so the parser consumes them here. The trailing star of a
+        // starred variant (`alignedat*`) is part of the name token but does
+        // not change the argument grammar, so match on the unstarred name.
+        let grammar_name = name.strip_suffix('*').unwrap_or(name.as_str());
+        let takes_optional = matches!(grammar_name, "matrix" | "pmatrix" | "bmatrix" | "Bmatrix" | "vmatrix" | "Vmatrix" | "smallmatrix" | "alignedat" | "alignat" | "array" | "tabular");
+        let takes_required = matches!(grammar_name, "alignedat" | "alignat" | "array" | "tabular");
         if takes_optional && state.at(TexTokenType::LeftBracket) {
             self.parse_optional_argument(state)?;
         }
