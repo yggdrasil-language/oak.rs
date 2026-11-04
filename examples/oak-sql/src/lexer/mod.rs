@@ -95,7 +95,7 @@ impl<'config> SqlLexer<'config> {
                     '@' => {
                         self.lex_system_variable(state);
                     }
-                    '<' | '>' | '!' | '=' | '+' | '*' | '%' => {
+                    '<' | '>' | '!' | '=' | '+' | '*' | '%' | '|' => {
                         self.lex_operators(state);
                     }
                     '(' | ')' | ',' | ';' | '.' | ':' | '[' | ']' => {
@@ -485,6 +485,13 @@ impl<'config> SqlLexer<'config> {
             (">=", SqlTokenType::GreaterEqual),
             ("<>", SqlTokenType::NotEqual),
             ("!=", SqlTokenType::NotEqual),
+            // SQLite's JSON (`->`, `->>`) and shift (`<<`, `>>`) operators are not
+            // modelled by the AST yet. Tokenize them as explicit errors so they
+            // cannot be silently mis-lexed into comparisons / arithmetic.
+            ("->>", SqlTokenType::Error),
+            ("->", SqlTokenType::Error),
+            ("<<", SqlTokenType::Error),
+            (">>", SqlTokenType::Error),
             ("=", SqlTokenType::Equal),
             ("<", SqlTokenType::Less),
             (">", SqlTokenType::Greater),
@@ -493,6 +500,10 @@ impl<'config> SqlLexer<'config> {
             ("*", SqlTokenType::Star),
             ("/", SqlTokenType::Slash),
             ("%", SqlTokenType::Percent),
+            // A lone `|` is the unsupported bitwise OR; keep it as an explicit
+            // error token so the source stays fully covered instead of being
+            // skipped. `||` above still wins for concatenation.
+            ("|", SqlTokenType::Error),
         ];
 
         for (op, kind) in ops {
