@@ -1,7 +1,9 @@
 use oak_core::{Builder, SourceText};
 use oak_mermaid::{
     MermaidBuilder, MermaidLanguage,
-    ast::{ClassDiagram, EdgeStyle, FlowElement, Flowchart, MermaidDiagram, MermaidRoot, MessageArrow, NodeShape, ParticipantKind, SequenceDiagram},
+    ast::{
+        ClassDiagram, EdgeStyle, ErCardinality, ErDiagram, ErKey, FlowElement, Flowchart, MermaidDiagram, MermaidRoot, MessageArrow, NodeShape, ParticipantKind, SequenceDiagram, StateDiagram, StateDiagramVersion, StateElement, StateEndpoint, StateKind,
+    },
 };
 use oak_testing::{building::BuilderTester, source_from_path};
 use std::{path::Path, time::Duration};
@@ -28,6 +30,20 @@ fn class_diagram(root: &MermaidRoot, index: usize) -> &ClassDiagram {
     match &root.diagrams[index] {
         MermaidDiagram::Class(class) => class,
         other => panic!("expected a class diagram, got {other:?}"),
+    }
+}
+
+fn state_diagram(root: &MermaidRoot, index: usize) -> &StateDiagram {
+    match &root.diagrams[index] {
+        MermaidDiagram::State(state) => state,
+        other => panic!("expected a state diagram, got {other:?}"),
+    }
+}
+
+fn er_diagram(root: &MermaidRoot, index: usize) -> &ErDiagram {
+    match &root.diagrams[index] {
+        MermaidDiagram::EntityRelationship(er) => er,
+        other => panic!("expected an ER diagram, got {other:?}"),
     }
 }
 
@@ -288,6 +304,99 @@ fn test_tolerant_parsing_keeps_following_content() {
     assert_eq!(sequence.messages.len(), 2, "unknown sequence line must be skipped without swallowing later messages");
     assert_eq!(sequence.messages[0].text, "still parsed");
     assert_eq!(sequence.messages[1].text, "done");
+}
+
+#[test]
+fn test_state_diagram_ast() {
+    let root = build_root("stateDiagram-v2\n    [*] --> Idle\n    Idle --> Running : start\n    state Running {\n        [*] --> Warm\n        Warm --> Hot : heat\n        --\n        [*] --> Left\n    }\n    Running --> [*]\n");
+    assert_eq!(root.diagrams.len(), 1);
+
+    let state = state_diagram(&root, 0);
+    assert_eq!(state.version, StateDiagramVersion::V2);
+
+    let running = state
+        .elements
+        .iter()
+        .find_map(|element| match element {
+            StateElement::State(state) if state.id == "Running" => Some(state),
+            _ => None,
+        })
+        .expect("Running is missing");
+    assert_eq!(running.kind, StateKind::Normal);
+    assert_eq!(running.regions.len(), 2, "`--` must separate concurrent regions");
+    assert_eq!(running.regions[0].elements.len(), 4, "region one holds two states and two transitions");
+    assert_eq!(running.regions[1].elements.len(), 2, "region two holds one state and one transition");
+
+    let transitions: Vec<_> = state
+        .elements
+        .iter()
+        .filter_map(|element| match element {
+            StateElement::Transition(transition) => Some(transition),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(transitions.len(), 3);
+    assert_eq!(transitions[0].from, StateEndpoint::Start);
+    assert_eq!(transitions[0].to, StateEndpoint::State("Idle".to_string()));
+    assert_eq!(transitions[1].from, StateEndpoint::State("Idle".to_string()));
+    assert_eq!(transitions[1].to, StateEndpoint::State("Running".to_string()));
+    assert_eq!(transitions[1].label.as_deref(), Some("start"));
+    assert_eq!(transitions[2].from, StateEndpoint::State("Running".to_string()));
+    assert_eq!(transitions[2].to, StateEndpoint::End);
+}
+
+#[test]
+fn test_state_kinds_and_display_text() {
+    let root = build_root("stateDiagram\n    state \"Long name\" as long1\n    state fork_state <<fork>>\n    state join_state <<join>>\n    state choice1 <<choice>>\n");
+    let state = state_diagram(&root, 0);
+    assert_eq!(state.version, StateDiagramVersion::V1);
+    assert_eq!(state.elements.len(), 4);
+
+    let states: Vec<_> = state
+        .elements
+        .iter()
+        .filter_map(|element| match element {
+            StateElement::State(state) => Some(state),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(states[0].id, "long1");
+    assert_eq!(states[0].text.as_deref(), Some("Long name"));
+    assert_eq!(states[1].kind, StateKind::Fork);
+    assert_eq!(states[2].kind, StateKind::Join);
+    assert_eq!(states[3].kind, StateKind::Choice);
+}
+
+#[test]
+fn test_er_diagram_ast() {
+    let root = build_root(
+        "erDiagram\n    CUSTOMER {\n        string customer_id PK\n        string name \"display name\"\n    }\n    ORDER {\n        int order_number PK, FK\n    }\n    CUSTOMER ||--o{ ORDER : places\n    CUSTOMER }|..|{ DELIVERY-ADDRESS : uses\n",
+    );
+    assert_eq!(root.diagrams.len(), 1);
+
+    let er = er_diagram(&root, 0);
+    assert_eq!(er.entities.len(), 3, "relation endpoints must exist as entities");
+    assert_eq!(er.entities[0].name, "CUSTOMER");
+    assert_eq!(er.entities[0].attributes.len(), 2);
+    assert_eq!(er.entities[0].attributes[0].type_name, "string");
+    assert_eq!(er.entities[0].attributes[0].name, "customer_id");
+    assert_eq!(er.entities[0].attributes[0].keys, vec![ErKey::Primary]);
+    assert_eq!(er.entities[0].attributes[1].keys, Vec::new());
+    assert_eq!(er.entities[0].attributes[1].comment.as_deref(), Some("display name"));
+    assert_eq!(er.entities[1].attributes[0].keys, vec![ErKey::Primary, ErKey::Foreign]);
+    assert_eq!(er.entities[2].name, "DELIVERY-ADDRESS");
+    assert!(er.entities[2].attributes.is_empty());
+
+    assert_eq!(er.relations.len(), 2);
+    assert_eq!((er.relations[0].left.as_str(), er.relations[0].right.as_str()), ("CUSTOMER", "ORDER"));
+    assert_eq!(er.relations[0].left_cardinality, ErCardinality::One);
+    assert_eq!(er.relations[0].right_cardinality, ErCardinality::ZeroOrMore);
+    assert!(er.relations[0].identifying);
+    assert_eq!(er.relations[0].label.as_deref(), Some("places"));
+
+    assert_eq!(er.relations[1].left_cardinality, ErCardinality::OneOrMore);
+    assert_eq!(er.relations[1].right_cardinality, ErCardinality::OneOrMore);
+    assert!(!er.relations[1].identifying, "`..` means a non-identifying relationship");
 }
 
 #[test]

@@ -1,0 +1,16 @@
+stateDiagram-v2
+    [*] --> Still
+    Still --> Moving : push
+    Moving --> Still : release
+    Still --> [*]
+    state "Long name" as long1
+    state fork_state <<fork>>
+    state join_state <<join>>
+    state choice1 <<choice>>
+    state Moving {
+        [*] --> Slow
+        Slow --> Fast : accelerate
+        --
+        [*] --> Forward
+        Forward --> Backward : reverse
+    }

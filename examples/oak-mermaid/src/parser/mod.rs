@@ -31,6 +31,9 @@ const SEQUENCE_SKIPPED_KEYWORDS: &[&str] =
 /// [`MermaidParser::parse_class_declaration`] 处理。
 const CLASS_SKIPPED_KEYWORDS: &[&str] = &["direction", "note", "Note", "style", "cssClass", "linkStyle", "namespace", "click", "acctitle", "accTitle", "accDescr", "callback", "link"];
 
+/// state diagram 中暂不建模、需要整行跳过的语句。
+const STATE_SKIPPED_KEYWORDS: &[&str] = &["direction", "note", "Note", "style", "classDef", "class", "click", "linkStyle", "title", "accTitle", "accDescr"];
+
 /// 其他 Mermaid 图表头。遇到它们时结束当前 flowchart 段落，避免把
 /// 序列图/类图的内容误当成 flowchart 节点。
 const DIAGRAM_HEADERS: &[&str] = &[
@@ -74,6 +77,8 @@ impl<'a> MermaidParser<'a> {
                 Some(MermaidTokenType::Graph) => self.parse_graph(state),
                 Some(MermaidTokenType::Id) if Self::starts_with_keyword(state, &["sequenceDiagram"]) => self.parse_sequence(state),
                 Some(MermaidTokenType::Id) if Self::starts_with_keyword(state, &["classDiagram"]) => self.parse_class(state),
+                Some(MermaidTokenType::Id) if Self::starts_with_keyword(state, &["stateDiagram-v2", "stateDiagram"]) => self.parse_state(state),
+                Some(MermaidTokenType::Id) if Self::starts_with_keyword(state, &["erDiagram"]) => self.parse_er(state),
                 Some(MermaidTokenType::Eof) => {
                     state.bump();
                     break;
@@ -383,6 +388,252 @@ impl<'a> MermaidParser<'a> {
         }
         state.finish_at(checkpoint, MermaidElementType::Relation);
         true
+    }
+
+    /// 解析 `stateDiagram` / `stateDiagram-v2` 段落。
+    ///
+    /// 只建模状态声明（含复合状态与并发区域）与迁移；note、direction、
+    /// style 等语句整行跳过。遇到其他图表头即结束本段。
+    fn parse_state<'s, S: Source + ?Sized>(&self, state: &mut State<'s, S>) {
+        let checkpoint = state.checkpoint();
+        state.bump(); // `stateDiagram` / `stateDiagram-v2`
+        self.skip_line(state);
+
+        while state.not_at_end() {
+            if state.at(MermaidTokenType::Eof) || state.at(MermaidTokenType::Graph) {
+                break;
+            }
+            if state.at(MermaidTokenType::Newline) {
+                state.bump();
+                continue;
+            }
+            if Self::starts_with_keyword(state, DIAGRAM_HEADERS) {
+                break;
+            }
+            if Self::starts_with_keyword(state, &["state"]) {
+                if !self.parse_state_declaration(state) {
+                    self.skip_line(state);
+                }
+                continue;
+            }
+            if Self::starts_with_keyword(state, STATE_SKIPPED_KEYWORDS) {
+                self.skip_line(state);
+                continue;
+            }
+
+            let line_checkpoint = state.checkpoint();
+            if !self.parse_state_transition(state) {
+                state.restore(line_checkpoint);
+                self.skip_line(state);
+            }
+        }
+
+        state.finish_at(checkpoint, MermaidElementType::StateDiagram);
+    }
+
+    /// 解析 `state Foo`、`state "text" as id`、`state Foo <<fork>>`
+    /// 以及带 `{ ... }` 的复合状态。
+    ///
+    /// 复合状态体按 `--` 分隔成并发区域，每个区域包成 `StateRegion`。
+    /// 未闭合的块遇到图表头、EOF 或外层 `}` 时结束，不会吞掉后续内容。
+    fn parse_state_declaration<'s, S: Source + ?Sized>(&self, state: &mut State<'s, S>) -> bool {
+        let checkpoint = state.checkpoint();
+        state.bump(); // `state`
+
+        let mut has_body = false;
+        while state.not_at_end() && !state.at(MermaidTokenType::Newline) && !state.at(MermaidTokenType::Eof) {
+            if Self::at_text(state, "{") {
+                has_body = true;
+                state.bump();
+                break;
+            }
+            state.bump();
+        }
+        if state.at(MermaidTokenType::Newline) {
+            state.bump();
+        }
+
+        if has_body {
+            self.parse_state_regions(state);
+        }
+
+        state.finish_at(checkpoint, MermaidElementType::StateDeclaration);
+        true
+    }
+
+    /// 解析复合状态体内的一个或多个并发区域。
+    ///
+    /// 每个 `--` 分隔行结束当前区域并开启下一个区域。没有分隔符时整个
+    /// 状态体就是一个区域。
+    fn parse_state_regions<'s, S: Source + ?Sized>(&self, state: &mut State<'s, S>) {
+        let mut region_checkpoint = state.checkpoint();
+
+        while state.not_at_end() {
+            if state.at(MermaidTokenType::Eof) || state.at(MermaidTokenType::Graph) || Self::starts_with_keyword(state, DIAGRAM_HEADERS) {
+                break;
+            }
+            if state.at(MermaidTokenType::Newline) {
+                state.bump();
+                continue;
+            }
+            if Self::at_text(state, "}") {
+                state.finish_at(region_checkpoint, MermaidElementType::StateRegion);
+                state.bump();
+                self.skip_line(state);
+                return;
+            }
+            if Self::at_region_separator(state) {
+                state.finish_at(region_checkpoint, MermaidElementType::StateRegion);
+                state.bump(); // `--`
+                self.skip_line(state);
+                region_checkpoint = state.checkpoint();
+                continue;
+            }
+            if Self::starts_with_keyword(state, &["state"]) {
+                if !self.parse_state_declaration(state) {
+                    self.skip_line(state);
+                }
+                continue;
+            }
+            if Self::starts_with_keyword(state, STATE_SKIPPED_KEYWORDS) {
+                self.skip_line(state);
+                continue;
+            }
+
+            let line_checkpoint = state.checkpoint();
+            if !self.parse_state_transition(state) {
+                state.restore(line_checkpoint);
+                self.skip_line(state);
+            }
+        }
+
+        state.finish_at(region_checkpoint, MermaidElementType::StateRegion);
+    }
+
+    /// 解析一行状态迁移（`A --> B : event`，端点可为 `[*]`）。
+    fn parse_state_transition<'s, S: Source + ?Sized>(&self, state: &mut State<'s, S>) -> bool {
+        if !state.at(MermaidTokenType::Id) && !Self::at_text(state, "[*]") {
+            return false;
+        }
+
+        let checkpoint = state.checkpoint();
+        state.bump();
+        if !state.at(MermaidTokenType::Arrow) {
+            state.restore(checkpoint);
+            return false;
+        }
+        state.bump();
+        if !state.at(MermaidTokenType::Id) && !Self::at_text(state, "[*]") {
+            state.restore(checkpoint);
+            return false;
+        }
+        state.bump();
+        while state.not_at_end() && !state.at(MermaidTokenType::Newline) && !state.at(MermaidTokenType::Eof) {
+            state.bump();
+        }
+        if state.at(MermaidTokenType::Newline) {
+            state.bump();
+        }
+
+        state.finish_at(checkpoint, MermaidElementType::StateTransition);
+        true
+    }
+
+    /// 解析 `erDiagram` 段落。
+    ///
+    /// 实体块包成 `ErEntity`（属性行是 `ErAttribute`），带基数的行包成
+    /// `ErRelation`，单独一行的实体名包成没有属性的 `ErEntity`。
+    fn parse_er<'s, S: Source + ?Sized>(&self, state: &mut State<'s, S>) {
+        let checkpoint = state.checkpoint();
+        state.bump(); // `erDiagram`
+        self.skip_line(state);
+
+        while state.not_at_end() {
+            if state.at(MermaidTokenType::Eof) || state.at(MermaidTokenType::Graph) {
+                break;
+            }
+            if state.at(MermaidTokenType::Newline) {
+                state.bump();
+                continue;
+            }
+            if Self::starts_with_keyword(state, DIAGRAM_HEADERS) {
+                break;
+            }
+            if !state.at(MermaidTokenType::Id) {
+                self.skip_line(state);
+                continue;
+            }
+
+            let line_checkpoint = state.checkpoint();
+            state.bump();
+            if state.at(MermaidTokenType::LeftBrace) {
+                state.bump();
+                self.skip_line(state);
+                self.parse_er_attributes(state);
+                state.finish_at(line_checkpoint, MermaidElementType::ErEntity);
+                continue;
+            }
+            state.restore(line_checkpoint);
+
+            // 单独一行的实体名后面只剩换行。只要第一段标识符之后还有内容
+            // （基数符号、`--` / `..` 或标签），就是关系行。
+            //
+            // 不能只检测 `Arrow`：`}|..|{` 会被词法成 `RightBrace` +
+            // `Label("|..|")` + `LeftBrace`，根本没有 Arrow token。
+            state.bump();
+            let is_relation = !(state.at(MermaidTokenType::Newline) || state.at(MermaidTokenType::Eof));
+
+            while state.not_at_end() && !state.at(MermaidTokenType::Newline) && !state.at(MermaidTokenType::Eof) {
+                state.bump();
+            }
+            if state.at(MermaidTokenType::Newline) {
+                state.bump();
+            }
+            let element_type = if is_relation { MermaidElementType::ErRelation } else { MermaidElementType::ErEntity };
+            state.finish_at(line_checkpoint, element_type);
+        }
+
+        state.finish_at(checkpoint, MermaidElementType::ErDiagram);
+    }
+
+    /// 解析实体块里的属性行，直到 `}` 或段落结束。
+    fn parse_er_attributes<'s, S: Source + ?Sized>(&self, state: &mut State<'s, S>) {
+        while state.not_at_end() {
+            if state.at(MermaidTokenType::Eof) || state.at(MermaidTokenType::Graph) || Self::starts_with_keyword(state, DIAGRAM_HEADERS) {
+                break;
+            }
+            if state.at(MermaidTokenType::Newline) {
+                state.bump();
+                continue;
+            }
+            if Self::at_text(state, "}") {
+                state.bump();
+                self.skip_line(state);
+                break;
+            }
+
+            let line_checkpoint = state.checkpoint();
+            while state.not_at_end() && !state.at(MermaidTokenType::Newline) && !state.at(MermaidTokenType::Eof) && !Self::at_text(state, "}") {
+                state.bump();
+            }
+            if state.at(MermaidTokenType::Newline) {
+                state.bump();
+            }
+            state.finish_at(line_checkpoint, MermaidElementType::ErAttribute);
+        }
+    }
+
+    /// 当前是否停在复合状态体内的 `--` 区域分隔行。
+    fn at_region_separator<S: Source + ?Sized>(state: &mut State<'_, S>) -> bool {
+        if !state.at(MermaidTokenType::Arrow) || !state.peek_text().is_some_and(|text| text.as_ref() == "--") {
+            return false;
+        }
+
+        let checkpoint = state.checkpoint();
+        state.bump();
+        let alone = state.at(MermaidTokenType::Newline) || state.at(MermaidTokenType::Eof);
+        state.restore(checkpoint);
+        alone
     }
 
     /// 解析一行 flowchart 语句，产出 `Node` 或 `Edge` 元素。

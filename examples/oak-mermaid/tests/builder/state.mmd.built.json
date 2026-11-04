@@ -1,0 +1,191 @@
+{
+    "success": true,
+    "typed_root": {
+        "type_name": "oak_mermaid::ast::MermaidRoot",
+        "content": {
+            "diagrams": [
+                {
+                    "State": {
+                        "elements": [
+                            {
+                                "State": {
+                                    "id": "Still",
+                                    "kind": "Normal",
+                                    "regions": [],
+                                    "text": null
+                                }
+                            },
+                            {
+                                "Transition": {
+                                    "from": "Start",
+                                    "label": null,
+                                    "to": {
+                                        "State": "Still"
+                                    }
+                                }
+                            },
+                            {
+                                "State": {
+                                    "id": "Moving",
+                                    "kind": "Normal",
+                                    "regions": [
+                                        {
+                                            "elements": [
+                                                {
+                                                    "State": {
+                                                        "id": "Slow",
+                                                        "kind": "Normal",
+                                                        "regions": [],
+                                                        "text": null
+                                                    }
+                                                },
+                                                {
+                                                    "Transition": {
+                                                        "from": "Start",
+                                                        "label": null,
+                                                        "to": {
+                                                            "State": "Slow"
+                                                        }
+                                                    }
+                                                },
+                                                {
+                                                    "State": {
+                                                        "id": "Fast",
+                                                        "kind": "Normal",
+                                                        "regions": [],
+                                                        "text": null
+                                                    }
+                                                },
+                                                {
+                                                    "Transition": {
+                                                        "from": {
+                                                            "State": "Slow"
+                                                        },
+                                                        "label": "accelerate",
+                                                        "to": {
+                                                            "State": "Fast"
+                                                        }
+                                                    }
+                                                }
+                                            ]
+                                        },
+                                        {
+                                            "elements": [
+                                                {
+                                                    "State": {
+                                                        "id": "Forward",
+                                                        "kind": "Normal",
+                                                        "regions": [],
+                                                        "text": null
+                                                    }
+                                                },
+                                                {
+                                                    "Transition": {
+                                                        "from": "Start",
+                                                        "label": null,
+                                                        "to": {
+                                                            "State": "Forward"
+                                                        }
+                                                    }
+                                                },
+                                                {
+                                                    "State": {
+                                                        "id": "Backward",
+                                                        "kind": "Normal",
+                                                        "regions": [],
+                                                        "text": null
+                                                    }
+                                                },
+                                                {
+                                                    "Transition": {
+                                                        "from": {
+                                                            "State": "Forward"
+                                                        },
+                                                        "label": "reverse",
+                                                        "to": {
+                                                            "State": "Backward"
+                                                        }
+                                                    }
+                                                }
+                                            ]
+                                        }
+                                    ],
+                                    "text": null
+                                }
+                            },
+                            {
+                                "Transition": {
+                                    "from": {
+                                        "State": "Still"
+                                    },
+                                    "label": "push",
+                                    "to": {
+                                        "State": "Moving"
+                                    }
+                                }
+                            },
+                            {
+                                "Transition": {
+                                    "from": {
+                                        "State": "Moving"
+                                    },
+                                    "label": "release",
+                                    "to": {
+                                        "State": "Still"
+                                    }
+                                }
+                            },
+                            {
+                                "Transition": {
+                                    "from": {
+                                        "State": "Still"
+                                    },
+                                    "label": null,
+                                    "to": "End"
+                                }
+                            },
+                            {
+                                "State": {
+                                    "id": "long1",
+                                    "kind": "Normal",
+                                    "regions": [],
+                                    "text": "Long name"
+                                }
+                            },
+                            {
+                                "State": {
+                                    "id": "fork_state",
+                                    "kind": "Fork",
+                                    "regions": [],
+                                    "text": null
+                                }
+                            },
+                            {
+                                "State": {
+                                    "id": "join_state",
+                                    "kind": "Join",
+                                    "regions": [],
+                                    "text": null
+                                }
+                            },
+                            {
+                                "State": {
+                                    "id": "choice1",
+                                    "kind": "Choice",
+                                    "regions": [],
+                                    "text": null
+                                }
+                            }
+                        ],
+                        "version": "V2"
+                    }
+                }
+            ],
+            "span": {
+                "end": 386,
+                "start": 0
+            }
+        }
+    },
+    "errors": []
+}

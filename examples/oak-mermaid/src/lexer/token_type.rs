@@ -24,6 +24,14 @@ pub enum MermaidTokenType {
     Label,
     /// Connection arrow (e.g., `-->`).
     Arrow,
+    /// Opening brace of a composite state, class body or ER entity block.
+    LeftBrace,
+    /// Closing brace of a composite state, class body or ER entity block.
+    RightBrace,
+    /// Colon separating a statement head from its label (state and ER).
+    Colon,
+    /// A single pipe inside an ER cardinality symbol such as `--|{`.
+    Pipe,
 
     /// Lexing error.
     Error,
@@ -68,7 +76,7 @@ impl TokenType for MermaidTokenType {
             Self::Graph | Self::Direction => UniversalTokenRole::Keyword,
             Self::Id => UniversalTokenRole::Name,
             Self::Label => UniversalTokenRole::Literal,
-            Self::Arrow => UniversalTokenRole::Operator,
+            Self::Arrow | Self::LeftBrace | Self::RightBrace | Self::Colon | Self::Pipe => UniversalTokenRole::Operator,
             Self::Error => UniversalTokenRole::Error,
             Self::Eof => UniversalTokenRole::Eof,
         }
