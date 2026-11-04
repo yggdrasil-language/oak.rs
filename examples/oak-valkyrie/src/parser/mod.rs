@@ -657,3 +657,154 @@ mod spaceship_operator_tests {
         assert_eq!(operator_of(&expr), Some(ValkyrieTokenType::LessEqGreater), "reparsed expression: {expr:?}");
     }
 }
+
+#[cfg(test)]
+mod trait_template_tests {
+    use super::*;
+    use crate::{
+        ValkyrieBuilder, ValkyrieRoot,
+        ast::{StatementNode, TemplateNode, Trait},
+    };
+    use oak_core::{Builder, GreenTree, OakDiagnostics, SourceText, Token, parser::ParseSession};
+
+    /// 与 std 消费端同构：trait 体内按 target 分派成员。
+    const TARGET_TRAIT: &str = "trait Iterator {\n    <% match arch %>\n    <% case wasm %>\n    micro filter_map(self, predicate: micro(i32) -> bool): i32\n    <% case native %>\n    micro take_while(self, predicate: micro(i32) -> bool): i32\n    <% end %>\n}\n";
+
+    fn build(source: &str) -> OakDiagnostics<ValkyrieRoot> {
+        let language = ValkyrieLanguage::default();
+        let builder = ValkyrieBuilder::new(&language);
+        let text = SourceText::new(source);
+        let mut session = ParseSession::<ValkyrieLanguage>::default();
+        builder.build(&text, &[], &mut session)
+    }
+
+    fn root(source: &str) -> ValkyrieRoot {
+        let output = build(source);
+        assert!(output.diagnostics.is_empty(), "diagnostics: {:?}", output.diagnostics);
+        output.result.unwrap_or_else(|error| panic!("trait templates must build, got {error:?}"))
+    }
+
+    fn trait_of<'root>(root: &'root ValkyrieRoot, name: &str) -> &'root Trait {
+        root.items
+            .iter()
+            .find_map(|item| match item {
+                StatementNode::Trait(trait_decl) if trait_decl.name.name == name => Some(trait_decl.as_ref()),
+                _ => None,
+            })
+            .unwrap_or_else(|| panic!("expected trait {name}"))
+    }
+
+    fn single_template<'root>(trait_decl: &'root Trait) -> &'root TemplateNode {
+        assert_eq!(trait_decl.body.templates.len(), 1, "trait body must keep its template node: {:?}", trait_decl.body.templates);
+        &trait_decl.body.templates[0]
+    }
+
+    fn header_kinds(tokens: &[Token<ValkyrieTokenType>]) -> Vec<ValkyrieTokenType> {
+        tokens.iter().map(|token| token.kind).collect()
+    }
+
+    fn member_names(items: &[StatementNode]) -> Vec<&str> {
+        items
+            .iter()
+            .filter_map(|item| match item {
+                StatementNode::Micro(micro) => Some(micro.name.name.as_str()),
+                _ => None,
+            })
+            .collect()
+    }
+
+    /// 正例：`<% match arch %>` 及其分支成员进入 AST，分支体保留各自成员。
+    #[test]
+    fn trait_body_template_reaches_ast() {
+        let root = root(TARGET_TRAIT);
+        let iterator = trait_of(&root, "Iterator");
+        let TemplateNode::Match(matched) = single_template(iterator)
+        else {
+            panic!("`<% match arch %>` must build a match template: {:?}", iterator.body.templates)
+        };
+        assert_eq!(header_kinds(&matched.header), [ValkyrieTokenType::Identifier], "match header: {:?}", matched.header);
+        assert_eq!(matched.arms.len(), 2, "arms: {:?}", matched.arms);
+
+        let wasm = matched.arms[0].pattern.as_deref().expect("`<% case wasm %>` pattern");
+        assert_eq!(header_kinds(wasm), [ValkyrieTokenType::Identifier], "case pattern: {wasm:?}");
+        assert_eq!(member_names(&matched.arms[0].body), ["filter_map"], "wasm arm body: {:?}", matched.arms[0].body);
+
+        let native = matched.arms[1].pattern.as_deref().expect("`<% case native %>` pattern");
+        assert_eq!(header_kinds(native), [ValkyrieTokenType::Identifier], "case pattern: {native:?}");
+        assert_eq!(member_names(&matched.arms[1].body), ["take_while"], "native arm body: {:?}", matched.arms[1].body);
+    }
+
+    /// 正例：模板叶子完整留在 CST —— 无 `Error` 叶子，全部源码字节被叶子覆盖。
+    #[test]
+    fn trait_body_template_keeps_every_source_byte() {
+        let language = ValkyrieLanguage::default();
+        let parser = ValkyrieParser::new(&language);
+        let text = SourceText::new(TARGET_TRAIT);
+        let mut session = ParseSession::<ValkyrieLanguage>::default();
+        let output = parser.parse(&text, &[], &mut session);
+        assert!(output.diagnostics.is_empty(), "diagnostics: {:?}", output.diagnostics);
+        let green = output.result.unwrap_or_else(|error| panic!("template must lex and parse, got {error:?}"));
+
+        fn walk(tree: &GreenTree<ValkyrieLanguage>, out: &mut Vec<(ValkyrieTokenType, u32)>) {
+            match tree {
+                GreenTree::Leaf(leaf) => out.push((leaf.kind, leaf.length)),
+                GreenTree::Node(node) => {
+                    for child in node.children {
+                        walk(child, out);
+                    }
+                }
+            }
+        }
+
+        let mut leaves = Vec::new();
+        for child in green.children {
+            walk(child, &mut leaves);
+        }
+        let covered: u32 = leaves.iter().map(|(_, length)| *length).sum();
+        assert_eq!(covered as usize, TARGET_TRAIT.len(), "leaves must cover the whole source: {leaves:?}");
+        assert!(!leaves.iter().any(|(kind, _)| *kind == ValkyrieTokenType::Error), "template must not degrade into error tokens: {leaves:?}");
+        assert_eq!(leaves.iter().filter(|(kind, _)| *kind == ValkyrieTokenType::TemplateL).count(), 4, "leaves: {leaves:?}");
+        assert_eq!(leaves.iter().filter(|(kind, _)| *kind == ValkyrieTokenType::TemplateR).count(), 4, "leaves: {leaves:?}");
+    }
+
+    /// 正例：CST 格式化往返保留模板原文，重解析仍得到同一批分支成员。
+    #[test]
+    fn formatter_roundtrip_preserves_trait_body_template() {
+        let formatted = crate::formatter::format_source(TARGET_TRAIT, &crate::formatter::FormatOptions::default()).expect("formatting must succeed");
+        assert!(formatted.contains("<% match arch %>"), "formatted output must keep the directive: {formatted:?}");
+        let root = root(&formatted);
+        let iterator = trait_of(&root, "Iterator");
+        let TemplateNode::Match(matched) = single_template(iterator)
+        else {
+            panic!("reparsed trait must keep the match template: {:?}", iterator.body.templates)
+        };
+        assert_eq!(member_names(&matched.arms[0].body), ["filter_map"], "reparsed wasm arm: {:?}", matched.arms[0].body);
+        assert_eq!(member_names(&matched.arms[1].body), ["take_while"], "reparsed native arm: {:?}", matched.arms[1].body);
+    }
+
+    /// 反例：缺少 `<% end %>` 必须报结构化语法错误，不能静默吞掉模板。
+    #[test]
+    fn unclosed_match_template_reports_structured_error() {
+        let output = build("trait T {\n    <% match arch %>\n    <% case wasm %>\n    micro f(self)\n}\n");
+        assert_eq!(output.diagnostics.len(), 1, "diagnostics: {:?}", output.diagnostics);
+        assert!(output.diagnostics[0].to_string().contains("unclosed `<% match %>` block"), "diagnostics: {:?}", output.diagnostics);
+        let root = output.result.unwrap_or_else(|error| panic!("recovery must keep the build alive, got {error:?}"));
+        assert!(!root.items.iter().any(|item| matches!(item, StatementNode::Trait(_))), "broken trait must not reach the AST: {:?}", root.items);
+    }
+
+    /// 反例：`%>` 缺失必须报结构化语法错误。
+    #[test]
+    fn unterminated_template_directive_reports_structured_error() {
+        let output = build("trait T {\n    <% match arch\n}\n");
+        assert_eq!(output.diagnostics.len(), 1, "diagnostics: {:?}", output.diagnostics);
+        assert!(output.diagnostics[0].to_string().contains("expected `%>`"), "diagnostics: {:?}", output.diagnostics);
+    }
+
+    /// 反例：trait 体内直接出现 `<% case %>`（没有 `<% match %>`）必须报结构化语法错误。
+    #[test]
+    fn stray_case_directive_reports_structured_error() {
+        let output = build("trait T {\n    <% case wasm %>\n    micro f(self)\n}\n");
+        assert_eq!(output.diagnostics.len(), 1, "diagnostics: {:?}", output.diagnostics);
+        assert!(output.diagnostics[0].to_string().contains("unexpected template boundary directive"), "diagnostics: {:?}", output.diagnostics);
+    }
+}

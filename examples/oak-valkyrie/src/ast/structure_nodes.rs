@@ -4,7 +4,7 @@
 //! Anonymous `structure { ... }` literals use [`AnonymousStructure`].
 //! Anonymous `class { ... }` literals use [`AnonymousClass`](crate::ast::class_nodes::AnonymousClass).
 
-use crate::ast::{Attribute, Block, GenericParam, Identifier, Param, Parent, Span, TermExpression, TypeExpression, trait_nodes::AssociatedType};
+use crate::ast::{Attribute, Block, GenericParam, Identifier, Param, Parent, Span, TermExpression, TypeExpression, template_nodes::TemplateNode, trait_nodes::AssociatedType};
 
 /// Named value-type declaration keyword (`struct` / `structure`).
 ///
@@ -95,6 +95,20 @@ pub struct StructureBody {
     pub methods: Vec<MethodDeclaration>,
     /// Associated types declared in trait bodies.
     pub associated_types: Vec<AssociatedType>,
+    /// Body-level TGrammar template nodes, in source order.
+    ///
+    /// # V Language Example
+    /// ```v
+    /// trait Iterator {
+    ///     <% match arch %>
+    ///     <% case wasm %>
+    ///     micro filter_map(self): Self
+    ///     <% case native %>
+    ///     micro take_while(self): Self
+    ///     <% end %>
+    /// }
+    /// ```
+    pub templates: Vec<TemplateNode>,
     /// The source code span covering the body braces.
     #[cfg_attr(feature = "serde", serde(with = "oak_core::serde_range"))]
     pub span: Span,
