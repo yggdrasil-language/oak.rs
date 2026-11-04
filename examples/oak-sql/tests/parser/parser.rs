@@ -1172,7 +1172,6 @@ fn test_sql_builder_insert_returning() {
     assert_eq!(reparsed_source, source);
 }
 
-#[ignore = "SQL builder/AST round-trip tests are out of date"]
 #[test]
 fn test_sql_builder_create_table() {
     let config = SqlLanguage::default();
@@ -1204,7 +1203,6 @@ fn test_sql_builder_create_table() {
     assert_eq!(columns[1].data_type.as_ref(), "TEXT");
 }
 
-#[ignore = "SQL builder/AST round-trip tests are out of date"]
 #[test]
 fn test_sql_builder_create_view() {
     let config = SqlLanguage::default();
@@ -1231,11 +1229,12 @@ fn test_sql_builder_create_view() {
     assert!(query.expr.is_some());
 }
 
-#[ignore = "SQL builder/AST round-trip tests are out of date"]
 #[test]
 fn test_sql_builder_update_delete() {
     let config = SqlLanguage::default();
     let builder = SqlBuilder::new(&config);
+    // Each build parses a separate document, so each one needs its own
+    // session: an empty edit list reuses the previous tree by design.
     let mut session = ParseSession::<SqlLanguage>::default();
 
     let source_update = SourceText::new("UPDATE users SET name = 'John', age = 30 WHERE id = 1;");
@@ -1251,7 +1250,8 @@ fn test_sql_builder_update_delete() {
     assert!(update.selection.is_some());
 
     let source_delete = SourceText::new("DELETE FROM users WHERE id = 1;");
-    let result_delete = builder.build(&source_delete, &[], &mut session);
+    let mut session_delete = ParseSession::<SqlLanguage>::default();
+    let result_delete = builder.build(&source_delete, &[], &mut session_delete);
     assert!(result_delete.result.is_ok());
     let root_delete = result_delete.result.unwrap();
     let SqlStatement::Delete(delete) = &root_delete.statements[0]
@@ -1262,7 +1262,6 @@ fn test_sql_builder_update_delete() {
     assert!(delete.selection.is_some());
 }
 
-#[ignore = "SQL builder/AST round-trip tests are out of date"]
 #[test]
 fn test_sql_builder_drop_alter() {
     let config = SqlLanguage::default();
@@ -1282,7 +1281,8 @@ fn test_sql_builder_drop_alter() {
     assert!(drop.if_exists);
 
     let source_alter = SourceText::new("ALTER TABLE users RENAME TO customers;");
-    let result_alter = builder.build(&source_alter, &[], &mut session);
+    let mut session_alter = ParseSession::<SqlLanguage>::default();
+    let result_alter = builder.build(&source_alter, &[], &mut session_alter);
     assert!(result_alter.result.is_ok());
     let root_alter = result_alter.result.unwrap();
     let SqlStatement::Alter(alter) = &root_alter.statements[0]
@@ -1292,7 +1292,6 @@ fn test_sql_builder_drop_alter() {
     assert_eq!(alter.table_name.name.name.as_ref(), "users");
 }
 
-#[ignore = "SQL builder/AST round-trip tests are out of date"]
 #[test]
 fn test_sql_builder_database_stmt() {
     let config = SqlLanguage::default();
@@ -1312,7 +1311,8 @@ fn test_sql_builder_database_stmt() {
     assert!(matches!(create.body, CreateBody::Database { .. }));
 
     let source_drop = SourceText::new("DROP DATABASE test_db;");
-    let result_drop = builder.build(&source_drop, &[], &mut session);
+    let mut session_drop = ParseSession::<SqlLanguage>::default();
+    let result_drop = builder.build(&source_drop, &[], &mut session_drop);
     assert!(result_drop.result.is_ok());
     let root_drop = result_drop.result.unwrap();
     let SqlStatement::Drop(drop) = &root_drop.statements[0]

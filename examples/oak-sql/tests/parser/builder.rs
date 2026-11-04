@@ -49,7 +49,6 @@ fn test_update_assignment_accepts_bare_identifier() {
     assert!(update.selection.is_some());
 }
 
-#[ignore = "SQL builder/AST round-trip tests are out of date"]
 #[test]
 fn test_create_table_ast() {
     let language = SqlLanguage::default();

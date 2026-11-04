@@ -650,7 +650,11 @@ impl<'config> SqlBuilder<'config> {
 
     fn build_column_definition<'a>(&self, node: RedNode<'a, SqlLanguage>, source: &SourceText) -> Result<ColumnDefinition, OakError> {
         let mut name = None;
-        let mut data_type_str = String::new();
+        // Spans of the tokens that spell the column type. Slicing the source
+        // between the first and the last one keeps the type exactly as written
+        // (`VARCHAR(255)`, not `VARCHAR ( 255 )`) and drops the trivia that
+        // separates it from the constraints.
+        let mut data_type_spans: Vec<Range<usize>> = Vec::new();
         let mut constraints = Vec::new();
 
         // Use a flag to track if we are currently parsing the data type
@@ -665,10 +669,7 @@ impl<'config> SqlBuilder<'config> {
                             parsing_data_type = true;
                         }
                         else if parsing_data_type {
-                            if !data_type_str.is_empty() {
-                                data_type_str.push(' ');
-                            }
-                            data_type_str.push_str(self.get_text(n.span(), source).trim());
+                            data_type_spans.push(n.span());
                         }
                     }
                     _ => {}
@@ -722,10 +723,9 @@ impl<'config> SqlBuilder<'config> {
                             }
                         }
                         _ if parsing_data_type => {
-                            if !data_type_str.is_empty() {
-                                data_type_str.push(' ');
+                            if !source.get_text_in(t.span.clone()).trim().is_empty() {
+                                data_type_spans.push(t.span.clone());
                             }
-                            data_type_str.push_str(self.get_text(t.span.clone(), source).trim());
                         }
                         _ => {}
                     }
@@ -733,7 +733,12 @@ impl<'config> SqlBuilder<'config> {
             }
         }
 
-        Ok(ColumnDefinition { name: name.ok_or_else(|| OakError::custom_error("Missing name in column definition"))?, data_type: Arc::from(data_type_str), constraints, span: node.span() })
+        let data_type = match (data_type_spans.first(), data_type_spans.last()) {
+            (Some(first), Some(last)) => Arc::from(source.get_text_in(Range { start: first.start, end: last.end }).trim()),
+            _ => Arc::from(""),
+        };
+
+        Ok(ColumnDefinition { name: name.ok_or_else(|| OakError::custom_error("Missing name in column definition"))?, data_type, constraints, span: node.span() })
     }
 
     /// Helper to find the next node of a specific kind after a certain position
