@@ -221,7 +221,8 @@ impl AsDocument for Expression {
             Expression::Wildcard { .. } => Document::text("*"),
             Expression::Literal(it) => it.as_document(&()),
             Expression::Binary { left, op, right, .. } => {
-                doc!(left.as_document(&()), soft_space, op.as_document(&()), soft_space, right.as_document(&()))
+                let precedence = binary_precedence(*op);
+                doc!(binary_operand_document(left, precedence, false), soft_space, op.as_document(&()), soft_space, binary_operand_document(right, precedence, true))
             }
             Expression::Unary { op, expr, .. } => {
                 doc!(op.as_document(&()), expr.as_document(&()))
@@ -282,6 +283,42 @@ fn is_operand_document(expr: &Expression) -> Document<'_> {
     if crate::ast::expression_nodes::needs_is_operand_parentheses(expr) { doc!("(", expr.as_document(&()), ")") } else { expr.as_document(&()) }
 }
 
+/// Binding strength used when pretty-printing binary expressions. It mirrors
+/// SQLite, where `||` binds tighter than `*`/`/`/`%`, which in turn bind tighter
+/// than `+`/`-`, and all of them bind tighter than the comparison/logical
+/// operators.
+#[cfg(feature = "oak-pretty-print")]
+fn binary_precedence(op: BinaryOperator) -> u8 {
+    match op {
+        BinaryOperator::Or => 1,
+        BinaryOperator::And => 2,
+        BinaryOperator::Equal | BinaryOperator::NotEqual | BinaryOperator::Less | BinaryOperator::Greater | BinaryOperator::LessEqual | BinaryOperator::GreaterEqual | BinaryOperator::Like => 4,
+        BinaryOperator::Plus | BinaryOperator::Minus => 10,
+        BinaryOperator::Star | BinaryOperator::Slash | BinaryOperator::Percent => 11,
+        BinaryOperator::Concat => 12,
+    }
+}
+
+#[cfg(feature = "oak-pretty-print")]
+fn expression_precedence(expr: &Expression) -> u8 {
+    match expr {
+        Expression::Binary { op, .. } => binary_precedence(*op),
+        Expression::Unary { op: UnaryOperator::Not, .. } => 3,
+        Expression::Unary { .. } => 14,
+        Expression::InList { .. } | Expression::Between { .. } | Expression::IsNull { .. } | Expression::IsTruth { .. } | Expression::InSubquery { .. } | Expression::Exists { .. } => 5,
+        _ => u8::MAX,
+    }
+}
+
+/// Writes a binary operand, adding parentheses when it would otherwise reparse
+/// with a different grouping. A right-nested operand of the same precedence also
+/// needs parentheses because SQLite's binary operators are left-associative.
+#[cfg(feature = "oak-pretty-print")]
+fn binary_operand_document(expr: &Expression, parent_precedence: u8, is_right: bool) -> Document<'_> {
+    let needs_parentheses = expression_precedence(expr) < parent_precedence || (is_right && expression_precedence(expr) == parent_precedence);
+    if needs_parentheses { doc!("(", expr.as_document(&()), ")") } else { expr.as_document(&()) }
+}
+
 #[cfg(feature = "oak-pretty-print")]
 impl AsDocument for BinaryOperator {
     fn as_document(&self, _config: &Self::Config) -> Document<'_> {
@@ -300,6 +337,7 @@ impl AsDocument for BinaryOperator {
             BinaryOperator::LessEqual => Document::text("<="),
             BinaryOperator::GreaterEqual => Document::text(">="),
             BinaryOperator::Like => Document::text("LIKE"),
+            BinaryOperator::Concat => Document::text("||"),
         }
     }
 }

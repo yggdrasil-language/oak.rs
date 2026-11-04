@@ -1533,6 +1533,7 @@ impl<'config> SqlBuilder<'config> {
             SqlTokenType::And => Some(BinaryOperator::And),
             SqlTokenType::Or => Some(BinaryOperator::Or),
             SqlTokenType::Like => Some(BinaryOperator::Like),
+            SqlTokenType::Concat => Some(BinaryOperator::Concat),
             _ => None,
         }
     }
