@@ -1091,6 +1091,28 @@ fn test_sql_builder_insert_select() {
 }
 
 #[test]
+fn test_sql_builder_insert_default_values() {
+    let (statement, source) = build_statement("INSERT INTO users DEFAULT VALUES;");
+
+    let SqlStatement::Insert(insert) = &statement
+    else {
+        panic!("Expected Insert statement, got {statement:?}");
+    };
+    assert!(matches!(insert.source, InsertSource::DefaultValues));
+    assert!(insert.rows.is_empty());
+    assert_eq!(source, "INSERT INTO users DEFAULT VALUES;");
+
+    // The printed statement must parse back into the same form.
+    let (reparsed, reparsed_source) = build_statement(&source);
+    let SqlStatement::Insert(reparsed) = &reparsed
+    else {
+        panic!("Expected Insert statement after round trip, got {reparsed:?}");
+    };
+    assert!(matches!(reparsed.source, InsertSource::DefaultValues));
+    assert_eq!(reparsed_source, source);
+}
+
+#[test]
 fn test_sql_builder_insert_on_conflict_do_nothing() {
     let (statement, source) = build_statement("INSERT INTO users (name) VALUES ('John') ON CONFLICT (name) DO NOTHING;");
 
