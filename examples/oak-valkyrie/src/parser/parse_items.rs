@@ -696,7 +696,13 @@ pub(crate) fn parse_trait<S: oak_core::Source + ?Sized>(state: &mut State<'_, S>
     }
     if state.at(ValkyrieTokenType::Colon) {
         state.bump();
+        // supertrait 列表以 `&` 连接（`trait X: Y & Z`）：每个 bound 都是独立的
+        // `Type` 节点，`&` 作为分隔符留在 Trait 节点下，不进任何 bound。
         parse_type(state)?;
+        while state.at(ValkyrieTokenType::Ampersand) {
+            state.bump();
+            parse_type(state)?;
+        }
     }
     if state.at(ValkyrieTokenType::BraceL) {
         state.bump();

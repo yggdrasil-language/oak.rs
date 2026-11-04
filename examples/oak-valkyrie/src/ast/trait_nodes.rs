@@ -23,6 +23,15 @@ pub struct Trait {
     pub generics: Vec<GenericParam>,
     /// Annotations applied to the trait.
     pub annotations: Vec<Attribute>,
+    /// Supertraits declared after `:` in the header, in source order.
+    ///
+    /// # V Language Example
+    /// ```v
+    /// trait Comparable: Equal & Ordered {
+    ///     micro compare(self, other: Self) -> Ordering
+    /// }
+    /// ```
+    pub super_traits: Vec<TypeExpression>,
     /// Trait body (`type` members and `micro` methods).
     pub body: StructureBody,
     /// The source code span.
