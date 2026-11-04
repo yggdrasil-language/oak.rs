@@ -81,6 +81,8 @@ pub enum TypstTokenType {
 
     /// Plain text.
     Text,
+    /// An escaped character (`\*`, `\\`, ...).
+    Escape,
     /// Strong text (*strong*).
     Strong,
     /// Emphasized text (_emphasis_).

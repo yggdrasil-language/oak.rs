@@ -825,21 +825,21 @@
             "end": 493
         },
         {
-            "kind": "Hash",
-            "text": "#",
-            "start": 495,
+            "kind": "Escape",
+            "text": "\\#",
+            "start": 494,
             "end": 496
         },
         {
-            "kind": "Dollar",
-            "text": "$",
-            "start": 498,
+            "kind": "Escape",
+            "text": "\\$",
+            "start": 497,
             "end": 499
         },
         {
-            "kind": "Percent",
-            "text": "%",
-            "start": 501,
+            "kind": "Escape",
+            "text": "\\%",
+            "start": 500,
             "end": 502
         },
         {

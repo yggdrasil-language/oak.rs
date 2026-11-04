@@ -61,6 +61,11 @@ impl<'config> TypstBuilder<'config> {
             RedTree::Node(node) => self.build_item(node, source),
             RedTree::Leaf(leaf) => match leaf.kind {
                 TypstTokenType::Whitespace | TypstTokenType::Newline => Ok(Some(TypstItem::Space)),
+                TypstTokenType::Escape => {
+                    // 转义条目只暴露被保护的字符，反斜杠本身不进入正文。
+                    let raw = source.get_text_in(leaf.span);
+                    Ok(Some(TypstItem::Text(raw.get(1..).unwrap_or_default().to_string())))
+                }
                 _ => Ok(Some(TypstItem::Text(source.get_text_in(leaf.span).to_string()))),
             },
         }
