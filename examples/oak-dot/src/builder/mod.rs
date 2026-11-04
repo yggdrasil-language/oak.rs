@@ -130,7 +130,55 @@ impl DotBuilder<'_> {
             return None;
         };
 
-        Some(NodeStatement { node_id, attributes, span })
+        let record = self.build_record(&attributes, source, diagnostics);
+
+        Some(NodeStatement { node_id, attributes, record, span })
+    }
+
+    /// Parses a `record` or `mrecord` label into fields and brace groups.
+    ///
+    /// Only node shapes named `record` or `mrecord` are structured. The raw
+    /// `label` attribute is left untouched so callers can still read the
+    /// original text.
+    fn build_record(&self, attributes: &[Attribute], source: &SourceText, diagnostics: &mut Vec<OakError>) -> Option<RecordLabel> {
+        let is_record = attributes.iter().any(|attribute| attribute.name.eq_ignore_ascii_case("shape") && matches!(attribute.value.as_deref(), Some(value) if value.eq_ignore_ascii_case("record") || value.eq_ignore_ascii_case("mrecord")));
+        if !is_record {
+            return None;
+        }
+
+        let label = attributes.iter().find(|attribute| attribute.name.eq_ignore_ascii_case("label"))?;
+        let raw = source.get_text_in(label.span);
+        let quote = raw.find('"')?;
+
+        let mut escaped = false;
+        let mut end = None;
+        for (offset, ch) in raw[quote + 1..].char_indices() {
+            if escaped {
+                escaped = false;
+                continue;
+            }
+            match ch {
+                '\\' => escaped = true,
+                '"' => {
+                    end = Some(quote + 1 + offset);
+                    break;
+                }
+                _ => {}
+            }
+        }
+
+        let Some(end) = end
+        else {
+            diagnostics.push(OakError::syntax_error("unterminated record label", label.span.start, source.source_id()));
+            return None;
+        };
+
+        let content_start = label.span.start + quote + 1;
+        let mut parser = RecordParser::new(&raw[quote + 1..end], content_start);
+        let items = parser.parse_items(false);
+        let span = core::range::Range { start: content_start, end: content_start + end - (quote + 1) };
+
+        Some(RecordLabel { items, span })
     }
 
     /// Builds a node identifier with its optional port.
@@ -411,5 +459,117 @@ fn flush_attribute(attributes: &mut Vec<Attribute>, name: &mut Option<(String, u
             None => (None, end),
         };
         attributes.push(Attribute { name, value, span: (start..end).into() });
+    }
+}
+
+/// Splits record label text into fields and brace groups.
+///
+/// The grammar is a flat sequence of items separated by unescaped `|`. A
+/// leading `{` opens a group whose own items are separated the same way, so
+/// nesting is arbitrary. `<name>` before the field text is its port. A
+/// backslash escapes the next character, which keeps `\|`, `\{` and `\<`
+/// inside field text instead of acting as separators.
+struct RecordParser<'text> {
+    text: &'text str,
+    position: usize,
+    base: usize,
+}
+
+impl<'text> RecordParser<'text> {
+    fn new(text: &'text str, base: usize) -> Self {
+        Self { text, position: 0, base }
+    }
+
+    fn peek(&self) -> Option<char> {
+        self.text[self.position..].chars().next()
+    }
+
+    fn next(&mut self) -> Option<char> {
+        let ch = self.peek()?;
+        self.position += ch.len_utf8();
+        Some(ch)
+    }
+
+    fn parse_items(&mut self, in_group: bool) -> Vec<RecordItem> {
+        let mut items = Vec::new();
+
+        loop {
+            let item_start = self.position;
+            let mut text = String::new();
+            let mut port = None;
+            let mut group = None;
+
+            while let Some(ch) = self.peek() {
+                match ch {
+                    '|' | '}' => break,
+                    '\\' => {
+                        self.next();
+                        if let Some(escaped) = self.next() {
+                            text.push(escaped);
+                        }
+                    }
+                    '{' if text.trim().is_empty() && port.is_none() => {
+                        let group_start = self.position;
+                        self.next();
+                        let nested = self.parse_items(true);
+                        group = Some(RecordGroup { items: nested, span: self.span_from(group_start) });
+                    }
+                    '<' if text.trim().is_empty() && port.is_none() => {
+                        self.next();
+                        let mut name = String::new();
+                        while let Some(inner) = self.next() {
+                            if inner == '>' {
+                                break;
+                            }
+                            if inner == '\\' {
+                                if let Some(escaped) = self.next() {
+                                    name.push(escaped);
+                                }
+                                continue;
+                            }
+                            name.push(inner);
+                        }
+                        port = Some(name.trim().to_string());
+                    }
+                    _ => {
+                        text.push(ch);
+                        self.next();
+                    }
+                }
+            }
+
+            let end = self.position;
+            let span = self.span_between(item_start, end);
+
+            if let Some(group) = group {
+                items.push(RecordItem::Group(group));
+            }
+            else if port.is_some() || !text.trim().is_empty() {
+                items.push(RecordItem::Field(RecordField { port, text: text.trim().to_string(), span }));
+            }
+
+            match self.peek() {
+                Some('|') => {
+                    self.next();
+                }
+                Some('}') => {
+                    self.next();
+                    if in_group {
+                        break;
+                    }
+                }
+                _ => break,
+            }
+        }
+
+        items
+    }
+
+    fn span_from(&self, start: usize) -> core::range::Range<usize> {
+        self.span_between(start, self.position)
+    }
+
+    fn span_between(&self, start: usize, end: usize) -> core::range::Range<usize> {
+        core::range::Range { start: self.base + start, end: self.base + end }
     }
 }

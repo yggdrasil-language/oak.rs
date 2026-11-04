@@ -1,7 +1,7 @@
 use oak_core::{Builder, OakError, OakErrorKind, SourceText, parser::session::ParseSession};
 use oak_dot::{
     DotBuilder, DotLanguage,
-    ast::{AttributeTarget, Compass, EdgeOp, EdgeOperand, GraphType, Statement},
+    ast::{AttributeTarget, Compass, EdgeOp, EdgeOperand, GraphType, RecordItem, Statement},
 };
 
 /// Builds the typed AST from `source`.
@@ -235,6 +235,161 @@ fn test_single_segment_compass_port() {
     let port = node.node_id.port.as_ref().expect("the node should carry a port");
     assert_eq!(port.id, None);
     assert_eq!(port.compass, Some(Compass::C));
+}
+
+#[test]
+fn test_builds_record_fields_and_ports() {
+    let source = "digraph { R [shape=record, label=\"<f0> left|<f1> mid|<f2> right\"] }";
+    let (root, diagnostics) = build(source);
+    assert!(diagnostics.is_empty(), "unexpected diagnostics: {diagnostics:?}");
+
+    let Statement::Node(node) = &root.graphs[0].statements[0]
+    else {
+        panic!("expected a node statement")
+    };
+    let record = node.record.as_ref().expect("a record shape should expose its field structure");
+    assert_eq!(&source[record.span.start..record.span.end], "<f0> left|<f1> mid|<f2> right");
+    assert_eq!(record.items.len(), 3);
+
+    let ports: Vec<_> = record
+        .items
+        .iter()
+        .map(|item| match item {
+            RecordItem::Field(field) => (field.port.clone(), field.text.clone()),
+            RecordItem::Group(_) => panic!("expected flat fields"),
+        })
+        .collect();
+    assert_eq!(ports, [(Some("f0".to_string()), "left".to_string()), (Some("f1".to_string()), "mid".to_string()), (Some("f2".to_string()), "right".to_string())]);
+
+    let RecordItem::Field(first) = &record.items[0]
+    else {
+        panic!("expected a field")
+    };
+    assert_eq!(&source[first.span.start..first.span.end], "<f0> left");
+
+    assert_eq!(node.node_id.id, "R");
+    assert!(node.node_id.port.is_none(), "record field ports live in the label, not on the node identifier");
+}
+
+#[test]
+fn test_builds_mrecord_groups_and_unported_fields() {
+    let source = "digraph { Record [shape=mrecord, label=\"head|{a|b}|tail\"] }";
+    let (root, diagnostics) = build(source);
+    assert!(diagnostics.is_empty(), "unexpected diagnostics: {diagnostics:?}");
+
+    let Statement::Node(node) = &root.graphs[0].statements[0]
+    else {
+        panic!("expected a node statement")
+    };
+    let record = node.record.as_ref().expect("mrecord should be structured like record");
+    assert_eq!(record.items.len(), 3, "head, group and tail: {:?}", record.items);
+
+    let RecordItem::Field(head) = &record.items[0]
+    else {
+        panic!("expected the head field")
+    };
+    assert_eq!(head.port, None);
+    assert_eq!(head.text, "head");
+
+    let RecordItem::Group(group) = &record.items[1]
+    else {
+        panic!("expected a brace group")
+    };
+    assert_eq!(&source[group.span.start..group.span.end], "{a|b}");
+    assert_eq!(group.items.len(), 2);
+    assert!(matches!(group.items[0], RecordItem::Field(_)));
+
+    let RecordItem::Field(tail) = &record.items[2]
+    else {
+        panic!("expected the tail field")
+    };
+    assert_eq!(tail.text, "tail");
+}
+
+#[test]
+fn test_record_label_escapes_stay_literal() {
+    let source = "digraph { R [shape=record, label=\"a\\|b|<p> c\\{d\\}\"] }";
+    let (root, diagnostics) = build(source);
+    assert!(diagnostics.is_empty(), "unexpected diagnostics: {diagnostics:?}");
+
+    let Statement::Node(node) = &root.graphs[0].statements[0]
+    else {
+        panic!("expected a node statement")
+    };
+    let record = node.record.as_ref().expect("the record label should still parse");
+    assert_eq!(record.items.len(), 2);
+
+    let RecordItem::Field(first) = &record.items[0]
+    else {
+        panic!("expected a field")
+    };
+    assert_eq!(first.port, None);
+    assert_eq!(first.text, "a|b");
+
+    let RecordItem::Field(second) = &record.items[1]
+    else {
+        panic!("expected a field")
+    };
+    assert_eq!(second.port.as_deref(), Some("p"));
+    assert_eq!(second.text, "c{d}");
+}
+
+#[test]
+fn test_only_record_shapes_get_field_structure() {
+    let source = "digraph { A [shape=box, label=\"<f0> left|<f1> right\"] }";
+    let (root, diagnostics) = build(source);
+    assert!(diagnostics.is_empty(), "unexpected diagnostics: {diagnostics:?}");
+
+    let Statement::Node(node) = &root.graphs[0].statements[0]
+    else {
+        panic!("expected a node statement")
+    };
+    assert!(node.record.is_none(), "non-record shapes keep a flat label");
+    assert_eq!(node.attributes[1].value.as_deref(), Some("<f0> left|<f1> right"));
+}
+
+#[test]
+fn test_record_fixture_keeps_port_anchors() {
+    let source = include_str!("record.dot");
+    let (root, diagnostics) = build(source);
+    assert!(diagnostics.is_empty(), "unexpected diagnostics: {diagnostics:?}");
+
+    let statements = &root.graphs[0].statements;
+    assert_eq!(statements.len(), 3);
+
+    let Statement::Node(record_node) = &statements[0]
+    else {
+        panic!("expected the record node")
+    };
+    assert_eq!(record_node.node_id.id, "R");
+    assert_eq!(record_node.record.as_ref().expect("R is a record").items.len(), 3);
+
+    let Statement::Node(mrecord_node) = &statements[1]
+    else {
+        panic!("expected the mrecord node")
+    };
+    assert_eq!(mrecord_node.node_id.id, "M");
+    let mrecord = mrecord_node.record.as_ref().expect("M is an mrecord");
+    assert_eq!(mrecord.items.len(), 3);
+    assert!(matches!(mrecord.items[1], RecordItem::Group(_)));
+
+    let Statement::Edge(edge) = &statements[2]
+    else {
+        panic!("expected the port edge")
+    };
+    let EdgeOperand::Node(left) = &edge.left
+    else {
+        panic!("expected a node operand")
+    };
+    assert_eq!(left.id, "R");
+    assert_eq!(left.port.as_ref().and_then(|port| port.id.clone()).as_deref(), Some("f0"), "the edge must anchor on the record field port");
+
+    let EdgeOperand::Node(right) = &edge.edges[0].1
+    else {
+        panic!("expected a node operand")
+    };
+    assert_eq!(right.id, "M");
+    assert_eq!(right.port.as_ref().and_then(|port| port.id.clone()).as_deref(), Some("a"));
 }
 
 #[test]

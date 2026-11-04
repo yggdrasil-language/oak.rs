@@ -48,7 +48,29 @@ assert_eq!(root.graphs.len(), 1);
 ### 1. Syntax Tree Traversal
 After a successful parse, you can traverse the red tree to extract DOT constructs like graph definitions, node statements, edge connections, or attribute lists. The typed AST also covers them directly, see the `ast` module for `Graph`, `NodeStatement`, `EdgeStatement`, `AttributeStatement`, `SubgraphStatement` and `NodeId`.
 
-### 2. Incremental Parsing
+### 2. Record Ports
+A node shaped `record` or `mrecord` keeps its raw `label` attribute and also exposes a structured `RecordLabel`:
+```rust
+use oak_core::{Builder, SourceText, parser::session::ParseSession};
+use oak_dot::{DotBuilder, DotLanguage, ast::{RecordItem, Statement}};
+
+let config = DotLanguage::new();
+let builder = DotBuilder::new(&config);
+let source = SourceText::new(r#"digraph { R [shape=record, label="<f0> left|<f1> right"] }"#);
+let mut cache = ParseSession::<DotLanguage>::default();
+let root = builder.build(&source, &[], &mut cache).result.expect("the graph should parse");
+
+let Statement::Node(node) = &root.graphs[0].statements[0] else { panic!("expected a node") };
+let record = node.record.as_ref().expect("record shapes expose fields");
+assert_eq!(record.items.len(), 2);
+let RecordItem::Field(field) = &record.items[0] else { panic!("expected a field") };
+assert_eq!(field.port.as_deref(), Some("f0"));
+assert_eq!(field.text, "left");
+```
+
+Fields are split on unescaped `|`, `<name>` before the text becomes `RecordField::port`, and `{ ... }` becomes a nested `RecordGroup`. A backslash escapes the next character, so `\|`, `\{`, `\}` and `\<` stay literal. Edge endpoints keep the existing `NodeId.port` model, so `R:f0 -> M:a` anchors on the record ports instead of collapsing the node into one box.
+
+### 3. Incremental Parsing
 The parser reuses the cache it is given, so parsing an edited source again only reuses unchanged structure:
 ```rust
 use oak_core::{Parser, SourceText};
@@ -65,7 +87,7 @@ let edited = SourceText::new("digraph { A -> B; B -> C }");
 let _ = parser.parse(&edited, &[], &mut cache);
 ```
 
-### 3. Diagnostics
+### 4. Diagnostics
 `oak-dot` recovers from malformed input and reports every skipped piece with its byte offset:
 ```rust
 use oak_core::{Builder, OakErrorKind, SourceText, parser::session::ParseSession};

@@ -177,7 +177,58 @@ pub struct NodeStatement {
     pub node_id: NodeId,
     /// Attributes associated with the node.
     pub attributes: Vec<Attribute>,
+    /// The parsed field structure when `shape` is `record` or `mrecord`.
+    ///
+    /// The raw `label` attribute stays in `attributes`. This field is the
+    /// structural view of the same text, so consumers can address fields and
+    /// ports instead of splitting the label themselves.
+    pub record: Option<RecordLabel>,
     /// The source range of this node statement.
+    #[cfg_attr(feature = "serde", serde(with = "oak_core::serde_range"))]
+    pub span: Range<usize>,
+}
+
+/// A `record` or `mrecord` label, split into fields and brace groups.
+#[derive(Debug, Clone, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct RecordLabel {
+    /// Top-level fields and groups in source order.
+    pub items: Vec<RecordItem>,
+    /// The source range of the label text inside its quotes.
+    #[cfg_attr(feature = "serde", serde(with = "oak_core::serde_range"))]
+    pub span: Range<usize>,
+}
+
+/// One item of a record label.
+#[derive(Debug, Clone, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub enum RecordItem {
+    /// A single field.
+    Field(RecordField),
+    /// A `{ ... }` brace group that stacks its fields.
+    Group(RecordGroup),
+}
+
+/// One record field.
+#[derive(Debug, Clone, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct RecordField {
+    /// The port name written as `<name>` before the field text.
+    pub port: Option<String>,
+    /// The field text with escapes resolved and surrounding whitespace trimmed.
+    pub text: String,
+    /// The source range of this field inside the label text.
+    #[cfg_attr(feature = "serde", serde(with = "oak_core::serde_range"))]
+    pub span: Range<usize>,
+}
+
+/// A brace group inside a record label.
+#[derive(Debug, Clone, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct RecordGroup {
+    /// Fields and nested groups in source order.
+    pub items: Vec<RecordItem>,
+    /// The source range of this group inside the label text, including braces.
     #[cfg_attr(feature = "serde", serde(with = "oak_core::serde_range"))]
     pub span: Range<usize>,
 }
