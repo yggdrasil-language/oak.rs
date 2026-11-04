@@ -89,6 +89,11 @@ pub(crate) fn build_name_path<S: Source + ?Sized>(node: &RedNode<ValkyrieLanguag
                 ValkyrieTokenType::Keyword(crate::lexer::ValkyrieKeywords::SelfType) => {
                     parts.push(Identifier { name: "Self".to_string(), span: t.span });
                 }
+                // `type<T>` keeps the same `NamePath` carrier as any named type reference;
+                // the keyword leaf contributes the `type` segment instead of a new node kind.
+                ValkyrieTokenType::Keyword(crate::lexer::ValkyrieKeywords::Type) => {
+                    parts.push(Identifier { name: "type".to_string(), span: t.span });
+                }
                 _ if t.kind.is_soft_identifier() => {
                     parts.push(Identifier { name: crate::builder::identifier_text(source, t.span), span: t.span });
                 }

@@ -21,9 +21,12 @@ fn stalled<S: oak_core::Source + ?Sized>(state: &State<'_, S>, before: usize) ->
     token_index(state) == before
 }
 
-/// Type-name start tokens: `Self` / `micro` / `mezzo` are keywords; raw ids and ordinary identifiers are `Identifier`.
+/// Type-name start tokens: `Self` / `micro` / `mezzo` / `type` are keywords; raw ids and ordinary identifiers are `Identifier`.
+///
+/// `type` is a type-name head like any other: `type<T>` is a generic type application
+/// on the builtin `type` alias, not a distinct syntax form.
 fn is_type_name_token(kind: &ValkyrieTokenType) -> bool {
-    matches!(kind, ValkyrieTokenType::Identifier | ValkyrieTokenType::Keyword(ValkyrieKeywords::SelfType) | ValkyrieTokenType::Keyword(ValkyrieKeywords::Micro) | ValkyrieTokenType::Keyword(ValkyrieKeywords::Mezzo))
+    matches!(kind, ValkyrieTokenType::Identifier | ValkyrieTokenType::Keyword(ValkyrieKeywords::SelfType) | ValkyrieTokenType::Keyword(ValkyrieKeywords::Micro) | ValkyrieTokenType::Keyword(ValkyrieKeywords::Mezzo) | ValkyrieTokenType::Keyword(ValkyrieKeywords::Type))
 }
 
 /// 解析类型名路径：`std.text.utf16` / `core::primitive::usize` / `Self`。
