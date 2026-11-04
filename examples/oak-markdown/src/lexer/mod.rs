@@ -5,6 +5,8 @@ pub mod token_type;
 mod block;
 mod inline;
 mod list;
+#[cfg(test)]
+mod tests;
 
 use crate::{language::MarkdownLanguage, lexer::token_type::MarkdownTokenType};
 use oak_core::{Lexer, LexerCache, LexerState, TextEdit, errors::OakError, lexer::LexOutput, source::Source};
@@ -260,17 +262,20 @@ impl<'config> MarkdownLexer<'config> {
             let mut in_string = None;
 
             for (i, ch) in remaining[7..].char_indices() {
-                if let Some(quote) = in_string {
+                // An import statement never spans lines, even when a quoted module
+                // specifier is left unterminated. Checking the newline first keeps a
+                // broken quote from scanning the rest of the document.
+                if ch == '\n' {
+                    end_pos = 7 + i;
+                    break;
+                }
+                else if let Some(quote) = in_string {
                     if ch == quote {
                         in_string = None;
                     }
                 }
                 else if ch == '"' || ch == '\'' {
                     in_string = Some(ch);
-                }
-                else if ch == '\n' {
-                    end_pos = 7 + i;
-                    break;
                 }
             }
 
@@ -399,20 +404,29 @@ impl<'config> MarkdownLexer<'config> {
             let mut in_string = None;
 
             while let Some(ch) = state.peek() {
+                // A raw HTML/XML tag is a single-line construct for this context-free
+                // lexer. Without this guard a lone `<` (for example `if n <= 1:` inside
+                // a fenced code block) scans forward until the next `>` on some later
+                // line and swallows every token in between, including the closing fence.
+                // A newline means the candidate was never a tag, so the `<` is handed
+                // back to the caller as ordinary punctuation.
+                if ch == '\n' || ch == '\r' {
+                    state.set_position(start_pos);
+                    return false;
+                }
+
                 if let Some(quote) = in_string {
                     if ch == quote {
                         in_string = None;
                     }
                 }
-                else {
-                    if ch == '>' {
-                        state.advance(1);
-                        found_end = true;
-                        break;
-                    }
-                    else if ch == '"' || ch == '\'' {
-                        in_string = Some(ch);
-                    }
+                else if ch == '>' {
+                    state.advance(1);
+                    found_end = true;
+                    break;
+                }
+                else if ch == '"' || ch == '\'' {
+                    in_string = Some(ch);
                 }
                 state.advance(ch.len_utf8());
             }
@@ -493,7 +507,11 @@ impl<'config> MarkdownLexer<'config> {
                 None => break,
             };
             if ch == '>' {
-                if pos > start_pos + 1 {
+                // CommonMark only autolinks URIs and email addresses. A generic
+                // `<name ...>` candidate belongs to the HTML/XML/MDX rules instead,
+                // otherwise `<div>` would silently become an `AutoLink`.
+                let content = state.source().get_text_in((start_pos + 1..pos).into());
+                if is_autolink_content(&content) {
                     state.set_position(pos + 1);
                     state.add_token(MarkdownTokenType::AutoLink, start_pos, pos + 1);
                     return true;
@@ -596,5 +614,42 @@ impl<'config> MarkdownLexer<'config> {
         let mut state = State::new(source);
         let result = self.run(&mut state);
         state.finish(result)
+    }
+}
+
+/// Returns `true` when `<...>` holds a CommonMark URI or email autolink.
+///
+/// Both forms are single-line and contain no whitespace. Everything else (`<div>`,
+/// `<Component />`, `</div>`) is left for the HTML, XML and MDX rules.
+fn is_autolink_content(content: &str) -> bool {
+    if content.is_empty() || content.chars().any(|ch| ch.is_whitespace()) {
+        return false;
+    }
+
+    is_uri_autolink(content) || is_email_autolink(content)
+}
+
+/// Matches the CommonMark URI autolink form: `scheme ":" rest`, where the scheme is
+/// 2–32 ASCII alphanumerics, `+`, `.` or `-` and starts with a letter.
+fn is_uri_autolink(content: &str) -> bool {
+    let Some((scheme, rest)) = content.split_once(':')
+    else {
+        return false;
+    };
+
+    if rest.is_empty() || !(2..=32).contains(&scheme.len()) {
+        return false;
+    }
+
+    let bytes = scheme.as_bytes();
+    bytes[0].is_ascii_alphabetic() && bytes.iter().all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'+' | b'.' | b'-'))
+}
+
+/// Matches the CommonMark email autolink form: exactly one `@` with non-empty sides.
+fn is_email_autolink(content: &str) -> bool {
+    let mut parts = content.split('@');
+    match (parts.next(), parts.next(), parts.next()) {
+        (Some(local), Some(domain), None) => !local.is_empty() && !domain.is_empty() && !domain.starts_with('.') && !domain.ends_with('.'),
+        _ => false,
     }
 }
