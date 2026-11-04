@@ -3,7 +3,7 @@ use crate::{
     lexer::{keywords::ValkyrieKeywords, token_type::ValkyrieTokenType},
     parser::{
         element_type::ValkyrieElementType,
-        parse_modifiers::{dispatch_prefixed_declaration, is_declaration_keyword, is_member_accessor_keyword, is_raw_id_follower, parse_field_modifiers, parse_modifiers, parse_modifiers_followed_by},
+        parse_modifiers::{dispatch_prefixed_declaration, is_declaration_keyword, is_member_name_token, is_raw_id_follower, parse_field_modifiers, parse_modifiers, parse_modifiers_followed_by},
     },
 };
 use oak_core::parser::ParserState;
@@ -248,49 +248,55 @@ pub(crate) fn parse_class<S: oak_core::Source + ?Sized>(state: &mut State<'_, S>
     Ok(())
 }
 
-/// Parse a class member
+/// Parse a class-like member.
+///
+/// 成员产生式只有一条：`修饰符列表 + 名字`，然后按名字之后的 token 决定类别：
+///
+/// - `(` → method（参数列表、可选返回类型、方法体）
+/// - `:` → field（类型、可选默认值）
+///
+/// 修饰符只是位置上的 `Identifier` 序列，语法层不读名字文本。
 pub(crate) fn parse_class_member<S: oak_core::Source + ?Sized>(state: &mut State<'_, S>) -> Result<(), oak_core::OakError> {
     while state.at(ValkyrieTokenType::At) {
         parse_attribute(state)?;
-    }
-    // Detect field pattern: [modifiers] name : type [= default]
-    // Case 1: name : type  (no modifier — Identifier directly followed by Colon)
-    // Case 2: mod name : type  (modifier like `mut` — Identifier, Identifier, Colon)
-    let looks_like_field = if state.at(ValkyrieTokenType::Identifier) {
-        let t1 = state.peek_non_trivia_kind_at(1);
-        let t2 = state.peek_non_trivia_kind_at(2);
-        t1 == Some(ValkyrieTokenType::Colon)  // Case 1: name : type
-            || (t1 == Some(ValkyrieTokenType::Identifier) && t2 == Some(ValkyrieTokenType::Colon))  // Case 2: mod name : type
-    } else {
-        false
-    };
-    if looks_like_field {
-        let cp = state.sink.checkpoint();
-        parse_field_modifiers(state)?;
-        if state.at(ValkyrieTokenType::Identifier) {
-            state.bump();
-        }
-        if state.at(ValkyrieTokenType::Colon) {
-            state.bump();
-            parse_type(state)?;
-        }
-        if state.at(ValkyrieTokenType::Eq) {
-            state.bump();
-            parse_expression(state)?;
-        }
-        state.sink.finish_node(cp, ValkyrieElementType::Field);
-        if state.at(ValkyrieTokenType::Comma) {
-            state.bump();
-        }
-        return Ok(());
     }
     if state.at(ValkyrieTokenType::Identifier) {
         let next = state.peek_non_trivia_kind_at(1);
         if next.is_some_and(|kind| is_declaration_keyword(&kind)) {
             return dispatch_prefixed_declaration(state);
         }
-        if next.is_some_and(|kind| is_member_accessor_keyword(&kind)) {
-            return parse_property(state);
+        if let Some(after_name) = member_shape_after_modifiers(state) {
+            let cp = state.sink.checkpoint();
+            parse_modifiers_followed_by(state, is_member_name_token)?;
+            state.bump();
+            if after_name == ValkyrieTokenType::ParenthesisL {
+                parse_parameter_list(state)?;
+                if state.at(ValkyrieTokenType::Arrow) || state.at(ValkyrieTokenType::Colon) {
+                    state.bump();
+                    parse_type(state)?;
+                }
+                crate::parser::parse_types::parse_where_clause(state)?;
+                if state.at(ValkyrieTokenType::BraceL) {
+                    parse_block(state)?;
+                }
+                state.sink.finish_node(cp, ValkyrieElementType::Method);
+            }
+            else if state.at(ValkyrieTokenType::Colon) {
+                state.bump();
+                parse_type(state)?;
+                if state.at(ValkyrieTokenType::Eq) {
+                    state.bump();
+                    parse_expression(state)?;
+                }
+                state.sink.finish_node(cp, ValkyrieElementType::Field);
+                if state.at(ValkyrieTokenType::Comma) {
+                    state.bump();
+                }
+            }
+            else {
+                debug_assert!(false, "member shape must end with `(` or `:`");
+            }
+            return Ok(());
         }
     }
     if let Some(token) = state.current() {
@@ -302,7 +308,6 @@ pub(crate) fn parse_class_member<S: oak_core::Source + ?Sized>(state: &mut State
                 state.sink.finish_node(cp, ValkyrieElementType::Field);
                 Ok(())
             }
-            ValkyrieTokenType::Keyword(ValkyrieKeywords::Get) | ValkyrieTokenType::Keyword(ValkyrieKeywords::Set) => parse_property(state),
             _ => {
                 let cp = state.sink.checkpoint();
                 parse_expr_statement(state)?;
@@ -316,23 +321,21 @@ pub(crate) fn parse_class_member<S: oak_core::Source + ?Sized>(state: &mut State
     }
 }
 
-/// Parse a property definition
-pub(crate) fn parse_property<S: oak_core::Source + ?Sized>(state: &mut State<'_, S>) -> Result<(), oak_core::OakError> {
-    let cp = state.sink.checkpoint();
-    parse_modifiers_followed_by(state, is_member_accessor_keyword)?;
-    state.bump();
-    if state.at(ValkyrieTokenType::Identifier) {
-        state.bump();
+/// 判断 `Identifier` 成员是否成立：跳过修饰符后，最后一个名字后面必须是 `(` 或 `:`。
+///
+/// 只看 token 类别与位置，不读名字文本。
+fn member_shape_after_modifiers<S: oak_core::Source + ?Sized>(state: &State<'_, S>) -> Option<ValkyrieTokenType> {
+    let mut offset = 0usize;
+    while state.peek_non_trivia_kind_at(offset).is_some_and(|kind| is_member_name_token(&kind)) {
+        offset += 1;
     }
-    if state.at(ValkyrieTokenType::Colon) {
-        state.bump();
-        parse_type(state)?;
+    if offset == 0 {
+        return None;
     }
-    if state.at(ValkyrieTokenType::BraceL) {
-        parse_block(state)?;
+    match state.peek_non_trivia_kind_at(offset) {
+        Some(kind @ (ValkyrieTokenType::ParenthesisL | ValkyrieTokenType::Colon)) => Some(kind),
+        _ => None,
     }
-    state.sink.finish_node(cp, ValkyrieElementType::Property);
-    Ok(())
 }
 
 /// Parse a struct definition

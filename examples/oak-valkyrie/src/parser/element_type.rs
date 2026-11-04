@@ -153,8 +153,6 @@ pub enum ValkyrieElementType {
     Method,
     /// Variant definition node.
     Variant,
-    /// Property definition node (getter/setter).
-    Property,
     /// Flags definition node.
     Flags,
     /// Widget definition node.

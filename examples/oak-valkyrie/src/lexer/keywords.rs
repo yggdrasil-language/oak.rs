@@ -241,25 +241,6 @@ pub enum ValkyrieKeywords {
     /// x as T
     /// ```
     As,
-    /// 历史遗留变体：词法器不再产出这个值。
-    ///
-    /// `get` 是**修饰符位置上的标识符**，不是关键字：
-    ///
-    /// ```v
-    /// class S { get length() { ... } }
-    /// ```
-    ///
-    /// 枚举变体暂时保留，仅因为仍在运行的 `parser/parse_items.rs` 按名字引用它；
-    /// 该文件解锁后与 [`Self::Set`] 一起删除。
-    Get,
-    /// 历史遗留变体：词法器不再产出这个值。
-    ///
-    /// `set` 是**修饰符位置上的标识符**，不是关键字：
-    ///
-    /// ```v
-    /// class S { set length(value: u64) { ... } }
-    /// ```
-    Set,
     /// Self type reference.
     ///
     /// Used in trait implementations and associated type paths.

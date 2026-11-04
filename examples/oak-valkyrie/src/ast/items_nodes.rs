@@ -70,8 +70,6 @@ pub enum StatementNode {
     Variant(Box<Variant>),
     /// An effect declaration.
     Effect(Box<Effect>),
-    /// A property declaration (getter or setter).
-    Property(Box<Property>),
     /// A shader declaration.
     Shader(Box<ShaderDeclaration>),
     /// A component declaration for ECS.
@@ -293,77 +291,4 @@ pub struct Effect {
     /// The source code span.
     #[cfg_attr(feature = "serde", serde(with = "oak_core::serde_range"))]
     pub span: Span,
-}
-
-/// The kind of a property (getter or setter).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub enum PropertyKind {
-    /// A getter property.
-    Getter,
-    /// A setter property.
-    Setter,
-}
-
-/// A property declaration (getter or setter).
-///
-/// # V Language Example
-/// ```v
-/// class Temperature {
-///     _celsius: f64 = 0.0
-///
-///     property celsius: f64 {
-///         get { return self._celsius }
-///         set(value) { self._celsius = value }
-///     }
-/// }
-/// ```
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct Property {
-    /// The name of the property.
-    pub name: Identifier,
-    /// Whether this is a getter or setter.
-    pub kind: PropertyKind,
-    /// Generic parameters for the property.
-    pub generics: Vec<GenericParam>,
-    /// Annotations on the property.
-    pub annotations: Vec<Attribute>,
-    /// Parameters for the property (`self` for getter, `self` + value for setter).
-    pub params: Vec<Param>,
-    /// Return type for getter, `None` for setter.
-    pub return_type: Option<TypeExpression>,
-    /// The body of the property.
-    pub body: Block,
-    /// The source code span.
-    #[cfg_attr(feature = "serde", serde(with = "oak_core::serde_range"))]
-    pub span: Span,
-    /// Whether this property is abstract (has no body implementation).
-    ///
-    /// Abstract properties are declared without a body in abstract classes
-    /// and must be implemented by concrete subclasses.
-    pub is_abstract: bool,
-    /// Whether this property is final (cannot be overridden).
-    pub is_final: bool,
-    /// Whether this property is static (belongs to the class, not instances).
-    ///
-    /// Static properties are accessed via `ClassName.property_name` syntax
-    /// and do not have access to `self`.
-    pub is_static: bool,
-    /// Whether this property is virtual (can be overridden by subclasses).
-    ///
-    /// Virtual properties use dynamic dispatch through the vtable,
-    /// allowing subclasses to provide their own implementation.
-    pub is_virtual: bool,
-    /// Whether this property overrides a parent class property.
-    ///
-    /// Override properties must match the signature of the parent property
-    /// and are verified during type checking.
-    pub is_override: bool,
-    /// Whether this property uses lazy initialization.
-    ///
-    /// Lazy properties cache their computed value after first access.
-    /// The getter is only called once, and subsequent accesses return
-    /// the cached value.
-    pub is_lazy: bool,
 }

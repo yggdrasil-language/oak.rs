@@ -75,7 +75,7 @@ impl<'config> ValkyrieBuilder<'config> {
                             fields.push(field);
                         }
                     }
-                    ValkyrieElementType::Micro => {
+                    ValkyrieElementType::Micro | ValkyrieElementType::Method => {
                         if let Some(method) = self.recover_member(self.build_function(n, source)) {
                             methods.push(method);
                         }
@@ -683,7 +683,7 @@ impl<'config> ValkyrieBuilder<'config> {
                             fields.push(field);
                         }
                     }
-                    ValkyrieElementType::Micro => {
+                    ValkyrieElementType::Micro | ValkyrieElementType::Method => {
                         if let Some(method) = self.recover_member(self.build_function(n, source)) {
                             methods.push(method);
                         }
@@ -748,7 +748,7 @@ impl<'config> ValkyrieBuilder<'config> {
                             fields.push(field);
                         }
                     }
-                    ValkyrieElementType::Micro => {
+                    ValkyrieElementType::Micro | ValkyrieElementType::Method => {
                         if let Some(method) = self.recover_member(self.build_function(n, source)) {
                             methods.push(method);
                         }
@@ -762,7 +762,7 @@ impl<'config> ValkyrieBuilder<'config> {
                                             fields.push(field);
                                         }
                                     }
-                                    ValkyrieElementType::Micro => {
+                                    ValkyrieElementType::Micro | ValkyrieElementType::Method => {
                                         if let Some(method) = self.recover_member(self.build_function(inner_n, source)) {
                                             methods.push(method);
                                         }
