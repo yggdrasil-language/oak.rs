@@ -112,6 +112,16 @@ fn build_statement(sql: &str) -> (SqlStatement, String) {
     (statement, source)
 }
 
+/// Like [`build_statement`], but reuses the caller's session so several
+/// documents can be parsed through one cache.
+fn build_statement_with_session(sql: &str, builder: &SqlBuilder, session: &mut ParseSession<SqlLanguage>) -> (SqlStatement, String) {
+    let result = builder.build(&SourceText::new(sql), &[], session);
+    let root = result.result.unwrap_or_else(|error| panic!("{sql}: {error:?} {:?}", result.diagnostics));
+    let statement = root.statements.into_iter().next().unwrap_or_else(|| panic!("Missing statement for {sql}"));
+    let source = SqlRoot { statements: vec![statement.clone()], span: root.span }.to_source_string();
+    (statement, source)
+}
+
 #[test]
 fn test_sql_builder_scoped_session_variables() {
     let (statement, source) = build_statement("SET SESSION sql_mode = 'STRICT';");
@@ -1319,8 +1329,8 @@ fn test_sql_builder_create_view() {
 fn test_sql_builder_update_delete() {
     let config = SqlLanguage::default();
     let builder = SqlBuilder::new(&config);
-    // Each build parses a separate document, so each one needs its own
-    // session: an empty edit list reuses the previous tree by design.
+    // One session parses both documents: the cache must not leak the first
+    // document's tree into the second.
     let mut session = ParseSession::<SqlLanguage>::default();
 
     let source_update = SourceText::new("UPDATE users SET name = 'John', age = 30 WHERE id = 1;");
@@ -1336,8 +1346,7 @@ fn test_sql_builder_update_delete() {
     assert!(update.selection.is_some());
 
     let source_delete = SourceText::new("DELETE FROM users WHERE id = 1;");
-    let mut session_delete = ParseSession::<SqlLanguage>::default();
-    let result_delete = builder.build(&source_delete, &[], &mut session_delete);
+    let result_delete = builder.build(&source_delete, &[], &mut session);
     assert!(result_delete.result.is_ok());
     let root_delete = result_delete.result.unwrap();
     let SqlStatement::Delete(delete) = &root_delete.statements[0]
@@ -1367,8 +1376,7 @@ fn test_sql_builder_drop_alter() {
     assert!(drop.if_exists);
 
     let source_alter = SourceText::new("ALTER TABLE users RENAME TO customers;");
-    let mut session_alter = ParseSession::<SqlLanguage>::default();
-    let result_alter = builder.build(&source_alter, &[], &mut session_alter);
+    let result_alter = builder.build(&source_alter, &[], &mut session);
     assert!(result_alter.result.is_ok());
     let root_alter = result_alter.result.unwrap();
     let SqlStatement::Alter(alter) = &root_alter.statements[0]
@@ -1376,6 +1384,31 @@ fn test_sql_builder_drop_alter() {
         panic!("Expected Alter statement");
     };
     assert_eq!(alter.table_name.name.name.as_ref(), "users");
+}
+
+/// A reused `ParseSession` must never serve a tree that belongs to the
+/// previously parsed document.
+#[test]
+fn test_same_session_parses_a_different_document() {
+    let config = SqlLanguage::default();
+    let builder = SqlBuilder::new(&config);
+    let mut session = ParseSession::<SqlLanguage>::default();
+
+    let (first, first_source) = build_statement_with_session("SELECT 1;", &builder, &mut session);
+    let SqlStatement::Select(_) = &first
+    else {
+        panic!("Expected Select statement, got {first:?}");
+    };
+    assert_eq!(first_source, "SELECT 1;");
+
+    let (second, second_source) = build_statement_with_session("DROP TABLE t;", &builder, &mut session);
+    let SqlStatement::Drop(drop) = &second
+    else {
+        panic!("Expected Drop statement, got {second:?}");
+    };
+    assert_eq!(drop.object_type, DropObjectType::Table);
+    assert_eq!(drop.name.name.as_ref(), "t");
+    assert_eq!(second_source, "DROP TABLE t;");
 }
 
 #[test]
@@ -1397,8 +1430,7 @@ fn test_sql_builder_database_stmt() {
     assert!(matches!(create.body, CreateBody::Database { .. }));
 
     let source_drop = SourceText::new("DROP DATABASE test_db;");
-    let mut session_drop = ParseSession::<SqlLanguage>::default();
-    let result_drop = builder.build(&source_drop, &[], &mut session_drop);
+    let result_drop = builder.build(&source_drop, &[], &mut session);
     assert!(result_drop.result.is_ok());
     let root_drop = result_drop.result.unwrap();
     let SqlStatement::Drop(drop) = &root_drop.statements[0]

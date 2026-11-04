@@ -150,6 +150,18 @@ impl<L: Language + Send + Sync + 'static, C: ParseCache<L>> ParseCache<L> for Ca
         self.inner.lex_output()
     }
 
+    fn source_fingerprint(&self) -> Option<u64> {
+        self.inner.source_fingerprint()
+    }
+
+    fn set_source_fingerprint(&mut self, fingerprint: u64) {
+        self.inner.set_source_fingerprint(fingerprint)
+    }
+
+    fn clear_lex_output(&mut self) {
+        self.inner.clear_lex_output()
+    }
+
     fn prepare_generation(&mut self) {
         self.inner.prepare_generation()
     }
