@@ -182,8 +182,12 @@ pub enum SetOperator {
     UnionAll,
     /// `INTERSECT`
     Intersect,
+    /// `INTERSECT ALL`
+    IntersectAll,
     /// `EXCEPT`
     Except,
+    /// `EXCEPT ALL`
+    ExceptAll,
 }
 
 impl ToSource for SetOperator {
@@ -195,7 +199,15 @@ impl ToSource for SetOperator {
                 buffer.push("ALL");
             }
             SetOperator::Intersect => buffer.push("INTERSECT"),
+            SetOperator::IntersectAll => {
+                buffer.push("INTERSECT");
+                buffer.push("ALL");
+            }
             SetOperator::Except => buffer.push("EXCEPT"),
+            SetOperator::ExceptAll => {
+                buffer.push("EXCEPT");
+                buffer.push("ALL");
+            }
         }
     }
 }

@@ -160,7 +160,9 @@ impl AsDocument for SetOperationStatement {
                     SetOperator::Union => "UNION",
                     SetOperator::UnionAll => "UNION ALL",
                     SetOperator::Intersect => "INTERSECT",
+                    SetOperator::IntersectAll => "INTERSECT ALL",
                     SetOperator::Except => "EXCEPT",
+                    SetOperator::ExceptAll => "EXCEPT ALL",
                 }));
                 parts.push(line);
             }

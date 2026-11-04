@@ -789,11 +789,11 @@ impl<'config> SqlParser<'config> {
             state.finish_at(cp, SqlElementType::SelectStatement);
 
             // Collect the rest of the chain: operator + operand, repeated.
-            while let Some(operator) = Self::set_operator_kind(state.peek_kind()) {
+            while Self::set_operator_kind(state.peek_kind()).is_some() {
                 state.bump();
-                if operator == Union {
-                    state.eat(All);
-                }
+                // `ALL` is accepted after every set operator: `UNION ALL`,
+                // `INTERSECT ALL` and `EXCEPT ALL` are all standard forms.
+                state.eat(All);
                 let operand_cp = state.checkpoint();
                 self.parse_select_terms(state)?;
                 state.finish_at(operand_cp, SqlElementType::SelectStatement);

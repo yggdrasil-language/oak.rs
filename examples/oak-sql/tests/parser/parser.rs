@@ -919,7 +919,9 @@ fn test_sql_builder_set_operations() {
         ("SELECT a FROM t UNION SELECT b FROM u;", SetOperator::Union, "SELECT a FROM t UNION SELECT b FROM u;"),
         ("SELECT a FROM t UNION ALL SELECT b FROM u;", SetOperator::UnionAll, "SELECT a FROM t UNION ALL SELECT b FROM u;"),
         ("SELECT a FROM t INTERSECT SELECT b FROM u;", SetOperator::Intersect, "SELECT a FROM t INTERSECT SELECT b FROM u;"),
+        ("SELECT a FROM t INTERSECT ALL SELECT b FROM u;", SetOperator::IntersectAll, "SELECT a FROM t INTERSECT ALL SELECT b FROM u;"),
         ("SELECT a FROM t EXCEPT SELECT b FROM u;", SetOperator::Except, "SELECT a FROM t EXCEPT SELECT b FROM u;"),
+        ("SELECT a FROM t EXCEPT ALL SELECT b FROM u;", SetOperator::ExceptAll, "SELECT a FROM t EXCEPT ALL SELECT b FROM u;"),
     ] {
         let (statement, source) = build_statement(sql);
         let SqlStatement::SetOperation(set) = &statement
