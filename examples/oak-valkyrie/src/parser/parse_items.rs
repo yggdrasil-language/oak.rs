@@ -131,6 +131,15 @@ fn bump_micro_name<S: oak_core::Source + ?Sized>(state: &mut State<'_, S>) {
 
 /// Parse a micro function definition
 pub(crate) fn parse_micro<S: oak_core::Source + ?Sized>(state: &mut State<'_, S>) -> Result<(), oak_core::OakError> {
+    parse_micro_member(state, true)
+}
+
+/// Parse a micro member.
+///
+/// `implicit_empty_body` 保留历史上的恢复体：顶层与类成员的宿主声明（`micro write(message: utf8): unit`）
+/// 依赖一个空 `BlockExpression` 表示“已声明但无实现”。声明容器（trait）传 `false`，
+/// 让无体成员保持 `body: None`，与 `;` 结尾的纯声明形态一致。
+fn parse_micro_member<S: oak_core::Source + ?Sized>(state: &mut State<'_, S>, implicit_empty_body: bool) -> Result<(), oak_core::OakError> {
     let cp = state.sink.checkpoint();
     parse_modifiers(state)?;
     state.bump();
@@ -152,7 +161,7 @@ pub(crate) fn parse_micro<S: oak_core::Source + ?Sized>(state: &mut State<'_, S>
         state.bump();
         // Do NOT create a BlockExpression — let the builder detect body.is_none() → is_abstract = true.
     }
-    else {
+    else if implicit_empty_body {
         // Implicit empty body for error recovery.
         let bcp = state.sink.checkpoint();
         state.sink.finish_node(bcp, ValkyrieElementType::BlockExpression);
@@ -597,8 +606,10 @@ fn parse_associated_type_item<S: oak_core::Source + ?Sized>(state: &mut State<'_
     Ok(())
 }
 
-/// Imply member: `prefix`/`infix`/`postfix` + raw id (`` `==` ``), or an ordinary identifier method.
-fn parse_imply_method<S: oak_core::Source + ?Sized>(state: &mut State<'_, S>) -> Result<(), oak_core::OakError> {
+/// 方法成员（trait / imply 共用）：`prefix`/`infix`/`postfix`/`suffix` 修饰符 + raw id（`` `==` ``），
+/// 或普通 Identifier 方法名；签名后可带 `where` 子句与 `{ ... }` 方法体。
+/// 无体成员不产出 `BlockExpression`，保持 `body: None` 的纯声明形态。
+fn parse_method_member<S: oak_core::Source + ?Sized>(state: &mut State<'_, S>) -> Result<(), oak_core::OakError> {
     let cp = state.sink.checkpoint();
     parse_modifiers_followed_by(state, is_raw_id_follower)?;
     if !state.at(ValkyrieTokenType::Identifier) {
@@ -655,7 +666,7 @@ pub(crate) fn parse_imply<S: oak_core::Source + ?Sized>(state: &mut State<'_, S>
                 parse_associated_type_item(state)?;
             }
             else if state.at(ValkyrieTokenType::Identifier) {
-                parse_imply_method(state)?;
+                parse_method_member(state)?;
             }
             else if stalled(state, before) {
                 break;
@@ -696,22 +707,14 @@ pub(crate) fn parse_trait<S: oak_core::Source + ?Sized>(state: &mut State<'_, S>
                 state.skip_trivia();
             }
             if state.at(ValkyrieTokenType::Keyword(ValkyrieKeywords::Micro)) {
-                parse_micro(state)?;
+                // Trait 成员里的 `micro` 是签名/默认体，不产出宿主声明用的隐式空体。
+                parse_micro_member(state, false)?;
             }
             else if state.at(ValkyrieTokenType::Keyword(ValkyrieKeywords::Type)) {
                 parse_associated_type_item(state)?;
             }
             else if state.at(ValkyrieTokenType::Identifier) {
-                let mcp = state.sink.checkpoint();
-                state.bump();
-                if state.at(ValkyrieTokenType::ParenthesisL) {
-                    parse_parameter_list(state)?;
-                }
-                if state.at(ValkyrieTokenType::Colon) {
-                    state.bump();
-                    parse_type(state)?;
-                }
-                state.sink.finish_node(mcp, ValkyrieElementType::Method);
+                parse_method_member(state)?;
             }
             else {
                 state.bump();
