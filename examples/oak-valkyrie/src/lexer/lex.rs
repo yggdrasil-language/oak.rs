@@ -406,8 +406,6 @@ impl crate::lexer::ValkyrieLexer<'_> {
                     "effect" => ValkyrieTokenType::Keyword(ValkyrieKeywords::Effect),
                     "resume" => ValkyrieTokenType::Keyword(ValkyrieKeywords::Resume),
                     "as" => ValkyrieTokenType::Keyword(ValkyrieKeywords::As),
-                    "get" => ValkyrieTokenType::Keyword(ValkyrieKeywords::Get),
-                    "set" => ValkyrieTokenType::Keyword(ValkyrieKeywords::Set),
                     "Self" => ValkyrieTokenType::Keyword(ValkyrieKeywords::SelfType),
                     "impl" => ValkyrieTokenType::Keyword(ValkyrieKeywords::Impl),
                     "where" => ValkyrieTokenType::Keyword(ValkyrieKeywords::Where),
