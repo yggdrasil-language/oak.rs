@@ -481,12 +481,14 @@ impl AsDocument for CreateStatement {
         parts.push(self.name.as_document(&()));
 
         match &self.body {
-            CreateBody::Table { columns, .. } => {
-                if !columns.is_empty() {
+            CreateBody::Table { columns, constraints, .. } => {
+                if !columns.is_empty() || !constraints.is_empty() {
                     parts.push(soft_space);
                     parts.push(Document::text("("));
-                    let cols = Document::join(columns.iter().map(|it| it.as_document(&())), doc!(",", line));
-                    parts.push(indent(doc!(line, cols)));
+                    let mut items: Vec<Document<'_>> = columns.iter().map(|it| it.as_document(&())).collect();
+                    items.extend(constraints.iter().map(|it| it.as_document(&())));
+                    let body = Document::join(items, doc!(",", line));
+                    parts.push(indent(doc!(line, body)));
                     parts.push(line);
                     parts.push(Document::text(")"));
                 }
@@ -534,6 +536,56 @@ impl AsDocument for ColumnConstraint {
             ColumnConstraint::Default(expr, _) => doc!("DEFAULT", soft_space, expr.as_document(&())),
             ColumnConstraint::Check(expr, _) => doc!("CHECK", soft_space, "(", expr.as_document(&()), ")"),
             ColumnConstraint::AutoIncrement { .. } => Document::text("AUTOINCREMENT"),
+        }
+    }
+}
+
+#[cfg(feature = "oak-pretty-print")]
+impl AsDocument for TableConstraint {
+    fn as_document(&self, _config: &Self::Config) -> Document<'_> {
+        match self {
+            TableConstraint::PrimaryKey { columns, on_conflict, .. } => {
+                let columns = Document::join(columns.iter().map(|it| it.as_document(&())), doc!(",", soft_space));
+                let conflict = match on_conflict {
+                    Some(resolution) => doc!(soft_space, "ON CONFLICT", soft_space, resolution.as_document(&())),
+                    None => nil,
+                };
+                doc!("PRIMARY", soft_space, "KEY", soft_space, "(", columns, ")", conflict)
+            }
+            TableConstraint::ForeignKey { columns, table_name, referenced_columns, .. } => {
+                let columns = Document::join(columns.iter().map(|it| it.as_document(&())), doc!(",", soft_space));
+                let referenced = if referenced_columns.is_empty() {
+                    nil
+                }
+                else {
+                    doc!(soft_space, "(", Document::join(referenced_columns.iter().map(|it| it.as_document(&())), doc!(",", soft_space)), ")")
+                };
+                doc!("FOREIGN", soft_space, "KEY", soft_space, "(", columns, ")", soft_space, "REFERENCES", soft_space, table_name.as_document(&()), referenced)
+            }
+            TableConstraint::Check { expr, .. } => doc!("CHECK", soft_space, "(", expr.as_document(&()), ")"),
+        }
+    }
+}
+
+#[cfg(feature = "oak-pretty-print")]
+impl AsDocument for IndexedColumn {
+    fn as_document(&self, _config: &Self::Config) -> Document<'_> {
+        match &self.direction {
+            Some(direction) => doc!(self.name.as_document(&()), soft_space, direction.as_document(&())),
+            None => self.name.as_document(&()),
+        }
+    }
+}
+
+#[cfg(feature = "oak-pretty-print")]
+impl AsDocument for ConflictResolution {
+    fn as_document(&self, _config: &Self::Config) -> Document<'_> {
+        match self {
+            ConflictResolution::Rollback => Document::text("ROLLBACK"),
+            ConflictResolution::Abort => Document::text("ABORT"),
+            ConflictResolution::Fail => Document::text("FAIL"),
+            ConflictResolution::Ignore => Document::text("IGNORE"),
+            ConflictResolution::Replace => Document::text("REPLACE"),
         }
     }
 }

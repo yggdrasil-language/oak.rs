@@ -1,6 +1,6 @@
 use crate::ast::{
     expr::{Expression, Identifier, TableName},
-    statements::query::SelectStatement,
+    statements::query::{OrderDirection, SelectStatement},
 };
 use core::range::Range;
 use oak_core::source::{SourceBuffer, ToSource};
@@ -27,10 +27,12 @@ pub struct CreateStatement {
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum CreateBody {
-    /// A TABLE body with column definitions.
+    /// A TABLE body with column definitions and table-level constraints.
     Table {
         /// The column definitions.
         columns: Vec<ColumnDefinition>,
+        /// The table-level constraints, in source order.
+        constraints: Vec<TableConstraint>,
         /// The span of the TABLE body.
         #[serde(with = "oak_core::serde_range")]
         span: Range<usize>,
@@ -77,14 +79,20 @@ impl ToSource for CreateStatement {
         }
         self.name.to_source(buffer);
         match &self.body {
-            CreateBody::Table { columns, .. } => {
-                if !columns.is_empty() {
+            CreateBody::Table { columns, constraints, .. } => {
+                if !columns.is_empty() || !constraints.is_empty() {
                     buffer.push("(");
                     for (i, col) in columns.iter().enumerate() {
                         if i > 0 {
                             buffer.push(",");
                         }
                         col.to_source(buffer);
+                    }
+                    for (i, constraint) in constraints.iter().enumerate() {
+                        if i > 0 || !columns.is_empty() {
+                            buffer.push(",");
+                        }
+                        constraint.to_source(buffer);
                     }
                     buffer.push(")");
                 }
@@ -199,6 +207,161 @@ impl ToSource for ColumnConstraint {
                 buffer.push(")");
             }
             ColumnConstraint::AutoIncrement { .. } => buffer.push("AUTOINCREMENT"),
+        }
+    }
+}
+
+/// Represents a constraint declared for the whole table instead of a single
+/// column.
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub enum TableConstraint {
+    /// `PRIMARY KEY (col [ASC|DESC], ...) [ON CONFLICT resolution]`
+    PrimaryKey {
+        /// The indexed columns, in source order.
+        columns: Vec<IndexedColumn>,
+        /// The `ON CONFLICT` resolution, when one was written.
+        on_conflict: Option<ConflictResolution>,
+        /// Source span of the constraint.
+        #[serde(with = "oak_core::serde_range")]
+        span: Range<usize>,
+    },
+    /// `FOREIGN KEY (col, ...) REFERENCES table [(col, ...)]`
+    ForeignKey {
+        /// The constrained columns of the current table.
+        columns: Vec<Identifier>,
+        /// The referenced table.
+        table_name: TableName,
+        /// The referenced columns, empty when the reference names no columns.
+        referenced_columns: Vec<Identifier>,
+        /// Source span of the constraint.
+        #[serde(with = "oak_core::serde_range")]
+        span: Range<usize>,
+    },
+    /// `CHECK (expr)`
+    Check {
+        /// The checked expression.
+        expr: Expression,
+        /// Source span of the constraint.
+        #[serde(with = "oak_core::serde_range")]
+        span: Range<usize>,
+    },
+}
+
+impl ToSource for TableConstraint {
+    fn to_source(&self, buffer: &mut SourceBuffer) {
+        match self {
+            TableConstraint::PrimaryKey { columns, on_conflict, .. } => {
+                buffer.push("PRIMARY");
+                buffer.push("KEY");
+                buffer.push("(");
+                for (i, column) in columns.iter().enumerate() {
+                    if i > 0 {
+                        buffer.push(",");
+                    }
+                    column.to_source(buffer);
+                }
+                buffer.push(")");
+                if let Some(resolution) = on_conflict {
+                    buffer.push(" ON");
+                    buffer.push("CONFLICT");
+                    resolution.to_source(buffer);
+                }
+            }
+            TableConstraint::ForeignKey { columns, table_name, referenced_columns, .. } => {
+                buffer.push("FOREIGN");
+                buffer.push("KEY");
+                buffer.push("(");
+                for (i, column) in columns.iter().enumerate() {
+                    if i > 0 {
+                        buffer.push(",");
+                    }
+                    column.to_source(buffer);
+                }
+                buffer.push(")");
+                buffer.push(" REFERENCES");
+                table_name.to_source(buffer);
+                if !referenced_columns.is_empty() {
+                    buffer.push("(");
+                    for (i, column) in referenced_columns.iter().enumerate() {
+                        if i > 0 {
+                            buffer.push(",");
+                        }
+                        column.to_source(buffer);
+                    }
+                    buffer.push(")");
+                }
+            }
+            TableConstraint::Check { expr, .. } => {
+                buffer.push("CHECK");
+                buffer.push("(");
+                expr.to_source(buffer);
+                buffer.push(")");
+            }
+        }
+    }
+}
+
+/// A column of a table-level `PRIMARY KEY`, with its optional ordering.
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct IndexedColumn {
+    /// The column name.
+    pub name: Identifier,
+    /// The optional `ASC` / `DESC` ordering.
+    pub direction: Option<OrderDirection>,
+    /// Source span of the indexed column.
+    #[serde(with = "oak_core::serde_range")]
+    pub span: Range<usize>,
+}
+
+impl ToSource for IndexedColumn {
+    fn to_source(&self, buffer: &mut SourceBuffer) {
+        self.name.to_source(buffer);
+        if let Some(direction) = &self.direction {
+            direction.to_source(buffer);
+        }
+    }
+}
+
+/// The conflict resolution of an `ON CONFLICT` clause.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub enum ConflictResolution {
+    /// `ON CONFLICT ROLLBACK`
+    Rollback,
+    /// `ON CONFLICT ABORT`
+    Abort,
+    /// `ON CONFLICT FAIL`
+    Fail,
+    /// `ON CONFLICT IGNORE`
+    Ignore,
+    /// `ON CONFLICT REPLACE`
+    Replace,
+}
+
+impl ConflictResolution {
+    /// Returns the resolution written as `word`, or `None` when it is unknown.
+    pub fn from_word(word: &str) -> Option<Self> {
+        match word.to_ascii_uppercase().as_str() {
+            "ROLLBACK" => Some(Self::Rollback),
+            "ABORT" => Some(Self::Abort),
+            "FAIL" => Some(Self::Fail),
+            "IGNORE" => Some(Self::Ignore),
+            "REPLACE" => Some(Self::Replace),
+            _ => None,
+        }
+    }
+}
+
+impl ToSource for ConflictResolution {
+    fn to_source(&self, buffer: &mut SourceBuffer) {
+        match self {
+            ConflictResolution::Rollback => buffer.push("ROLLBACK"),
+            ConflictResolution::Abort => buffer.push("ABORT"),
+            ConflictResolution::Fail => buffer.push("FAIL"),
+            ConflictResolution::Ignore => buffer.push("IGNORE"),
+            ConflictResolution::Replace => buffer.push("REPLACE"),
         }
     }
 }

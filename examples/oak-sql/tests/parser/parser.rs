@@ -1205,6 +1205,68 @@ fn test_sql_builder_create_table() {
     assert_eq!(columns[1].data_type.as_ref(), "TEXT");
 }
 
+/// Table-level constraints keep their typed shape and print back into a
+/// statement that parses to the same constraints.
+#[test]
+fn test_sql_builder_table_constraints() {
+    let sql = "CREATE TABLE orders (id INT, user_id INT, total INT, PRIMARY KEY (id DESC, user_id ASC) ON CONFLICT REPLACE, FOREIGN KEY (user_id) REFERENCES users (id), CHECK (total >= 0));";
+    let (statement, source) = build_statement(sql);
+    let SqlStatement::Create(create) = &statement
+    else {
+        panic!("Expected Create statement, got {statement:?}");
+    };
+    let CreateBody::Table { columns, constraints, .. } = &create.body
+    else {
+        panic!("Expected Table body");
+    };
+    assert_eq!(columns.len(), 3);
+    assert_eq!(constraints.len(), 3);
+
+    let TableConstraint::PrimaryKey { columns: primary, on_conflict, .. } = &constraints[0]
+    else {
+        panic!("Expected PRIMARY KEY, got {:?}", constraints[0]);
+    };
+    assert_eq!(primary.len(), 2);
+    assert_eq!(primary[0].name.name.as_ref(), "id");
+    assert_eq!(primary[0].direction, Some(OrderDirection::Desc));
+    assert_eq!(primary[1].name.name.as_ref(), "user_id");
+    assert_eq!(primary[1].direction, Some(OrderDirection::Asc));
+    assert_eq!(on_conflict, &Some(ConflictResolution::Replace));
+
+    let TableConstraint::ForeignKey { columns: foreign, table_name, referenced_columns, .. } = &constraints[1]
+    else {
+        panic!("Expected FOREIGN KEY, got {:?}", constraints[1]);
+    };
+    assert_eq!(foreign.len(), 1);
+    assert_eq!(foreign[0].name.as_ref(), "user_id");
+    assert_eq!(table_name.name.name.as_ref(), "users");
+    assert_eq!(referenced_columns.len(), 1);
+    assert_eq!(referenced_columns[0].name.as_ref(), "id");
+
+    assert!(matches!(&constraints[2], TableConstraint::Check { .. }), "Expected CHECK, got {:?}", constraints[2]);
+
+    assert_eq!(source, "CREATE TABLE orders(id INT,user_id INT,total INT,PRIMARY KEY(id DESC,user_id ASC) ON CONFLICT REPLACE,FOREIGN KEY(user_id) REFERENCES users(id),CHECK(total>=0));");
+
+    // The printed statement must parse back into the same constraints.
+    let (reparsed, reparsed_source) = build_statement(&source);
+    let SqlStatement::Create(reparsed) = &reparsed
+    else {
+        panic!("Expected Create statement after round trip, got {reparsed:?}");
+    };
+    let CreateBody::Table { constraints: reparsed_constraints, .. } = &reparsed.body
+    else {
+        panic!("Expected Table body after round trip");
+    };
+    assert_eq!(reparsed_constraints.len(), 3);
+    assert_eq!(reparsed_source, source);
+}
+
+#[test]
+fn test_sql_builder_table_constraint_rejects_unknown_conflict_resolution() {
+    let reason = rejection_reason("CREATE TABLE t (id INT, PRIMARY KEY (id) ON CONFLICT SOMETIMES);");
+    assert!(reason.contains("`ON CONFLICT` requires ROLLBACK, ABORT, FAIL, IGNORE or REPLACE"), "{reason}");
+}
+
 #[test]
 fn test_sql_builder_create_view() {
     let config = SqlLanguage::default();
