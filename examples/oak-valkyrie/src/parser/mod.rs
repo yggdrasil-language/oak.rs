@@ -488,3 +488,172 @@ mod trait_member_tests {
         }
     }
 }
+
+#[cfg(test)]
+mod spaceship_operator_tests {
+    use super::*;
+    use crate::{
+        ValkyrieBuilder, ValkyrieRoot,
+        ast::{Statement, StatementNode, TermExpression},
+    };
+    use oak_core::{Builder, GreenTree, OakDiagnostics, SourceText, parser::ParseSession};
+
+    fn build(source: &str) -> OakDiagnostics<ValkyrieRoot> {
+        let language = ValkyrieLanguage::default();
+        let builder = ValkyrieBuilder::new(&language);
+        let text = SourceText::new(source);
+        let mut session = ParseSession::<ValkyrieLanguage>::default();
+        builder.build(&text, &[], &mut session)
+    }
+
+    fn micro_names(root: &ValkyrieRoot) -> Vec<&str> {
+        root.items
+            .iter()
+            .filter_map(|item| match item {
+                StatementNode::Micro(micro) => Some(micro.name.name.as_str()),
+                _ => None,
+            })
+            .collect()
+    }
+
+    /// 收集 CST 叶子 token 及其字节长度，用于验证词法切分。
+    fn leaves(source: &str) -> Vec<(ValkyrieTokenType, u32)> {
+        let language = ValkyrieLanguage::default();
+        let parser = ValkyrieParser::new(&language);
+        let text = SourceText::new(source);
+        let mut session = ParseSession::<ValkyrieLanguage>::default();
+        let output = parser.parse(&text, &[], &mut session);
+        assert!(output.diagnostics.is_empty(), "diagnostics: {:?}", output.diagnostics);
+        let green = output.result.unwrap_or_else(|error| panic!("lexing must succeed, got {error:?}"));
+
+        fn walk(tree: &GreenTree<ValkyrieLanguage>, out: &mut Vec<(ValkyrieTokenType, u32)>) {
+            match tree {
+                GreenTree::Leaf(leaf) => out.push((leaf.kind, leaf.length)),
+                GreenTree::Node(node) => {
+                    for child in node.children {
+                        walk(child, out);
+                    }
+                }
+            }
+        }
+
+        let mut kinds = Vec::new();
+        for child in green.children {
+            walk(child, &mut kinds);
+        }
+        kinds
+    }
+
+    fn single_micro_body_expr(source: &str) -> TermExpression {
+        let output = build(source);
+        assert!(output.diagnostics.is_empty(), "diagnostics: {:?}", output.diagnostics);
+        let root = output.result.unwrap_or_else(|error| panic!("expression must build, got {error:?}"));
+        let micro = root
+            .items
+            .iter()
+            .find_map(|item| match item {
+                StatementNode::Micro(micro) => Some(micro),
+                _ => None,
+            })
+            .expect("expected a micro item");
+        let statement = micro.body.statements.first().expect("expected one body statement");
+        match statement {
+            Statement::Expression(expr) => expr.expr.clone(),
+            other => panic!("expected expression statement, got {other:?}"),
+        }
+    }
+
+    fn name_of(expr: &TermExpression) -> Option<&str> {
+        match expr {
+            TermExpression::NamePath(path) if path.parts.len() == 1 => Some(path.parts[0].name.as_str()),
+            _ => None,
+        }
+    }
+
+    fn operator_of(expr: &TermExpression) -> Option<ValkyrieTokenType> {
+        match expr {
+            TermExpression::Binary(node) => Some(node.operator),
+            _ => None,
+        }
+    }
+
+    /// 正例：`<=>` 整体成三字节 token，不被切成 `<=` + `>`。
+    #[test]
+    fn spaceship_lexes_as_a_single_three_byte_token() {
+        let kinds = leaves("micro f() { a <=> b }\n");
+        let spaceship_lengths: Vec<u32> = kinds.iter().filter(|(kind, _)| *kind == ValkyrieTokenType::LessEqGreater).map(|(_, length)| *length).collect();
+        assert_eq!(spaceship_lengths, [3], "spaceship must be one three-byte token, leaves: {kinds:?}");
+        assert!(!kinds.iter().any(|(kind, _)| matches!(kind, ValkyrieTokenType::LessEq | ValkyrieTokenType::GreaterThan)), "spaceship must not leave comparison remnants: {kinds:?}");
+    }
+
+    /// 反例：`a <= b > c` 仍是两个比较算子，贪婪匹配不得吞成 `<=>`。
+    #[test]
+    fn adjacent_comparisons_are_not_greedy() {
+        let kinds = leaves("micro f() { a <= b > c }\n");
+        assert!(!kinds.iter().any(|(kind, _)| *kind == ValkyrieTokenType::LessEqGreater), "`<=` followed by `>` must not merge: {kinds:?}");
+        let less_eq_lengths: Vec<u32> = kinds.iter().filter(|(kind, _)| *kind == ValkyrieTokenType::LessEq).map(|(_, length)| *length).collect();
+        assert_eq!(less_eq_lengths, [2], "`<=` must stay a two-byte token, leaves: {kinds:?}");
+        let greater_lengths: Vec<u32> = kinds.iter().filter(|(kind, _)| *kind == ValkyrieTokenType::GreaterThan).map(|(_, length)| *length).collect();
+        assert_eq!(greater_lengths, [1], "`>` must stay a one-byte token, leaves: {kinds:?}");
+    }
+
+    /// 既有最长匹配不变：`<<` 仍是单个左移 token。
+    #[test]
+    fn left_shift_stays_a_single_token() {
+        let kinds = leaves("micro f() { a << b }\n");
+        let shift_lengths: Vec<u32> = kinds.iter().filter(|(kind, _)| *kind == ValkyrieTokenType::LeftShift).map(|(_, length)| *length).collect();
+        assert_eq!(shift_lengths, [2], "`<<` must stay a two-byte token, leaves: {kinds:?}");
+        assert!(!kinds.iter().any(|(kind, _)| *kind == ValkyrieTokenType::LessEqGreater), "`<<` must not merge into spaceship: {kinds:?}");
+    }
+
+    /// 正例：`<=>` 与算术优先级正确 —— 算术先结合，三向比较取比较层。
+    #[test]
+    fn spaceship_binds_below_arithmetic() {
+        let expr = single_micro_body_expr("micro f() { a <=> b + c * d }\n");
+        assert_eq!(operator_of(&expr), Some(ValkyrieTokenType::LessEqGreater), "expression: {expr:?}");
+        let TermExpression::Binary(node) = &expr
+        else {
+            panic!("expected binary expression, got {expr:?}")
+        };
+        assert_eq!(name_of(&node.lhs), Some("a"), "lhs: {:?}", node.lhs);
+        assert_eq!(operator_of(&node.rhs), Some(ValkyrieTokenType::Plus), "rhs must be the arithmetic addition: {:?}", node.rhs);
+        let TermExpression::Binary(plus) = &node.rhs
+        else {
+            panic!("expected addition on the rhs, got {:?}", node.rhs)
+        };
+        assert_eq!(name_of(&plus.lhs), Some("b"), "addition lhs: {:?}", plus.lhs);
+        assert_eq!(operator_of(&plus.rhs), Some(ValkyrieTokenType::Star), "multiplication must nest under addition: {:?}", plus.rhs);
+    }
+
+    /// 同族比较左结合：`a <=> b <=> c` 解析为 `(a <=> b) <=> c`。
+    #[test]
+    fn spaceship_is_left_associative_within_comparisons() {
+        let expr = single_micro_body_expr("micro f() { a <=> b <=> c }\n");
+        assert_eq!(operator_of(&expr), Some(ValkyrieTokenType::LessEqGreater), "expression: {expr:?}");
+        let TermExpression::Binary(node) = &expr
+        else {
+            panic!("expected binary expression, got {expr:?}")
+        };
+        assert_eq!(name_of(&node.rhs), Some("c"), "outer rhs must be the last operand: {:?}", node.rhs);
+        assert_eq!(operator_of(&node.lhs), Some(ValkyrieTokenType::LessEqGreater), "left side must nest first: {:?}", node.lhs);
+    }
+
+    /// 反例：`a < => b` 不完整形态报结构化语法错误，兄弟 item 仍可恢复。
+    #[test]
+    fn incomplete_spaceship_reports_structured_error() {
+        let output = build("micro f() { a < => b }\nmicro g() {}\n");
+        let root = output.result.unwrap_or_else(|error| panic!("recovery must keep the build alive, got {error:?}"));
+        assert_eq!(micro_names(&root), ["g"]);
+        assert_eq!(output.diagnostics.len(), 1, "diagnostics: {:?}", output.diagnostics);
+        assert!(output.diagnostics[0].to_string().contains("需要表达式"), "diagnostics: {:?}", output.diagnostics);
+    }
+
+    /// 格式化往返：CST token-gap 格式化保留 `<=>`，重解析仍是三向比较算子。
+    #[test]
+    fn formatter_roundtrip_preserves_spaceship() {
+        let formatted = crate::formatter::format_source("micro f(){a<=>b}\n", &crate::formatter::FormatOptions::default()).expect("formatting must succeed");
+        assert!(formatted.contains("<=>"), "formatted output must keep the operator: {formatted:?}");
+        let expr = single_micro_body_expr(&formatted);
+        assert_eq!(operator_of(&expr), Some(ValkyrieTokenType::LessEqGreater), "reparsed expression: {expr:?}");
+    }
+}
