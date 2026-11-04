@@ -1,6 +1,9 @@
 /// Element types for the Markdown language.
 pub mod element_type;
 
+#[cfg(test)]
+mod tests;
+
 use crate::{language::MarkdownLanguage, lexer::token_type::MarkdownTokenType, parser::element_type::MarkdownElementType as ET};
 use oak_core::{Parser, ParserState, source::Source};
 
@@ -220,6 +223,10 @@ impl<'config> Parser<MarkdownLanguage> for MarkdownParser<'config> {
 
                             while state.not_at_end() {
                                 if let Some(next_kind) = state.peek_kind() {
+                                    if Self::is_heading(next_kind) {
+                                        self.parse_heading_block(state, next_kind);
+                                        continue;
+                                    }
                                     if next_kind == MarkdownTokenType::Newline {
                                         state.bump();
                                         if let Some(after_nl) = state.peek_kind() {
@@ -230,6 +237,10 @@ impl<'config> Parser<MarkdownLanguage> for MarkdownParser<'config> {
 
                                                 while state.not_at_end() {
                                                     if let Some(nested_next_kind) = state.peek_kind() {
+                                                        if Self::is_heading(nested_next_kind) {
+                                                            self.parse_heading_block(state, nested_next_kind);
+                                                            continue;
+                                                        }
                                                         if nested_next_kind == MarkdownTokenType::Newline {
                                                             state.bump();
                                                             if let Some(nested_after_nl) = state.peek_kind() {
@@ -240,6 +251,10 @@ impl<'config> Parser<MarkdownLanguage> for MarkdownParser<'config> {
 
                                                                     while state.not_at_end() {
                                                                         if let Some(deeper_nested_next_kind) = state.peek_kind() {
+                                                                            if Self::is_heading(deeper_nested_next_kind) {
+                                                                                self.parse_heading_block(state, deeper_nested_next_kind);
+                                                                                continue;
+                                                                            }
                                                                             if deeper_nested_next_kind == MarkdownTokenType::Newline {
                                                                                 state.bump();
                                                                                 if let Some(deeper_nested_after_nl) = state.peek_kind() {
@@ -458,6 +473,19 @@ impl<'config> MarkdownParser<'config> {
         else {
             false
         }
+    }
+
+    fn is_heading(kind: MarkdownTokenType) -> bool {
+        matches!(kind, MarkdownTokenType::Heading1 | MarkdownTokenType::Heading2 | MarkdownTokenType::Heading3 | MarkdownTokenType::Heading4 | MarkdownTokenType::Heading5 | MarkdownTokenType::Heading6)
+    }
+
+    /// Parses a heading as a block child, used where a container such as a
+    /// blockquote holds block-level content instead of inline content.
+    fn parse_heading_block<'a, S: Source + ?Sized>(&self, state: &mut ParserState<'a, MarkdownLanguage, S>, kind: MarkdownTokenType) {
+        let checkpoint = state.checkpoint();
+        state.bump();
+        self.parse_inlines_until_newline(state);
+        state.finish_at(checkpoint, ET::from(kind));
     }
 
     fn is_block_start(&self, kind: MarkdownTokenType) -> bool {
