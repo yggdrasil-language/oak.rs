@@ -486,7 +486,14 @@ impl crate::lexer::ValkyrieLexer<'_> {
                     state.advance(ch_len);
                     if let Some('=') = state.current() {
                         state.advance('='.len_utf8());
-                        ValkyrieTokenType::LessEq
+                        // 三字符算子须按最长匹配整体成 token：`<=>` 不可被切成 `<=` + `>`。
+                        if let Some('>') = state.current() {
+                            state.advance('>'.len_utf8());
+                            ValkyrieTokenType::LessEqGreater
+                        }
+                        else {
+                            ValkyrieTokenType::LessEq
+                        }
                     }
                     else if let Some('<') = state.current() {
                         state.advance('<'.len_utf8());

@@ -31,7 +31,7 @@ The primary goal of this module is to provide a fast, accurate, and feature-rich
 
 ### Operators & Symbols
 - **Arithmetic**: `+`, `-`, `*`, `/`, `%`.
-- **Comparison**: `==`, `!=`, `<`, `>`, `<=`, `>=`.
+- **Comparison**: `==`, `!=`, `<`, `>`, `<=`, `>=`, `<=>`.
 - **Logical**: `&&`, `||`, `!`.
 - **Assignment**: `=`, `+=`, `-=`, `*=`, `/=`, `:=`.
 - **Navigation**: `.`, `::`, `->`, `=>`.

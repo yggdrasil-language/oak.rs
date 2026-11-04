@@ -111,6 +111,8 @@ pub enum ValkyrieTokenType {
     LeftShift,
     /// Less than or equal operator `<=`.
     LessEq,
+    /// Three-way comparison operator `<=>`.
+    LessEqGreater,
     /// Less than operator `<`.
     LessThan,
     /// Minus operator `-`.
