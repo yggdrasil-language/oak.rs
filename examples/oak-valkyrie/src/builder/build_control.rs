@@ -526,7 +526,8 @@ impl<'config> ValkyrieBuilder<'config> {
             return Ok(Pattern::Variable(Box::new(VariablePattern { name: identifier, span: id_span })));
         }
 
-        Ok(Pattern::Wildcard(Box::new(WildcardPattern { span })))
+        // 无法识别的叶子不再合成通配符：通配符只能来自源码里真实写出的 `_`。
+        Err(source.syntax_error(format!("Missing pattern at {span:?}"), span.start))
     }
 
     fn positional_variant_fields(nested_patterns: &[Pattern], fallback_span: Span) -> Vec<(Identifier, Option<Pattern>)> {
