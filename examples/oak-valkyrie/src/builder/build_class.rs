@@ -71,12 +71,12 @@ impl<'config> ValkyrieBuilder<'config> {
                         }
                     }
                     ValkyrieElementType::Field => {
-                        if let Ok(field) = self.build_field(n, source) {
+                        if let Some(field) = self.recover_member(self.build_field(n, source)) {
                             fields.push(field);
                         }
                     }
                     ValkyrieElementType::Micro => {
-                        if let Ok(method) = self.build_function(n, source) {
+                        if let Some(method) = self.recover_member(self.build_function(n, source)) {
                             methods.push(method);
                         }
                     }
@@ -113,7 +113,7 @@ impl<'config> ValkyrieBuilder<'config> {
                         for inner_child in n.children() {
                             if let RedTree::Node(inner_n) = inner_child {
                                 if inner_n.green.kind == ValkyrieElementType::Variant {
-                                    if let Ok(v) = self.build_enum_variant(inner_n, source) {
+                                    if let Some(v) = self.recover_member(self.build_enum_variant(inner_n, source)) {
                                         variants.push(v);
                                     }
                                 }
@@ -167,7 +167,7 @@ impl<'config> ValkyrieBuilder<'config> {
                         for inner_child in n.children() {
                             if let RedTree::Node(inner_n) = inner_child {
                                 if inner_n.green.kind == ValkyrieElementType::Variant {
-                                    if let Ok(v) = self.build_enum_variant(inner_n, source) {
+                                    if let Some(v) = self.recover_member(self.build_enum_variant(inner_n, source)) {
                                         variants.push(v)
                                     }
                                 }
@@ -201,15 +201,14 @@ impl<'config> ValkyrieBuilder<'config> {
                 RedTree::Node(n) => match n.green.kind {
                     ValkyrieElementType::Attribute => annotations.push(self.build_attribute(n, source)?),
                     ValkyrieElementType::Field => {
-                        if let Ok(field) = self.build_field(n, source) {
+                        if let Some(field) = self.recover_member(self.build_field(n, source)) {
                             fields.push(field);
                         }
                     }
                     _ => {
                         if value.is_none() {
-                            if let Ok(expr) = self.build_expr(n, source) {
-                                value = Some(expr);
-                            }
+                            // 保留枚举变体本身，只记录表达式诊断；变体不会因一个坏默认值整体消失。
+                            value = self.recover_member(self.build_expr(n, source));
                         }
                     }
                 },
@@ -279,7 +278,7 @@ impl<'config> ValkyrieBuilder<'config> {
                         generics = self.build_generic_params(n, source)?;
                     }
                     ValkyrieElementType::MatchArm => {
-                        if let Ok(case) = self.build_variant_case(n, source) {
+                        if let Some(case) = self.recover_member(self.build_variant_case(n, source)) {
                             cases.push(case);
                         }
                     }
@@ -378,7 +377,7 @@ impl<'config> ValkyrieBuilder<'config> {
                             if let RedTree::Node(inner_n) = inner_child {
                                 match inner_n.green.kind {
                                     ValkyrieElementType::Micro | ValkyrieElementType::Method => {
-                                        if let Ok(func) = self.build_function(inner_n, source) {
+                                        if let Some(func) = self.recover_member(self.build_function(inner_n, source)) {
                                             methods.push(func);
                                         }
                                     }
@@ -424,12 +423,12 @@ impl<'config> ValkyrieBuilder<'config> {
                     ValkyrieElementType::NamePath => {}
                     ValkyrieElementType::Type => {}
                     ValkyrieElementType::Micro | ValkyrieElementType::Method => {
-                        if let Ok(func) = self.build_function(n, source) {
+                        if let Some(func) = self.recover_member(self.build_function(n, source)) {
                             methods.push(func);
                         }
                     }
                     ValkyrieElementType::AssociatedType => {
-                        if let Ok(item) = self.build_trait_associated_type(n, source) {
+                        if let Some(item) = self.recover_member(self.build_trait_associated_type(n, source)) {
                             associated_types.push(item);
                         }
                     }
@@ -438,12 +437,12 @@ impl<'config> ValkyrieBuilder<'config> {
                             if let RedTree::Node(inner_n) = inner_child {
                                 match inner_n.green.kind {
                                     ValkyrieElementType::Micro | ValkyrieElementType::Method => {
-                                        if let Ok(func) = self.build_function(inner_n, source) {
+                                        if let Some(func) = self.recover_member(self.build_function(inner_n, source)) {
                                             methods.push(func);
                                         }
                                     }
                                     ValkyrieElementType::AssociatedType => {
-                                        if let Ok(item) = self.build_trait_associated_type(inner_n, source) {
+                                        if let Some(item) = self.recover_member(self.build_trait_associated_type(inner_n, source)) {
                                             associated_types.push(item);
                                         }
                                     }
@@ -522,7 +521,7 @@ impl<'config> ValkyrieBuilder<'config> {
                     ValkyrieElementType::Attribute => annotations.push(self.build_attribute(n, source)?),
                     ValkyrieElementType::GenericParameterList => generics = self.build_generic_params(n, source)?,
                     ValkyrieElementType::Field => {
-                        if let Ok(field) = self.build_field(n, source) {
+                        if let Some(field) = self.recover_member(self.build_field(n, source)) {
                             fields.push(field);
                         }
                     }
@@ -530,7 +529,7 @@ impl<'config> ValkyrieBuilder<'config> {
                         for inner_child in n.children() {
                             if let RedTree::Node(inner_n) = inner_child {
                                 if inner_n.green.kind == ValkyrieElementType::Field {
-                                    if let Ok(field) = self.build_field(inner_n, source) {
+                                    if let Some(field) = self.recover_member(self.build_field(inner_n, source)) {
                                         fields.push(field);
                                     }
                                 }
@@ -680,12 +679,12 @@ impl<'config> ValkyrieBuilder<'config> {
                         }
                     }
                     ValkyrieElementType::Field => {
-                        if let Ok(field) = self.build_field(n, source) {
+                        if let Some(field) = self.recover_member(self.build_field(n, source)) {
                             fields.push(field);
                         }
                     }
                     ValkyrieElementType::Micro => {
-                        if let Ok(method) = self.build_function(n, source) {
+                        if let Some(method) = self.recover_member(self.build_function(n, source)) {
                             methods.push(method);
                         }
                     }
@@ -745,12 +744,12 @@ impl<'config> ValkyrieBuilder<'config> {
                         }
                     }
                     ValkyrieElementType::Field => {
-                        if let Ok(field) = self.build_field(n, source) {
+                        if let Some(field) = self.recover_member(self.build_field(n, source)) {
                             fields.push(field);
                         }
                     }
                     ValkyrieElementType::Micro => {
-                        if let Ok(method) = self.build_function(n, source) {
+                        if let Some(method) = self.recover_member(self.build_function(n, source)) {
                             methods.push(method);
                         }
                     }
@@ -759,12 +758,12 @@ impl<'config> ValkyrieBuilder<'config> {
                             if let RedTree::Node(inner_n) = inner_child {
                                 match inner_n.green.kind {
                                     ValkyrieElementType::Field => {
-                                        if let Ok(field) = self.build_field(inner_n, source) {
+                                        if let Some(field) = self.recover_member(self.build_field(inner_n, source)) {
                                             fields.push(field);
                                         }
                                     }
                                     ValkyrieElementType::Micro => {
-                                        if let Ok(method) = self.build_function(inner_n, source) {
+                                        if let Some(method) = self.recover_member(self.build_function(inner_n, source)) {
                                             methods.push(method);
                                         }
                                     }

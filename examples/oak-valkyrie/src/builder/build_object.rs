@@ -40,7 +40,7 @@ impl<'config> ValkyrieBuilder<'config> {
                                                         }
                                                     }
                                                     crate::parser::element_type::ValkyrieElementType::IdentifierExpression => {
-                                                        if let Ok(expr) = self.build_identifier_expr(expr_n.clone(), source) {
+                                                        if let Some(expr) = self.recover_member(self.build_identifier_expr(expr_n.clone(), source)) {
                                                             if let TermExpression::NamePath(path) = expr {
                                                                 if let Some(ident) = path.parts.first().cloned() {
                                                                     fields.push((ident, None));
@@ -106,7 +106,7 @@ impl<'config> ValkyrieBuilder<'config> {
                     | crate::parser::element_type::ValkyrieElementType::BlockComment => continue,
                     crate::parser::element_type::ValkyrieElementType::IdentifierExpression => {
                         if field_name.is_none() {
-                            if let Ok(expr) = self.build_identifier_expr(n.clone(), source) {
+                            if let Some(expr) = self.recover_member(self.build_identifier_expr(n.clone(), source)) {
                                 if let TermExpression::NamePath(path) = expr {
                                     if let Some(ident) = path.parts.first().cloned() {
                                         field_name = Some(ident);

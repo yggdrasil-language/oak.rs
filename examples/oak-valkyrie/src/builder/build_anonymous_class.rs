@@ -66,12 +66,12 @@ impl<'config> ValkyrieBuilder<'config> {
                         parent_nodes.push(n);
                     }
                     crate::parser::element_type::ValkyrieElementType::Field => {
-                        if let Ok(field) = self.build_field(n, source) {
+                        if let Some(field) = self.recover_member(self.build_field(n, source)) {
                             fields.push(field);
                         }
                     }
                     crate::parser::element_type::ValkyrieElementType::Micro => {
-                        if let Ok(method) = self.build_function(n, source) {
+                        if let Some(method) = self.recover_member(self.build_function(n, source)) {
                             methods.push(method);
                         }
                     }
@@ -158,7 +158,7 @@ impl<'config> ValkyrieBuilder<'config> {
                     crate::parser::element_type::ValkyrieElementType::ArgList => {
                         for arg_child in n.children() {
                             if let RedTree::Node(arg_n) = arg_child {
-                                if let Ok(arg) = self.build_expr(arg_n, source) {
+                                if let Some(arg) = self.recover_member(self.build_expr(arg_n, source)) {
                                     args.push(arg);
                                 }
                             }
