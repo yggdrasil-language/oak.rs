@@ -89,14 +89,14 @@ fn parse_equality_expression_with_options<S: oak_core::Source + ?Sized>(state: &
     Ok(())
 }
 
-/// 解析 < <= > >= 表达式
+/// 解析 < <= <=> > >= 表达式
 pub(crate) fn parse_comparison_expression<S: oak_core::Source + ?Sized>(state: &mut State<'_, S>) -> Result<(), oak_core::OakError> {
     parse_comparison_expression_with_options(state, true)
 }
 
 fn parse_comparison_expression_with_options<S: oak_core::Source + ?Sized>(state: &mut State<'_, S>, allow_object_literal: bool) -> Result<(), oak_core::OakError> {
     parse_bit_or_expression(state, allow_object_literal)?;
-    while state.at(ValkyrieTokenType::LessThan) || state.at(ValkyrieTokenType::LessEq) || state.at(ValkyrieTokenType::GreaterThan) || state.at(ValkyrieTokenType::GreaterEq) {
+    while state.at(ValkyrieTokenType::LessThan) || state.at(ValkyrieTokenType::LessEq) || state.at(ValkyrieTokenType::LessEqGreater) || state.at(ValkyrieTokenType::GreaterThan) || state.at(ValkyrieTokenType::GreaterEq) {
         let cp = state.sink.last_node_checkpoint();
         state.bump();
         parse_bit_or_expression(state, allow_object_literal)?;

@@ -67,7 +67,7 @@ impl<'config> ValkyrieBuilder<'config> {
             match op {
                 ValkyrieTokenType::Star | ValkyrieTokenType::Slash | ValkyrieTokenType::Percent => 10,
                 ValkyrieTokenType::Plus | ValkyrieTokenType::Minus => 9,
-                ValkyrieTokenType::LessThan | ValkyrieTokenType::GreaterThan | ValkyrieTokenType::LessEq | ValkyrieTokenType::GreaterEq => 8,
+                ValkyrieTokenType::LessThan | ValkyrieTokenType::GreaterThan | ValkyrieTokenType::LessEq | ValkyrieTokenType::GreaterEq | ValkyrieTokenType::LessEqGreater => 8,
                 ValkyrieTokenType::EqEq | ValkyrieTokenType::NotEq => 7,
                 ValkyrieTokenType::AndAnd => 6,
                 ValkyrieTokenType::OrOr => 5,
@@ -87,6 +87,7 @@ impl<'config> ValkyrieBuilder<'config> {
                 | ValkyrieTokenType::GreaterThan
                 | ValkyrieTokenType::LessEq
                 | ValkyrieTokenType::GreaterEq
+                | ValkyrieTokenType::LessEqGreater
                 | ValkyrieTokenType::EqEq
                 | ValkyrieTokenType::NotEq
                 | ValkyrieTokenType::AndAnd
