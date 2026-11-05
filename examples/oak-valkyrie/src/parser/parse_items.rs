@@ -266,8 +266,14 @@ pub(crate) fn parse_class<S: oak_core::Source + ?Sized>(state: &mut State<'_, S>
 ///
 /// 修饰符只是位置上的 `Identifier` 序列，语法层不读名字文本。
 pub(crate) fn parse_class_member<S: oak_core::Source + ?Sized>(state: &mut State<'_, S>) -> Result<(), oak_core::OakError> {
+    // 成员属性与条目属性同形：`[export(...)]` 或 `@export(...)`，都留在成员节点之前。
+    while state.at(ValkyrieTokenType::BracketL) {
+        parse_bracket_attribute_list(state)?;
+        state.skip_trivia();
+    }
     while state.at(ValkyrieTokenType::At) {
         parse_attribute(state)?;
+        state.skip_trivia();
     }
     if state.at(ValkyrieTokenType::Identifier) {
         let next = state.peek_non_trivia_kind_at(1);

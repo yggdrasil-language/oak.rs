@@ -20,6 +20,7 @@ impl<'config> ValkyrieBuilder<'config> {
         let mut parents = Vec::new();
         let mut fields = Vec::new();
         let mut methods = Vec::new();
+        let mut pending_annotations = Vec::new();
         for child in node.children() {
             match child {
                 RedTree::Leaf(t) => match t.kind {
@@ -51,7 +52,15 @@ impl<'config> ValkyrieBuilder<'config> {
                         annotations.push(ValkyrieBuilder::modifier_to_attribute(modifier));
                     }
                     ValkyrieElementType::Attribute => {
-                        annotations.push(self.build_attribute(n, source)?);
+                        // 名字之后出现的属性属于下一个成员（`[export]` / `@export`），
+                        // 不能并进类自身的注解；名字之前的才是类注解。
+                        let attribute = self.build_attribute(n, source)?;
+                        if name.name.is_empty() {
+                            annotations.push(attribute);
+                        }
+                        else {
+                            pending_annotations.push(attribute);
+                        }
                     }
                     ValkyrieElementType::GenericParameterList => {
                         generics = self.build_generic_params(n, source)?;
@@ -71,18 +80,23 @@ impl<'config> ValkyrieBuilder<'config> {
                         }
                     }
                     ValkyrieElementType::Field => {
-                        if let Some(field) = self.recover_member(self.build_field(n, source)) {
+                        if let Some(mut field) = self.recover_member(self.build_field(n, source)) {
+                            field.annotations.splice(0..0, pending_annotations.drain(..));
                             fields.push(field);
                         }
                     }
                     ValkyrieElementType::Micro | ValkyrieElementType::Method => {
-                        if let Some(method) = self.recover_member(self.build_function(n, source)) {
+                        if let Some(mut method) = self.recover_member(self.build_function(n, source)) {
+                            method.annotations.splice(0..0, pending_annotations.drain(..));
                             methods.push(method);
                         }
                     }
                     _ => {}
                 },
             }
+        }
+        if !pending_annotations.is_empty() {
+            return Err(source.syntax_error("Attribute is not attached to a class member".to_string(), span.end));
         }
         Ok(ClassDeclaration { name, annotations, generics, parents, body: StructureBody { fields, methods, associated_types: Vec::new(), span }, span })
     }
