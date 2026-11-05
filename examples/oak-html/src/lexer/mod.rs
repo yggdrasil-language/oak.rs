@@ -45,61 +45,92 @@ impl<'config> HtmlLexer<'config> {
     /// The main lexing loop that iterates through the source text.
     fn run<'a, S: Source + ?Sized>(&self, state: &mut State<'a, S>) -> Result<(), OakError> {
         let mut in_markup = false;
+        // HTML allows an attribute value without quotes, and that value may
+        // start with any character except whitespace (`/x`, `2`). Without this
+        // state the `/` in `<a href=/x>` lexes as a self-closing slash and the
+        // remainder of the tag turns into text.
+        let mut expecting_attribute_value = false;
         while state.not_at_end() {
             let safe_point = state.get_position();
+            let mut handled = false;
 
             if let Some(ch) = state.peek() {
-                match ch {
-                    ' ' | '\t' | '\n' | '\r' => {
-                        self.skip_whitespace(state);
+                if expecting_attribute_value && !matches!(ch, ' ' | '\t' | '\n' | '\r') {
+                    handled = match ch {
+                        '"' | '\'' => {
+                            self.lex_string_literal(state);
+                            true
+                        }
+                        '>' => false,
+                        '/' if state.peek_next_n(1) == Some('>') => false,
+                        _ => self.lex_unquoted_attribute_value(state),
+                    };
+                }
+
+                if handled {
+                    expecting_attribute_value = false;
+                }
+                else {
+                    if ch == '<' {
+                        expecting_attribute_value = false;
                     }
-                    '<' => {
-                        if let Some(next) = state.peek_next_n(1) {
-                            if next == '!' {
-                                if state.starts_with("<!--") {
-                                    self.lex_comment(state);
+                    match ch {
+                        ' ' | '\t' | '\n' | '\r' => {
+                            self.skip_whitespace(state);
+                        }
+                        '<' => {
+                            if let Some(next) = state.peek_next_n(1) {
+                                if next == '!' {
+                                    if state.starts_with("<!--") {
+                                        self.lex_comment(state);
+                                    }
+                                    else if state.starts_with("<![CDATA[") {
+                                        self.lex_cdata(state);
+                                    }
+                                    else if !self.lex_doctype(state) {
+                                        self.apply_tag_operator(state, &mut in_markup);
+                                    }
                                 }
-                                else if state.starts_with("<![CDATA[") {
-                                    self.lex_cdata(state);
+                                else if next == '?' {
+                                    self.lex_processing_instruction(state);
                                 }
-                                else if !self.lex_doctype(state) {
+                                else {
                                     self.apply_tag_operator(state, &mut in_markup);
                                 }
-                            }
-                            else if next == '?' {
-                                self.lex_processing_instruction(state);
                             }
                             else {
                                 self.apply_tag_operator(state, &mut in_markup);
                             }
                         }
-                        else {
+                        '/' | '>' if in_markup => {
                             self.apply_tag_operator(state, &mut in_markup);
                         }
-                    }
-                    '/' | '>' if in_markup => {
-                        self.apply_tag_operator(state, &mut in_markup);
-                    }
-                    '&' => {
-                        self.lex_entity_reference(state);
-                    }
-                    '"' | '\'' if in_markup => {
-                        self.lex_string_literal(state);
-                    }
-                    'a'..='z' | 'A'..='Z' | '_' | ':' if in_markup => {
-                        self.lex_identifier(state);
-                    }
-                    '=' if in_markup => {
-                        self.lex_single_char_tokens(state);
-                    }
-                    _ => {
-                        if self.lex_text(state, in_markup) {
-                            continue;
+                        '&' => {
+                            self.lex_entity_reference(state);
                         }
+                        '"' | '\'' if in_markup => {
+                            self.lex_string_literal(state);
+                        }
+                        'a'..='z' | 'A'..='Z' | '_' | ':' if in_markup => {
+                            self.lex_identifier(state);
+                        }
+                        '=' if in_markup => {
+                            self.lex_single_char_tokens(state);
+                            expecting_attribute_value = true;
+                        }
+                        _ => {
+                            if self.lex_text(state, in_markup) {
+                                continue;
+                            }
 
-                        // Safety check to prevent infinite loop
-                        state.advance(ch.len_utf8());
-                        state.add_token(HtmlTokenType::Error, safe_point, state.get_position());
+                            // Safety check to prevent infinite loop
+                            state.advance(ch.len_utf8());
+                            state.add_token(HtmlTokenType::Error, safe_point, state.get_position());
+                        }
+                    }
+
+                    if !in_markup {
+                        expecting_attribute_value = false;
                     }
                 }
             }
@@ -429,6 +460,29 @@ impl<'config> HtmlLexer<'config> {
 
     fn lex_string_literal<'a, S: Source + ?Sized>(&self, state: &mut State<'a, S>) -> bool {
         HTML_STRING.scan(state, HtmlTokenType::AttributeValue)
+    }
+
+    /// Lex an attribute value the author wrote without quotes.
+    ///
+    /// The value runs until whitespace, the tag close bracket, or the next tag
+    /// open, so characters such as `/` and digits stay part of the value
+    /// instead of turning into tag operators.
+    fn lex_unquoted_attribute_value<'a, S: Source + ?Sized>(&self, state: &mut State<'a, S>) -> bool {
+        let start_pos = state.get_position();
+        let mut advanced = false;
+        while let Some(ch) = state.peek() {
+            if matches!(ch, ' ' | '\t' | '\n' | '\r' | '>' | '<') {
+                break;
+            }
+            advanced = true;
+            state.advance(ch.len_utf8());
+        }
+
+        if !advanced {
+            return false;
+        }
+        state.add_token(HtmlTokenType::AttributeValue, start_pos, state.get_position());
+        true
     }
 
     fn lex_identifier<'a, S: Source + ?Sized>(&self, state: &mut State<'a, S>) -> bool {
