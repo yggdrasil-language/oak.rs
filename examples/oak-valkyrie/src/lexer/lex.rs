@@ -550,7 +550,14 @@ impl crate::lexer::ValkyrieLexer<'_> {
                     state.advance(ch_len);
                     if let Some('.') = state.current() {
                         state.advance('.'.len_utf8());
-                        ValkyrieTokenType::DotDot
+                        // `..=` 只有紧邻 `=` 才合并；`..` 与 `=` 之间留空白仍是 `DotDot` + `Eq`。
+                        if let Some('=') = state.current() {
+                            state.advance('='.len_utf8());
+                            ValkyrieTokenType::DotDotEq
+                        }
+                        else {
+                            ValkyrieTokenType::DotDot
+                        }
                     }
                     else {
                         ValkyrieTokenType::Dot
