@@ -30,8 +30,10 @@ impl<'config> HtmlParser<'config> {
     /// Parses an HTML tag, including its attributes and potentially its children.
     ///
     /// This method handles both self-closing tags (e.g., `<br/>`) and tags with
-    /// separate closing tags (e.g., `<div>...</div>`).
-    fn parse_tag<'a, S: Source + ?Sized>(&self, state: &mut State<'a, S>) -> Result<(), OakError> {
+    /// separate closing tags (e.g., `<div>...</div>`). `foreign` marks the
+    /// inside of an `<svg>` or `<math>` subtree, where the self-closing flag is
+    /// acknowledged instead of ignored.
+    fn parse_tag<'a, S: Source + ?Sized>(&self, state: &mut State<'a, S>, foreign: bool) -> Result<(), OakError> {
         use crate::lexer::token_type::HtmlTokenType::*;
         let cp = state.checkpoint();
         state.expect(TagOpen).ok();
@@ -58,13 +60,21 @@ impl<'config> HtmlParser<'config> {
             }
         }
 
+        let self_closing = state.at(TagSelfClose);
         if is_void_element(&tag_name) {
             if !state.eat(TagSelfClose) {
                 state.eat(TagClose);
             }
         }
+        else if self_closing && (foreign || is_foreign_element(&tag_name)) {
+            // SVG and MathML elements acknowledge the self-closing flag, so the
+            // element ends at the slash. Treating it like HTML would leave the
+            // element open, and the closing tag of the foreign parent could not
+            // pop it, so every following sibling would be swallowed as a child.
+            state.bump();
+        }
         else {
-            let closed = if state.at(TagSelfClose) {
+            let closed = if self_closing {
                 // HTML ignores a self-closing slash on a non-void element, so
                 // `<div/>after` stays one element whose content is `after`
                 // instead of an empty element followed by stray text.
@@ -75,6 +85,7 @@ impl<'config> HtmlParser<'config> {
                 state.eat(TagClose)
             };
             if closed {
+                let child_foreign = foreign || is_foreign_element(&tag_name);
                 loop {
                     if !state.not_at_end() {
                         break;
@@ -86,7 +97,7 @@ impl<'config> HtmlParser<'config> {
                         break;
                     }
                     if state.at(TagOpen) {
-                        self.parse_tag(state)?;
+                        self.parse_tag(state, child_foreign)?;
                     }
                     else if state.not_at_end() {
                         state.bump();
@@ -116,6 +127,11 @@ fn is_void_element(tag_name: &str) -> bool {
     matches!(tag_name, "area" | "base" | "br" | "col" | "embed" | "hr" | "img" | "input" | "link" | "meta" | "param" | "source" | "track" | "wbr")
 }
 
+/// Foreign roots whose descendants live outside the HTML namespace.
+fn is_foreign_element(tag_name: &str) -> bool {
+    matches!(tag_name, "svg" | "math")
+}
+
 impl<'config> Parser<HtmlLanguage> for HtmlParser<'config> {
     fn parse<'a, S: Source + ?Sized>(&self, text: &'a S, edits: &[TextEdit], cache: &'a mut impl ParseCache<HtmlLanguage>) -> ParseOutput<'a, HtmlLanguage> {
         let lexer = HtmlLexer::new(self.config);
@@ -124,7 +140,7 @@ impl<'config> Parser<HtmlLanguage> for HtmlParser<'config> {
 
             while state.not_at_end() {
                 match state.peek_kind() {
-                    Some(HtmlTokenType::TagOpen) => self.parse_tag(state)?,
+                    Some(HtmlTokenType::TagOpen) => self.parse_tag(state, false)?,
                     Some(HtmlTokenType::Doctype) => {
                         state.bump();
                     }

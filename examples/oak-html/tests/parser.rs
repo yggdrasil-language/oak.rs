@@ -125,3 +125,52 @@ fn parse_nested_nav_green_structure() {
     }
     assert_eq!(anchor_count, 2);
 }
+
+fn top_level_element_texts(text: &str) -> Vec<String> {
+    let language = HtmlLanguage::default();
+    let source = SourceText::new(text);
+    let mut cache = ParseSession::<HtmlLanguage>::default();
+    let parsed = HtmlParser::new(&language).parse(&source, &[], &mut cache);
+    let green = parsed.result.expect("parse html");
+    let root = RedNode::new(&green, 0);
+    root.children()
+        .filter_map(|child| match child {
+            RedTree::Node(node) if node.element_type() == HtmlElementType::Element => Some(node.text(&source).to_string()),
+            _ => None,
+        })
+        .collect()
+}
+
+#[test]
+fn self_closing_svg_children_do_not_swallow_following_siblings() {
+    const SVG: &str = r#"<svg viewBox="0 0 10 10"><rect width="4" height="4"/><text>label</text></svg>"#;
+    let source = format!("<p>before</p>{SVG}<p>after</p>");
+    assert_eq!(
+        top_level_element_texts(&source),
+        vec!["<p>before</p>".to_string(), SVG.to_string(), "<p>after</p>".to_string()]
+    );
+}
+
+#[test]
+fn inline_svg_stays_inside_paragraph() {
+    const SOURCE: &str = r#"<p>Status <svg viewBox="0 0 10 10"><circle cx="5" cy="5" r="4"/></svg> online</p>"#;
+    assert_eq!(top_level_element_texts(SOURCE), vec![SOURCE.to_string()]);
+}
+
+#[test]
+fn self_closing_svg_root_does_not_swallow_following_siblings() {
+    const SOURCE: &str = r#"<p>a<svg/>b</p><p>c</p>"#;
+    assert_eq!(top_level_element_texts(SOURCE), vec![r#"<p>a<svg/>b</p>"#.to_string(), "<p>c</p>".to_string()]);
+}
+
+#[test]
+fn self_closing_math_children_do_not_swallow_following_siblings() {
+    const SOURCE: &str = r#"<p>a<math><mi>x</mi><mspace width="1em"/></math>b</p><p>c</p>"#;
+    assert_eq!(
+        top_level_element_texts(SOURCE),
+        vec![
+            r#"<p>a<math><mi>x</mi><mspace width="1em"/></math>b</p>"#.to_string(),
+            "<p>c</p>".to_string()
+        ]
+    );
+}
