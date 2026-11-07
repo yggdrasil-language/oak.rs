@@ -13,10 +13,12 @@ fn parse(source: &str) -> oak_typescript::ast::TypeScriptRoot {
 }
 
 fn specifier(expression: &Expression) -> &str {
-    let ExpressionKind::ImportExpression { module_specifier } = &*expression.kind else {
+    let ExpressionKind::ImportExpression { module_specifier } = &*expression.kind
+    else {
         panic!("expected an import expression, got {:?}", expression.kind);
     };
-    let ExpressionKind::StringLiteral(text) = &*module_specifier.kind else {
+    let ExpressionKind::StringLiteral(text) = &*module_specifier.kind
+    else {
         panic!("expected a literal specifier, got {:?}", module_specifier.kind);
     };
     text
@@ -25,7 +27,8 @@ fn specifier(expression: &Expression) -> &str {
 #[test]
 fn import_expression_statement_carries_the_specifier() {
     let root = parse("import('./lazy.js');");
-    let Some(Statement::ExpressionStatement(statement)) = root.statements.first() else {
+    let Some(Statement::ExpressionStatement(statement)) = root.statements.first()
+    else {
         panic!("expected an expression statement, got {:#?}", root.statements);
     };
     assert_eq!(specifier(&statement.expression), "./lazy.js");
@@ -34,11 +37,13 @@ fn import_expression_statement_carries_the_specifier() {
 #[test]
 fn arrow_const_keeps_import_expression_inside_the_body() {
     let root = parse("const load = () => import('./lazy.js');");
-    let Some(Statement::VariableDeclaration(declaration)) = root.statements.first() else {
+    let Some(Statement::VariableDeclaration(declaration)) = root.statements.first()
+    else {
         panic!("expected a variable declaration, got {:#?}", root.statements);
     };
     let init = declaration.declarators[0].value.as_ref().expect("initializer");
-    let ExpressionKind::ArrowFunction { body, .. } = &*init.kind else {
+    let ExpressionKind::ArrowFunction { body, .. } = &*init.kind
+    else {
         panic!("expected an arrow function, got {:?}", init.kind);
     };
     let body = body.as_ref();
@@ -55,10 +60,12 @@ fn arrow_const_keeps_import_expression_inside_the_body() {
 #[test]
 fn empty_arrow_call_is_not_an_import_expression() {
     let root = parse("(() => {})('./lazy.js');");
-    let Some(Statement::ExpressionStatement(statement)) = root.statements.first() else {
+    let Some(Statement::ExpressionStatement(statement)) = root.statements.first()
+    else {
         panic!("expected an expression statement, got {:#?}", root.statements);
     };
-    let ExpressionKind::CallExpression { func, args } = &*statement.expression.kind else {
+    let ExpressionKind::CallExpression { func, args } = &*statement.expression.kind
+    else {
         panic!("expected a call, got {:?}", statement.expression.kind);
     };
     assert!(matches!(&*func.kind, ExpressionKind::ArrowFunction { .. }), "{:?}", func.kind);
@@ -68,11 +75,13 @@ fn empty_arrow_call_is_not_an_import_expression() {
 #[test]
 fn import_meta_stays_a_meta_property() {
     let root = parse("const base = import.meta.url;");
-    let Some(Statement::VariableDeclaration(declaration)) = root.statements.first() else {
+    let Some(Statement::VariableDeclaration(declaration)) = root.statements.first()
+    else {
         panic!("expected a variable declaration");
     };
     let init = declaration.declarators[0].value.as_ref().expect("initializer");
-    let ExpressionKind::MemberExpression { object, property, .. } = &*init.kind else {
+    let ExpressionKind::MemberExpression { object, property, .. } = &*init.kind
+    else {
         panic!("expected a member expression, got {:?}", init.kind);
     };
     assert!(matches!(&*object.kind, ExpressionKind::MetaProperty { meta, property } if meta == "import" && property == "meta"));

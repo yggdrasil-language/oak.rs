@@ -167,7 +167,8 @@ fn object_literal_parses_method_shorthand_with_empty_array_body() {
     let source = "const x = { m() { this.c = []; } };";
     let properties = properties(source);
     assert_eq!(properties.len(), 1);
-    let ObjectProperty::Method { name, body, modifiers, generator, span, .. } = &properties[0] else {
+    let ObjectProperty::Method { name, body, modifiers, generator, span, .. } = &properties[0]
+    else {
         panic!("expected a method, got {:?}", properties[0]);
     };
     assert_eq!(name, "m");
@@ -182,13 +183,15 @@ fn object_literal_keeps_accessors_as_methods_with_modifiers() {
     let source = "const x = { get v() { return 1; }, set v(value) { this.h = value; } };";
     let properties = properties(source);
     assert_eq!(properties.len(), 2);
-    let ObjectProperty::Method { name, params, modifiers, .. } = &properties[0] else {
+    let ObjectProperty::Method { name, params, modifiers, .. } = &properties[0]
+    else {
         panic!("expected a method, got {:?}", properties[0]);
     };
     assert_eq!(name, "v");
     assert!(params.is_empty());
     assert_eq!(modifiers.iter().map(|m| m.kind).collect::<Vec<_>>(), vec![ModifierKind::Get]);
-    let ObjectProperty::Method { name, params, modifiers, .. } = &properties[1] else {
+    let ObjectProperty::Method { name, params, modifiers, .. } = &properties[1]
+    else {
         panic!("expected a method, got {:?}", properties[1]);
     };
     assert_eq!(name, "v");
@@ -201,13 +204,15 @@ fn object_literal_keeps_async_generator_and_computed_methods() {
     let source = "const x = { async *gen() { yield 1; }, [key]() { this.k = []; } };";
     let properties = properties(source);
     assert_eq!(properties.len(), 2);
-    let ObjectProperty::Method { name, modifiers, generator, .. } = &properties[0] else {
+    let ObjectProperty::Method { name, modifiers, generator, .. } = &properties[0]
+    else {
         panic!("expected a method, got {:?}", properties[0]);
     };
     assert_eq!(name, "gen");
     assert!(generator);
     assert_eq!(modifiers.iter().map(|m| m.kind).collect::<Vec<_>>(), vec![ModifierKind::Async]);
-    let ObjectProperty::Method { name, body, .. } = &properties[1] else {
+    let ObjectProperty::Method { name, body, .. } = &properties[1]
+    else {
         panic!("expected a method, got {:?}", properties[1]);
     };
     assert_eq!(name, "key");
@@ -230,12 +235,14 @@ fn keyword_named_method_stays_a_method_named_after_the_keyword() {
     let source = "const x = { get() { return 1; }, async load() { return []; } };";
     let properties = properties(source);
     assert_eq!(properties.len(), 2);
-    let ObjectProperty::Method { name, modifiers, .. } = &properties[0] else {
+    let ObjectProperty::Method { name, modifiers, .. } = &properties[0]
+    else {
         panic!("expected a method named `get`, got {:?}", properties[0]);
     };
     assert_eq!(name, "get");
     assert!(modifiers.is_empty());
-    let ObjectProperty::Method { name, modifiers, .. } = &properties[1] else {
+    let ObjectProperty::Method { name, modifiers, .. } = &properties[1]
+    else {
         panic!("expected a method, got {:?}", properties[1]);
     };
     assert_eq!(name, "load");

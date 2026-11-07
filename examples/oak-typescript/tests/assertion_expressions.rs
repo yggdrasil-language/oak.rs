@@ -14,7 +14,8 @@ fn build(source: &str) -> oak_typescript::ast::TypeScriptRoot {
 
 fn single_init(source: &str) -> oak_typescript::ast::Expression {
     let root = build(source);
-    let Some(Statement::VariableDeclaration(decl)) = root.statements.first() else {
+    let Some(Statement::VariableDeclaration(decl)) = root.statements.first()
+    else {
         panic!("{source}: expected variable declaration, got {:?}", root.statements);
     };
     decl.declarators[0].value.clone().expect("init")
@@ -36,10 +37,12 @@ fn satisfies_parses_as_dedicated_expression() {
 #[test]
 fn satisfies_parses_in_call_argument() {
     let root = build("register(name satisfies string);");
-    let Some(Statement::ExpressionStatement(stmt)) = root.statements.first() else {
+    let Some(Statement::ExpressionStatement(stmt)) = root.statements.first()
+    else {
         panic!("expected expression statement");
     };
-    let ExpressionKind::CallExpression { args, .. } = &*stmt.expression.kind else {
+    let ExpressionKind::CallExpression { args, .. } = &*stmt.expression.kind
+    else {
         panic!("expected call, got {:?}", stmt.expression.kind);
     };
     assert_eq!(args.len(), 1);
@@ -50,10 +53,12 @@ fn satisfies_parses_in_call_argument() {
 fn satisfies_keeps_plain_identifier_usage() {
     let root = build("const satisfies = 1;\nf(satisfies);");
     assert_eq!(root.statements.len(), 2, "{:?}", root.statements);
-    let Some(Statement::ExpressionStatement(stmt)) = root.statements.get(1) else {
+    let Some(Statement::ExpressionStatement(stmt)) = root.statements.get(1)
+    else {
         panic!("expected expression statement, got {:?}", root.statements);
     };
-    let ExpressionKind::CallExpression { args, .. } = &*stmt.expression.kind else {
+    let ExpressionKind::CallExpression { args, .. } = &*stmt.expression.kind
+    else {
         panic!("expected call, got {:?}", stmt.expression.kind);
     };
     assert!(matches!(&*args[0].kind, ExpressionKind::Identifier(n) if n == "satisfies"));
@@ -76,10 +81,12 @@ fn prefix_assertion_parses_as_type_assertion() {
 fn prefix_assertion_parses_in_call_argument_and_nested_generics() {
     let root = build("resolve(<FractalWasm>mod.default);\nconst m = <Map<string, number>>cache.map;");
     assert_eq!(root.statements.len(), 2, "{:?}", root.statements);
-    let Some(Statement::ExpressionStatement(stmt)) = root.statements.first() else {
+    let Some(Statement::ExpressionStatement(stmt)) = root.statements.first()
+    else {
         panic!("expected expression statement");
     };
-    let ExpressionKind::CallExpression { args, .. } = &*stmt.expression.kind else {
+    let ExpressionKind::CallExpression { args, .. } = &*stmt.expression.kind
+    else {
         panic!("expected call, got {:?}", stmt.expression.kind);
     };
     assert!(matches!(&*args[0].kind, ExpressionKind::TypeAssertionExpression { .. }), "{:?}", args[0].kind);
@@ -97,7 +104,8 @@ fn prefix_assertion_does_not_split_module_statements() {
     let source = "export const forced = <FractalWasm>resolved;\nconst plain = resolved;\n";
     let root = build(source);
     assert_eq!(root.statements.len(), 2, "{:?}", root.statements);
-    let Some(Statement::ExportDeclaration(export)) = root.statements.first() else {
+    let Some(Statement::ExportDeclaration(export)) = root.statements.first()
+    else {
         panic!("expected export declaration, got {:?}", root.statements);
     };
     let text = &source[export.span.start..export.span.end];

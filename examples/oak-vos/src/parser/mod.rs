@@ -207,10 +207,7 @@ impl VosParser {
         let element = loop {
             self.skip_trivia(state);
             if !self.starts_attribute(state) {
-                break state
-                    .current()
-                    .map(|t| Self::declaration_kind(t.kind))
-                    .unwrap_or(VosElementType::Error);
+                break state.current().map(|t| Self::declaration_kind(t.kind)).unwrap_or(VosElementType::Error);
             }
             if self.parse_attribute(state).is_err() {
                 break VosElementType::Error;

@@ -364,7 +364,8 @@ impl<'config> TypeScriptParser<'config> {
             let mut depth = 0usize;
             let mut consumed = false;
             while state.not_at_end() {
-                let Some(kind) = self.peek_kind(state) else {
+                let Some(kind) = self.peek_kind(state)
+                else {
                     break;
                 };
                 match kind {
@@ -402,7 +403,8 @@ impl<'config> TypeScriptParser<'config> {
         let mut angles = 0usize;
         let mut consumed = false;
         while state.not_at_end() {
-            let Some(kind) = self.peek_kind(state) else {
+            let Some(kind) = self.peek_kind(state)
+            else {
                 break;
             };
             if consumed && depth == 0 && angles == 0 {
@@ -443,19 +445,15 @@ impl<'config> TypeScriptParser<'config> {
     /// unions and arrow return types intact.
     fn interface_member_starts<'a, S: Source + ?Sized>(&self, state: &State<'a, S>) -> bool {
         use crate::lexer::token_type::TypeScriptTokenType::*;
-        let Some(first) = state.peek_non_trivia_kind_at(0) else {
+        let Some(first) = state.peek_non_trivia_kind_at(0)
+        else {
             return false;
         };
         if matches!(first, Readonly | Get | Set | New | LeftParen | Star) {
             return true;
         }
-        let starts = matches!(first, IdentifierName | StringLiteral | NumericLiteral)
-            || first.is_contextual_keyword();
-        starts
-            && matches!(
-                state.peek_non_trivia_kind_at(1),
-                Some(Colon | Question | LeftParen | Less)
-            )
+        let starts = matches!(first, IdentifierName | StringLiteral | NumericLiteral) || first.is_contextual_keyword();
+        starts && matches!(state.peek_non_trivia_kind_at(1), Some(Colon | Question | LeftParen | Less))
     }
 
     pub(crate) fn parse_enum_declaration<'a, S: Source + ?Sized>(&self, state: &mut State<'a, S>) -> Result<(), OakError> {

@@ -63,7 +63,7 @@ impl<'config> TypeScriptBuilder<'config> {
                         }
                     }
                     _ => {}
-                }
+                },
             }
         }
         let span = node.span();

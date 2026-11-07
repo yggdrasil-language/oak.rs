@@ -385,12 +385,7 @@ mod trait_member_tests {
     }
 
     fn method<'a>(trait_decl: &'a Trait, name: &str) -> &'a MethodDeclaration {
-        trait_decl
-            .body
-            .methods
-            .iter()
-            .find(|method| method.name.name == name)
-            .unwrap_or_else(|| panic!("expected method {name}, got {:?}", trait_decl.body.methods.iter().map(|method| method.name.name.as_str()).collect::<Vec<_>>()))
+        trait_decl.body.methods.iter().find(|method| method.name.name == name).unwrap_or_else(|| panic!("expected method {name}, got {:?}", trait_decl.body.methods.iter().map(|method| method.name.name.as_str()).collect::<Vec<_>>()))
     }
 
     fn annotations(method: &MethodDeclaration) -> Vec<&str> {
@@ -425,9 +420,7 @@ mod trait_member_tests {
     /// 判据主用例：普通方法成员与算子成员都能带 `{ ... }` 默认体，且体内容完整进 AST。
     #[test]
     fn trait_members_accept_default_bodies() {
-        let root = root(
-            "trait Comparable: Equal {\n    micro compare(self, other: Self): Ordering\n    infix `<`(self, other: Self): bool { return compare(self, other) == Ordering.Less }\n}\n",
-        );
+        let root = root("trait Comparable: Equal {\n    micro compare(self, other: Self): Ordering\n    infix `<`(self, other: Self): bool { return compare(self, other) == Ordering.Less }\n}\n");
         let comparable = trait_of(&root, "Comparable");
         let names: Vec<&str> = comparable.body.methods.iter().map(|method| method.name.name.as_str()).collect();
         assert_eq!(names, ["compare", "<"], "member names must not leak modifiers or body identifiers");
@@ -458,9 +451,7 @@ mod trait_member_tests {
     /// imply 侧同样带体（算子与 `micro` 两种写法）。
     #[test]
     fn imply_members_keep_bodies() {
-        let root = root(
-            "imply Utf8Text: Equal {\n    infix `<`(self, other: Self): bool { return self.length() == 0 }\n    micro length(self) -> i32 { return 1 }\n}\n",
-        );
+        let root = root("imply Utf8Text: Equal {\n    infix `<`(self, other: Self): bool { return self.length() == 0 }\n    micro length(self) -> i32 { return 1 }\n}\n");
         let imply = imply_of(&root);
         let names: Vec<&str> = imply.methods.iter().map(|method| method.name.name.as_str()).collect();
         assert_eq!(names, ["<", "length"]);
@@ -668,7 +659,8 @@ mod trait_template_tests {
     use oak_core::{Builder, GreenTree, OakDiagnostics, SourceText, Token, parser::ParseSession};
 
     /// 与 std 消费端同构：trait 体内按 target 分派成员。
-    const TARGET_TRAIT: &str = "trait Iterator {\n    <% match arch %>\n    <% case wasm %>\n    micro filter_map(self, predicate: micro(i32) -> bool): i32\n    <% case native %>\n    micro take_while(self, predicate: micro(i32) -> bool): i32\n    <% end %>\n}\n";
+    const TARGET_TRAIT: &str =
+        "trait Iterator {\n    <% match arch %>\n    <% case wasm %>\n    micro filter_map(self, predicate: micro(i32) -> bool): i32\n    <% case native %>\n    micro take_while(self, predicate: micro(i32) -> bool): i32\n    <% end %>\n}\n";
 
     fn build(source: &str) -> OakDiagnostics<ValkyrieRoot> {
         let language = ValkyrieLanguage::default();

@@ -19,12 +19,14 @@ fn default_exported_kind(source: &str) -> ExpressionKind {
     let output = parse(source);
     assert!(output.diagnostics.is_empty(), "{source}: {:#?}", output.diagnostics);
     let root = output.result.expect("source should parse");
-    let Some(Statement::ExportDeclaration(export)) = root.statements.first().cloned() else {
+    let Some(Statement::ExportDeclaration(export)) = root.statements.first().cloned()
+    else {
         panic!("expected export declaration in {source}");
     };
     assert!(export.is_default(), "expected default modifier in {source}");
     let inner = export.declaration.expect("default payload");
-    let Statement::ExpressionStatement(expr) = *inner else {
+    let Statement::ExpressionStatement(expr) = *inner
+    else {
         panic!("expected expression statement, got {inner:?}");
     };
     *expr.expression.kind
@@ -44,11 +46,13 @@ fn property_value<'a>(properties: &'a [ObjectProperty], name: &str) -> &'a Expre
 #[test]
 fn object_with_string_array_property() {
     let kind = default_exported_kind("export default { rules: ['x', 'y'] }");
-    let ExpressionKind::ObjectLiteral { properties } = kind else {
+    let ExpressionKind::ObjectLiteral { properties } = kind
+    else {
         panic!("expected object literal, got {kind:?}");
     };
     assert_eq!(properties.len(), 1);
-    let ExpressionKind::ArrayLiteral { elements } = property_value(&properties, "rules") else {
+    let ExpressionKind::ArrayLiteral { elements } = property_value(&properties, "rules")
+    else {
         panic!("expected array literal value");
     };
     assert_eq!(elements.len(), 2);
@@ -57,10 +61,12 @@ fn object_with_string_array_property() {
 #[test]
 fn object_with_identifier_array_property() {
     let kind = default_exported_kind("export default { rules: [x, y] }");
-    let ExpressionKind::ObjectLiteral { properties } = kind else {
+    let ExpressionKind::ObjectLiteral { properties } = kind
+    else {
         panic!("expected object literal, got {kind:?}");
     };
-    let ExpressionKind::ArrayLiteral { elements } = property_value(&properties, "rules") else {
+    let ExpressionKind::ArrayLiteral { elements } = property_value(&properties, "rules")
+    else {
         panic!("expected array literal value");
     };
     assert_eq!(elements.len(), 2);
@@ -69,18 +75,22 @@ fn object_with_identifier_array_property() {
 #[test]
 fn nested_objects_and_arrays() {
     let kind = default_exported_kind("export default { a: { b: [1, 2, 3] }, c: [{ d: 'e' }, { f: 'g' }] }");
-    let ExpressionKind::ObjectLiteral { properties } = kind else {
+    let ExpressionKind::ObjectLiteral { properties } = kind
+    else {
         panic!("expected object literal, got {kind:?}");
     };
     assert_eq!(properties.len(), 2);
-    let ExpressionKind::ObjectLiteral { properties: inner } = property_value(&properties, "a") else {
+    let ExpressionKind::ObjectLiteral { properties: inner } = property_value(&properties, "a")
+    else {
         panic!("expected nested object for `a`");
     };
-    let ExpressionKind::ArrayLiteral { elements } = property_value(inner, "b") else {
+    let ExpressionKind::ArrayLiteral { elements } = property_value(inner, "b")
+    else {
         panic!("expected array for `a.b`");
     };
     assert_eq!(elements.len(), 3);
-    let ExpressionKind::ArrayLiteral { elements: objs } = property_value(&properties, "c") else {
+    let ExpressionKind::ArrayLiteral { elements: objs } = property_value(&properties, "c")
+    else {
         panic!("expected array for `c`");
     };
     assert_eq!(objs.len(), 2);
@@ -90,7 +100,8 @@ fn nested_objects_and_arrays() {
 #[test]
 fn multiline_object_with_trailing_comma() {
     let kind = default_exported_kind("export default {\n  rules: ['a', 'b'],\n  fmt: { x: 1 },\n}\n");
-    let ExpressionKind::ObjectLiteral { properties } = kind else {
+    let ExpressionKind::ObjectLiteral { properties } = kind
+    else {
         panic!("expected object literal, got {kind:?}");
     };
     assert_eq!(properties.len(), 2);
@@ -99,7 +110,8 @@ fn multiline_object_with_trailing_comma() {
 #[test]
 fn default_export_array_literal_still_parses() {
     let kind = default_exported_kind("export default [1, 2, 3]");
-    let ExpressionKind::ArrayLiteral { elements } = kind else {
+    let ExpressionKind::ArrayLiteral { elements } = kind
+    else {
         panic!("expected array literal, got {kind:?}");
     };
     assert_eq!(elements.len(), 3);

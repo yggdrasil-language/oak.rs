@@ -22,7 +22,8 @@ fn first_statement(source: &str) -> Statement {
 }
 
 fn expression_kind(stmt: &Statement) -> &ExpressionKind {
-    let Statement::ExpressionStatement(expr) = stmt else {
+    let Statement::ExpressionStatement(expr) = stmt
+    else {
         panic!("expected expression statement, got {stmt:?}");
     };
     &expr.expression.kind
@@ -32,7 +33,8 @@ fn expression_kind(stmt: &Statement) -> &ExpressionKind {
 fn tagged_template_builds_node_with_spans() {
     let source = "sql`SELECT * FROM t`;";
     let stmt = first_statement(source);
-    let ExpressionKind::TaggedTemplateExpression { tag, template } = expression_kind(&stmt) else {
+    let ExpressionKind::TaggedTemplateExpression { tag, template } = expression_kind(&stmt)
+    else {
         panic!("expected tagged template, got {:?}", expression_kind(&stmt));
     };
     assert_eq!(&source[tag.span.start..tag.span.end], "sql");
@@ -43,7 +45,8 @@ fn tagged_template_builds_node_with_spans() {
 fn tagged_template_inside_ternary() {
     let source = "negate ? r`\\B` : r`\\b`;";
     let stmt = first_statement(source);
-    let ExpressionKind::ConditionalExpression { alternate, consequent, .. } = expression_kind(&stmt) else {
+    let ExpressionKind::ConditionalExpression { alternate, consequent, .. } = expression_kind(&stmt)
+    else {
         panic!("expected conditional, got {:?}", expression_kind(&stmt));
     };
     assert!(matches!(*consequent.kind, ExpressionKind::TaggedTemplateExpression { .. }));
@@ -52,16 +55,7 @@ fn tagged_template_inside_ternary() {
 
 #[test]
 fn tagged_template_with_interpolation_and_member_tag() {
-    assert!(matches!(
-        expression_kind(&first_statement("a.b`x${c}d`;")),
-        ExpressionKind::TaggedTemplateExpression { .. }
-    ));
-    assert!(matches!(
-        expression_kind(&first_statement("f()``;")),
-        ExpressionKind::TaggedTemplateExpression { .. }
-    ));
-    assert!(matches!(
-        expression_kind(&first_statement("css`${v}px`;")),
-        ExpressionKind::TaggedTemplateExpression { .. }
-    ));
+    assert!(matches!(expression_kind(&first_statement("a.b`x${c}d`;")), ExpressionKind::TaggedTemplateExpression { .. }));
+    assert!(matches!(expression_kind(&first_statement("f()``;")), ExpressionKind::TaggedTemplateExpression { .. }));
+    assert!(matches!(expression_kind(&first_statement("css`${v}px`;")), ExpressionKind::TaggedTemplateExpression { .. }));
 }

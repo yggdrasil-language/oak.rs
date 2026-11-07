@@ -26,7 +26,8 @@ fn parsed_root(source: &str) -> TypeScriptRoot {
 
 fn class_members(source: &str) -> Vec<ClassMember> {
     let root = parsed_root(source);
-    let Some(Statement::ClassDeclaration(declaration)) = root.statements.first().cloned() else {
+    let Some(Statement::ClassDeclaration(declaration)) = root.statements.first().cloned()
+    else {
         panic!("expected class declaration in {source}");
     };
     declaration.body
@@ -36,7 +37,8 @@ fn class_members(source: &str) -> Vec<ClassMember> {
 fn method_named_get_keeps_function_frame() {
     let source = "class C {\n  get(key) {\n    if (cache.has(key)) { return 1; }\n    return 2;\n  }\n}";
     let members = class_members(source);
-    let [ClassMember::Method { name, modifiers, .. }] = members.as_slice() else {
+    let [ClassMember::Method { name, modifiers, .. }] = members.as_slice()
+    else {
         panic!("expected one method, got {members:?}")
     };
     assert_eq!(name, "get");
@@ -49,7 +51,8 @@ fn method_named_get_keeps_function_frame() {
 fn method_named_set_keeps_function_frame() {
     let source = "class C {\n  set(key) {\n    if (cache.has(key)) { return 1; }\n  }\n}";
     let members = class_members(source);
-    let [ClassMember::Method { name, modifiers, .. }] = members.as_slice() else {
+    let [ClassMember::Method { name, modifiers, .. }] = members.as_slice()
+    else {
         panic!("expected one method, got {members:?}")
     };
     assert_eq!(name, "set");
@@ -62,7 +65,8 @@ fn method_named_set_keeps_function_frame() {
 fn static_method_named_get_keeps_function_frame() {
     let source = "class C {\n  static get(key) {\n    return key;\n  }\n}";
     let members = class_members(source);
-    let [ClassMember::Method { name, modifiers, .. }] = members.as_slice() else {
+    let [ClassMember::Method { name, modifiers, .. }] = members.as_slice()
+    else {
         panic!("expected one method, got {members:?}")
     };
     assert_eq!(name, "get");
@@ -73,7 +77,8 @@ fn static_method_named_get_keeps_function_frame() {
 #[test]
 fn field_named_get_stays_property() {
     let members = class_members("class C {\n  get = 1;\n}");
-    let [ClassMember::Property { name, .. }] = members.as_slice() else {
+    let [ClassMember::Property { name, .. }] = members.as_slice()
+    else {
         panic!("expected one property, got {members:?}")
     };
     assert_eq!(name, "get");
@@ -82,8 +87,7 @@ fn field_named_get_stays_property() {
 #[test]
 fn real_getter_and_setter_still_detected() {
     let members = class_members("class C {\n  get value() { return 1; }\n  set value(v) {}\n}");
-    let [ClassMember::Method { name: get_name, modifiers: get_modifiers, .. }, ClassMember::Method { name: set_name, modifiers: set_modifiers, .. }] =
-        members.as_slice()
+    let [ClassMember::Method { name: get_name, modifiers: get_modifiers, .. }, ClassMember::Method { name: set_name, modifiers: set_modifiers, .. }] = members.as_slice()
     else {
         panic!("expected getter/setter pair, got {members:?}")
     };

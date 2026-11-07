@@ -25,7 +25,8 @@ fn parsed_root(source: &str) -> TypeScriptRoot {
 
 fn variable_initializer(source: &str) -> ExpressionKind {
     let root = parsed_root(source);
-    let Some(Statement::VariableDeclaration(declaration)) = root.statements.first().cloned() else {
+    let Some(Statement::VariableDeclaration(declaration)) = root.statements.first().cloned()
+    else {
         panic!("expected variable declaration in {source}");
     };
     let value = declaration.value().expect("initializer");
@@ -59,12 +60,21 @@ fn class_expression_with_fields_and_constructor() {
     let (name, _, body) = class_expression(variable_initializer("var X = class { a = 1; constructor(v) { this.a = v; } b = f(this.a); };"));
     assert_eq!(name, None);
     assert_eq!(body.len(), 3);
-    let ClassMember::Property { name, .. } = &body[0] else { panic!("expected property `a`, got {:?}", body[0]) };
+    let ClassMember::Property { name, .. } = &body[0]
+    else {
+        panic!("expected property `a`, got {:?}", body[0])
+    };
     assert_eq!(name, "a");
-    let ClassMember::Method { name, params, .. } = &body[1] else { panic!("expected constructor, got {:?}", body[1]) };
+    let ClassMember::Method { name, params, .. } = &body[1]
+    else {
+        panic!("expected constructor, got {:?}", body[1])
+    };
     assert_eq!(name, "constructor");
     assert_eq!(params.len(), 1);
-    let ClassMember::Property { name, initializer, .. } = &body[2] else { panic!("expected property `b`, got {:?}", body[2]) };
+    let ClassMember::Property { name, initializer, .. } = &body[2]
+    else {
+        panic!("expected property `b`, got {:?}", body[2])
+    };
     assert_eq!(name, "b");
     assert!(initializer.is_some(), "field initializer `f(this.a)` must survive");
 }
@@ -75,20 +85,28 @@ fn named_class_expression_with_extends_and_static_field() {
     assert_eq!(name.as_deref(), Some("Named"));
     assert_eq!(extends.as_deref(), Some("Base"));
     assert_eq!(body.len(), 2);
-    let ClassMember::Property { name, .. } = &body[0] else { panic!("expected property `s`, got {:?}", body[0]) };
+    let ClassMember::Property { name, .. } = &body[0]
+    else {
+        panic!("expected property `s`, got {:?}", body[0])
+    };
     assert_eq!(name, "s");
     assert!(body[0].is_static());
-    let ClassMember::Method { name, .. } = &body[1] else { panic!("expected method `m`, got {:?}", body[1]) };
+    let ClassMember::Method { name, .. } = &body[1]
+    else {
+        panic!("expected method `m`, got {:?}", body[1])
+    };
     assert_eq!(name, "m");
 }
 
 #[test]
 fn class_expression_as_call_argument() {
     let root = parsed_root("f(class { });");
-    let Some(Statement::ExpressionStatement(statement)) = root.statements.first().cloned() else {
+    let Some(Statement::ExpressionStatement(statement)) = root.statements.first().cloned()
+    else {
         panic!("expected expression statement");
     };
-    let ExpressionKind::CallExpression { args, .. } = *statement.expression.kind else {
+    let ExpressionKind::CallExpression { args, .. } = *statement.expression.kind
+    else {
         panic!("expected call expression");
     };
     assert_eq!(args.len(), 1);
@@ -109,12 +127,14 @@ fn vscode_textmate_style_class_expression_parses_clean() {
 #[test]
 fn anonymous_default_export_class() {
     let root = parsed_root("export default class { c = 3; }");
-    let Some(Statement::ExportDeclaration(export)) = root.statements.first().cloned() else {
+    let Some(Statement::ExportDeclaration(export)) = root.statements.first().cloned()
+    else {
         panic!("expected export declaration");
     };
     assert!(export.is_default());
     let inner = export.declaration.expect("default payload");
-    let Statement::ClassDeclaration(declaration) = *inner else {
+    let Statement::ClassDeclaration(declaration) = *inner
+    else {
         panic!("expected class declaration, got {inner:?}");
     };
     assert_eq!(declaration.name, "");
@@ -125,11 +145,13 @@ fn anonymous_default_export_class() {
 #[test]
 fn named_default_export_class_keeps_its_name() {
     let root = parsed_root("export default class Named { }");
-    let Some(Statement::ExportDeclaration(export)) = root.statements.first().cloned() else {
+    let Some(Statement::ExportDeclaration(export)) = root.statements.first().cloned()
+    else {
         panic!("expected export declaration");
     };
     let inner = export.declaration.expect("default payload");
-    let Statement::ClassDeclaration(declaration) = *inner else {
+    let Statement::ClassDeclaration(declaration) = *inner
+    else {
         panic!("expected class declaration, got {inner:?}");
     };
     assert_eq!(declaration.name, "Named");
@@ -138,7 +160,8 @@ fn named_default_export_class_keeps_its_name() {
 #[test]
 fn named_class_declaration_regression() {
     let root = parsed_root("class Y { a = 1; }");
-    let Some(Statement::ClassDeclaration(declaration)) = root.statements.first().cloned() else {
+    let Some(Statement::ClassDeclaration(declaration)) = root.statements.first().cloned()
+    else {
         panic!("expected class declaration");
     };
     assert_eq!(declaration.name, "Y");

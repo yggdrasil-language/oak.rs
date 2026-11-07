@@ -402,8 +402,7 @@ impl<'config> TypeScriptBuilder<'config> {
                                         TypeScriptTokenType::Set => modifiers.push(Modifier::new(ModifierKind::Set, leaf.span)),
                                         TypeScriptTokenType::Star => generator = true,
                                         TypeScriptTokenType::LeftParen => past_paren = true,
-                                        TypeScriptTokenType::IdentifierName | TypeScriptTokenType::StringLiteral | TypeScriptTokenType::NumericLiteral
-                                            if !past_paren && name.is_empty() => {
+                                        TypeScriptTokenType::IdentifierName | TypeScriptTokenType::StringLiteral | TypeScriptTokenType::NumericLiteral if !past_paren && name.is_empty() => {
                                             let raw = source.get_text_in(leaf.span.into());
                                             name = match leaf.kind {
                                                 TypeScriptTokenType::StringLiteral => decode_string_literal_text(&raw).unwrap_or_else(|_| raw.trim_matches(['"', '\'']).to_string()),
@@ -539,44 +538,46 @@ impl<'config> TypeScriptBuilder<'config> {
 
                 for child in node.children() {
                     match child {
-                        RedTree::Node(child_node) => {
-                            match child_node.green.kind {
-                                TypeScriptElementType::IdentifierName => {
-                                    if name.is_none() {
-                                        let text = source.get_text_in(child_node.span().into()).trim().to_string();
-                                        if !text.is_empty() { name = Some(text); }
+                        RedTree::Node(child_node) => match child_node.green.kind {
+                            TypeScriptElementType::IdentifierName => {
+                                if name.is_none() {
+                                    let text = source.get_text_in(child_node.span().into()).trim().to_string();
+                                    if !text.is_empty() {
+                                        name = Some(text);
                                     }
                                 }
-                                TypeScriptElementType::TypeParameter => {
-                                    if !self.erase_types {
-                                        if let Some(tp) = self.build_type_parameter(&child_node, source)? {
-                                            type_params.push(tp)
-                                        }
-                                    }
-                                }
-                                TypeScriptElementType::Parameter => {
-                                    if let Some(p) = self.build_parameter(&child_node, source)? {
-                                        params.push(p)
-                                    }
-                                }
-                                TypeScriptElementType::TypeAnnotation => {
-                                    if !self.erase_types {
-                                        return_type = self.build_type_annotation(&child_node, source)?
-                                    }
-                                }
-                                TypeScriptElementType::BlockStatement => {
-                                    if let Some(Statement::BlockStatement(block)) = self.build_statement(&child_node, source)? {
-                                        body = block.statements
-                                    }
-                                }
-                                _ => {}
                             }
-                        }
+                            TypeScriptElementType::TypeParameter => {
+                                if !self.erase_types {
+                                    if let Some(tp) = self.build_type_parameter(&child_node, source)? {
+                                        type_params.push(tp)
+                                    }
+                                }
+                            }
+                            TypeScriptElementType::Parameter => {
+                                if let Some(p) = self.build_parameter(&child_node, source)? {
+                                    params.push(p)
+                                }
+                            }
+                            TypeScriptElementType::TypeAnnotation => {
+                                if !self.erase_types {
+                                    return_type = self.build_type_annotation(&child_node, source)?
+                                }
+                            }
+                            TypeScriptElementType::BlockStatement => {
+                                if let Some(Statement::BlockStatement(block)) = self.build_statement(&child_node, source)? {
+                                    body = block.statements
+                                }
+                            }
+                            _ => {}
+                        },
                         RedTree::Leaf(leaf) => match leaf.kind {
                             TypeScriptTokenType::IdentifierName => {
                                 if name.is_none() {
                                     let text = source.get_text_in(leaf.span.into()).trim().to_string();
-                                    if !text.is_empty() { name = Some(text); }
+                                    if !text.is_empty() {
+                                        name = Some(text);
+                                    }
                                 }
                             }
                             TypeScriptTokenType::Async => async_ = true,
@@ -665,7 +666,12 @@ impl<'config> TypeScriptBuilder<'config> {
 
                 for child in node.children() {
                     if let RedTree::Node(child_node) = child {
-                        if tag.is_none() { tag = self.build_expression(&child_node, source)? } else if template.is_none() { template = self.build_expression(&child_node, source)? }
+                        if tag.is_none() {
+                            tag = self.build_expression(&child_node, source)?
+                        }
+                        else if template.is_none() {
+                            template = self.build_expression(&child_node, source)?
+                        }
                     }
                 }
 

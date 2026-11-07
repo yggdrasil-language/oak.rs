@@ -18,9 +18,7 @@ const RAW_TEXT_ELEMENTS: &[&str] = &["script", "style", "textarea", "title"];
 /// Reads the tag name at the current position when it names a raw text element.
 fn raw_text_element_name<'a, S: Source + ?Sized>(state: &mut State<'a, S>) -> Option<String> {
     let rest = state.rest();
-    let end = rest
-        .find(|ch: char| !(ch.is_ascii_alphanumeric() || matches!(ch, '_' | '-' | '.' | ':')))
-        .unwrap_or(rest.len());
+    let end = rest.find(|ch: char| !(ch.is_ascii_alphanumeric() || matches!(ch, '_' | '-' | '.' | ':'))).unwrap_or(rest.len());
     let name = rest[..end].to_ascii_lowercase();
     RAW_TEXT_ELEMENTS.contains(&name.as_str()).then_some(name)
 }
@@ -164,14 +162,7 @@ impl<'config> HtmlLexer<'config> {
         Ok(())
     }
 
-    fn apply_tag_operator<'a, S: Source + ?Sized>(
-        &self,
-        state: &mut State<'a, S>,
-        in_markup: &mut bool,
-        raw_text_tag: &mut Option<String>,
-        tag_name_seen: &mut bool,
-        closing_tag: &mut bool,
-    ) {
+    fn apply_tag_operator<'a, S: Source + ?Sized>(&self, state: &mut State<'a, S>, in_markup: &mut bool, raw_text_tag: &mut Option<String>, tag_name_seen: &mut bool, closing_tag: &mut bool) {
         let Some(kind) = self.lex_tag_operators(state)
         else {
             return;

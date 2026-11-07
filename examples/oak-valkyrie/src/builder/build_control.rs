@@ -432,11 +432,7 @@ impl<'config> ValkyrieBuilder<'config> {
                             lone_identifier = Some((Identifier { name, span: t.span }, t.span));
                         }
                     }
-                    ValkyrieTokenType::IntegerLiteral
-                    | ValkyrieTokenType::FloatLiteral
-                    | ValkyrieTokenType::BoolLiteral
-                    | ValkyrieTokenType::StringLiteral
-                    | ValkyrieTokenType::CharLiteral => {
+                    ValkyrieTokenType::IntegerLiteral | ValkyrieTokenType::FloatLiteral | ValkyrieTokenType::BoolLiteral | ValkyrieTokenType::StringLiteral | ValkyrieTokenType::CharLiteral => {
                         // 字面量可以是完整模式（`case 60`），也可以是构造/数组模式的
                         // 位置子模式（`case Some(60)` / `case [head, 0]`）：前者整臂即
                         // Literal，后者按位置落入嵌套/数组序列，不得丢弃成 Wildcard。

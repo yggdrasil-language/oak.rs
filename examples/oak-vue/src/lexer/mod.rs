@@ -345,9 +345,7 @@ impl<'config> VueLexer<'config> {
                 self.lex_number(state);
                 VueTokenType::NumberLiteral
             }
-            _ if is_ident_start(ch) => {
-                self.lex_identifier(state)
-            }
+            _ if is_ident_start(ch) => self.lex_identifier(state),
             _ => {
                 self.lex_text(state);
                 VueTokenType::Text

@@ -280,9 +280,7 @@ fn export_type_clause_marks_type_reference_on_value_binding() {
 
 #[test]
 fn interface_bodies_record_member_and_heritage_type_references() {
-    let f = facts(
-        "class Bar {}\ninterface I extends Bar { b: Bar\n readonly c?: Bar }\ninterface Empty {}",
-    );
+    let f = facts("class Bar {}\ninterface I extends Bar { b: Bar\n readonly c?: Bar }\ninterface Empty {}");
     assert!(!f.is_incomplete(), "interface members are walked now: {f:?}");
     assert!(binding(&f, "Bar").has_type_references, "heritage and member types name `Bar`: {:?}", binding(&f, "Bar"));
 
@@ -294,17 +292,14 @@ fn interface_bodies_record_member_and_heritage_type_references() {
 
 #[test]
 fn interface_index_and_call_signatures_keep_their_value_types() {
-    let f = facts(
-        "class Bar {}\ninterface I { [key: string]: Bar\n (value: Bar): Bar\n new (value: Bar): Bar }",
-    );
+    let f = facts("class Bar {}\ninterface I { [key: string]: Bar\n (value: Bar): Bar\n new (value: Bar): Bar }");
     assert!(!f.is_incomplete(), "{f:?}");
     assert!(binding(&f, "Bar").has_type_references, "index, call and construct signatures name `Bar`: {:?}", binding(&f, "Bar"));
 }
 
 #[test]
 fn destructuring_declarations_mark_only_shorthand_keys_rename_unsafe() {
-    let source =
-        "const { value } = obj;\nlet [a, b] = arr;\nconst { x: renamed } = obj2;\nconst { d = 1 } = o3;\nconst { outer: { inner } } = o4;\nconst plain = 1;\nconst o = { plain };\nfunction safe(){ }\nsafe();";
+    let source = "const { value } = obj;\nlet [a, b] = arr;\nconst { x: renamed } = obj2;\nconst { d = 1 } = o3;\nconst { outer: { inner } } = o4;\nconst plain = 1;\nconst o = { plain };\nfunction safe(){ }\nsafe();";
     let f = facts(source);
     assert!(!f.is_incomplete(), "{f:?}");
     assert!(binding(&f, "value").rename_unsafe, "shorthand pattern token doubles as the property key");

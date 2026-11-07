@@ -332,11 +332,7 @@ impl crate::lexer::ValkyrieLexer<'_> {
                     }
                     else {
                         state.add_token(ValkyrieTokenType::Error, start, state.get_position());
-                        state.add_error(oak_core::OakError::syntax_error(
-                            "float literal exponent requires at least one digit",
-                            start,
-                            None,
-                        ));
+                        state.add_error(oak_core::OakError::syntax_error("float literal exponent requires at least one digit", start, None));
                         return true;
                     }
                 }

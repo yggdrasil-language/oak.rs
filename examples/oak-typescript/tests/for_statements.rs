@@ -23,7 +23,8 @@ fn first_statement(source: &str) -> Statement {
 #[test]
 fn for_in_with_const_declaration() {
     let stmt = first_statement("for (const k in o) x();");
-    let Statement::ForInStatement(s) = stmt else {
+    let Statement::ForInStatement(s) = stmt
+    else {
         panic!("expected for-in, got {stmt:?}");
     };
     assert!(matches!(*s.left, Statement::VariableDeclaration(_)));
@@ -44,10 +45,12 @@ fn for_in_with_let_and_bare_forms() {
 fn for_in_bare_left_keeps_member_chain() {
     let source = "for (a[i].b in o) x();";
     let stmt = first_statement(source);
-    let Statement::ForInStatement(s) = stmt else {
+    let Statement::ForInStatement(s) = stmt
+    else {
         panic!("expected for-in, got {stmt:?}");
     };
-    let Statement::ExpressionStatement(e) = &*s.left else {
+    let Statement::ExpressionStatement(e) = &*s.left
+    else {
         panic!("expected expression left, got {:?}", s.left);
     };
     assert_eq!(&source[e.span.start..e.span.end], "a[i].b");
@@ -70,7 +73,8 @@ fn for_of_and_classic_for_still_parse() {
 fn in_operator_inside_parens_stays_binary() {
     // A top-level `;` ends the header scan before the nested `in` matters.
     let stmt = first_statement("for (var ok = ('a' in b); ok; ) ;");
-    let Statement::ForStatement(s) = stmt else {
+    let Statement::ForStatement(s) = stmt
+    else {
         panic!("expected classic for, got {stmt:?}");
     };
     assert!(s.initializer.is_some());
