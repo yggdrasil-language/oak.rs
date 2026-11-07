@@ -90,7 +90,13 @@ jobs:
                   # inside the same semver range, and the comment says so on
                   # purpose. The `cargo-manifests-` namespace keeps the old
                   # constant `cargo-` entries from matching this prefix.
-                  key: ${{ runner.os }}-cargo-manifests-${{ hashFiles('**/Cargo.toml', 'rust-toolchain.toml') }}
+                  # The feature set is part of the key because three Linux variants
+                  # write the same `target` directory, so a shared key leaves the
+                  # stored entry owned by whichever variant finishes first. A cold
+                  # variant still starts from a sibling through the feature-less
+                  # `restore-keys` prefix below, which is why that prefix must stay
+                  # free of `matrix.feature`.
+                  key: ${{ runner.os }}-cargo-manifests-${{ matrix.feature }}-${{ hashFiles('**/Cargo.toml', 'rust-toolchain.toml') }}
                   restore-keys: |
                       ${{ runner.os }}-cargo-manifests-
 
