@@ -33,6 +33,22 @@ impl<'config> MarkdownLexer<'config> {
             return false;
         }
 
+        // CommonMark lets `*` open and close inside a word, but `_` cannot:
+        // an underscore flanked by alphanumeric characters is both
+        // left-flanking and right-flanking, and an underscore opener may not
+        // be right-flanking unless it is preceded by punctuation. Treating
+        // `snake_case_name` as emphasis would rewrite source text on export, so
+        // an intraword `_` run is emitted as literal text instead of a delimiter.
+        if marker_char == '_' {
+            let before = preceding_char(state.source(), start_pos);
+            let after = state.source().get_char_at(pos);
+            if before.is_some_and(char::is_alphanumeric) && after.is_some_and(char::is_alphanumeric) {
+                state.advance(marker_count);
+                state.add_token(MarkdownTokenType::Text, start_pos, state.get_position());
+                return true;
+            }
+        }
+
         state.advance(marker_count);
 
         let token_kind = if marker_count >= 2 { MarkdownTokenType::Strong } else { MarkdownTokenType::Emphasis };
@@ -249,4 +265,21 @@ impl<'config> MarkdownLexer<'config> {
             false
         }
     }
+}
+
+/// Character immediately before `offset`, or `None` at the start of the source.
+///
+/// UTF-8 limits a character to four bytes, so trying the four possible
+/// backward widths finds the previous character without scanning the whole
+/// prefix.
+fn preceding_char<S: Source + ?Sized>(source: &S, offset: usize) -> Option<char> {
+    (1..=4).find_map(|back| {
+        let start = offset.checked_sub(back)?;
+        let text = source.get_text_in((start..offset).into());
+        let mut chars = text.chars();
+        match (chars.next(), chars.next()) {
+            (Some(ch), None) => Some(ch),
+            _ => None,
+        }
+    })
 }
