@@ -39,28 +39,59 @@ pub struct Attribute {
     pub span: Span,
 }
 
-/// A string literal node.
+/// Quote character kind of a captured literal.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub enum QuoteKind {
+    /// `'` capture.
+    Single,
+    /// `"` capture.
+    Double,
+}
+
+impl QuoteKind {
+    /// The quote character for this kind.
+    pub fn character(self) -> char {
+        match self {
+            QuoteKind::Single => '\'',
+            QuoteKind::Double => '"',
+        }
+    }
+}
+
+/// A quoted literal node: pure capture facts, no semantics.
+///
+/// The lexer captures raw text between equal-length delimiter runs; prefix,
+/// quote kind and run length are syntax metadata. Character/text attribution,
+/// escape decoding and template interpretation all belong to consumers after
+/// capture; template structure comes from an explicit
+/// [`crate::builder::ValkyrieBuilder::parse_quote_template`] request.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct StringLiteral {
-    /// DSL prefix (e.g., `s`, `f`, `r`, `sql`).
+pub struct QuoteLiteral {
+    /// Adjacent identifier prefix (e.g., `r`, `b`); no semantic preset.
     pub prefix: Option<Identifier>,
-    /// Number of quotes (1, 2, 3, 4, ...).
+    /// Quote character kind.
+    pub quote: QuoteKind,
+    /// Number of quotes in the delimiter run (1, 3, 4, ...; `""` / `''` empty captures use 2).
     pub quote_count: u8,
-    /// String segments.
-    pub segments: Vec<StringSegment>,
-    /// The source code span.
+    /// Raw captured content between the delimiter runs, undecoded.
+    pub content: String,
+    /// Span of the raw content (excludes the prefix and both delimiter runs).
+    #[cfg_attr(feature = "serde", serde(with = "oak_core::serde_range"))]
+    pub content_span: Span,
+    /// The source code span of the whole literal (including the prefix).
     #[cfg_attr(feature = "serde", serde(with = "oak_core::serde_range"))]
     pub span: Span,
 }
 
-/// A string segment.
+/// A template segment produced by [`crate::builder::ValkyrieBuilder::parse_quote_template`].
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum StringSegment {
-    /// Text content.
+    /// Raw text content: escapes are kept verbatim (`\{` / `\}` included), decoding belongs to consumers.
     Text(Box<TextSegment>),
-    /// Interpolation expression.
+    /// Interpolation carrying a real parsed expression tree with absolute source spans.
     Interpolation(Box<InterpolationSegment>),
 }
 
@@ -68,7 +99,7 @@ pub enum StringSegment {
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct TextSegment {
-    /// The text content.
+    /// The raw text content, undecoded.
     pub content: String,
     /// The source code span.
     #[cfg_attr(feature = "serde", serde(with = "oak_core::serde_range"))]
@@ -79,11 +110,11 @@ pub struct TextSegment {
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct InterpolationSegment {
-    /// The interpolation expression.
+    /// The interpolation expression, parsed by the regular expression parser.
     pub expr: TermExpression,
     /// Whether this is a locale argument (with the ߷ locale marker).
     pub is_locale: bool,
-    /// The source code span.
+    /// The source code span of the whole `{ ... }` region.
     #[cfg_attr(feature = "serde", serde(with = "oak_core::serde_range"))]
     pub span: Span,
 }

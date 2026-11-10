@@ -3,7 +3,7 @@
 use oak_pretty_print::{Document, SOFT_LINE as soft_line, doc, indent};
 
 use crate::{
-    ast::{Attribute, Block, Identifier, Let, MicroDeclaration, NamePath, NamespaceDeclaration, Param, Pattern, Return, Statement, StatementNode, StringLiteral, StringSegment, TermBinaryNode, TermExpression, TypeExpression, ValkyrieRoot},
+    ast::{Attribute, Block, Identifier, Let, MicroDeclaration, NamePath, NamespaceDeclaration, Param, Pattern, QuoteLiteral, Return, Statement, StatementNode, TermBinaryNode, TermExpression, TypeExpression, ValkyrieRoot},
     lexer::token_type::ValkyrieTokenType,
 };
 
@@ -115,18 +115,7 @@ fn term_document(expression: &TermExpression) -> Result<Document<'static>, Print
         TermExpression::IntegerLiteral { value, .. } => Ok(Document::text(value.clone())),
         TermExpression::FloatLiteral { value, .. } => Ok(Document::text(value.clone())),
         TermExpression::BooleanLiteral { value, .. } => Ok(Document::text(if *value { "true" } else { "false" })),
-        TermExpression::StringLiteral(literal) => Ok(string_literal_document(literal)),
-        TermExpression::SingleQuoteLiteral { prefix, quote_count, content, .. } => {
-            let mut text = String::new();
-            if let Some(prefix) = prefix {
-                text.push_str(&prefix.name);
-            }
-            let quotes = "'".repeat(*quote_count as usize);
-            text.push_str(&quotes);
-            text.push_str(content);
-            text.push_str(&quotes);
-            Ok(Document::text(text))
-        }
+        TermExpression::QuoteLiteral(literal) => Ok(quote_literal_document(literal)),
         TermExpression::NamePath(path) => Ok(Document::text(name_path_text(path))),
         TermExpression::ApplyCall { callee, args, .. } => apply_call_document(callee, args),
         TermExpression::Return(node) => return_document(node.as_ref()),
@@ -192,15 +181,15 @@ fn binary_document(node: &TermBinaryNode) -> Result<Document<'static>, PrintErro
     Ok(doc!(term_document(&node.lhs)?, operator, term_document(&node.rhs)?))
 }
 
-fn string_literal_document(literal: &StringLiteral) -> Document<'static> {
-    let mut text = String::from("\"");
-    for segment in &literal.segments {
-        match segment {
-            StringSegment::Text(text_segment) => text.push_str(&text_segment.content),
-            StringSegment::Interpolation(_) => text.push('…'),
-        }
+fn quote_literal_document(literal: &QuoteLiteral) -> Document<'static> {
+    let mut text = String::new();
+    if let Some(prefix) = &literal.prefix {
+        text.push_str(&prefix.name);
     }
-    text.push('"');
+    let quotes = literal.quote.character().to_string().repeat(literal.quote_count as usize);
+    text.push_str(&quotes);
+    text.push_str(&literal.content);
+    text.push_str(&quotes);
     Document::text(text)
 }
 

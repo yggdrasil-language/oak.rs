@@ -2,7 +2,7 @@
 
 use std::ops::Range;
 
-use oak_valkyrie::ast::{Attribute, Block, Let, MicroDeclaration, Pattern, StatementNode, StringLiteral, StringSegment, TermExpression, TypeExpression, ValkyrieRoot, WidgetDeclaration};
+use oak_valkyrie::ast::{Attribute, Block, Let, MicroDeclaration, Pattern, StatementNode, TermExpression, TypeExpression, ValkyrieRoot, WidgetDeclaration};
 
 use crate::frontend::{parse_vx_source, std_range};
 
@@ -275,20 +275,17 @@ fn arg_identifier(expression: &TermExpression) -> Option<String> {
 
 fn arg_string_literal(expression: &TermExpression) -> Option<String> {
     match expression {
-        TermExpression::StringLiteral(literal) => Some(string_literal_text(literal)),
+        // 捕获内容是原始文本：含 `{` 即可能存在插值，不作为常量文本消费。
+        TermExpression::QuoteLiteral(literal) => {
+            if literal.content.contains('{') {
+                None
+            }
+            else {
+                Some(literal.content.clone())
+            }
+        }
         _ => None,
     }
-}
-
-fn string_literal_text(literal: &StringLiteral) -> String {
-    literal
-        .segments
-        .iter()
-        .filter_map(|segment| match segment {
-            StringSegment::Text(text) => Some(text.content.as_str()),
-            StringSegment::Interpolation(_) => None,
-        })
-        .collect()
 }
 
 fn type_expression_span(expression: &TypeExpression) -> Range<usize> {
