@@ -430,7 +430,13 @@ impl crate::lexer::ValkyrieLexer<'_> {
                 '+' => {
                     let ch_len = ch.len_utf8();
                     state.advance(ch_len);
-                    ValkyrieTokenType::Plus
+                    if let Some('+') = state.current() {
+                        state.advance('+'.len_utf8());
+                        ValkyrieTokenType::PlusPlus
+                    }
+                    else {
+                        ValkyrieTokenType::Plus
+                    }
                 }
                 '-' => {
                     let ch_len = ch.len_utf8();

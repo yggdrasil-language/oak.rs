@@ -129,6 +129,8 @@ pub enum ValkyrieTokenType {
     Pipe,
     /// Plus operator `+`.
     Plus,
+    /// Concatenation operator `++`（文本/序列拼接，与算术 `+` 区分）。
+    PlusPlus,
     /// Question operator `?`.
     Question,
     /// Right shift operator `>>`.

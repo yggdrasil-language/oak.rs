@@ -220,6 +220,7 @@ where
 fn operator_text(operator: ValkyrieTokenType) -> Option<&'static str> {
     match operator {
         ValkyrieTokenType::Plus => Some("+"),
+        ValkyrieTokenType::PlusPlus => Some("++"),
         ValkyrieTokenType::Minus => Some("-"),
         ValkyrieTokenType::Star => Some("*"),
         ValkyrieTokenType::Slash => Some("/"),

@@ -145,7 +145,7 @@ pub(crate) fn parse_additive_expression<S: oak_core::Source + ?Sized>(state: &mu
 
 fn parse_additive_expression_with_options<S: oak_core::Source + ?Sized>(state: &mut State<'_, S>, allow_object_literal: bool) -> Result<(), oak_core::OakError> {
     parse_multiplicative_expression_with_options(state, allow_object_literal)?;
-    while state.at(ValkyrieTokenType::Plus) || state.at(ValkyrieTokenType::Minus) {
+    while state.at(ValkyrieTokenType::Plus) || state.at(ValkyrieTokenType::PlusPlus) || state.at(ValkyrieTokenType::Minus) {
         let cp = state.sink.last_node_checkpoint();
         state.bump();
         parse_multiplicative_expression_with_options(state, allow_object_literal)?;
