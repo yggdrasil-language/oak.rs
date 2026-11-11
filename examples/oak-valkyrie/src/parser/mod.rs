@@ -621,6 +621,26 @@ mod spaceship_operator_tests {
         assert_eq!(operator_of(&node.lhs), Some(ValkyrieTokenType::PlusPlus), "concat must nest first: {:?}", node.lhs);
     }
 
+    /// 数字类型后缀与数字同属一个 token：`0.1f64` / `42i64` 不被拆成数字 + 标识符。
+    #[test]
+    fn numeric_type_suffix_stays_inside_the_literal_token() {
+        let floats = leaves("micro f() { let x: f64 = 0.1f64 }\n");
+        let float_lengths: Vec<u32> = floats.iter().filter(|(kind, _)| *kind == ValkyrieTokenType::FloatLiteral).map(|(_, length)| *length).collect();
+        assert_eq!(float_lengths, [6], "`0.1f64` must be one six-byte float token, leaves: {floats:?}");
+
+        let integers = leaves("micro f() { let x: i64 = 42i64 }\n");
+        let integer_lengths: Vec<u32> = integers.iter().filter(|(kind, _)| *kind == ValkyrieTokenType::IntegerLiteral).map(|(_, length)| *length).collect();
+        assert_eq!(integer_lengths, [5], "`42i64` must be one five-byte integer token, leaves: {integers:?}");
+    }
+
+    /// 十六进制字面量内的 `f64` 字符不是后缀，整个 token 保持原样。
+    #[test]
+    fn radix_literal_letters_are_not_treated_as_suffix() {
+        let kinds = leaves("micro f() { let x: i64 = 0x1f64 }\n");
+        let hex_lengths: Vec<u32> = kinds.iter().filter(|(kind, _)| *kind == ValkyrieTokenType::IntegerLiteral).map(|(_, length)| *length).collect();
+        assert!(hex_lengths.contains(&6), "`0x1f64` must stay one six-byte integer token, leaves: {kinds:?}");
+    }
+
     /// 正例：`<=>` 与算术优先级正确 —— 算术先结合，三向比较取比较层。
     #[test]
     fn spaceship_binds_below_arithmetic() {
