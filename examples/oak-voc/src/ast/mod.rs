@@ -42,7 +42,7 @@ pub enum AwslTemplateNode {
         /// span。
         span: Range<usize>,
     },
-    /// 插值表达式 `{expr}` 或 `{{expr}}`。
+    /// 插值表达式 `{expr}`（唯一形式；花括号识别与表达式解析共享 Valkyrie 模板规则）。
     Interpolation {
         /// 表达式源码。
         expr: String,

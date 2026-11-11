@@ -129,15 +129,8 @@ impl<'a> AwslParser<'a> {
             else if self.lexer.peek_starts_with("<template") {
                 return Err(self.reject_nested_section_tag("template"));
             }
-            else if self.lexer.peek_char_eq('<') {
-                template.push(self.parse_node()?);
-            }
-            else if !self.lexer.peek_starts_with(&close) {
-                let text = self.lexer.read_text_until(&['<']);
-                if !text.is_empty() {
-                    let span = self.lexer.span_before(text.len());
-                    template.push(AwslTemplateNode::Text { content: text, span });
-                }
+            else {
+                template.extend(self.parse_node()?);
             }
         }
 
@@ -221,28 +214,81 @@ impl<'a> AwslParser<'a> {
             if self.lexer.peek_starts_with("</") {
                 break;
             }
-            nodes.push(self.parse_node()?);
+            nodes.extend(self.parse_node()?);
         }
         Ok(nodes)
     }
 
-    fn parse_node(&mut self) -> Result<AwslTemplateNode, AwslParseError> {
-        if self.lexer.peek_starts_with("{{") {
-            return self.parse_mustache_interpolation();
+    fn parse_node(&mut self) -> Result<Vec<AwslTemplateNode>, AwslParseError> {
+        if self.lexer.peek_char_eq('<') {
+            let element = self.parse_element()?;
+            return Ok(vec![AwslTemplateNode::Element(element)]);
         }
-        if self.lexer.peek_char_eq('{') && !self.lexer.peek_starts_with("{{") {
-            return self.parse_brace_interpolation();
+        let start = self.lexer.pos;
+        let text = self.lexer.read_text_until(&['<']);
+        if text.is_empty() {
+            return Err(self.error_at(start, "empty template region: expected `<` element or interpolation"));
         }
-        if !self.lexer.peek_char_eq('<') {
-            let text = self.lexer.read_text_until(&['<', '{']);
-            if text.is_empty() && self.lexer.peek_char_eq('{') {
-                return self.parse_brace_interpolation();
-            }
-            let span = self.lexer.span_before(text.len());
-            return Ok(AwslTemplateNode::Text { content: text, span });
+        self.text_template_nodes(&text, start)
+    }
+
+    /// 文本区域的模板拆分（合同 §4.10 D/F）：`{ expr }` 是插值，`\{`/`\}` 是原样
+    /// 花括号的转义候选（成对留在文本段，解码归消费方），裸 `}` 结构化报错。
+    /// 表达式边界与语法由共享的 Valkyrie 表达式解析器给出，AWSL 不自建花括号计数。
+    fn text_template_nodes(&self, content: &str, content_start: usize) -> Result<Vec<AwslTemplateNode>, AwslParseError> {
+        if !content.contains('{') && !content.contains('}') {
+            return Ok(vec![AwslTemplateNode::Text { content: content.to_string(), span: content_start..content_start + content.len() }]);
         }
-        let element = self.parse_element()?;
-        Ok(AwslTemplateNode::Element(element))
+        let segments = self.template_segments(content, content_start)?;
+        Ok(self.segments_to_template_nodes(&segments, content, content_start))
+    }
+
+    /// 请求共享模板解析器对捕获区间做有边界分段。
+    fn template_segments(&self, content: &str, content_start: usize) -> Result<Vec<oak_valkyrie::ast::StringSegment>, AwslParseError> {
+        let language = oak_valkyrie::ValkyrieLanguage::default();
+        oak_valkyrie::ValkyrieBuilder::new(&language)
+            .parse_quote_template(content, content_start)
+            .map_err(|error| self.error_at(content_start, error.to_string()))
+    }
+
+    fn segments_to_template_nodes(&self, segments: &[oak_valkyrie::ast::StringSegment], content: &str, content_start: usize) -> Vec<AwslTemplateNode> {
+        segments
+            .iter()
+            .map(|segment| match segment {
+                oak_valkyrie::ast::StringSegment::Text(text) => AwslTemplateNode::Text { content: text.content.clone(), span: text.span.start..text.span.end },
+                oak_valkyrie::ast::StringSegment::Interpolation(interpolation) => AwslTemplateNode::Interpolation {
+                    expr: interpolation_source(content, content_start, interpolation),
+                    span: interpolation.span.start..interpolation.span.end,
+                },
+            })
+            .collect()
+    }
+
+    /// 引号属性内容的模板值：与文本区域同一套规则（§4.10 F）。
+    /// `<tag="{ expr }">` 是表达式插值，不是 dict，也不是 JavaScript 模板。
+    fn attribute_template_value(&self, content: &str, content_start: usize) -> Result<AwslAttributeValue, AwslParseError> {
+        if !content.contains('{') && !content.contains('}') {
+            return Ok(AwslAttributeValue::Literal(content.to_string()));
+        }
+        let segments = self.template_segments(content, content_start)?;
+        Ok(self.segments_to_attr_value(&segments, content, content_start))
+    }
+
+    fn segments_to_attr_value(&self, segments: &[oak_valkyrie::ast::StringSegment], content: &str, content_start: usize) -> AwslAttributeValue {
+        let parts: Vec<AwslTextPart> = segments
+            .iter()
+            .map(|segment| match segment {
+                oak_valkyrie::ast::StringSegment::Text(text) => AwslTextPart::Text(text.content.clone()),
+                oak_valkyrie::ast::StringSegment::Interpolation(interpolation) => {
+                    AwslTextPart::Expr(interpolation_source(content, content_start, interpolation))
+                }
+            })
+            .collect();
+        match parts.as_slice() {
+            [AwslTextPart::Text(text)] => AwslAttributeValue::Literal(text.clone()),
+            [AwslTextPart::Expr(expr)] => AwslAttributeValue::Expression(expr.clone()),
+            _ => AwslAttributeValue::Mixed(parts),
+        }
     }
 
     fn parse_element(&mut self) -> Result<AwslElement, AwslParseError> {
@@ -311,7 +357,7 @@ impl<'a> AwslParser<'a> {
                 if self.lexer.peek_starts_with("</") {
                     return Err(self.error_at(self.lexer.pos, format!("unexpected closing tag while parsing <{tag}>")));
                 }
-                children.push(self.parse_node()?);
+                children.extend(self.parse_node()?);
             }
             self.lexer.expect_literal(&close)?;
         }
@@ -407,7 +453,9 @@ impl<'a> AwslParser<'a> {
                 }
             }
             else if self.lexer.peek_char_eq('"') || self.lexer.peek_char_eq('\'') {
-                AwslAttributeValue::Literal(self.lexer.read_quoted_string()?)
+                // 引号内容按共享模板规则处理：`{ expr }` 插值、`\{`/`\}` 原样花括号（§4.10 F）。
+                let (raw, raw_start) = self.lexer.read_quoted_string_spanned()?;
+                self.attribute_template_value(&raw, raw_start)?
             }
             else {
                 return Err(self.error(format!("attribute `{name}` requires a quoted string literal `\"...\"`")));
@@ -420,40 +468,6 @@ impl<'a> AwslParser<'a> {
             return Err(self.error_at(start, format!("attribute `{name}` requires a value in strict mode")));
         };
         Ok(AwslAttribute { name, value, span: start..self.lexer.pos })
-    }
-
-    fn literal_to_attr_value(&self, literal: &str) -> AwslAttributeValue {
-        if !literal.contains("{{") {
-            return AwslAttributeValue::Literal(literal.to_string());
-        }
-        let mut parts = Vec::new();
-        let mut rest = literal;
-        while let Some(start) = rest.find("{{") {
-            if start > 0 {
-                parts.push(AwslTextPart::Text(rest[..start].to_string()));
-            }
-            let after = &rest[start + 2..];
-            if let Some(end) = after.find("}}") {
-                parts.push(AwslTextPart::Expr(after[..end].trim().to_string()));
-                rest = &after[end + 2..];
-            }
-            else {
-                parts.push(AwslTextPart::Text(rest.to_string()));
-                return AwslAttributeValue::Mixed(parts);
-            }
-        }
-        if !rest.is_empty() {
-            parts.push(AwslTextPart::Text(rest.to_string()));
-        }
-        if parts.len() == 1 {
-            match &parts[0] {
-                AwslTextPart::Text(text) => AwslAttributeValue::Literal(text.clone()),
-                AwslTextPart::Expr(expr) => AwslAttributeValue::Expression(expr.clone()),
-            }
-        }
-        else {
-            AwslAttributeValue::Mixed(parts)
-        }
     }
 
     fn try_parse_control_flow_header(&mut self, tag: &str) -> Result<Option<Vec<AwslAttribute>>, AwslParseError> {
@@ -523,43 +537,6 @@ impl<'a> AwslParser<'a> {
         }
     }
 
-    fn parse_brace_interpolation(&mut self) -> Result<AwslTemplateNode, AwslParseError> {
-        let start = self.lexer.pos;
-        let expr = self.lexer.read_braced_expr()?;
-        Ok(AwslTemplateNode::Interpolation { expr, span: start..self.lexer.pos })
-    }
-
-    fn parse_mustache_interpolation(&mut self) -> Result<AwslTemplateNode, AwslParseError> {
-        let start = self.lexer.pos;
-        self.lexer.expect_literal("{{")?;
-        let expr = self.lexer.read_until_literal("}}")?;
-        self.lexer.expect_literal("}}")?;
-        Ok(AwslTemplateNode::Interpolation { expr: expr.trim().to_string(), span: start..self.lexer.pos })
-    }
-
-    fn parse_mixed_text(&self, raw: &str) -> Vec<AwslTextPart> {
-        let mut parts = Vec::new();
-        let mut rest = raw;
-        while let Some(start) = rest.find('{') {
-            if start > 0 {
-                parts.push(AwslTextPart::Text(rest[..start].to_string()));
-            }
-            if let Some(end) = rest[start..].find('}') {
-                let expr = rest[start + 1..start + end].trim().to_string();
-                parts.push(AwslTextPart::Expr(expr));
-                rest = &rest[start + end + 1..];
-            }
-            else {
-                parts.push(AwslTextPart::Text(rest.to_string()));
-                return parts;
-            }
-        }
-        if !rest.is_empty() {
-            parts.push(AwslTextPart::Text(rest.to_string()));
-        }
-        parts
-    }
-
     fn error(&self, message: impl Into<String>) -> AwslParseError {
         self.lexer.error(message)
     }
@@ -567,4 +544,11 @@ impl<'a> AwslParser<'a> {
     fn error_at(&self, pos: usize, message: impl Into<String>) -> AwslParseError {
         self.lexer.error_at(pos, message)
     }
+}
+
+/// `{ ... }` 区间的表达式源码（不含外层花括号）；区间由共享模板解析器冻结。
+fn interpolation_source(content: &str, content_start: usize, interpolation: &oak_valkyrie::ast::InterpolationSegment) -> String {
+    let inner_start = interpolation.span.start + 1 - content_start;
+    let inner_end = interpolation.span.end - 1 - content_start;
+    content[inner_start..inner_end].trim().to_string()
 }

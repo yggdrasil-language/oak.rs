@@ -111,30 +111,31 @@ impl<'a> Lexer<'a> {
         Err(self.error("unclosed `{` in expression"))
     }
 
-    pub fn read_quoted_string(&mut self) -> Result<String, AwslParseError> {
+    /// 捕获引号字符串到同类结束引号的原始内容；返回内容与内容首字节的绝对偏移。
+    ///
+    /// 反斜杠不保护定界符（合同 §A.2）：`\` 与后继字符作为转义候选原样留在
+    /// 捕获区间内，解码归消费方；结束引号只由引号字符本身判定。
+    pub fn read_quoted_string_spanned(&mut self) -> Result<(String, usize), AwslParseError> {
         let quote = self.peek_char().ok_or_else(|| self.error("expected quoted string"))?;
         if quote != '"' && quote != '\'' {
             return Err(self.error("expected quoted string"));
         }
-        self.pos += 1;
+        self.pos += quote.len_utf8();
         let start = self.pos;
         while self.pos < self.source.len() {
             let ch = self.peek_char().unwrap();
             if ch == quote {
                 let value = self.source[start..self.pos].to_string();
-                self.pos += 1;
-                return Ok(value);
-            }
-            if ch == '\\' {
-                self.pos += 1;
-                if self.pos < self.source.len() {
-                    self.pos += self.peek_char().unwrap().len_utf8();
-                }
-                continue;
+                self.pos += ch.len_utf8();
+                return Ok((value, start));
             }
             self.pos += ch.len_utf8();
         }
         Err(self.error("unclosed string literal"))
+    }
+
+    pub fn read_quoted_string(&mut self) -> Result<String, AwslParseError> {
+        self.read_quoted_string_spanned().map(|(value, _)| value)
     }
 
     pub fn read_quoted_or_bare(&mut self) -> String {

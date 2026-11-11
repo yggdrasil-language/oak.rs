@@ -1,4 +1,4 @@
-use oak_awsl::{AwslAttributeValue, AwslDirectiveKind, AwslElement, AwslParser, AwslTemplateNode, validate_component_contract};
+use oak_awsl::{AwslAttributeValue, AwslDirectiveKind, AwslElement, AwslParser, AwslTemplateNode, AwslTextPart, validate_component_contract};
 
 fn expect_element<'a>(node: &'a AwslTemplateNode) -> &'a AwslElement {
     match node {
@@ -249,6 +249,103 @@ fn colon_bind_uses_quoted_expression() {
     let input = expect_element(&root.template[0]);
     assert_eq!(input.attributes[0].name, "bind");
     assert!(matches!(&input.attributes[0].value, AwslAttributeValue::Expression(v) if v == "name"));
+}
+
+// ---------- 统一模板规则（合同 §4.10 D/F）：`{ expr }` 插值与 `\{ raw \}` 原样花括号 ----------
+
+#[test]
+fn attribute_interpolation_is_expression_not_dict() {
+    // `<tag="{ expr }">` 的引号内容按模板规则处理：花括号是插值定界，不是 dict。
+    let source = "<widget><Text label=\"{ greeting }\" /></widget>";
+    let root = AwslParser::parse_root(source).expect("parse attr interpolation");
+    let text = expect_element(&root.template[0]);
+    let label = text.attributes.iter().find(|a| a.name == "label").expect("label attr");
+    assert!(matches!(&label.value, AwslAttributeValue::Expression(expr) if expr == "greeting"), "got {:?}", label.value);
+}
+
+#[test]
+fn attribute_mixed_text_and_interpolation() {
+    let source = "<widget><Text title=\"Hi {name}!\" /></widget>";
+    let root = AwslParser::parse_root(source).expect("parse mixed attr");
+    let text = expect_element(&root.template[0]);
+    let title = text.attributes.iter().find(|a| a.name == "title").expect("title attr");
+    match &title.value {
+        AwslAttributeValue::Mixed(parts) => {
+            assert_eq!(parts.len(), 3, "期望 Text/Expr/Text 三段，实际 {parts:?}");
+            assert!(matches!(&parts[0], AwslTextPart::Text(t) if t == "Hi "));
+            assert!(matches!(&parts[1], AwslTextPart::Expr(e) if e == "name"));
+            assert!(matches!(&parts[2], AwslTextPart::Text(t) if t == "!"));
+        }
+        other => panic!("mixed attribute 必须产出 Mixed，实际 {other:?}"),
+    }
+}
+
+#[test]
+fn attribute_literal_braces_stay_undecoded_text() {
+    // `\{ raw \}` 是原样花括号：转义候选成对留在文本段，解码归消费方，不解析其中的表达式。
+    let source = r#"<widget><Text title="\{ raw \}" /></widget>"#;
+    let root = AwslParser::parse_root(source).expect("parse literal braces attr");
+    let text = expect_element(&root.template[0]);
+    let title = text.attributes.iter().find(|a| a.name == "title").expect("title attr");
+    assert!(matches!(&title.value, AwslAttributeValue::Literal(v) if v == r"\{ raw \}"), "got {:?}", title.value);
+}
+
+#[test]
+fn text_region_interpolation_splits_into_nodes() {
+    let source = "<widget><div>hello {count + 1}!</div></widget>";
+    let root = AwslParser::parse_root(source).expect("parse text interpolation");
+    let div = expect_element(&root.template[0]);
+    let nodes: Vec<&AwslTemplateNode> = div.children.iter().filter(|node| !matches!(node, AwslTemplateNode::Text { content, .. } if content.trim().is_empty())).collect();
+    assert_eq!(nodes.len(), 3, "期望 Text/Interpolation/Text，实际 {:?}", div.children);
+    assert!(matches!(&nodes[0], AwslTemplateNode::Text { content, .. } if content == "hello "));
+    assert!(matches!(&nodes[1], AwslTemplateNode::Interpolation { expr, .. } if expr == "count + 1"));
+    assert!(matches!(&nodes[2], AwslTemplateNode::Text { content, .. } if content == "!"));
+}
+
+#[test]
+fn text_literal_braces_do_not_start_interpolation() {
+    let source = r"<widget><div>\{ literal \}</div></widget>";
+    let root = AwslParser::parse_root(source).expect("parse literal braces text");
+    let div = expect_element(&root.template[0]);
+    assert_eq!(div.children.len(), 1, "转义候选不得拆出插值节点：{:?}", div.children);
+    assert!(matches!(&div.children[0], AwslTemplateNode::Text { content, .. } if content == r"\{ literal \}"));
+}
+
+#[test]
+fn mustache_double_braces_are_no_longer_interpolation_syntax() {
+    // `{{expr}}` 不再是独立语法：外层 `{` 开启插值后内容按普通表达式解析，
+    // 绝不再产出表达式源码为 `count` 的 mustache 插值；内层非法时结构化失败同样合规。
+    match AwslParser::parse_root("<widget><div>{{count}}</div></widget>") {
+        Ok(root) => {
+            let div = expect_element(&root.template[0]);
+            let interpolations: Vec<&str> = div
+                .children
+                .iter()
+                .filter_map(|node| match node {
+                    AwslTemplateNode::Interpolation { expr, .. } => Some(expr.as_str()),
+                    _ => None,
+                })
+                .collect();
+            assert!(interpolations.iter().all(|expr| *expr != "count"), "mustache 别名已退役，实际 {interpolations:?}");
+        }
+        Err(_) => {}
+    }
+}
+
+#[test]
+fn bare_closing_brace_in_attribute_is_structured_error() {
+    let error = AwslParser::parse_root("<widget><Text title=\"a}\" /></widget>").expect_err("裸结束花括号必须报错");
+    assert!(error.message.contains("}"), "诊断必须指向花括号：{}", error.message);
+}
+
+#[test]
+fn backslash_does_not_protect_closing_quote() {
+    // §A.2：`"a\"` 的捕获在第二个引号结束，反斜杠只是转义候选，不延迟定界符。
+    let source = r#"<widget><div title="a\" /></widget>"#;
+    let root = AwslParser::parse_root(source).expect("capture ends at next quote");
+    let div = expect_element(&root.template[0]);
+    let title = div.attributes.iter().find(|a| a.name == "title").expect("title attr");
+    assert!(matches!(&title.value, AwslAttributeValue::Literal(v) if v == "a\\"), "捕获应在引号处结束，实际 {:?}", title.value);
 }
 
 #[test]
