@@ -377,7 +377,7 @@ pub(crate) fn parse_primary_expression<S: oak_core::Source + ?Sized>(state: &mut
                 state.bump();
                 if state.at(ValkyrieTokenType::ParenthesisR) {
                     state.bump();
-                    state.sink.finish_node(cp, ValkyrieElementType::LiteralExpression);
+                    state.sink.finish_node(cp, ValkyrieElementType::UnitLiteral);
                 }
                 else {
                     parse_expression(state)?;
