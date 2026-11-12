@@ -691,6 +691,76 @@ mod spaceship_operator_tests {
         let expr = single_micro_body_expr(&formatted);
         assert_eq!(operator_of(&expr), Some(ValkyrieTokenType::LessEqGreater), "reparsed expression: {expr:?}");
     }
+
+    /// 正例：`pair.0` / `pair.1` 的成员名是整数字面量 token，语法层照常成 FieldExpression。
+    #[test]
+    fn tuple_index_member_parses_as_field_expression() {
+        for source in ["micro f() { pair.0 }\n", "micro f() { pair.1 }\n"] {
+            let kinds = leaves(source);
+            let integer_lengths: Vec<u32> = kinds.iter().filter(|(kind, _)| *kind == ValkyrieTokenType::IntegerLiteral).map(|(_, length)| *length).collect();
+            assert_eq!(integer_lengths, [1], "index member must be a one-byte integer token, leaves: {kinds:?}");
+            assert!(!kinds.iter().any(|(kind, _)| *kind == ValkyrieTokenType::FloatLiteral), "`.` after an identifier must not start a float token: {kinds:?}");
+        }
+
+        let expr = single_micro_body_expr("micro f() { pair.1 }\n");
+        let TermExpression::DotCall { receiver, field, .. } = &expr
+        else {
+            panic!("tuple index member must build a DotCall, got {expr:?}")
+        };
+        assert_eq!(field.name, "1", "member name must freeze the written position: {expr:?}");
+        assert_eq!(name_of(receiver), Some("pair"), "receiver must stay the base expression: {receiver:?}");
+    }
+
+    /// 链式：`a.0.b` 数字成员与名字成员交替，`.` 后接非数字时不被吸收进小数。
+    #[test]
+    fn tuple_index_member_chains_with_named_members() {
+        let kinds = leaves("micro f() { a.0.b }\n");
+        let integer_lengths: Vec<u32> = kinds.iter().filter(|(kind, _)| *kind == ValkyrieTokenType::IntegerLiteral).map(|(_, length)| *length).collect();
+        assert_eq!(integer_lengths, [1], "`0` must stay a one-byte integer token, leaves: {kinds:?}");
+        assert!(!kinds.iter().any(|(kind, _)| *kind == ValkyrieTokenType::FloatLiteral), "trailing `.` before `b` must not form a float: {kinds:?}");
+
+        let expr = single_micro_body_expr("micro f() { a.0.b }\n");
+        let TermExpression::DotCall { receiver, field, .. } = &expr
+        else {
+            panic!("outer member must build a DotCall, got {expr:?}")
+        };
+        assert_eq!(field.name, "b", "outer member: {expr:?}");
+        let TermExpression::DotCall { receiver: inner, field: index, .. } = receiver.as_ref()
+        else {
+            panic!("inner index member must build a DotCall, got {receiver:?}")
+        };
+        assert_eq!(index.name, "0", "inner member must freeze the position: {receiver:?}");
+        assert_eq!(name_of(inner), Some("a"), "chain base: {inner:?}");
+    }
+
+    /// 既有数值吸收规则不被破坏：`1.x` 词法为 `1` + `.` + `x`，尾点不成浮点。
+    #[test]
+    fn trailing_dot_without_digit_stays_member_path() {
+        let kinds = leaves("micro f() { 1.x }\n");
+        assert!(!kinds.iter().any(|(kind, _)| *kind == ValkyrieTokenType::FloatLiteral), "`1.` must not be absorbed into a float: {kinds:?}");
+        let integer_lengths: Vec<u32> = kinds.iter().filter(|(kind, _)| *kind == ValkyrieTokenType::IntegerLiteral).map(|(_, length)| *length).collect();
+        assert_eq!(integer_lengths, [1], "`1` must stay a one-byte integer token, leaves: {kinds:?}");
+
+        let expr = single_micro_body_expr("micro f() { 1.x }\n");
+        let TermExpression::DotCall { field, .. } = &expr
+        else {
+            panic!("`1.x` must build a member access, got {expr:?}")
+        };
+        assert_eq!(field.name, "x", "member name after the trailing dot: {expr:?}");
+    }
+
+    /// 格式化往返：CST token-gap 格式化保留 `.0`，重解析仍是数字成员 DotCall。
+    #[test]
+    fn formatter_roundtrip_preserves_tuple_index_member() {
+        let formatted = crate::formatter::format_source("micro f(){pair.0}\n", &crate::formatter::FormatOptions::default()).expect("formatting must succeed");
+        assert!(formatted.contains("pair.0"), "formatted output must keep the index member: {formatted:?}");
+        let expr = single_micro_body_expr(&formatted);
+        let TermExpression::DotCall { field, .. } = &expr
+        else {
+            panic!("reparsed expression must stay a member access, got {expr:?}")
+        };
+        assert_eq!(field.name, "0", "reparsed member name: {expr:?}");
+    }
 }
 
 #[cfg(test)]
