@@ -136,11 +136,14 @@ mod tests {
         assert_eq!(single.content, "x\\ny");
     }
 
-    /// 反斜杠不救定界符：`"\""` 在第二个引号处闭合，悬挂引号是结构化错误。
+    /// 反斜杠保护定界符：cooked 单引号串里 `"\""` / `'\''` 完整捕获，不再产生悬挂错误。
     #[test]
-    fn backslash_does_not_protect_the_delimiter() {
+    fn backslash_protects_the_delimiter() {
         let output = build("let a = \"\\\"\"");
-        assert!(!output.diagnostics.is_empty(), "dangling quote must produce a structured error");
+        assert!(output.diagnostics.is_empty(), "escaped delimiter must capture without diagnostics");
+        let literal = literal_of("let a = \"\\\"\"");
+        assert_eq!(literal.quote_count, 1);
+        assert_eq!(literal.content, "\\\"");
     }
 
     /// 前缀只是携带者：builder 不识别 `r`，不解析模板。
