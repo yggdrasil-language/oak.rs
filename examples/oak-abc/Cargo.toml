@@ -1,0 +1,26 @@
+[package]
+name = "oak-abc"
+version.workspace = true
+authors.workspace = true
+description = "ABC music notation parser for the oak ecosystem."
+edition.workspace = true
+license.workspace = true
+homepage.workspace = true
+repository = "https://github.com/yggdrasil-language/oak.rs/tree/master/examples/oak-abc"
+categories = ["parsing"]
+keywords = ["parser", "abc", "music", "notation"]
+
+[dependencies]
+oak-core = { workspace = true }
+serde = { workspace = true, optional = true }
+
+[features]
+default = ["serde"]
+serde = ["dep:serde", "oak-core/serde"]
+
+[package.metadata.docs.rs]
+all-features = true
+
+[[test]]
+name = "main"
+required-features = ["serde"]
