@@ -181,6 +181,8 @@ pub enum ValkyrieElementType {
     Pattern,
     /// 备选模式节点：`case A | B: …`，子节点为若干 `Pattern`。
     AlternativePattern,
+    /// `expr?` 后缀传播表达式。
+    TryExpression,
     /// Argument list node.
     ArgList,
     /// Generic parameter list node.

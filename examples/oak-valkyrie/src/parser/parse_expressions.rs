@@ -277,6 +277,12 @@ fn parse_postfix_expression_with_options<S: oak_core::Source + ?Sized>(state: &m
             crate::parser::parse_types::parse_type(state)?;
             state.sink.finish_node(cp, ValkyrieElementType::CastExpression);
         }
+        else if state.at(ValkyrieTokenType::Question) {
+            // 后缀 `?` 传播：只包住紧邻的操作数，不参与类型位置的 nullable 解析。
+            let cp = state.sink.last_node_checkpoint();
+            state.bump();
+            state.sink.finish_node(cp, ValkyrieElementType::TryExpression);
+        }
         else {
             break;
         }

@@ -125,6 +125,14 @@ pub enum TermExpression {
         #[cfg_attr(feature = "serde", serde(with = "oak_core::serde_range"))]
         span: Span,
     },
+    /// `expr?` 后缀传播：操作数为 `Result` / `Option` / nullable，失败分支早退。
+    TryPropagate {
+        /// 被传播的操作数表达式。
+        expr: Box<TermExpression>,
+        /// 源码区间（含 `?`）。
+        #[cfg_attr(feature = "serde", serde(with = "oak_core::serde_range"))]
+        span: Span,
+    },
     /// Term 层显式泛型应用（turbofish），如 `identity::<i32>` 或 `T::<i64>()`。
     Turbofish {
         /// 被应用泛型的表达式。
@@ -708,6 +716,7 @@ impl TermExpression {
             TermExpression::Unary(node) => node.span,
             TermExpression::Turbofish { span, .. } => *span,
             TermExpression::Cast { span, .. } => *span,
+            TermExpression::TryPropagate { span, .. } => *span,
             TermExpression::ApplyCall { span, .. } => *span,
             TermExpression::DotCall { span, .. } => *span,
             TermExpression::Index { span, .. } => *span,
