@@ -57,6 +57,21 @@ pub enum Pattern {
     Else(Box<ElsePattern>),
     /// An array pattern with optional rest binding.
     Array(Box<ArrayPattern>),
+    /// 备选模式：`case A | B: …`，任一子模式匹配即命中。
+    Alternative(Box<AlternativePattern>),
+}
+
+/// 备选模式（`A | B | C`）。
+///
+/// 仅允许出现在 match arm 顶层；子模式按源码顺序保存，语义为“或”。
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct AlternativePattern {
+    /// 备选子模式，至少两个。
+    pub patterns: Vec<Pattern>,
+    /// 整个备选模式覆盖的源码区间。
+    #[cfg_attr(feature = "serde", serde(with = "oak_core::serde_range"))]
+    pub span: Span,
 }
 
 /// A wildcard pattern that matches anything.

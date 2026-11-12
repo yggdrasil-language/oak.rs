@@ -1,7 +1,7 @@
 use crate::{
     ValkyrieLanguage,
     ast::{
-        pattern_nodes::{ArrayPattern, ClassPattern, ElsePattern, LiteralPattern, TypePattern, VariablePattern, WildcardPattern},
+        pattern_nodes::{AlternativePattern, ArrayPattern, ClassPattern, ElsePattern, LiteralPattern, TypePattern, VariablePattern, WildcardPattern},
         term_nodes::{Break, Continue, Raise, Resume, Return},
         *,
     },
@@ -122,7 +122,7 @@ impl<'config> ValkyrieBuilder<'config> {
                     | crate::parser::element_type::ValkyrieElementType::Newline
                     | crate::parser::element_type::ValkyrieElementType::LineComment
                     | crate::parser::element_type::ValkyrieElementType::BlockComment => continue,
-                    crate::parser::element_type::ValkyrieElementType::Pattern => {
+                    crate::parser::element_type::ValkyrieElementType::Pattern | crate::parser::element_type::ValkyrieElementType::AlternativePattern => {
                         pattern = Some(self.build_pattern(n, source)?);
                     }
                     _ => expressions.push(self.build_expr(n, source)?),
@@ -397,6 +397,18 @@ impl<'config> ValkyrieBuilder<'config> {
 
     pub(crate) fn build_pattern<S: Source + ?Sized>(&self, node: RedNode<ValkyrieLanguage>, source: &S) -> Result<Pattern, OakError> {
         let span = node.span();
+        // 备选模式容器：子节点是若干完整 `Pattern`，本层只收集顺序，不做分组猜测。
+        if node.green.kind == crate::parser::element_type::ValkyrieElementType::AlternativePattern {
+            let mut patterns = Vec::new();
+            for child in node.children() {
+                if let RedTree::Node(n) = child
+                    && n.green.kind == crate::parser::element_type::ValkyrieElementType::Pattern
+                {
+                    patterns.push(self.build_pattern(n, source)?);
+                }
+            }
+            return Ok(Pattern::Alternative(Box::new(AlternativePattern { patterns, span })));
+        }
         let mut name_path: Option<NamePath> = None;
         let mut fields: Option<Vec<(Identifier, Option<Pattern>)>> = None;
         let mut nested_patterns: Vec<Pattern> = Vec::new();
