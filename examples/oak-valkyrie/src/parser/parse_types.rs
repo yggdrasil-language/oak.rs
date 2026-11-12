@@ -104,6 +104,16 @@ pub(crate) fn parse_type<S: oak_core::Source + ?Sized>(state: &mut State<'_, S>)
         state.bump();
         while state.not_at_end() && !state.at(ValkyrieTokenType::ParenthesisR) {
             let before = token_index(state);
+            // 函数类型参数修饰：`micro(mut T) -> U` 的 `mut` 属于紧随其后的参数类型，
+            // 不能单独当成类型名（否则 `mut` 会成为参数类型并触发未知类型诊断）。
+            if state.at(ValkyrieTokenType::Identifier) && state.peek_text().as_deref() == Some("mut") && state.peek_non_trivia_kind_at(1) != Some(ValkyrieTokenType::Colon) {
+                state.bump();
+                parse_type(state)?;
+                if state.at(ValkyrieTokenType::Comma) {
+                    state.bump();
+                }
+                continue;
+            }
             if state.at(ValkyrieTokenType::Identifier) && state.peek_non_trivia_kind_at(1) == Some(ValkyrieTokenType::Colon) {
                 state.bump();
                 state.bump();
