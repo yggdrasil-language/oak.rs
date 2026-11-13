@@ -1052,3 +1052,107 @@ mod inclusive_range_and_member_attribute_tests {
         assert_eq!(class.body.fields[0].annotations[0].name.name, "export", "field annotations: {:?}", class.body.fields[0].annotations);
     }
 }
+
+#[cfg(test)]
+mod soft_keyword_name_tests {
+    use super::*;
+    use crate::{
+        ValkyrieBuilder, ValkyrieRoot,
+        ast::{ClassDeclaration, Statement, StatementNode, StructureDeclaration, TermExpression},
+    };
+    use oak_core::{Builder, OakDiagnostics, SourceText, parser::ParseSession};
+
+    /// 名字位置上是标识符的软关键字；硬关键字不在此列。
+    const SOFT_NAMES: [&str; 4] = ["flags", "union", "by", "when"];
+
+    fn build(source: &str) -> OakDiagnostics<ValkyrieRoot> {
+        let language = ValkyrieLanguage::default();
+        let builder = ValkyrieBuilder::new(&language);
+        let text = SourceText::new(source);
+        let mut session = ParseSession::<ValkyrieLanguage>::default();
+        builder.build(&text, &[], &mut session)
+    }
+
+    fn root(source: &str) -> ValkyrieRoot {
+        let output = build(source);
+        assert!(output.diagnostics.is_empty(), "diagnostics: {:?}", output.diagnostics);
+        output.result.unwrap_or_else(|error| panic!("source must build, got {error:?}"))
+    }
+
+    fn class_of<'root>(root: &'root ValkyrieRoot, name: &str) -> &'root ClassDeclaration {
+        root.items
+            .iter()
+            .find_map(|item| match item {
+                StatementNode::Class(class) if class.name.name == name => Some(class.as_ref()),
+                _ => None,
+            })
+            .unwrap_or_else(|| panic!("expected class {name}"))
+    }
+
+    fn structure_of<'root>(root: &'root ValkyrieRoot, name: &str) -> &'root StructureDeclaration {
+        root.items
+            .iter()
+            .find_map(|item| match item {
+                StatementNode::Structure(structure) if structure.name.name == name => Some(structure.as_ref()),
+                _ => None,
+            })
+            .unwrap_or_else(|| panic!("expected structure {name}"))
+    }
+
+    fn single_micro_body_expr(source: &str) -> TermExpression {
+        let root = root(source);
+        let micro = root
+            .items
+            .iter()
+            .find_map(|item| match item {
+                StatementNode::Micro(micro) => Some(micro),
+                _ => None,
+            })
+            .expect("expected a micro item");
+        let statement = micro.body.statements.first().expect("expected one body statement");
+        match statement {
+            Statement::Expression(expr) => expr.expr.clone(),
+            other => panic!("expected expression statement, got {other:?}"),
+        }
+    }
+
+    /// 正例：类字段名是软关键字时仍走成员产生式，名字原样进 AST。
+    #[test]
+    fn class_fields_accept_soft_keyword_names() {
+        let root = root("class SessionSlots {\n    flags: ArrayList<bool>,\n    union: i32,\n    by: i32,\n    when: i32,\n}\n");
+        let class = class_of(&root, "SessionSlots");
+        let names: Vec<&str> = class.body.fields.iter().map(|field| field.name.name.as_str()).collect();
+        assert_eq!(names, SOFT_NAMES, "fields: {:?}", class.body.fields);
+    }
+
+    /// 正例：`structure` 字段名同样接受软关键字。
+    #[test]
+    fn structure_fields_accept_soft_keyword_names() {
+        let root = root("structure SessionSlots { flags: i32, union: i32, by: i32, when: i32 }\n");
+        let structure = structure_of(&root, "SessionSlots");
+        let names: Vec<&str> = structure.body.fields.iter().map(|field| field.name.name.as_str()).collect();
+        assert_eq!(names, SOFT_NAMES, "fields: {:?}", structure.body.fields);
+    }
+
+    /// 正例：对象字面量字段名是软关键字时仍按 `name: value` 建字段。
+    #[test]
+    fn object_literal_fields_accept_soft_keyword_names() {
+        let expr = single_micro_body_expr("micro f() { Sample { flags: 1, union: 2, by: 3, when: 4 } }\n");
+        let TermExpression::Object { fields, .. } = &expr
+        else {
+            panic!("expected an object literal, got {expr:?}")
+        };
+        let names: Vec<&str> = fields.iter().map(|(name, _)| name.name.as_str()).collect();
+        assert_eq!(names, SOFT_NAMES, "fields: {fields:?}");
+        assert!(fields.iter().all(|(_, value)| value.is_some()), "fields must keep their values: {fields:?}");
+    }
+
+    /// 反例：硬关键字仍是硬关键字，不能借名字门禁进入字段名位置。
+    #[test]
+    fn hard_keywords_stay_rejected_as_field_names() {
+        for source in ["class Sample { class: i32 }\n", "structure Sample { return: i32 }\n", "micro f() { Sample { return: 1 } }\n"] {
+            let output = build(source);
+            assert!(!output.diagnostics.is_empty(), "hard keyword must not become a field name: {source:?}");
+        }
+    }
+}

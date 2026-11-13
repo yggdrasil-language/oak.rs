@@ -1,7 +1,7 @@
 use crate::{
     ValkyrieLanguage,
     lexer::token_type::ValkyrieTokenType,
-    parser::{element_type::ValkyrieElementType, parse_statements},
+    parser::{element_type::ValkyrieElementType, parse_modifiers::at_identifier_like, parse_statements},
 };
 use oak_core::parser::ParserState;
 
@@ -40,7 +40,7 @@ pub(crate) fn parse_object_initializer<S: oak_core::Source + ?Sized>(state: &mut
             break;
         }
         let stmt_cp = state.sink.checkpoint();
-        if state.at(ValkyrieTokenType::Identifier) {
+        if at_identifier_like(state) {
             let name_cp = state.sink.checkpoint();
             state.bump();
             state.sink.finish_node(name_cp, ValkyrieElementType::IdentifierExpression);
