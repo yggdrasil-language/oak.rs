@@ -48,6 +48,7 @@ impl<'config> HlslBuilder<'config> {
                     HlslElementType::VariableDeclaration => items.push(HlslItem::GlobalVar(self.build_global_var(node, source))),
                     HlslElementType::GlobalConstDeclaration => items.push(HlslItem::Const(self.build_const(node, source))),
                     HlslElementType::TypeAliasDeclaration => items.push(HlslItem::TypeAlias(self.build_type_alias(node, source))),
+                    HlslElementType::BufferBlock => items.push(HlslItem::Cbuffer(self.build_cbuffer(node, source))),
                     _ => {}
                 }
             }
@@ -147,6 +148,31 @@ impl<'config> HlslBuilder<'config> {
         }
 
         HlslTypeAlias { name: declared_name(node, source), ty }
+    }
+
+    fn build_cbuffer<'a, S: Source + ?Sized>(&self, node: RedNode<'a, HlslLanguage>, source: &S) -> HlslCbuffer {
+        let mut attributes = Vec::new();
+        let mut register = None;
+        let mut members = Vec::new();
+        let mut kind = String::new();
+
+        for child in node.children() {
+            match child {
+                RedTree::Leaf(token) => {
+                    if kind.is_empty() && matches!(token.kind, HlslTokenType::Cbuffer | HlslTokenType::Tbuffer) {
+                        kind = leaf_text(&token, source);
+                    }
+                }
+                RedTree::Node(child) => match child.element_type() {
+                    HlslElementType::Attribute => attributes.push(build_attribute(child, source)),
+                    HlslElementType::RegisterClause => register = Some(build_register(child, source)),
+                    HlslElementType::StructMemberDeclaration => members.push(build_struct_member(child, source)),
+                    _ => {}
+                },
+            }
+        }
+
+        HlslCbuffer { attributes, kind, name: declared_name(node, source), register, members }
     }
 }
 

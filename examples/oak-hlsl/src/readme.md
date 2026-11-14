@@ -54,6 +54,7 @@ fn main() {
             HlslItem::GlobalVar(global) => println!("global {}", global.name),
             HlslItem::Const(constant) => println!("const {}", constant.name),
             HlslItem::TypeAlias(alias) => println!("alias {}", alias.name),
+            HlslItem::Cbuffer(buffer) => println!("cbuffer {}", buffer.name),
         }
     }
 }

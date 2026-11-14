@@ -420,6 +420,8 @@ pub enum HlslElementType {
     TypeAliasDeclaration,
     /// Struct member node.
     StructMemberDeclaration,
+    /// `cbuffer` / `tbuffer` block node.
+    BufferBlock,
     /// Resource register node such as `register(b0)`.
     RegisterClause,
 
@@ -475,6 +477,7 @@ impl ElementType for HlslElementType {
         match self {
             Self::Root => UniversalElementRole::Root,
             Self::FunctionDeclaration | Self::StructDeclaration | Self::VariableDeclaration | Self::GlobalConstDeclaration | Self::TypeAliasDeclaration => UniversalElementRole::Definition,
+            Self::BufferBlock => UniversalElementRole::Definition,
             Self::Block => UniversalElementRole::Container,
             Self::TypeReference => UniversalElementRole::Typing,
             Self::Attribute => UniversalElementRole::Attribute,

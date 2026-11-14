@@ -22,6 +22,24 @@ pub enum HlslItem {
     Const(HlslConst),
     /// Type alias declared through `typedef` or `using`.
     TypeAlias(HlslTypeAlias),
+    /// `cbuffer` / `tbuffer` block.
+    Cbuffer(HlslCbuffer),
+}
+
+/// An HLSL `cbuffer` / `tbuffer` block.
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[derive(Clone, Debug)]
+pub struct HlslCbuffer {
+    /// Attributes attached to the block.
+    pub attributes: Vec<HlslAttribute>,
+    /// Block keyword: `cbuffer` or `tbuffer`.
+    pub kind: String,
+    /// Block name. Anonymous blocks have an empty name.
+    pub name: String,
+    /// Resource register declared through `register(b0)`.
+    pub register: Option<HlslRegister>,
+    /// Member declarations inside the block.
+    pub members: Vec<HlslStructMember>,
 }
 
 /// An HLSL attribute such as `[numthreads(64, 1, 1)]` or `[unroll]`.
