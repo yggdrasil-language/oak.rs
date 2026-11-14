@@ -768,7 +768,7 @@ mod trait_template_tests {
     use super::*;
     use crate::{
         ValkyrieBuilder, ValkyrieRoot,
-        ast::{StatementNode, TemplateNode, Trait},
+        ast::{Statement, StatementNode, TemplateNode, Trait},
     };
     use oak_core::{Builder, GreenTree, OakDiagnostics, SourceText, Token, parser::ParseSession};
 
@@ -803,6 +803,22 @@ mod trait_template_tests {
     fn single_template<'root>(trait_decl: &'root Trait) -> &'root TemplateNode {
         assert_eq!(trait_decl.body.templates.len(), 1, "trait body must keep its template node: {:?}", trait_decl.body.templates);
         &trait_decl.body.templates[0]
+    }
+
+    /// 单行 `<% ... %>` 片段只作用自身：其后的块内代码必须继续按普通 Valkyrie
+    /// 词法解析，不能把函数体剩余部分吞成 `TemplateText` 而丢掉整个声明。
+    #[test]
+    fn single_line_template_keeps_following_block_code() {
+        let output = build("micro main() -> i32 {\n<% arch %>\nreturn 1\n}");
+        assert!(output.diagnostics.is_empty(), "diagnostics: {:?}", output.diagnostics);
+        let root = output.result.unwrap_or_else(|error| panic!("statement template must build, got {error:?}"));
+        let StatementNode::Micro(micro) = &root.items[0]
+        else {
+            panic!("expected micro, got {:?}", root.items)
+        };
+        assert_eq!(micro.body.statements.len(), 2, "template fragment + following statement: {:?}", micro.body.statements);
+        assert!(matches!(micro.body.statements[0], Statement::Template(_)), "{:?}", micro.body.statements[0]);
+        assert!(matches!(micro.body.statements[1], Statement::Expression(_)), "{:?}", micro.body.statements[1]);
     }
 
     fn header_kinds(tokens: &[Token<ValkyrieTokenType>]) -> Vec<ValkyrieTokenType> {
