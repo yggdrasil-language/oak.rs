@@ -18,7 +18,7 @@ oak-hlsl = { path = "..." }
 The following is a standard workflow for parsing an HLSL shader:
 
 ```rust
-use oak_hlsl::{Parser, SourceText};
+use oak_hlsl::{ast::HlslItem, parse_hlsl};
 
 fn main() {
     // 1. Prepare shader source code
@@ -42,21 +42,18 @@ fn main() {
             return output;
         }
     "#;
-    let source = SourceText::new(code);
 
-    // 2. Initialize parser
-    let parser = Parser::new();
+    // 2. Parse the shader into the typed AST
+    let root = parse_hlsl(code).expect("the shader should parse");
 
-    // 3. Execute parsing
-    let result = parser.parse(&source);
-
-    // 4. Handle results
-    if result.is_success() {
-        println!("Parsing successful! AST node count: {}", result.node_count());
-    } else {
-        eprintln!("Errors found during parsing.");
-        for diag in result.diagnostics() {
-            println!("[{}:{}] {}", diag.line, diag.column, diag.message);
+    // 3. Inspect the module-level items
+    for item in &root.items {
+        match item {
+            HlslItem::Function(function) => println!("function {}", function.name),
+            HlslItem::Struct(structure) => println!("struct {}", structure.name),
+            HlslItem::GlobalVar(global) => println!("global {}", global.name),
+            HlslItem::Const(constant) => println!("const {}", constant.name),
+            HlslItem::TypeAlias(alias) => println!("alias {}", alias.name),
         }
     }
 }
@@ -68,10 +65,17 @@ fn main() {
 After a successful parse, you can use the built-in visitor pattern or manually traverse the Green/Red Tree to extract HLSL constructs like shader entry points, constant buffer declarations, and resource bindings.
 
 ### 2. Incremental Parsing
-Shader code often undergoes frequent small edits during development. `oak-hlsl` supports sub-millisecond incremental updates:
+Shader code often undergoes frequent small edits during development. `oak-hlsl` re-parses through the Oak green tree and reuses unchanged nodes:
 ```rust
-// Re-parse only the modified section
-let new_result = parser.reparse(&new_source, &old_result);
+use oak_core::{Builder, SourceText, parser::session::ParseSession};
+use oak_hlsl::{HlslBuilder, HlslLanguage};
+
+let language = HlslLanguage::default();
+let builder = HlslBuilder::new(&language);
+let text = SourceText::new("void main() { }");
+let mut cache = ParseSession::<HlslLanguage>::default();
+let output = builder.build(&text, &[], &mut cache);
+assert!(output.result.is_ok());
 ```
 
 ### 3. Error Recovery

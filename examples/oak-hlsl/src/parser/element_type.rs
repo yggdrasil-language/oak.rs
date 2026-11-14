@@ -1,4 +1,4 @@
-use oak_core::{ElementType, Parser, UniversalElementRole};
+use oak_core::{ElementType, UniversalElementRole};
 
 /// Element types for the HLSL (High-Level Shading Language) parser.
 ///
@@ -409,6 +409,63 @@ pub enum HlslElementType {
     Expression,
     /// Error node.
     Error,
+
+    /// Attribute node such as `[numthreads(64, 1, 1)]`.
+    Attribute,
+    /// Type reference node.
+    TypeReference,
+    /// Module-scope `const` declaration node.
+    GlobalConstDeclaration,
+    /// Type alias declaration node.
+    TypeAliasDeclaration,
+    /// Struct member node.
+    StructMemberDeclaration,
+    /// Resource register node such as `register(b0)`.
+    RegisterClause,
+
+    /// Local variable declaration statement node.
+    VarStatement,
+    /// Assignment statement node.
+    AssignmentStatement,
+    /// `if` statement node.
+    IfStatement,
+    /// `for` statement node.
+    ForStatement,
+    /// The initializer part of a `for` header.
+    ForInit,
+    /// The condition part of a `for` header.
+    ForCond,
+    /// The update part of a `for` header.
+    ForUpdate,
+    /// `while` statement node.
+    WhileStatement,
+    /// `do ... while` statement node.
+    DoWhileStatement,
+    /// `break` statement node.
+    BreakStatement,
+    /// `continue` statement node.
+    ContinueStatement,
+    /// `return` statement node.
+    ReturnStatement,
+    /// `discard` statement node.
+    DiscardStatement,
+    /// Expression statement node.
+    ExpressionStatement,
+
+    /// Plain expression node such as a literal or a name.
+    Expr,
+    /// Prefix or postfix expression node.
+    ExprUnary,
+    /// Binary expression node.
+    ExprBinary,
+    /// Call expression node.
+    ExprCall,
+    /// Member access expression node.
+    ExprMember,
+    /// Index expression node.
+    ExprIndex,
+    /// Parenthesized expression node.
+    ExprParen,
 }
 
 impl ElementType for HlslElementType {
@@ -416,6 +473,26 @@ impl ElementType for HlslElementType {
 
     fn role(&self) -> Self::Role {
         match self {
+            Self::Root => UniversalElementRole::Root,
+            Self::FunctionDeclaration | Self::StructDeclaration | Self::VariableDeclaration | Self::GlobalConstDeclaration | Self::TypeAliasDeclaration => UniversalElementRole::Definition,
+            Self::Block => UniversalElementRole::Container,
+            Self::TypeReference => UniversalElementRole::Typing,
+            Self::Attribute => UniversalElementRole::Attribute,
+            Self::ParameterList | Self::Parameter | Self::StructMemberDeclaration | Self::RegisterClause => UniversalElementRole::Detail,
+            Self::VarStatement
+            | Self::AssignmentStatement
+            | Self::IfStatement
+            | Self::ForStatement
+            | Self::WhileStatement
+            | Self::DoWhileStatement
+            | Self::BreakStatement
+            | Self::ContinueStatement
+            | Self::ReturnStatement
+            | Self::DiscardStatement
+            | Self::ExpressionStatement
+            | Self::Statement => UniversalElementRole::Statement,
+            Self::Expr | Self::ExprUnary | Self::ExprBinary | Self::ExprMember | Self::ExprIndex | Self::ExprParen | Self::Expression => UniversalElementRole::Expression,
+            Self::ExprCall => UniversalElementRole::Call,
             _ => UniversalElementRole::None,
         }
     }
@@ -423,6 +500,9 @@ impl ElementType for HlslElementType {
 
 impl From<crate::lexer::token_type::HlslTokenType> for HlslElementType {
     fn from(token: crate::lexer::token_type::HlslTokenType) -> Self {
+        // Both enums are `#[repr(u8)]` with the token variants in the same order,
+        // and node-only variants are appended after them, so the discriminants
+        // of every token variant line up.
         unsafe { std::mem::transmute(token) }
     }
 }
