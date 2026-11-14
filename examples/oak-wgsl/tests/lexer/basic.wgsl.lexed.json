@@ -27,7 +27,7 @@
             "end": 191
         },
         {
-            "kind": "Identifier",
+            "kind": "LocationKw",
             "text": "location",
             "start": 191,
             "end": 199
@@ -99,7 +99,7 @@
             "end": 229
         },
         {
-            "kind": "Identifier",
+            "kind": "LocationKw",
             "text": "location",
             "start": 229,
             "end": 237
@@ -171,7 +171,7 @@
             "end": 265
         },
         {
-            "kind": "Identifier",
+            "kind": "LocationKw",
             "text": "location",
             "start": 265,
             "end": 273
@@ -243,7 +243,7 @@
             "end": 297
         },
         {
-            "kind": "Identifier",
+            "kind": "LocationKw",
             "text": "location",
             "start": 297,
             "end": 305
@@ -339,7 +339,7 @@
             "end": 357
         },
         {
-            "kind": "Identifier",
+            "kind": "BuiltinKw",
             "text": "builtin",
             "start": 357,
             "end": 364
@@ -411,7 +411,7 @@
             "end": 406
         },
         {
-            "kind": "Identifier",
+            "kind": "LocationKw",
             "text": "location",
             "start": 406,
             "end": 414
@@ -483,7 +483,7 @@
             "end": 450
         },
         {
-            "kind": "Identifier",
+            "kind": "LocationKw",
             "text": "location",
             "start": 450,
             "end": 458
@@ -555,7 +555,7 @@
             "end": 492
         },
         {
-            "kind": "Identifier",
+            "kind": "LocationKw",
             "text": "location",
             "start": 492,
             "end": 500
@@ -627,7 +627,7 @@
             "end": 524
         },
         {
-            "kind": "Identifier",
+            "kind": "LocationKw",
             "text": "location",
             "start": 524,
             "end": 532
@@ -723,7 +723,7 @@
             "end": 586
         },
         {
-            "kind": "Identifier",
+            "kind": "LocationKw",
             "text": "location",
             "start": 586,
             "end": 594
@@ -1479,7 +1479,7 @@
             "end": 1084
         },
         {
-            "kind": "Identifier",
+            "kind": "GroupKw",
             "text": "group",
             "start": 1084,
             "end": 1089
@@ -1509,7 +1509,7 @@
             "end": 1094
         },
         {
-            "kind": "Identifier",
+            "kind": "BindingKw",
             "text": "binding",
             "start": 1094,
             "end": 1101
@@ -1545,7 +1545,7 @@
             "end": 1109
         },
         {
-            "kind": "Identifier",
+            "kind": "UniformKw",
             "text": "uniform",
             "start": 1109,
             "end": 1116
@@ -1587,7 +1587,7 @@
             "end": 1135
         },
         {
-            "kind": "Identifier",
+            "kind": "GroupKw",
             "text": "group",
             "start": 1135,
             "end": 1140
@@ -1617,7 +1617,7 @@
             "end": 1145
         },
         {
-            "kind": "Identifier",
+            "kind": "BindingKw",
             "text": "binding",
             "start": 1145,
             "end": 1152
@@ -1653,7 +1653,7 @@
             "end": 1160
         },
         {
-            "kind": "Identifier",
+            "kind": "UniformKw",
             "text": "uniform",
             "start": 1160,
             "end": 1167
@@ -1695,7 +1695,7 @@
             "end": 1192
         },
         {
-            "kind": "Identifier",
+            "kind": "GroupKw",
             "text": "group",
             "start": 1192,
             "end": 1197
@@ -1725,7 +1725,7 @@
             "end": 1202
         },
         {
-            "kind": "Identifier",
+            "kind": "BindingKw",
             "text": "binding",
             "start": 1202,
             "end": 1209
@@ -1761,7 +1761,7 @@
             "end": 1217
         },
         {
-            "kind": "Identifier",
+            "kind": "UniformKw",
             "text": "uniform",
             "start": 1217,
             "end": 1224
@@ -1803,7 +1803,7 @@
             "end": 1247
         },
         {
-            "kind": "Identifier",
+            "kind": "GroupKw",
             "text": "group",
             "start": 1247,
             "end": 1252
@@ -1833,7 +1833,7 @@
             "end": 1257
         },
         {
-            "kind": "Identifier",
+            "kind": "BindingKw",
             "text": "binding",
             "start": 1257,
             "end": 1264
@@ -1869,7 +1869,7 @@
             "end": 1272
         },
         {
-            "kind": "Identifier",
+            "kind": "UniformKw",
             "text": "uniform",
             "start": 1272,
             "end": 1279
@@ -1941,7 +1941,7 @@
             "end": 1307
         },
         {
-            "kind": "Identifier",
+            "kind": "GroupKw",
             "text": "group",
             "start": 1307,
             "end": 1312
@@ -1971,7 +1971,7 @@
             "end": 1317
         },
         {
-            "kind": "Identifier",
+            "kind": "BindingKw",
             "text": "binding",
             "start": 1317,
             "end": 1324
@@ -2007,7 +2007,7 @@
             "end": 1332
         },
         {
-            "kind": "Identifier",
+            "kind": "UniformKw",
             "text": "uniform",
             "start": 1332,
             "end": 1339
@@ -2049,7 +2049,7 @@
             "end": 1386
         },
         {
-            "kind": "Identifier",
+            "kind": "GroupKw",
             "text": "group",
             "start": 1386,
             "end": 1391
@@ -2079,7 +2079,7 @@
             "end": 1396
         },
         {
-            "kind": "Identifier",
+            "kind": "BindingKw",
             "text": "binding",
             "start": 1396,
             "end": 1403
@@ -2157,7 +2157,7 @@
             "end": 1445
         },
         {
-            "kind": "Identifier",
+            "kind": "GroupKw",
             "text": "group",
             "start": 1445,
             "end": 1450
@@ -2187,7 +2187,7 @@
             "end": 1455
         },
         {
-            "kind": "Identifier",
+            "kind": "BindingKw",
             "text": "binding",
             "start": 1455,
             "end": 1462
@@ -2265,7 +2265,7 @@
             "end": 1504
         },
         {
-            "kind": "Identifier",
+            "kind": "GroupKw",
             "text": "group",
             "start": 1504,
             "end": 1509
@@ -2295,7 +2295,7 @@
             "end": 1514
         },
         {
-            "kind": "Identifier",
+            "kind": "BindingKw",
             "text": "binding",
             "start": 1514,
             "end": 1521
@@ -2373,7 +2373,7 @@
             "end": 1575
         },
         {
-            "kind": "Identifier",
+            "kind": "GroupKw",
             "text": "group",
             "start": 1575,
             "end": 1580
@@ -2403,7 +2403,7 @@
             "end": 1585
         },
         {
-            "kind": "Identifier",
+            "kind": "BindingKw",
             "text": "binding",
             "start": 1585,
             "end": 1592
@@ -2481,7 +2481,7 @@
             "end": 1630
         },
         {
-            "kind": "Identifier",
+            "kind": "GroupKw",
             "text": "group",
             "start": 1630,
             "end": 1635
@@ -2511,7 +2511,7 @@
             "end": 1640
         },
         {
-            "kind": "Identifier",
+            "kind": "BindingKw",
             "text": "binding",
             "start": 1640,
             "end": 1647
@@ -2589,7 +2589,7 @@
             "end": 1691
         },
         {
-            "kind": "Identifier",
+            "kind": "GroupKw",
             "text": "group",
             "start": 1691,
             "end": 1696
@@ -2619,7 +2619,7 @@
             "end": 1701
         },
         {
-            "kind": "Identifier",
+            "kind": "BindingKw",
             "text": "binding",
             "start": 1701,
             "end": 1708
@@ -2679,7 +2679,7 @@
             "end": 1784
         },
         {
-            "kind": "Identifier",
+            "kind": "GroupKw",
             "text": "group",
             "start": 1784,
             "end": 1789
@@ -2709,7 +2709,7 @@
             "end": 1794
         },
         {
-            "kind": "Identifier",
+            "kind": "BindingKw",
             "text": "binding",
             "start": 1794,
             "end": 1801
@@ -2787,7 +2787,7 @@
             "end": 1846
         },
         {
-            "kind": "Identifier",
+            "kind": "GroupKw",
             "text": "group",
             "start": 1846,
             "end": 1851
@@ -2817,7 +2817,7 @@
             "end": 1856
         },
         {
-            "kind": "Identifier",
+            "kind": "BindingKw",
             "text": "binding",
             "start": 1856,
             "end": 1863
@@ -2877,7 +2877,7 @@
             "end": 1922
         },
         {
-            "kind": "Identifier",
+            "kind": "GroupKw",
             "text": "group",
             "start": 1922,
             "end": 1927
@@ -2907,7 +2907,7 @@
             "end": 1932
         },
         {
-            "kind": "Identifier",
+            "kind": "BindingKw",
             "text": "binding",
             "start": 1932,
             "end": 1939
@@ -2943,7 +2943,7 @@
             "end": 1947
         },
         {
-            "kind": "Identifier",
+            "kind": "StorageKw",
             "text": "storage",
             "start": 1947,
             "end": 1954
@@ -2955,7 +2955,7 @@
             "end": 1955
         },
         {
-            "kind": "Identifier",
+            "kind": "ReadKw",
             "text": "read",
             "start": 1956,
             "end": 1960
@@ -3015,7 +3015,7 @@
             "end": 1998
         },
         {
-            "kind": "Identifier",
+            "kind": "GroupKw",
             "text": "group",
             "start": 1998,
             "end": 2003
@@ -3045,7 +3045,7 @@
             "end": 2008
         },
         {
-            "kind": "Identifier",
+            "kind": "BindingKw",
             "text": "binding",
             "start": 2008,
             "end": 2015
@@ -3081,7 +3081,7 @@
             "end": 2023
         },
         {
-            "kind": "Identifier",
+            "kind": "StorageKw",
             "text": "storage",
             "start": 2023,
             "end": 2030
@@ -3093,7 +3093,7 @@
             "end": 2031
         },
         {
-            "kind": "Identifier",
+            "kind": "ReadWriteKw",
             "text": "read_write",
             "start": 2032,
             "end": 2042
@@ -9663,7 +9663,7 @@
             "end": 6670
         },
         {
-            "kind": "Identifier",
+            "kind": "VertexKw",
             "text": "vertex",
             "start": 6670,
             "end": 6676
@@ -10197,7 +10197,7 @@
             "end": 7320
         },
         {
-            "kind": "Identifier",
+            "kind": "FragmentKw",
             "text": "fragment",
             "start": 7320,
             "end": 7328
@@ -11823,7 +11823,7 @@
             "end": 9164
         },
         {
-            "kind": "Identifier",
+            "kind": "SizeKw",
             "text": "size",
             "start": 9169,
             "end": 9173
@@ -11859,7 +11859,7 @@
             "end": 9184
         },
         {
-            "kind": "Identifier",
+            "kind": "GroupKw",
             "text": "group",
             "start": 9184,
             "end": 9189
@@ -11889,7 +11889,7 @@
             "end": 9194
         },
         {
-            "kind": "Identifier",
+            "kind": "BindingKw",
             "text": "binding",
             "start": 9194,
             "end": 9201
@@ -11925,7 +11925,7 @@
             "end": 9209
         },
         {
-            "kind": "Identifier",
+            "kind": "StorageKw",
             "text": "storage",
             "start": 9209,
             "end": 9216
@@ -11937,7 +11937,7 @@
             "end": 9217
         },
         {
-            "kind": "Identifier",
+            "kind": "ReadWriteKw",
             "text": "read_write",
             "start": 9218,
             "end": 9228
@@ -11997,7 +11997,7 @@
             "end": 9259
         },
         {
-            "kind": "Identifier",
+            "kind": "GroupKw",
             "text": "group",
             "start": 9259,
             "end": 9264
@@ -12027,7 +12027,7 @@
             "end": 9269
         },
         {
-            "kind": "Identifier",
+            "kind": "BindingKw",
             "text": "binding",
             "start": 9269,
             "end": 9276
@@ -12063,7 +12063,7 @@
             "end": 9284
         },
         {
-            "kind": "Identifier",
+            "kind": "UniformKw",
             "text": "uniform",
             "start": 9284,
             "end": 9291
@@ -12105,7 +12105,7 @@
             "end": 9311
         },
         {
-            "kind": "Identifier",
+            "kind": "GroupKw",
             "text": "group",
             "start": 9311,
             "end": 9316
@@ -12135,7 +12135,7 @@
             "end": 9321
         },
         {
-            "kind": "Identifier",
+            "kind": "BindingKw",
             "text": "binding",
             "start": 9321,
             "end": 9328
@@ -12171,7 +12171,7 @@
             "end": 9336
         },
         {
-            "kind": "Identifier",
+            "kind": "UniformKw",
             "text": "uniform",
             "start": 9336,
             "end": 9343
@@ -12231,7 +12231,7 @@
             "end": 9367
         },
         {
-            "kind": "Identifier",
+            "kind": "ComputeKw",
             "text": "compute",
             "start": 9367,
             "end": 9374
@@ -12243,7 +12243,7 @@
             "end": 9376
         },
         {
-            "kind": "Identifier",
+            "kind": "WorkgroupSizeKw",
             "text": "workgroup_size",
             "start": 9376,
             "end": 9390
@@ -12291,7 +12291,7 @@
             "end": 9418
         },
         {
-            "kind": "Identifier",
+            "kind": "BuiltinKw",
             "text": "builtin",
             "start": 9418,
             "end": 9425
@@ -13179,7 +13179,7 @@
             "end": 10219
         },
         {
-            "kind": "Identifier",
+            "kind": "SizeKw",
             "text": "size",
             "start": 10219,
             "end": 10223
@@ -13263,7 +13263,7 @@
             "end": 10313
         },
         {
-            "kind": "Identifier",
+            "kind": "GroupKw",
             "text": "group",
             "start": 10313,
             "end": 10318
@@ -13293,7 +13293,7 @@
             "end": 10323
         },
         {
-            "kind": "Identifier",
+            "kind": "BindingKw",
             "text": "binding",
             "start": 10323,
             "end": 10330
@@ -13371,7 +13371,7 @@
             "end": 10371
         },
         {
-            "kind": "Identifier",
+            "kind": "GroupKw",
             "text": "group",
             "start": 10371,
             "end": 10376
@@ -13401,7 +13401,7 @@
             "end": 10381
         },
         {
-            "kind": "Identifier",
+            "kind": "BindingKw",
             "text": "binding",
             "start": 10381,
             "end": 10388
@@ -13467,7 +13467,7 @@
             "end": 10442
         },
         {
-            "kind": "Identifier",
+            "kind": "WriteKw",
             "text": "write",
             "start": 10443,
             "end": 10448
@@ -13491,7 +13491,7 @@
             "end": 10453
         },
         {
-            "kind": "Identifier",
+            "kind": "ComputeKw",
             "text": "compute",
             "start": 10453,
             "end": 10460
@@ -13503,7 +13503,7 @@
             "end": 10462
         },
         {
-            "kind": "Identifier",
+            "kind": "WorkgroupSizeKw",
             "text": "workgroup_size",
             "start": 10462,
             "end": 10476
@@ -13563,7 +13563,7 @@
             "end": 10503
         },
         {
-            "kind": "Identifier",
+            "kind": "BuiltinKw",
             "text": "builtin",
             "start": 10503,
             "end": 10510
@@ -14865,7 +14865,7 @@
             "end": 11695
         },
         {
-            "kind": "Identifier",
+            "kind": "VertexKw",
             "text": "vertex",
             "start": 11695,
             "end": 11701
@@ -14895,7 +14895,7 @@
             "end": 11716
         },
         {
-            "kind": "Identifier",
+            "kind": "LocationKw",
             "text": "location",
             "start": 11716,
             "end": 11724
@@ -14973,7 +14973,7 @@
             "end": 11753
         },
         {
-            "kind": "Identifier",
+            "kind": "BuiltinKw",
             "text": "builtin",
             "start": 11753,
             "end": 11760
@@ -15171,7 +15171,7 @@
             "end": 11911
         },
         {
-            "kind": "Identifier",
+            "kind": "BuiltinKw",
             "text": "builtin",
             "start": 11911,
             "end": 11918
@@ -15243,7 +15243,7 @@
             "end": 11955
         },
         {
-            "kind": "Identifier",
+            "kind": "LocationKw",
             "text": "location",
             "start": 11955,
             "end": 11963
@@ -15321,7 +15321,7 @@
             "end": 11998
         },
         {
-            "kind": "Identifier",
+            "kind": "VertexKw",
             "text": "vertex",
             "start": 11998,
             "end": 12004
@@ -15351,7 +15351,7 @@
             "end": 12019
         },
         {
-            "kind": "Identifier",
+            "kind": "LocationKw",
             "text": "location",
             "start": 12019,
             "end": 12027
@@ -15915,7 +15915,7 @@
             "end": 12531
         },
         {
-            "kind": "Identifier",
+            "kind": "FragmentKw",
             "text": "fragment",
             "start": 12531,
             "end": 12539
@@ -15975,7 +15975,7 @@
             "end": 12578
         },
         {
-            "kind": "Identifier",
+            "kind": "LocationKw",
             "text": "location",
             "start": 12578,
             "end": 12586
@@ -16221,7 +16221,7 @@
             "end": 12804
         },
         {
-            "kind": "Identifier",
+            "kind": "GroupKw",
             "text": "group",
             "start": 12804,
             "end": 12809
@@ -16251,7 +16251,7 @@
             "end": 12814
         },
         {
-            "kind": "Identifier",
+            "kind": "BindingKw",
             "text": "binding",
             "start": 12814,
             "end": 12821
@@ -16287,7 +16287,7 @@
             "end": 12829
         },
         {
-            "kind": "Identifier",
+            "kind": "StorageKw",
             "text": "storage",
             "start": 12829,
             "end": 12836
@@ -16299,7 +16299,7 @@
             "end": 12837
         },
         {
-            "kind": "Identifier",
+            "kind": "ReadKw",
             "text": "read",
             "start": 12838,
             "end": 12842
@@ -16359,7 +16359,7 @@
             "end": 12878
         },
         {
-            "kind": "Identifier",
+            "kind": "VertexKw",
             "text": "vertex",
             "start": 12878,
             "end": 12884
@@ -16389,7 +16389,7 @@
             "end": 12907
         },
         {
-            "kind": "Identifier",
+            "kind": "LocationKw",
             "text": "location",
             "start": 12907,
             "end": 12915
@@ -16461,7 +16461,7 @@
             "end": 12945
         },
         {
-            "kind": "Identifier",
+            "kind": "LocationKw",
             "text": "location",
             "start": 12945,
             "end": 12953
@@ -16533,7 +16533,7 @@
             "end": 12981
         },
         {
-            "kind": "Identifier",
+            "kind": "LocationKw",
             "text": "location",
             "start": 12981,
             "end": 12989
@@ -16605,7 +16605,7 @@
             "end": 13013
         },
         {
-            "kind": "Identifier",
+            "kind": "BuiltinKw",
             "text": "builtin",
             "start": 13013,
             "end": 13020

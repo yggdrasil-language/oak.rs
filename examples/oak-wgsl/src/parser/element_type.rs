@@ -341,6 +341,61 @@ pub enum WgslElementType {
     Param,
     /// Struct member node.
     StructMember,
+
+    /// Attribute node such as `@group(0)`.
+    Attribute,
+    /// Type reference node.
+    Type,
+    /// Module-scope constant node.
+    GlobalConst,
+    /// Module-scope directive node such as `enable f16;`.
+    Directive,
+
+    /// `var`, `let`, or `const` statement node.
+    VarStatement,
+    /// Assignment statement node.
+    AssignmentStatement,
+    /// `if` statement node.
+    IfStatement,
+    /// `for` statement node.
+    ForStatement,
+    /// The initializer part of a `for` header.
+    ForInit,
+    /// The condition part of a `for` header.
+    ForCond,
+    /// The update part of a `for` header.
+    ForUpdate,
+    /// `while` statement node.
+    WhileStatement,
+    /// `loop` statement node.
+    LoopStatement,
+    /// `break` statement node.
+    BreakStatement,
+    /// `continue` statement node.
+    ContinueStatement,
+    /// `return` statement node.
+    ReturnStatement,
+    /// `discard` statement node.
+    DiscardStatement,
+    /// Expression statement node.
+    ExpressionStatement,
+
+    /// Plain expression node such as a literal or a name.
+    Expr,
+    /// Prefix expression node.
+    ExprUnary,
+    /// Binary expression node.
+    ExprBinary,
+    /// Type constructor expression node such as `vec3<f32>`.
+    ExprTypeCtor,
+    /// Call expression node.
+    ExprCall,
+    /// Member access expression node.
+    ExprMember,
+    /// Index expression node.
+    ExprIndex,
+    /// Parenthesized expression node.
+    ExprParen,
 }
 
 impl ElementType for WgslElementType {
@@ -354,6 +409,24 @@ impl ElementType for WgslElementType {
             Self::Variable => UniversalElementRole::Definition,
             Self::Block => UniversalElementRole::Container,
             Self::TypeAlias => UniversalElementRole::Definition,
+            Self::GlobalConst => UniversalElementRole::Definition,
+            Self::Attribute => UniversalElementRole::Attribute,
+            Self::Type => UniversalElementRole::Typing,
+            Self::VarStatement
+            | Self::AssignmentStatement
+            | Self::IfStatement
+            | Self::ForStatement
+            | Self::WhileStatement
+            | Self::LoopStatement
+            | Self::BreakStatement
+            | Self::ContinueStatement
+            | Self::ReturnStatement
+            | Self::DiscardStatement
+            | Self::ExpressionStatement
+            | Self::Directive => UniversalElementRole::Statement,
+            Self::ExprParen => UniversalElementRole::Expression,
+            Self::Expr | Self::ExprUnary | Self::ExprBinary | Self::ExprTypeCtor | Self::ExprMember | Self::ExprIndex => UniversalElementRole::Expression,
+            Self::ExprCall => UniversalElementRole::Call,
             _ => UniversalElementRole::None,
         }
     }

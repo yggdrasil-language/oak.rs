@@ -335,6 +335,27 @@ impl<'config> WgslLexer<'config> {
                     "continue" => WgslTokenType::ContinueKw,
                     "discard" => WgslTokenType::DiscardKw,
                     "enable" => WgslTokenType::EnableKw,
+                    "requires" => WgslTokenType::RequiresKw,
+                    "function" => WgslTokenType::FunctionKw,
+                    "private" => WgslTokenType::PrivateKw,
+                    "workgroup" => WgslTokenType::WorkgroupKw,
+                    "uniform" => WgslTokenType::UniformKw,
+                    "storage" => WgslTokenType::StorageKw,
+                    "read" => WgslTokenType::ReadKw,
+                    "write" => WgslTokenType::WriteKw,
+                    "read_write" => WgslTokenType::ReadWriteKw,
+                    "vertex" => WgslTokenType::VertexKw,
+                    "fragment" => WgslTokenType::FragmentKw,
+                    "compute" => WgslTokenType::ComputeKw,
+                    "binding" => WgslTokenType::BindingKw,
+                    "group" => WgslTokenType::GroupKw,
+                    "location" => WgslTokenType::LocationKw,
+                    "builtin" => WgslTokenType::BuiltinKw,
+                    "interpolate" => WgslTokenType::InterpolateKw,
+                    "invariant" => WgslTokenType::InvariantKw,
+                    "size" => WgslTokenType::SizeKw,
+                    "align" => WgslTokenType::AlignKw,
+                    "workgroup_size" => WgslTokenType::WorkgroupSizeKw,
                     "true" => WgslTokenType::BoolLiteral,
                     "false" => WgslTokenType::BoolLiteral,
                     _ => WgslTokenType::Identifier,
@@ -383,6 +404,21 @@ impl<'config> WgslLexer<'config> {
     fn lex_operator<'a, S: Source + ?Sized>(&self, state: &mut State<'a, S>) -> bool {
         let start_pos = state.get_position();
 
+        // Generic closers must stay separable, so `>>` is emitted as two `Gt`
+        // tokens. The compound `>>=` stays a single assignment operator.
+        if state.peek() == Some('>') && state.peek_next_n(1) == Some('>') {
+            if state.peek_next_n(2) == Some('=') {
+                state.advance(3);
+                state.add_token(WgslTokenType::RightShiftAssign, start_pos, state.get_position());
+            }
+            else {
+                state.advance(2);
+                state.add_token(WgslTokenType::Gt, start_pos, start_pos + 1);
+                state.add_token(WgslTokenType::Gt, start_pos + 1, start_pos + 2);
+            }
+            return true;
+        }
+
         if let Some(ch) = state.peek() {
             let kind = match ch {
                 '=' => {
@@ -413,21 +449,27 @@ impl<'config> WgslLexer<'config> {
                     }
                     else if let Some('<') = state.peek() {
                         state.advance(1);
-                        WgslTokenType::LeftShift
+                        if let Some('=') = state.peek() {
+                            state.advance(1);
+                            WgslTokenType::LeftShiftAssign
+                        }
+                        else {
+                            WgslTokenType::LeftShift
+                        }
                     }
                     else {
                         WgslTokenType::Lt
                     }
                 }
+                // `>` is always lexed as a single token so that nested generic
+                // argument lists such as `array<array<f32, 4>, 4>` can be closed
+                // unambiguously. Shift operators are recognised by the parser
+                // from two consecutive `>` tokens.
                 '>' => {
                     state.advance(1);
                     if let Some('=') = state.peek() {
                         state.advance(1);
                         WgslTokenType::Ge
-                    }
-                    else if let Some('>') = state.peek() {
-                        state.advance(1);
-                        WgslTokenType::RightShift
                     }
                     else {
                         WgslTokenType::Gt
