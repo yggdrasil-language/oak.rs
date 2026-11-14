@@ -21,6 +21,20 @@ pub mod parser;
 
 pub use crate::{ast::WgslRoot, builder::WgslBuilder, language::WgslLanguage, lexer::WgslLexer, parser::WgslParser};
 
+/// Parses WGSL source into the typed AST.
+///
+/// Syntax errors are returned as `Err` with the diagnostic message. Callers
+/// that need the full diagnostics should use [`WgslBuilder`] directly.
+pub fn parse_wgsl(source: &str) -> Result<WgslRoot, String> {
+    use oak_core::{Builder, parser::session::ParseSession, source::SourceText};
+
+    let language = WgslLanguage::new();
+    let builder = WgslBuilder::new(&language);
+    let text = SourceText::new(source.to_string());
+    let mut cache = ParseSession::<WgslLanguage>::default();
+    builder.build(&text, &[], &mut cache).result.map_err(|error| error.to_string())
+}
+
 /// LSP implementation.
 #[cfg(feature = "lsp")]
 pub use crate::lsp::WgslLanguageService;
