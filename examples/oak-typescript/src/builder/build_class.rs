@@ -22,7 +22,18 @@ impl<'config> TypeScriptBuilder<'config> {
                             let child_kind = child_node.green.kind;
                             match child_kind {
                                 TypeScriptElementType::IdentifierName => {
-                                    name = source.get_text_in(child_node.span().into()).trim().to_string();
+                                    // The declared property name is the first identifier.
+                                    // A later identifier is the initializer expression
+                                    // (`rows = SEED`), so it must not overwrite the name.
+                                    if name.is_empty() {
+                                        name = source
+                                            .get_text_in(child_node.span().into())
+                                            .trim()
+                                            .to_string();
+                                    }
+                                    else if value.is_none() {
+                                        value = self.build_expression(&child_node, source)?;
+                                    }
                                 }
                                 TypeScriptElementType::TypeAnnotation => {
                                     if !self.erase_types {
