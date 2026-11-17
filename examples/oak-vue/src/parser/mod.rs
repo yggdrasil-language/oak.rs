@@ -707,6 +707,7 @@ impl<'config> Pratt<VueLanguage> for VueParser<'config> {
             Plus | Minus => (70, Associativity::Left),
             Lt | Gt | LtEq | GtEq | NotEq => (60, Associativity::Left),
             EqEq => (50, Associativity::Left),
+            EqEqEq | NotEqEq => (50, Associativity::Left),
             And => (40, Associativity::Left),
             Or => (30, Associativity::Left),
             // Ternary `cond ? then : else` — between logical OR and assignment.
