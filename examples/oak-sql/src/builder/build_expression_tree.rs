@@ -527,7 +527,7 @@ impl<'config> SqlBuilder<'config> {
         }
     }
 
-    fn build_function_call<'a>(&self, node: RedNode<'a, SqlLanguage>, source: &SourceText) -> Result<Expression, OakError> {
+    pub(crate) fn build_function_call<'a>(&self, node: RedNode<'a, SqlLanguage>, source: &SourceText) -> Result<Expression, OakError> {
         let mut name = None;
         let mut args = Vec::new();
         let mut distinct = false;
@@ -760,7 +760,7 @@ impl<'config> SqlBuilder<'config> {
         Err(OakError::custom_error("EXISTS expected a subquery"))
     }
 
-    fn build_subquery<'a>(&self, node: RedNode<'a, SqlLanguage>, source: &SourceText) -> Result<Expression, OakError> {
+    pub(crate) fn build_subquery<'a>(&self, node: RedNode<'a, SqlLanguage>, source: &SourceText) -> Result<Expression, OakError> {
         for child in node.children() {
             if let RedTree::Node(n) = child {
                 if n.green.kind == SqlElementType::SelectStatement {

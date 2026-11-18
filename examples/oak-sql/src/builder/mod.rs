@@ -492,6 +492,12 @@ impl<'config> SqlBuilder<'config> {
                 match n.green.kind {
                     SqlElementType::Expression => out.push(self.build_expression(n, source)?),
                     SqlElementType::Identifier => out.push(Expression::Identifier(self.build_identifier(n, source)?)),
+                    // The Pratt parser leaves a top-level call or scalar subquery as a
+                    // bare `FunctionCall` / `Subquery` node, not wrapped in `Expression`,
+                    // so `INSERT ... VALUES (now(), (SELECT …))` would otherwise drop
+                    // the cell and desync the column/value count.
+                    SqlElementType::FunctionCall => out.push(self.build_function_call(n, source)?),
+                    SqlElementType::Subquery => out.push(self.build_subquery(n, source)?),
                     SqlElementType::ValueList => self.collect_expressions(n, source, out)?,
                     _ => {}
                 }
