@@ -11,5 +11,6 @@
 pub mod awsl;
 pub mod contract;
 pub mod formatter;
+pub mod highlight;
 pub mod printer;
 pub mod von;
