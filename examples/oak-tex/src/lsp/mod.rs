@@ -5,7 +5,7 @@ pub mod highlighter;
 #[cfg(feature = "lsp")]
 use {
     futures::Future,
-    oak_lsp::{MemoryVfs, Vfs},
+    oak_lsp::{DocumentSession, MemoryVfs, Vfs},
     oak_lsp::{service::LanguageService, workspace::WorkspaceManager},
 };
 #[cfg(feature = "oak-pretty-print")]
