@@ -13,12 +13,7 @@ use crate::{language::AbcLanguage, lexer::token_type::AbcTokenType};
 pub struct AbcLexer;
 
 impl Lexer<AbcLanguage> for AbcLexer {
-    fn lex<'a, S: Source + ?Sized>(
-        &self,
-        text: &S,
-        _edits: &[TextEdit],
-        cache: &'a mut impl LexerCache<AbcLanguage>,
-    ) -> LexOutput<AbcLanguage> {
+    fn lex<'a, S: Source + ?Sized>(&self, text: &S, _edits: &[TextEdit], cache: &'a mut impl LexerCache<AbcLanguage>) -> LexOutput<AbcLanguage> {
         let mut state = LexerState::new_with_cache(text, text.length(), cache);
 
         while state.not_at_end() {

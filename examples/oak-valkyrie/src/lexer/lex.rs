@@ -410,8 +410,7 @@ impl crate::lexer::ValkyrieLexer<'_> {
                     _ => None,
                 };
                 if let Some(suffix) = suffix {
-                    let matches_suffix = suffix.chars().enumerate().all(|(offset, expected)| state.peek_next_n(offset).is_some_and(|ch| ch.eq_ignore_ascii_case(&expected)))
-                        && state.peek_next_n(suffix.len()).map_or(true, |ch| !is_xid_continue(ch));
+                    let matches_suffix = suffix.chars().enumerate().all(|(offset, expected)| state.peek_next_n(offset).is_some_and(|ch| ch.eq_ignore_ascii_case(&expected))) && state.peek_next_n(suffix.len()).map_or(true, |ch| !is_xid_continue(ch));
                     if matches_suffix {
                         state.advance(suffix.len());
                     }

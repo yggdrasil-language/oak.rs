@@ -2,11 +2,7 @@
 
 use core::range::Range;
 
-use oak_core::{
-    Builder, BuilderCache, GreenNode, GreenTree, OakDiagnostics, OakError, Parser, SourceText, TextEdit,
-    parser::session::ParseSession,
-    source::Source,
-};
+use oak_core::{Builder, BuilderCache, GreenNode, GreenTree, OakDiagnostics, OakError, Parser, SourceText, TextEdit, parser::session::ParseSession, source::Source};
 
 use crate::{
     ast::{MdlAtom, MdlBond, MdlBondOrder, MdlDataField, MdlProperty, MdlPropertyEntry, MdlRecord, MdlRoot, MdlVersion},
@@ -19,12 +15,7 @@ use crate::{
 pub struct MdlBuilder;
 
 impl Builder<MdlLanguage> for MdlBuilder {
-    fn build<'a, S: Source + ?Sized>(
-        &self,
-        source: &S,
-        edits: &[TextEdit],
-        _cache: &'a mut impl BuilderCache<MdlLanguage>,
-    ) -> OakDiagnostics<MdlRoot> {
+    fn build<'a, S: Source + ?Sized>(&self, source: &S, edits: &[TextEdit], _cache: &'a mut impl BuilderCache<MdlLanguage>) -> OakDiagnostics<MdlRoot> {
         let parser = MdlParser;
         let mut cache = ParseSession::<MdlLanguage>::default();
         let parse_result = parser.parse(source, edits, &mut cache);
@@ -65,12 +56,7 @@ struct Pending {
 }
 
 impl MdlBuilder {
-    fn build_root(
-        &self,
-        green_tree: &GreenNode<MdlLanguage>,
-        source: &SourceText,
-        diagnostics: &mut Vec<OakError>,
-    ) -> Result<MdlRoot, OakError> {
+    fn build_root(&self, green_tree: &GreenNode<MdlLanguage>, source: &SourceText, diagnostics: &mut Vec<OakError>) -> Result<MdlRoot, OakError> {
         if green_tree.kind != MdlElementType::SourceFile {
             return Err(OakError::internal_error("the MDL syntax tree is missing its root element"));
         }
@@ -85,14 +71,7 @@ impl MdlBuilder {
                     let start = offset;
                     let end = offset + node.byte_length as usize;
                     offset = end;
-                    self.push_element(
-                        node.kind,
-                        (start..end).into(),
-                        source,
-                        &mut pending,
-                        &mut records,
-                        diagnostics,
-                    )?;
+                    self.push_element(node.kind, (start..end).into(), source, &mut pending, &mut records, diagnostics)?;
                 }
                 GreenTree::Leaf(leaf) => {
                     offset += leaf.length as usize;
@@ -105,15 +84,7 @@ impl MdlBuilder {
     }
 
     #[allow(clippy::too_many_arguments)]
-    fn push_element(
-        &self,
-        kind: MdlElementType,
-        span: Range<usize>,
-        source: &SourceText,
-        pending: &mut Pending,
-        records: &mut Vec<MdlRecord>,
-        diagnostics: &mut Vec<OakError>,
-    ) -> Result<(), OakError> {
+    fn push_element(&self, kind: MdlElementType, span: Range<usize>, source: &SourceText, pending: &mut Pending, records: &mut Vec<MdlRecord>, diagnostics: &mut Vec<OakError>) -> Result<(), OakError> {
         if pending.start == 0 && pending.header_lines == 0 && pending.counts.is_none() && pending.atoms.is_empty() {
             pending.start = span.start;
         }
@@ -124,17 +95,11 @@ impl MdlBuilder {
                 self.flush(pending, records);
                 Ok(())
             }
-            MdlElementType::ReactionMarker => Err(OakError::syntax_error(
-                "`$RXN` and `$RDFILE` reaction files are not modelled yet, so the source is refused instead of flattened into molecules",
-                span.start,
-                source.source_id(),
-            )),
+            MdlElementType::ReactionMarker => Err(OakError::syntax_error("`$RXN` and `$RDFILE` reaction files are not modelled yet, so the source is refused instead of flattened into molecules", span.start, source.source_id())),
             MdlElementType::DataFieldName => {
                 self.flush_data(pending);
                 let line = line_text(source, span);
-                let name = field_name(&line).ok_or_else(|| {
-                    OakError::syntax_error("a data header needs a `<NAME>` label", span.start, source.source_id())
-                })?;
+                let name = field_name(&line).ok_or_else(|| OakError::syntax_error("a data header needs a `<NAME>` label", span.start, source.source_id()))?;
                 pending.active_data = Some((name, Vec::new(), span.clone()));
                 Ok(())
             }
@@ -182,11 +147,7 @@ impl MdlBuilder {
                             pending.bonds.push(parse_bond(&line, span, atom_count, source)?);
                         }
                         else {
-                            diagnostics.push(OakError::syntax_error(
-                                "a content line after the declared atoms and bonds does not start with `M`, `>`, or `$$$$`",
-                                span.start,
-                                source.source_id(),
-                            ));
+                            diagnostics.push(OakError::syntax_error("a content line after the declared atoms and bonds does not start with `M`, `>`, or `$$$$`", span.start, source.source_id()));
                         }
                     }
                 }
@@ -236,28 +197,12 @@ fn line_text(source: &SourceText, span: Range<usize>) -> String {
 /// Parse the counts line into `(atom_count, bond_count)` and refuse V3000.
 fn parse_counts(line: &str, span: Range<usize>, source: &SourceText) -> Result<(usize, usize), OakError> {
     if line.contains("V3000") {
-        return Err(OakError::syntax_error(
-            "V3000 connection tables are not modelled yet, so the source is refused instead of read as V2000",
-            span.start,
-            source.source_id(),
-        ));
+        return Err(OakError::syntax_error("V3000 connection tables are not modelled yet, so the source is refused instead of read as V2000", span.start, source.source_id()));
     }
     let atom_count = columns(line, 0, 3).trim();
     let bond_count = columns(line, 3, 6).trim();
-    let atom_count = atom_count.parse::<usize>().map_err(|_| {
-        OakError::syntax_error(
-            format!("counts line atom field `{atom_count}` is not a number"),
-            span.start,
-            source.source_id(),
-        )
-    })?;
-    let bond_count = bond_count.parse::<usize>().map_err(|_| {
-        OakError::syntax_error(
-            format!("counts line bond field `{bond_count}` is not a number"),
-            span.start,
-            source.source_id(),
-        )
-    })?;
+    let atom_count = atom_count.parse::<usize>().map_err(|_| OakError::syntax_error(format!("counts line atom field `{atom_count}` is not a number"), span.start, source.source_id()))?;
+    let bond_count = bond_count.parse::<usize>().map_err(|_| OakError::syntax_error(format!("counts line bond field `{bond_count}` is not a number"), span.start, source.source_id()))?;
     Ok((atom_count, bond_count))
 }
 
@@ -285,56 +230,25 @@ fn field_name(line: &str) -> Option<String> {
 fn parse_atom(line: &str, span: Range<usize>, source: &SourceText) -> Result<MdlAtom, OakError> {
     let element = columns(line, 31, 34).trim();
     if element.is_empty() {
-        return Err(OakError::syntax_error(
-            "an atom line is missing the element symbol in columns 32-34",
-            span.start,
-            source.source_id(),
-        ));
+        return Err(OakError::syntax_error("an atom line is missing the element symbol in columns 32-34", span.start, source.source_id()));
     }
     let coordinate = |start: usize, end: usize| -> Result<f64, OakError> {
         let raw = columns(line, start, end).trim();
-        raw.parse::<f64>().map_err(|_| {
-            OakError::syntax_error(
-                format!("atom coordinate `{raw}` is not a number"),
-                span.start,
-                source.source_id(),
-            )
-        })
+        raw.parse::<f64>().map_err(|_| OakError::syntax_error(format!("atom coordinate `{raw}` is not a number"), span.start, source.source_id()))
     };
-    let integer = |start: usize, end: usize| -> i16 {
-        columns(line, start, end).trim().parse::<i16>().unwrap_or(0)
-    };
-    Ok(MdlAtom {
-        element: element.to_string(),
-        x: coordinate(0, 10)?,
-        y: coordinate(10, 20)?,
-        z: coordinate(20, 30)?,
-        mass_difference: integer(34, 36),
-        charge: decode_charge(integer(36, 39)),
-        stereo: integer(39, 42),
-        span,
-    })
+    let integer = |start: usize, end: usize| -> i16 { columns(line, start, end).trim().parse::<i16>().unwrap_or(0) };
+    Ok(MdlAtom { element: element.to_string(), x: coordinate(0, 10)?, y: coordinate(10, 20)?, z: coordinate(20, 30)?, mass_difference: integer(34, 36), charge: decode_charge(integer(36, 39)), stereo: integer(39, 42), span })
 }
 
 fn parse_bond(line: &str, span: Range<usize>, atom_count: usize, source: &SourceText) -> Result<MdlBond, OakError> {
     let index = |start: usize, end: usize| -> Result<usize, OakError> {
         let raw = columns(line, start, end).trim();
-        raw.parse::<usize>().map_err(|_| {
-            OakError::syntax_error(
-                format!("bond endpoint `{raw}` is not an atom index"),
-                span.start,
-                source.source_id(),
-            )
-        })
+        raw.parse::<usize>().map_err(|_| OakError::syntax_error(format!("bond endpoint `{raw}` is not an atom index"), span.start, source.source_id()))
     };
     let from = index(0, 3)?;
     let to = index(3, 6)?;
     if from == 0 || to == 0 || from > atom_count || to > atom_count {
-        return Err(OakError::syntax_error(
-            format!("bond endpoint ({from}, {to}) is outside the declared {atom_count} atoms"),
-            span.start,
-            source.source_id(),
-        ));
+        return Err(OakError::syntax_error(format!("bond endpoint ({from}, {to}) is outside the declared {atom_count} atoms"), span.start, source.source_id()));
     }
     let order = match columns(line, 6, 9).trim().parse::<u8>().unwrap_or(0) {
         1 => MdlBondOrder::Single,
@@ -363,12 +277,7 @@ fn decode_charge(code: i16) -> i8 {
 fn parse_property(line: &str, span: Range<usize>) -> MdlProperty {
     let kind = columns(line, 3, 6).trim().to_string();
     let count = columns(line, 6, 9).trim().parse::<usize>().unwrap_or(0);
-    let mut numbers = line
-        .get(9..)
-        .unwrap_or_default()
-        .split_whitespace()
-        .filter_map(|value| value.parse::<i16>().ok())
-        .collect::<Vec<_>>();
+    let mut numbers = line.get(9..).unwrap_or_default().split_whitespace().filter_map(|value| value.parse::<i16>().ok()).collect::<Vec<_>>();
     let mut entries = Vec::new();
     while numbers.len() >= 2 {
         let value = numbers.remove(1);

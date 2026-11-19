@@ -15,9 +15,7 @@ pub mod lexer;
 /// Parser producing the green tree.
 pub mod parser;
 
-pub use crate::{
-    ast::MdlRoot, builder::MdlBuilder, language::MdlLanguage, lexer::MdlLexer, parser::MdlParser,
-};
+pub use crate::{ast::MdlRoot, builder::MdlBuilder, language::MdlLanguage, lexer::MdlLexer, parser::MdlParser};
 
 /// Parse an MDL molfile or SDF source into its typed AST.
 ///

@@ -2,9 +2,7 @@
 
 use oak_core::language::{Language, LanguageCategory};
 
-use crate::{
-    ast::MdlRoot, lexer::token_type::MdlTokenType, parser::element_type::MdlElementType,
-};
+use crate::{ast::MdlRoot, lexer::token_type::MdlTokenType, parser::element_type::MdlElementType};
 
 /// Language definition for MDL molfiles and SDF members.
 pub struct MdlLanguage;

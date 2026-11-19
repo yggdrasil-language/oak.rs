@@ -15,9 +15,7 @@ pub mod lexer;
 /// Parser producing the green tree.
 pub mod parser;
 
-pub use crate::{
-    ast::AbcRoot, builder::AbcBuilder, language::AbcLanguage, lexer::AbcLexer, parser::AbcParser,
-};
+pub use crate::{ast::AbcRoot, builder::AbcBuilder, language::AbcLanguage, lexer::AbcLexer, parser::AbcParser};
 
 /// Parse an ABC source into its typed AST.
 ///

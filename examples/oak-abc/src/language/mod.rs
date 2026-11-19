@@ -2,9 +2,7 @@
 
 use oak_core::language::{Language, LanguageCategory};
 
-use crate::{
-    ast::AbcRoot, lexer::token_type::AbcTokenType, parser::element_type::AbcElementType,
-};
+use crate::{ast::AbcRoot, lexer::token_type::AbcTokenType, parser::element_type::AbcElementType};
 
 /// Language definition for ABC notation.
 pub struct AbcLanguage;

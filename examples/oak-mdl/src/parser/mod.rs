@@ -22,12 +22,7 @@ pub(crate) type State<'a, S> = ParserState<'a, MdlLanguage, S>;
 pub struct MdlParser;
 
 impl Parser<MdlLanguage> for MdlParser {
-    fn parse<'a, S: Source + ?Sized>(
-        &self,
-        text: &'a S,
-        edits: &[TextEdit],
-        cache: &'a mut impl ParseCache<MdlLanguage>,
-    ) -> ParseOutput<'a, MdlLanguage> {
+    fn parse<'a, S: Source + ?Sized>(&self, text: &'a S, edits: &[TextEdit], cache: &'a mut impl ParseCache<MdlLanguage>) -> ParseOutput<'a, MdlLanguage> {
         let lexer = MdlLexer::default();
         parse_with_lexer(&lexer, text, edits, cache, |state| {
             let root = state.checkpoint();

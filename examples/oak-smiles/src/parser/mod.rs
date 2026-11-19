@@ -19,12 +19,7 @@ pub use element_type::SmilesElementType;
 pub struct SmilesParser;
 
 impl Parser<SmilesLanguage> for SmilesParser {
-    fn parse<'a, S: Source + ?Sized>(
-        &self,
-        text: &'a S,
-        edits: &[TextEdit],
-        cache: &'a mut impl ParseCache<SmilesLanguage>,
-    ) -> ParseOutput<'a, SmilesLanguage> {
+    fn parse<'a, S: Source + ?Sized>(&self, text: &'a S, edits: &[TextEdit], cache: &'a mut impl ParseCache<SmilesLanguage>) -> ParseOutput<'a, SmilesLanguage> {
         let lexer = SmilesLexer::default();
         parse_with_lexer(&lexer, text, edits, cache, |state| {
             let root = state.checkpoint();

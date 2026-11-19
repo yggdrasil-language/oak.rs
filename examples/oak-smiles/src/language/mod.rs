@@ -2,9 +2,7 @@
 
 use oak_core::language::{Language, LanguageCategory};
 
-use crate::{
-    ast::SmilesRoot, lexer::token_type::SmilesTokenType, parser::element_type::SmilesElementType,
-};
+use crate::{ast::SmilesRoot, lexer::token_type::SmilesTokenType, parser::element_type::SmilesElementType};
 
 /// Language definition for SMILES and reaction SMILES.
 pub struct SmilesLanguage;

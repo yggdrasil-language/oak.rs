@@ -63,13 +63,10 @@ fn lex_tgrammar_control<S: Source + ?Sized>(lexer: &crate::lexer::ValkyrieLexer<
         let mut sub_state = state.sub_state(content_start, content_end);
         let _ = lexer.run_template_directive_programming(&mut sub_state);
         let directive_tokens = sub_state.get_tokens();
-        boundary_keyword = directive_tokens
-            .iter()
-            .find(|token| !token.kind.is_ignored())
-            .and_then(|token| match token.kind {
-                ValkyrieTokenType::Keyword(keyword) => Some(keyword),
-                _ => None,
-            });
+        boundary_keyword = directive_tokens.iter().find(|token| !token.kind.is_ignored()).and_then(|token| match token.kind {
+            ValkyrieTokenType::Keyword(keyword) => Some(keyword),
+            _ => None,
+        });
         for token in directive_tokens {
             state.add_token(token.kind, token.span.start, token.span.end);
         }

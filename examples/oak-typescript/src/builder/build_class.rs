@@ -26,10 +26,7 @@ impl<'config> TypeScriptBuilder<'config> {
                                     // A later identifier is the initializer expression
                                     // (`rows = SEED`), so it must not overwrite the name.
                                     if name.is_empty() {
-                                        name = source
-                                            .get_text_in(child_node.span().into())
-                                            .trim()
-                                            .to_string();
+                                        name = source.get_text_in(child_node.span().into()).trim().to_string();
                                     }
                                     else if value.is_none() {
                                         value = self.build_expression(&child_node, source)?;

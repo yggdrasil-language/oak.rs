@@ -33,12 +33,7 @@ fn benzene_keeps_every_bond_order_and_span() {
     text.push_str("  6  6  0  0  0  0  0  0  0  0999 V2000\n");
     for index in 0..6 {
         let angle = std::f64::consts::TAU * index as f64 / 6.0;
-        text.push_str(&format!(
-            "{:10.4}{:10.4}{:10.4} C   0  0  0  0  0  0  0  0  0  0  0  0\n",
-            angle.cos(),
-            angle.sin(),
-            0.0
-        ));
+        text.push_str(&format!("{:10.4}{:10.4}{:10.4} C   0  0  0  0  0  0  0  0  0  0  0  0\n", angle.cos(), angle.sin(), 0.0));
     }
     for index in 0..6 {
         let from = index + 1;

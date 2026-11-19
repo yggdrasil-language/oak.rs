@@ -246,9 +246,7 @@ impl<'a> AwslParser<'a> {
     /// 请求共享模板解析器对捕获区间做有边界分段。
     fn template_segments(&self, content: &str, content_start: usize) -> Result<Vec<oak_valkyrie::ast::StringSegment>, AwslParseError> {
         let language = oak_valkyrie::ValkyrieLanguage::default();
-        oak_valkyrie::ValkyrieBuilder::new(&language)
-            .parse_quote_template(content, content_start)
-            .map_err(|error| self.error_at(content_start, error.to_string()))
+        oak_valkyrie::ValkyrieBuilder::new(&language).parse_quote_template(content, content_start).map_err(|error| self.error_at(content_start, error.to_string()))
     }
 
     fn segments_to_template_nodes(&self, segments: &[oak_valkyrie::ast::StringSegment], content: &str, content_start: usize) -> Vec<AwslTemplateNode> {
@@ -256,10 +254,7 @@ impl<'a> AwslParser<'a> {
             .iter()
             .map(|segment| match segment {
                 oak_valkyrie::ast::StringSegment::Text(text) => AwslTemplateNode::Text { content: text.content.clone(), span: text.span.start..text.span.end },
-                oak_valkyrie::ast::StringSegment::Interpolation(interpolation) => AwslTemplateNode::Interpolation {
-                    expr: interpolation_source(content, content_start, interpolation),
-                    span: interpolation.span.start..interpolation.span.end,
-                },
+                oak_valkyrie::ast::StringSegment::Interpolation(interpolation) => AwslTemplateNode::Interpolation { expr: interpolation_source(content, content_start, interpolation), span: interpolation.span.start..interpolation.span.end },
             })
             .collect()
     }
@@ -279,9 +274,7 @@ impl<'a> AwslParser<'a> {
             .iter()
             .map(|segment| match segment {
                 oak_valkyrie::ast::StringSegment::Text(text) => AwslTextPart::Text(text.content.clone()),
-                oak_valkyrie::ast::StringSegment::Interpolation(interpolation) => {
-                    AwslTextPart::Expr(interpolation_source(content, content_start, interpolation))
-                }
+                oak_valkyrie::ast::StringSegment::Interpolation(interpolation) => AwslTextPart::Expr(interpolation_source(content, content_start, interpolation)),
             })
             .collect();
         match parts.as_slice() {
